@@ -87,7 +87,7 @@ export default function LoginSignup({ isNewUser, onLoginSuccess, onBack }: Login
             NAMOQR<span className="text-indigo-400 font-medium text-lg">V1</span>
           </div>
         </div>
-        <h2 className="mt-4 text-center font-display text-2xl font-black tracking-tight text-slate-800 uppercase">
+        <h2 className="mt-4 text-center font-serif text-2xl font-black tracking-tight text-slate-800 uppercase">
           {isSignMode === 'signin' ? 'Sign in to account' : 'Create dynamic tag credentials'}
         </h2>
         <p className="mt-1.5 text-center text-xs text-slate-550 font-semibold">
@@ -108,7 +108,7 @@ export default function LoginSignup({ isNewUser, onLoginSuccess, onBack }: Login
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         <div className="clay-morph-white py-9 px-6 sm:px-10 mx-auto w-full border border-white/60">
           {errorMsg && (
-            <div id="auth-error-box" className="mb-5 p-3.5 bg-rose-50/80 border border-rose-200 text-rose-700 text-xs rounded-xl font-bold font-mono shadow-sm">
+            <div id="auth-error-box" className="mb-5 p-3.5 bg-rose-50/80 border border-rose-200 text-rose-700 text-xs rounded-xl font-bold font-helvetica shadow-sm">
               {errorMsg}
             </div>
           )}
@@ -226,7 +226,7 @@ export default function LoginSignup({ isNewUser, onLoginSuccess, onBack }: Login
                 <div className="w-full border-t border-slate-250" />
               </div>
               <div className="relative flex justify-center text-[10px]">
-                <span className="bg-[#fbfcff] px-3 text-slate-400 uppercase font-mono tracking-widest font-black">
+                <span className="bg-[#fbfcff] px-3 text-slate-400 uppercase font-helvetica tracking-widest font-black">
                   Secure SSO Option
                 </span>
               </div>

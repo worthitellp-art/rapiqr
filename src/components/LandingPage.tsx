@@ -1,11 +1,16 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React from 'react';
 import { motion } from 'motion/react';
-import { QrCode, ShieldCheck, Mail, Smartphone, ArrowRight, UserCheck, AlertTriangle, MessageSquare, Car, Sparkles, Navigation } from 'lucide-react';
+import { QrCode, ShieldCheck, ArrowRight, Car, Menu, X } from 'lucide-react';
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.15 } },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } },
+};
 
 interface LandingPageProps {
   onStart: () => void;
@@ -14,84 +19,60 @@ interface LandingPageProps {
 }
 
 export default function LandingPage({ onStart, onLogin, onSimulateScan }: LandingPageProps) {
-  // Stagger animation helpers
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.15 }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] }
-    }
-  };
+  const [menuOpen, setMenuOpen] = React.useState(false);
 
   return (
-    <div id="landing-container" className="bg-[#f0f4f8] text-slate-800 font-sans min-h-screen selection:bg-indigo-600 selection:text-white relative overflow-hidden">
-      
-      {/* Dynamic Nav-Rail */}
-      <nav className="sticky top-0 z-50 w-full border-b border-white/45 bg-white/40 backdrop-blur-xl px-6 sm:px-12 h-16 flex items-center justify-between">
-        <div className="max-w-6xl w-full mx-auto grid grid-cols-3 items-center">
-          {/* Left side: secure status indicator */}
-          <div className="flex items-center justify-start select-none">
-           
+    <div className="bg-[#f0f4f8] text-slate-800 font-sans min-h-screen selection:bg-indigo-600 selection:text-white relative overflow-hidden">
+      {/* ── Nav ─────────────────────────────────────────── */}
+      <nav className="sticky top-0 z-50 w-full border-b border-white/45 bg-white/40 backdrop-blur-xl px-4 sm:px-8">
+        <div className="max-w-6xl mx-auto flex items-center justify-between h-14 sm:h-16">
+          <div className="flex items-center gap-6">
+            <a href="#how-namoqr-works" className="hidden sm:inline-block font-sans text-sm font-bold transition-all hover:text-[#3B82F6]" style={{ color: '#1C398E' }}>About</a>
+            <a href="#interactive-demo-hub" className="hidden sm:inline-block font-sans text-sm font-bold transition-all hover:text-[#3B82F6]" style={{ color: '#1C398E' }}>Services</a>
           </div>
 
-          {/* Center: About, QR Logo, Services */}
-          <div className="flex items-center justify-center gap-8">
-            <a href="#how-namoqr-works" className="hidden sm:inline-block text-slate-605 hover:text-indigo-600 font-bold text-sm transition-all">About</a>
-            <div className="flex items-center gap-2 text-indigo-600 font-black text-2xl tracking-tighter drop-shadow-xs shrink-0 select-none">
-              <QrCode size={22} className="text-indigo-650 shrink-0" />
-              <span>NAMO<span className="font-medium text-slate-700">QR</span></span>
-            </div>
-            <a href="#interactive-demo-hub" className="hidden sm:inline-block text-slate-655 hover:text-indigo-600 font-bold text-sm transition-all">Services</a>
+          <div className="flex items-center gap-2 font-serif font-black text-xl sm:text-2xl tracking-tighter shrink-0 select-none" style={{ color: '#3B82F6' }}>
+            <QrCode size={20} className="sm:size-[22px]" />
+            <span>NAMO<span className="font-medium" style={{ color: '#1C398E' }}>QR</span></span>
           </div>
 
-          {/* Right side: getstarted btn only */}
-          <div className="flex items-center justify-end">
-            <button
-              id="nav-start-btn"
-              onClick={onStart}
-              className="px-5 py-2.5 clay-morph-indigo-btn text-sm cursor-pointer shadow-md"
-            >
+          <div className="flex items-center gap-3">
+            <button onClick={onStart} className="clay-btn clay-btn-primary px-4 sm:px-5 py-2 text-[11px] sm:text-xs">
               Get Started
+            </button>
+            <button onClick={() => setMenuOpen(!menuOpen)} className="sm:hidden p-2 rounded-xl transition-all active:scale-90" style={{ color: '#1C398E' }}>
+              {menuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
         </div>
+        {menuOpen && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="sm:hidden pb-3 flex flex-col gap-2 px-2">
+            <a href="#how-namoqr-works" onClick={() => setMenuOpen(false)} className="font-sans text-sm font-bold py-2 px-3 rounded-xl transition-all" style={{ color: '#1C398E' }}>About</a>
+            <a href="#interactive-demo-hub" onClick={() => setMenuOpen(false)} className="font-sans text-sm font-bold py-2 px-3 rounded-xl transition-all" style={{ color: '#1C398E' }}>Services</a>
+          </motion.div>
+        )}
       </nav>
 
-      {/* Hero Section — Claymorphism */}
-      <header className="relative pt-20 pb-28 md:pt-28 md:pb-32 overflow-hidden z-10">
-        {/* Puffy clay background spheres */}
-        <div className="absolute top-10 -left-20 w-72 h-72 clay-ball-purple rounded-full opacity-70 animate-float-slow pointer-events-none" />
-        <div className="absolute top-40 -right-16 w-56 h-56 clay-ball-blue rounded-full opacity-60 animate-float-reverse pointer-events-none" />
-        <div className="absolute bottom-10 left-1/4 w-40 h-40 clay-ball-pink rounded-full opacity-50 animate-float-slow pointer-events-none" />
-
-        <div className="max-w-6xl mx-auto px-6 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center text-center lg:text-left">
-            {/* Left side */}
-            <div className="lg:col-span-7 space-y-8">
+      {/* ── Hero ────────────────────────────────────────── */}
+      <header className="relative pt-12 sm:pt-20 md:pt-28 pb-20 sm:pb-28 md:pb-32 overflow-hidden z-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-12 items-center text-center lg:text-left">
+            <div className="lg:col-span-7 space-y-6 sm:space-y-8">
               <motion.h1
                 initial={{ opacity: 0, y: 25 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.1 }}
-                className="font-display text-4xl sm:text-5xl md:text-6xl font-black text-[#1C398E] leading-[1.1] tracking-tight uppercase"
-                style={{ textShadow: '4px 4px 0 rgba(59,130,246,0.15), 8px 8px 0 rgba(59,130,246,0.05)' }}
+                className="font-serif text-3xl sm:text-5xl md:text-6xl font-black leading-[1.1] tracking-tight uppercase"
+                style={{ color: '#1C398E', textShadow: '4px 4px 0 rgba(59,130,246,0.15), 8px 8px 0 rgba(59,130,246,0.05)' }}
               >
                 Secure Your Car. <br />
-                <span className="text-[#3B82F6]" style={{ fontWeight: 300, textShadow: '2px 2px 0 rgba(59,130,246,0.1)' }}>Contact Privately.</span>
+                <span className="font-light" style={{ color: '#3B82F6', textShadow: '2px 2px 0 rgba(59,130,246,0.1)' }}>Contact Privately.</span>
               </motion.h1>
               <motion.p
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.2 }}
-                className="font-sans text-base sm:text-lg leading-relaxed max-w-xl mx-auto lg:mx-0 font-medium"
+                className="font-sans text-sm sm:text-base md:text-lg leading-relaxed max-w-xl mx-auto lg:mx-0 font-medium"
                 style={{ color: '#1C398E' }}
               >
                 Windshield QR tags let bystanders alert you about parking or emergencies instantly. No phone numbers shared, total privacy.
@@ -100,143 +81,98 @@ export default function LandingPage({ onStart, onLogin, onSimulateScan }: Landin
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.3 }}
-                className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2"
+                className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 sm:gap-4 pt-2"
               >
-                <button
-                  id="hero-dashboard-btn"
+                <motion.button
+                  whileTap={{ scale: 0.93 }}
+                  whileHover={{ scale: 1.02 }}
                   onClick={onStart}
-                  className="w-full sm:w-auto px-8 py-4 font-sans text-sm font-bold flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider"
-                  style={{
-                    background: '#3B82F6',
-                    color: '#fff',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: '16px',
-                    boxShadow: 'inset 3px 3px 8px rgba(255,255,255,0.35), inset -3px -3px 8px rgba(0,0,0,0.15), 0 8px 20px rgba(59,130,246,0.3)',
-                  }}
+                  className="clay-btn clay-btn-primary w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 text-xs sm:text-sm flex items-center justify-center gap-2"
                 >
-                  Get Started Free <ArrowRight size={16} />
-                </button>
-                <a
+                  Get Started Free <ArrowRight size={14} className="sm:size-4" />
+                </motion.button>
+                <motion.a
+                  whileTap={{ scale: 0.93 }}
+                  whileHover={{ scale: 1.02 }}
                   href="#interactive-demo-hub"
-                  className="w-full sm:w-auto px-8 py-4 font-sans text-sm font-bold flex items-center justify-center uppercase tracking-wider"
-                  style={{
-                    background: 'rgba(255,255,255,0.75)',
-                    color: '#1C398E',
-                    border: '1px solid rgba(255,255,255,0.9)',
-                    borderRadius: '16px',
-                    boxShadow: 'inset 3px 3px 8px rgba(255,255,255,0.95), inset -3px -3px 8px rgba(59,130,246,0.08), 0 4px 12px rgba(59,130,246,0.08)',
-                    backdropFilter: 'blur(8px)',
-                  }}
+                  className="clay-btn clay-btn-white w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 text-xs sm:text-sm flex items-center justify-center"
                 >
                   Try Scanned Demo
-                </a>
+                </motion.a>
               </motion.div>
             </div>
 
-            {/* Right side: 3D Clay QR Card */}
-            <div className="lg:col-span-5 flex justify-center pt-8 lg:pt-0">
-              <motion.div 
-                className="relative w-full max-w-xs md:max-w-sm"
+            <div className="lg:col-span-5 flex justify-center pt-6 sm:pt-8 lg:pt-0">
+              <motion.div
+                className="relative w-full max-w-[240px] xs:max-w-xs sm:max-w-sm"
                 animate={{ y: [0, -8, 0] }}
                 transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
               >
-                {/* Puffy clay QR card */}
                 <div
-                  className="p-6 flex flex-col items-center relative overflow-hidden"
+                  className="p-4 sm:p-6 flex flex-col items-center relative overflow-hidden"
                   style={{
                     background: 'rgba(255,255,255,0.7)',
                     backdropFilter: 'blur(12px)',
                     border: '1px solid rgba(255,255,255,0.9)',
-                    borderRadius: '24px',
+                    borderRadius: '20px',
                     boxShadow: 'inset 6px 6px 12px rgba(255,255,255,0.95), inset -6px -6px 12px rgba(59,130,246,0.08), 0 20px 40px -8px rgba(59,130,246,0.12)',
                   }}
                 >
-                  <div
-                    className="absolute top-3 left-3 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-wider"
-                    style={{
-                      background: '#3B82F6',
-                      color: '#fff',
-                      borderRadius: '20px',
-                      boxShadow: 'inset 2px 2px 4px rgba(255,255,255,0.3), inset -2px -2px 4px rgba(0,0,0,0.1)',
-                    }}
-                  >
+                  <div className="absolute top-2 sm:top-3 left-2 sm:left-3 px-2 sm:px-3 py-0.5 sm:py-1 font-helvetica text-[8px] sm:text-[10px] font-bold uppercase tracking-wider" style={{
+                    background: '#3B82F6', color: '#fff', borderRadius: '16px',
+                    boxShadow: 'inset 2px 2px 4px rgba(255,255,255,0.3), inset -2px -2px 4px rgba(0,0,0,0.1)',
+                  }}>
                     Windshield Tag
                   </div>
-
-                  {/* Clay QR frame */}
-                  <div
-                    className="w-28 h-28 mt-6 p-2 flex items-center justify-center relative overflow-hidden"
-                    style={{
-                      background: '#fff',
-                      borderRadius: '20px',
-                      boxShadow: 'inset 4px 4px 8px rgba(0,0,0,0.04), inset -4px -4px 8px rgba(255,255,255,0.8), 0 4px 12px rgba(59,130,246,0.06)',
-                    }}
-                  >
-                    <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(window.location.origin + window.location.pathname + '#/scan/QR-8A3F')}`} 
-                      alt="Windshield QR Tag" 
+                  <div className="w-20 h-20 sm:w-28 sm:h-28 mt-5 sm:mt-6 p-1.5 sm:p-2 flex items-center justify-center relative overflow-hidden" style={{
+                    background: '#fff', borderRadius: '16px',
+                    boxShadow: 'inset 4px 4px 8px rgba(0,0,0,0.04), inset -4px -4px 8px rgba(255,255,255,0.8), 0 4px 12px rgba(59,130,246,0.06)',
+                  }}>
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(window.location.origin + window.location.pathname + '#/scan/QR-8A3F')}`}
+                      alt="Windshield QR Tag"
                       className="w-full h-full object-contain"
                     />
-                    <motion.div 
+                    <motion.div
                       className="absolute inset-x-0 h-[2px]"
                       style={{ background: '#3B82F6', boxShadow: '0 0 8px rgba(59,130,246,0.6)' }}
                       animate={{ top: ['4%', '96%', '4%'] }}
                       transition={{ repeat: Infinity, duration: 2.5, ease: "linear" }}
                     />
                   </div>
-                  <div className="mt-4 text-center">
-                    <span
-                      className="font-display font-black text-xs uppercase tracking-tight block"
-                      style={{ color: '#1C398E' }}
-                    >
-                      Tesla Model 3
-                    </span>
-                    <span className="font-mono text-[10px] font-bold block mt-0.5" style={{ color: '#1C398E', opacity: 0.6 }}>
-                      Plate: P-ELECTRIC
-                    </span>
+                  <div className="mt-3 sm:mt-4 text-center">
+                    <span className="font-serif font-black text-[10px] sm:text-xs uppercase tracking-tight block" style={{ color: '#1C398E' }}>Tesla Model 3</span>
+                    <span className="font-helvetica text-[8px] sm:text-[10px] font-bold block mt-0.5" style={{ color: '#1C398E', opacity: 0.6 }}>Plate: P-ELECTRIC</span>
                   </div>
                 </div>
 
-                {/* Floating clay notification pill */}
                 <motion.div
                   initial={{ y: 30, opacity: 0 }}
                   animate={{ y: [0, -12, 0], opacity: 1 }}
-                  transition={{ 
-                    y: { repeat: Infinity, duration: 5, ease: "easeInOut" },
-                    opacity: { delay: 0.5, duration: 0.8 }
-                  }}
-                  className="absolute -bottom-8 -right-4 md:-right-8 w-44 p-4 flex flex-col items-center text-center"
+                  transition={{ y: { repeat: Infinity, duration: 5, ease: "easeInOut" }, opacity: { delay: 0.5, duration: 0.8 } }}
+                  className="absolute -bottom-6 sm:-bottom-8 -right-2 sm:-right-4 w-36 sm:w-44 p-3 sm:p-4 flex flex-col items-center text-center"
                   style={{
                     background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
-                    borderRadius: '20px',
+                    borderRadius: '16px',
                     border: '1px solid rgba(255,255,255,0.15)',
                     boxShadow: 'inset 4px 4px 10px rgba(255,255,255,0.2), inset -4px -4px 10px rgba(0,0,0,0.15), 0 12px 28px -4px rgba(79,70,229,0.3)',
                     color: '#fff',
                   }}
                 >
-                  <div
-                    className="w-9 h-9 flex items-center justify-center mb-2"
-                    style={{
-                      background: 'rgba(16,185,129,0.15)',
-                      borderRadius: '50%',
-                      border: '1px solid rgba(16,185,129,0.3)',
-                      boxShadow: 'inset 2px 2px 4px rgba(255,255,255,0.15), inset -2px -2px 4px rgba(0,0,0,0.1)',
-                    }}
-                  >
-                    <QrCode size={16} className="animate-pulse" style={{ color: '#34d399' }} />
+                  <div className="w-7 h-7 sm:w-9 sm:h-9 flex items-center justify-center mb-1.5 sm:mb-2" style={{
+                    background: 'rgba(16,185,129,0.15)', borderRadius: '50%',
+                    border: '1px solid rgba(16,185,129,0.3)',
+                    boxShadow: 'inset 2px 2px 4px rgba(255,255,255,0.15), inset -2px -2px 4px rgba(0,0,0,0.1)',
+                  }}>
+                    <QrCode size={12} className="sm:size-4 animate-pulse" style={{ color: '#34d399' }} />
                   </div>
-                  <span className="font-mono text-[10px] tracking-widest font-bold uppercase" style={{ color: '#a5b4fc' }}>Scan Detected</span>
-                  <h5 className="text-[11px] font-bold text-white mt-1 leading-tight">Instant Notification</h5>
-                  <p className="text-[10px] mt-1 max-w-[120px]" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                    Passerby can now contact the driver securely.
-                  </p>
-                  <button 
+                  <span className="font-helvetica text-[8px] sm:text-[10px] tracking-widest font-bold uppercase" style={{ color: '#a5b4fc' }}>Scan Detected</span>
+                  <h5 className="text-[10px] sm:text-[11px] font-bold text-white mt-0.5 sm:mt-1 leading-tight">Instant Notification</h5>
+                  <button
                     onClick={() => onSimulateScan('QR-8A3F')}
-                    className="mt-3 w-full py-1.5 font-bold text-[10px] uppercase tracking-wider cursor-pointer transition-all"
+                    className="mt-2 sm:mt-3 w-full py-1 sm:py-1.5 font-bold text-[8px] sm:text-[10px] uppercase tracking-wider cursor-pointer transition-all active:scale-95"
                     style={{
-                      background: '#fff',
-                      color: '#4f46e5',
-                      borderRadius: '12px',
+                      background: '#fff', color: '#4f46e5', borderRadius: '10px',
                       border: '1px solid rgba(255,255,255,0.8)',
                       boxShadow: 'inset 2px 2px 4px rgba(255,255,255,0.8), inset -2px -2px 4px rgba(0,0,0,0.05)',
                     }}
@@ -250,252 +186,209 @@ export default function LandingPage({ onStart, onLogin, onSimulateScan }: Landin
         </div>
       </header>
 
-      {/* Interactive Bystander Scanner Sandbox cockpit */}
-      <section id="interactive-demo-hub" className="py-16 relative z-10">
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="clay-morph-white p-8 sm:p-10 shadow-xl">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+      {/* ── Demo Section ────────────────────────────────── */}
+      <section id="interactive-demo-hub" className="py-12 sm:py-16 relative z-10">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6">
+          <div className="p-5 sm:p-8 md:p-10" style={{
+            background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255,255,255,0.9)', borderRadius: '20px',
+            boxShadow: 'inset 6px 6px 12px rgba(255,255,255,0.95), inset -6px -6px 12px rgba(59,130,246,0.06), 0 20px 40px -8px rgba(59,130,246,0.1)',
+          }}>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 sm:gap-8">
               <div className="max-w-md">
-                <span className="text-xs bg-indigo-600 text-white font-mono px-3 py-1 rounded-full font-black tracking-widest uppercase inline-block mb-3 shadow-xs">
-                  Interactive Demo Area
+                <span className="inline-block text-[10px] sm:text-xs font-helvetica px-3 py-1 font-bold uppercase tracking-widest mb-2 sm:mb-3" style={{
+                  background: '#3B82F6', color: '#fff', borderRadius: '20px',
+                  boxShadow: 'inset 2px 2px 4px rgba(255,255,255,0.3), inset -2px -2px 4px rgba(0,0,0,0.1)',
+                }}>
+                  Interactive Demo
                 </span>
-                <h3 className="font-display text-2xl font-black text-slate-900 uppercase tracking-tight">
-                  Simulate QR Scanner
-                </h3>
-                <p className="text-xs text-slate-650 mt-1.5 leading-relaxed font-medium">
-                  Experience how it works for a passerby immediately without needing a smartphone scanner! Select a preset registered tag to view its action form, or write customizable mock scenarios.
+                <h3 className="font-serif text-xl sm:text-2xl font-black uppercase tracking-tight" style={{ color: '#1C398E' }}>Simulate QR Scanner</h3>
+                <p className="font-sans text-[11px] sm:text-xs mt-1.5 leading-relaxed font-medium" style={{ color: '#1C398E', opacity: 0.6 }}>
+                  Select a preset tag to experience the scan flow.
                 </p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0">
-                <button
-                  onClick={() => onSimulateScan('QR-8A3F')}
-                  className="p-4 clay-morph-white border border-indigo-105 hover:border-indigo-300 text-center group transition-all text-slate-800 cursor-pointer flex flex-col items-center justify-center"
-                >
-                  <Car size={20} className="text-indigo-650 mb-1.5 group-hover:scale-110 transition-transform" />
-                  <span className="font-mono text-xs font-bold block text-slate-400">Tesla Model 3</span>
-                  <span className="font-display text-xs font-black block text-indigo-700 group-hover:underline uppercase mt-0.5">Scan QR-8A3F</span>
-                </button>
-                <button
-                  onClick={() => onSimulateScan('QR-9K2L')}
-                  className="p-4 clay-morph-white border border-indigo-105 hover:border-indigo-300 text-center group transition-all text-slate-800 cursor-pointer flex flex-col items-center justify-center"
-                >
-                  <Car size={20} className="text-slate-850 mb-1.5 group-hover:scale-110 transition-transform" />
-                  <span className="font-mono text-xs font-bold block text-slate-400">BMW M4 Coupe</span>
-                  <span className="font-display text-xs font-black block text-slate-900 group-hover:underline uppercase mt-0.5">Scan QR-9K2L</span>
-                </button>
-                <button
-                  onClick={() => onSimulateScan('QR-5T7S')}
-                  className="p-4 clay-morph-white border border-indigo-105 hover:border-indigo-300 text-center group transition-all text-slate-800 cursor-pointer flex flex-col items-center justify-center"
-                >
-                  <Car size={20} className="text-blue-650 mb-1.5 group-hover:scale-110 transition-transform" />
-                  <span className="font-mono text-xs font-bold block text-slate-400">Toyota RAV4</span>
-                  <span className="font-display text-xs font-black block text-blue-700 group-hover:underline uppercase mt-0.5">Scan QR-5T7S</span>
-                </button>
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 shrink-0 w-full md:w-auto">
+                {[
+                  { id: 'QR-8A3F', label: 'Tesla Model 3', color: '#3B82F6' },
+                  { id: 'QR-9K2L', label: 'BMW M4 Coupe', color: '#1C398E' },
+                  { id: 'QR-5T7S', label: 'Toyota RAV4', color: '#16A34A' },
+                ].map((car) => (
+                  <button
+                    key={car.id}
+                    onClick={() => onSimulateScan(car.id)}
+                    className="flex flex-col items-center justify-center p-2.5 sm:p-4 text-center transition-all active:scale-95 cursor-pointer"
+                    style={{
+                      background: 'rgba(255,255,255,0.5)', borderRadius: '14px',
+                      border: '1px solid rgba(255,255,255,0.7)',
+                      boxShadow: 'inset 3px 3px 6px rgba(255,255,255,0.9), inset -3px -3px 6px rgba(59,130,246,0.04)',
+                    }}
+                  >
+                    <Car size={16} className="sm:size-5 mb-1" style={{ color: car.color }} />
+                    <span className="font-helvetica text-[9px] sm:text-xs font-bold" style={{ color: '#1C398E', opacity: 0.5 }}>{car.label}</span>
+                    <span className="font-serif text-[8px] sm:text-[10px] font-black uppercase mt-0.5" style={{ color: car.color }}>Scan {car.id}</span>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* How It Works Section */}
-      <section id="how-namoqr-works" className="py-24 relative z-10">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="text-center max-w-xl mx-auto mb-16">
-            <h2 className="font-display text-3xl font-black text-slate-900 tracking-tight uppercase">
-              How NamoQR Works
-            </h2>
-            <p className="text-sm text-slate-500 mt-2 font-medium">
-              Four steps from registration to secure real-world protection. No complex setups needed.
+      {/* ── How It Works ────────────────────────────────── */}
+      <section id="how-namoqr-works" className="py-16 sm:py-24 relative z-10">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="text-center max-w-xl mx-auto mb-10 sm:mb-16">
+            <h2 className="font-serif text-2xl sm:text-3xl font-black uppercase tracking-tight" style={{ color: '#1C398E' }}>How NamoQR Works</h2>
+            <p className="font-sans text-xs sm:text-sm mt-2 font-medium" style={{ color: '#1C398E', opacity: 0.5 }}>
+              Four steps from registration to secure real-world protection.
             </p>
           </div>
-
           <motion.div
             variants={containerVariants}
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: '-100px' }}
-            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
           >
-            {/* Step 1 */}
-            <motion.div variants={itemVariants} className="clay-morph-white p-6 space-y-4 border border-white/80">
-              <div className="w-12 h-12 clay-morph-indigo flex items-center justify-center font-display text-base font-black text-white shadow-md">
-                01
-              </div>
-              <h3 className="font-display font-black text-slate-900 text-lg uppercase tracking-tight">Add Vehicle</h3>
-              <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                Add your vehicle details like make, color, model, and license plate into your secure personal dashboard.
-              </p>
-            </motion.div>
-
-            {/* Step 2 */}
-            <motion.div variants={itemVariants} className="clay-morph-white p-6 space-y-4 border border-white/85">
-              <div className="w-12 h-12 clay-morph-indigo flex items-center justify-center font-display text-base font-black text-white shadow-md">
-                02
-              </div>
-              <h3 className="font-display font-black text-slate-900 text-lg uppercase tracking-tight">Generate QR</h3>
-              <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                Unlock or generate a heavy-duty customized QR code tag mapped directly to your specific vehicle ID.
-              </p>
-            </motion.div>
-
-            {/* Step 3 */}
-            <motion.div variants={itemVariants} className="clay-morph-white p-6 space-y-4 border border-white/85">
-              <div className="w-12 h-12 clay-morph-indigo flex items-center justify-center font-display text-base font-black text-white shadow-md">
-                03
-              </div>
-              <h3 className="font-display font-black text-slate-900 text-lg uppercase tracking-tight">Stick Tag</h3>
-              <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                Print your dynamic window tag, or download it right to your lock screen. Ideal for dashboard placement.
-              </p>
-            </motion.div>
-
-            {/* Step 4 */}
-            <motion.div variants={itemVariants} className="clay-morph-white p-6 space-y-4 border border-white/85">
-              <div className="w-12 h-12 clay-morph-indigo flex items-center justify-center font-display text-base font-black text-white shadow-md">
-                04
-              </div>
-              <h3 className="font-display font-black text-slate-900 text-lg uppercase tracking-tight">Get Alerts</h3>
-              <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                Bystanders scan to report blocking or hazards. We alert you instantly while preserving absolute contact privacy.
-              </p>
-            </motion.div>
+            {[
+              { num: '01', title: 'Add Vehicle', desc: 'Add your vehicle details like make, model, and plate into your secure dashboard.' },
+              { num: '02', title: 'Generate QR', desc: 'Generate a customized QR code tag mapped to your specific vehicle ID.' },
+              { num: '03', title: 'Stick Tag', desc: 'Print your window tag and place it on your dashboard or windshield.' },
+              { num: '04', title: 'Get Alerts', desc: 'Bystanders scan to report blocking or hazards. We alert you privately.' },
+            ].map((step) => (
+              <motion.div
+                key={step.num}
+                variants={itemVariants}
+                className="p-5 sm:p-6 space-y-3 sm:space-y-4"
+                style={{
+                  background: 'rgba(255,255,255,0.6)', borderRadius: '18px',
+                  border: '1px solid rgba(255,255,255,0.8)',
+                  boxShadow: 'inset 4px 4px 8px rgba(255,255,255,0.9), inset -4px -4px 8px rgba(59,130,246,0.04)',
+                }}
+              >
+                <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center font-serif text-sm sm:text-base font-black text-white" style={{
+                  background: '#3B82F6', borderRadius: '14px',
+                  boxShadow: 'inset 3px 3px 6px rgba(255,255,255,0.3), inset -3px -3px 6px rgba(0,0,0,0.1)',
+                }}>
+                  {step.num}
+                </div>
+                <h3 className="font-serif font-black text-base sm:text-lg uppercase tracking-tight" style={{ color: '#1C398E' }}>{step.title}</h3>
+                <p className="font-sans text-[11px] sm:text-xs leading-relaxed font-medium" style={{ color: '#1C398E', opacity: 0.6 }}>{step.desc}</p>
+              </motion.div>
+            ))}
           </motion.div>
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section className="py-24 relative z-10">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="text-center max-w-xl mx-auto mb-16">
-            <h2 className="font-display text-3xl font-black text-slate-900 tracking-tight uppercase">
-              Transparent, simple pricing
-            </h2>
-            <p className="text-sm text-slate-550 mt-2 font-medium">
-              Start protecting your vehicle for free, or upgrade anytime for full coverage.
+      {/* ── Pricing ─────────────────────────────────────── */}
+      <section className="py-16 sm:py-24 relative z-10">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="text-center max-w-xl mx-auto mb-10 sm:mb-16">
+            <h2 className="font-serif text-2xl sm:text-3xl font-black uppercase tracking-tight" style={{ color: '#1C398E' }}>Simple Pricing</h2>
+            <p className="font-sans text-xs sm:text-sm mt-2 font-medium" style={{ color: '#1C398E', opacity: 0.5 }}>
+              Start protecting your vehicle for free, or upgrade for full coverage.
             </p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
-            {/* Free Plan */}
-            <div className="clay-morph-white p-8 flex flex-col justify-between shadow-lg relative overflow-hidden border border-white/80">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 max-w-3xl mx-auto">
+            {/* Free */}
+            <div className="p-5 sm:p-8 flex flex-col justify-between relative overflow-hidden" style={{
+              background: 'rgba(255,255,255,0.7)', borderRadius: '20px',
+              border: '1px solid rgba(255,255,255,0.9)',
+              boxShadow: 'inset 6px 6px 12px rgba(255,255,255,0.95), inset -6px -6px 12px rgba(59,130,246,0.06), 0 20px 40px -8px rgba(59,130,246,0.1)',
+            }}>
               <div>
-                <span className="text-xs font-mono tracking-wider font-extrabold uppercase text-slate-400">
-                  Basic Protection
-                </span>
-                <h3 className="font-display text-2xl font-black text-slate-900 mt-1.5 uppercase tracking-tight">Free Tier</h3>
-                <div className="mt-4 flex items-baseline">
-                  <span className="text-4xl font-display font-black tracking-tight text-slate-950">$0</span>
-                  <span className="text-slate-400 text-sm font-semibold ml-1">forever</span>
+                <span className="font-helvetica text-[10px] sm:text-xs tracking-wider font-extrabold uppercase" style={{ color: '#1C398E', opacity: 0.4 }}>Basic Protection</span>
+                <h3 className="font-serif text-xl sm:text-2xl font-black mt-1 uppercase tracking-tight" style={{ color: '#1C398E' }}>Free Tier</h3>
+                <div className="mt-3 sm:mt-4 flex items-baseline">
+                  <span className="text-3xl sm:text-4xl font-serif font-black tracking-tight" style={{ color: '#1C398E' }}>$0</span>
+                  <span className="text-xs sm:text-sm font-semibold ml-1" style={{ color: '#1C398E', opacity: 0.4 }}>forever</span>
                 </div>
-                <p className="text-xs text-slate-550 leading-relaxed mt-4 font-medium">
-                  Essential tools for individual owners who want a straightforward, privacy-focused security channel.
+                <p className="font-sans text-[11px] sm:text-xs leading-relaxed mt-3 sm:mt-4 font-medium" style={{ color: '#1C398E', opacity: 0.5 }}>
+                  Essential tools for individual owners who want straightforward privacy-focused security.
                 </p>
-
-                <ul className="mt-8 space-y-4 text-xs text-slate-650 border-t border-indigo-50/50 pt-6 font-semibold">
-                  <li className="flex items-center gap-2.5">
-                    <ShieldCheck className="text-slate-400" size={16} />
-                    <span>1 Registered Vehicle</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <ShieldCheck className="text-slate-400" size={16} />
-                    <span>1 Standard Printable QR Code</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <ShieldCheck className="text-slate-400" size={16} />
-                    <span>Real-time Email Alerts</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <ShieldCheck className="text-slate-400" size={16} />
-                    <span>Location Tagging (Accuracy 15m)</span>
-                  </li>
+                <ul className="mt-6 sm:mt-8 space-y-3 sm:space-y-4 text-[11px] sm:text-xs border-t pt-5 sm:pt-6 font-semibold" style={{ borderColor: 'rgba(59,130,246,0.06)', color: '#1C398E' }}>
+                  {['1 Registered Vehicle', '1 Standard Printable QR Code', 'Real-time Email Alerts', 'Location Tagging'].map((f) => (
+                    <li key={f} className="flex items-center gap-2 sm:gap-2.5">
+                      <ShieldCheck size={14} className="sm:size-4 shrink-0" style={{ color: '#3B82F6', opacity: 0.5 }} />
+                      <span style={{ opacity: 0.8 }}>{f}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
-
-              <button
-                onClick={onStart}
-                className="mt-8 w-full py-3.5 clay-morph-indigo-btn text-xs uppercase tracking-wider rounded-xl cursor-pointer"
-              >
+              <motion.button whileTap={{ scale: 0.93 }} onClick={onStart} className="clay-btn clay-btn-primary w-full mt-6 sm:mt-8 py-3 sm:py-3.5 text-[11px] sm:text-xs">
                 Sign Up Free
-              </button>
+              </motion.button>
             </div>
 
-            {/* Pro Plan */}
-            <div className="clay-morph-indigo p-8 flex flex-col justify-between shadow-lg relative overflow-hidden border border-white/20">
-              <div className="absolute top-4 right-4 px-2.5 py-1 text-xs font-mono font-bold uppercase bg-white text-indigo-650 rounded-full tracking-wider shadow-xs">
+            {/* Pro */}
+            <div className="p-5 sm:p-8 flex flex-col justify-between relative overflow-hidden" style={{
+              background: 'linear-gradient(135deg, #3B82F6 0%, #2563eb 100%)',
+              borderRadius: '20px',
+              border: '1px solid rgba(255,255,255,0.15)',
+              boxShadow: 'inset 4px 4px 10px rgba(255,255,255,0.2), inset -4px -4px 10px rgba(0,0,0,0.1), 0 12px 28px -4px rgba(59,130,246,0.3)',
+              color: '#fff',
+            }}>
+              <div className="absolute top-3 sm:top-4 right-3 sm:right-4 px-2 sm:px-2.5 py-0.5 sm:py-1 font-helvetica text-[8px] sm:text-[10px] font-bold uppercase bg-white rounded-full tracking-wider shadow-xs" style={{ color: '#3B82F6' }}>
                 Recommended
               </div>
-
               <div>
-                <span className="text-xs font-mono tracking-wider font-extrabold uppercase text-indigo-200">
-                  Total Shield
-                </span>
-                <h3 className="font-display text-2xl font-black text-white mt-1.5 uppercase tracking-tight">Pro premium</h3>
-                <div className="mt-4 flex items-baseline">
-                  <span className="text-4xl font-display font-black tracking-tight text-white">$5</span>
-                  <span className="text-indigo-200 text-sm font-semibold ml-1">/ month</span>
+                <span className="font-helvetica text-[10px] sm:text-xs tracking-wider font-extrabold uppercase" style={{ opacity: 0.7 }}>Total Shield</span>
+                <h3 className="font-serif text-xl sm:text-2xl font-black mt-1 uppercase tracking-tight">Pro Premium</h3>
+                <div className="mt-3 sm:mt-4 flex items-baseline">
+                  <span className="text-3xl sm:text-4xl font-serif font-black tracking-tight">$5</span>
+                  <span className="text-xs sm:text-sm font-semibold ml-1" style={{ opacity: 0.7 }}>/ month</span>
                 </div>
-                <p className="text-xs text-indigo-100 leading-relaxed mt-4 font-medium">
-                  Advanced alert channels, SMS callbacks, priority notification support, and custom printable styles.
+                <p className="font-sans text-[11px] sm:text-xs leading-relaxed mt-3 sm:mt-4 font-medium" style={{ opacity: 0.8 }}>
+                  Advanced alert channels, SMS callbacks, priority support, and custom styles.
                 </p>
-
-                <ul className="mt-8 space-y-4 text-xs text-indigo-50 border-t border-indigo-450/30 pt-6 font-bold">
-                  <li className="flex items-center gap-2.5">
-                    <ShieldCheck className="text-white" size={16} />
-                    <span className="text-white">Unlimited Vehicles Registered</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <ShieldCheck className="text-white" size={16} />
-                    <span className="text-white">Unlimited QR Tag Codes</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <ShieldCheck className="text-white" size={16} />
-                    <span className="text-white">Instant SMS Callback Alerts</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <ShieldCheck className="text-white animate-pulse" size={16} />
-                    <span>Custom vector SVG download</span>
-                  </li>
+                <ul className="mt-6 sm:mt-8 space-y-3 sm:space-y-4 text-[11px] sm:text-xs border-t pt-5 sm:pt-6 font-bold" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                  {['Unlimited Vehicles', 'Unlimited QR Codes', 'SMS Callback Alerts', 'Custom SVG Download'].map((f) => (
+                    <li key={f} className="flex items-center gap-2 sm:gap-2.5">
+                      <ShieldCheck size={14} className="sm:size-4 shrink-0" />
+                      <span>{f}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
-
-              <button
-                onClick={onStart}
-                className="mt-8 w-full py-3.5 clay-morph-white-btn text-xs uppercase tracking-wider rounded-xl cursor-pointer"
-              >
-                Get Pro Shield Now
-              </button>
+              <motion.button whileTap={{ scale: 0.93 }} onClick={onStart} className="clay-btn clay-btn-white w-full mt-6 sm:mt-8 py-3 sm:py-3.5 text-[11px] sm:text-xs">
+                Get Pro Shield
+              </motion.button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* CTA section (Spacious card) */}
-      <section className="py-24 relative z-10">
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="clay-morph-indigo p-10 sm:p-14 text-center relative overflow-hidden border border-white/20">
+      {/* ── CTA ─────────────────────────────────────────── */}
+      <section className="py-16 sm:py-24 relative z-10">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6">
+          <div className="p-6 sm:p-10 md:p-14 text-center relative overflow-hidden" style={{
+            background: 'linear-gradient(135deg, #3B82F6 0%, #2563eb 100%)',
+            borderRadius: '20px',
+            border: '1px solid rgba(255,255,255,0.15)',
+            boxShadow: 'inset 4px 4px 10px rgba(255,255,255,0.2), inset -4px -4px 10px rgba(0,0,0,0.1), 0 12px 28px -4px rgba(59,130,246,0.3)',
+            color: '#fff',
+          }}>
             <div className="relative z-10 max-w-xl mx-auto">
-              <h2 className="font-display text-3xl sm:text-4xl font-black tracking-tighter uppercase text-white">
-                Secure your vehicle today
-              </h2>
-              <p className="text-xs sm:text-sm text-indigo-100 mt-3 leading-relaxed font-semibold">
-                No phone number disclosure, no complicated tracking, full integration. Join thousands of drivers avoiding municipal towing fees and disputes.
+              <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-black tracking-tighter uppercase">Secure your vehicle today</h2>
+              <p className="font-sans text-[11px] sm:text-xs md:text-sm mt-3 leading-relaxed font-semibold" style={{ opacity: 0.8 }}>
+                No phone number disclosure, no complicated tracking. Join thousands of drivers avoiding municipal towing fees and disputes.
               </p>
-              <button
-                id="cta-enroll-btn"
-                onClick={onStart}
-                className="mt-8 px-8 py-4 clay-morph-white-btn text-xs tracking-wider uppercase transition-all shadow-md inline-flex items-center gap-2 cursor-pointer"
-              >
-                Access Dashboard <ArrowRight size={16} />
-              </button>
+              <motion.button whileTap={{ scale: 0.93 }} onClick={onStart} className="clay-btn clay-btn-white mt-6 sm:mt-8 px-6 sm:px-8 py-3.5 sm:py-4 text-xs sm:text-sm inline-flex items-center gap-2">
+                Access Dashboard <ArrowRight size={14} className="sm:size-4" />
+              </motion.button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-white/40 bg-white/20 backdrop-blur-md py-12 text-center text-slate-450 relative z-10">
-        <p className="font-display font-black text-slate-900 uppercase tracking-tighter text-lg">NAMO<span className="text-slate-500 font-medium">QR</span></p>
-        <p className="text-[11px] font-mono mt-2">&copy; {new Date().getFullYear()} NAMOQR, Inc. All rights reserved.</p>
+      {/* ── Footer ──────────────────────────────────────── */}
+      <footer className="border-t border-white/40 bg-white/20 backdrop-blur-md py-8 sm:py-12 text-center relative z-10">
+        <p className="font-serif font-black text-lg sm:text-xl uppercase tracking-tighter" style={{ color: '#3B82F6' }}>
+          NAMO<span className="font-medium" style={{ color: '#1C398E' }}>QR</span>
+        </p>
+        <p className="font-helvetica text-[10px] sm:text-[11px] mt-2" style={{ color: '#1C398E', opacity: 0.35 }}>
+          &copy; {new Date().getFullYear()} NAMOQR, Inc. All rights reserved.
+        </p>
       </footer>
     </div>
   );

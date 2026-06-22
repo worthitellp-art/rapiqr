@@ -240,7 +240,7 @@ export default function DashboardView({
             </div>
             <div className="overflow-hidden">
               <h4 className="text-xs font-bold text-slate-800 truncate tracking-tight font-helvetica">{user.fullName}</h4>
-              <p className="text-xs text-slate-500 truncate mt-0.5 font-mono">{user.email}</p>
+              <p className="text-xs text-slate-500 truncate mt-0.5 font-helvetica">{user.email}</p>
             </div>
           </div>
 
@@ -278,7 +278,7 @@ export default function DashboardView({
                 <QrCode size={14} className={activeTab === 'QRWizard' ? 'text-white' : 'text-slate-500'} />
                 <span className={activeTab === 'QRWizard' ? 'text-white' : 'text-slate-600 hover:text-slate-900'}>QR Wizard</span>
               </div>
-              <span className={`relative z-10 px-2 py-0.5 rounded font-mono text-xs font-bold transition-all ${activeTab === 'QRWizard' ? 'bg-indigo-700/50 text-white' : 'bg-slate-100 text-slate-500 border border-slate-200/80 shadow-xs'}`}>
+              <span className={`relative z-10 px-2 py-0.5 rounded font-helvetica text-xs font-bold transition-all ${activeTab === 'QRWizard' ? 'bg-indigo-700/50 text-white' : 'bg-slate-100 text-slate-500 border border-slate-200/80 shadow-xs'}`}>
                 {vehicles.length}
               </span>
             </button>
@@ -304,7 +304,7 @@ export default function DashboardView({
                   {reports.filter(r => r.status === 'unread').length}
                 </span>
               ) : (
-                <span className={`relative z-10 px-2 py-0.5 rounded-md font-mono text-xs font-bold transition-all ${activeTab === 'reports' ? 'bg-indigo-700/50 text-white' : 'bg-slate-100 text-slate-500 border border-slate-200/80 shadow-xs'}`}>
+                <span className={`relative z-10 px-2 py-0.5 rounded-md font-helvetica text-xs font-bold transition-all ${activeTab === 'reports' ? 'bg-indigo-700/50 text-white' : 'bg-slate-100 text-slate-500 border border-slate-200/80 shadow-xs'}`}>
                   {reports.length}
                 </span>
               )}
@@ -512,9 +512,9 @@ export default function DashboardView({
                         <div key={v.id} className="flex justify-between items-center p-3 rounded-md hover:bg-white/50 border border-slate-100 text-xs text-slate-800 font-medium transition-all shadow-[inset_-2px_-2px_6px_rgba(59,130,246,0.02),_inset_2px_2px_6px_rgba(255,255,255,0.7)]">
                           <div>
                             <span className="font-bold text-slate-900 font-helvetica">{v.make} {v.model}</span>
-                            <span className="block font-mono text-xs text-slate-500 mt-1 font-semibold">{v.color} &bull; {v.licensePlate}</span>
+                            <span className="block font-helvetica text-xs text-slate-500 mt-1 font-semibold">{v.color} &bull; {v.licensePlate}</span>
                           </div>
-                          <span className={`px-2 py-0.5 font-mono text-xs font-bold rounded border tracking-wider ${v.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-250 shadow-sm' : 'bg-slate-100 text-slate-400 border-slate-200'
+                          <span className={`px-2 py-0.5 font-helvetica text-xs font-bold rounded border tracking-wider ${v.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-250 shadow-sm' : 'bg-slate-100 text-slate-400 border-slate-200'
                             }`}>
                             {v.status === 'active' ? 'Active' : 'Off'}
                           </span>
@@ -546,7 +546,7 @@ export default function DashboardView({
                         <div key={r.id} className="relative p-4 rounded-md border border-slate-100 hover:border-slate-200 transition-all text-xs space-y-2.5 bg-slate-50/50">
                           <div className="flex justify-between items-start">
                             <div>
-                              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded font-mono text-xs font-bold tracking-wider border ${r.type === 'accident'
+                              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded font-helvetica text-xs font-bold tracking-wider border ${r.type === 'accident'
                                 ? 'bg-red-50 text-red-700 border-red-100'
                                 : r.type === 'wrong_parking'
                                   ? 'bg-amber-50 text-amber-850 border-amber-200'
@@ -558,7 +558,7 @@ export default function DashboardView({
                                 {r.vehicleLabel}
                               </h5>
                             </div>
-                            <span className="text-xs font-mono font-medium text-slate-400">
+                            <span className="text-xs font-helvetica font-medium text-slate-400">
                               {new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
@@ -624,7 +624,7 @@ export default function DashboardView({
                                 <span className="font-bold text-slate-900 text-sm block tracking-tight font-helvetica">
                                   {v.color} {v.make} {v.model}
                                 </span>
-                                <span className="text-xs text-slate-500 block font-mono font-semibold">Registered: {new Date(v.createdAt).toLocaleDateString()}</span>
+                                <span className="text-xs text-slate-500 block font-helvetica font-semibold">Registered: {new Date(v.createdAt).toLocaleDateString()}</span>
                               </div>
                             </div>
                           </td>
@@ -637,7 +637,7 @@ export default function DashboardView({
                                 e.stopPropagation();
                                 handleToggleVehicleStatus(v.id);
                               }}
-                              className={`px-3 py-1.5 rounded-md font-mono text-xs font-black transition-all inline-flex items-center gap-1.5 cursor-pointer border ${v.status === 'active'
+                              className={`px-3 py-1.5 rounded-md font-helvetica text-xs font-black transition-all inline-flex items-center gap-1.5 cursor-pointer border ${v.status === 'active'
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-220'
                                 : 'bg-slate-100 text-slate-400 border-slate-200'
                                 }`}
@@ -811,7 +811,7 @@ export default function DashboardView({
                       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded font-mono text-xs font-bold tracking-wider border ${r.type === 'accident'
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded font-helvetica text-xs font-bold tracking-wider border ${r.type === 'accident'
                               ? 'bg-red-50 text-red-700 border-red-200'
                               : r.type === 'wrong_parking'
                                 ? 'bg-amber-50 text-amber-805 border-amber-200'
@@ -915,16 +915,16 @@ export default function DashboardView({
                 <h4 className="font-serif font-black text-base text-slate-900 mb-4 pb-2 border-b border-slate-100 tracking-tight">Profile Information</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                   <div>
-                    <label className="block text-xs font-mono tracking-wider text-slate-500 mb-1.5 font-bold">Email / Username</label>
+                    <label className="block text-xs font-helvetica tracking-wider text-slate-500 mb-1.5 font-bold">Email / Username</label>
                     <input
                       type="text"
                       disabled
                       value={user.email}
-                      className="w-full px-3.5 py-2.5 bg-slate-100/85 border border-slate-200 text-slate-400 rounded-md outline-none font-mono cursor-not-allowed font-semibold shadow-inner"
+                      className="w-full px-3.5 py-2.5 bg-slate-100/85 border border-slate-200 text-slate-400 rounded-md outline-none font-helvetica cursor-not-allowed font-semibold shadow-inner"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-mono tracking-wider text-slate-500 mb-1.5 font-bold">Full Name</label>
+                    <label className="block text-xs font-helvetica tracking-wider text-slate-500 mb-1.5 font-bold">Full Name</label>
                     <input
                       type="text"
                       value={user.fullName}
@@ -942,7 +942,7 @@ export default function DashboardView({
                     <h4 className="font-serif font-black text-base text-slate-900 tracking-tight">Premium Subscription Plan</h4>
                     <p className="text-[11px] text-slate-500 mt-0.5 font-medium font-inter">Toggle tier level to witness responsive plan changes.</p>
                   </div>
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-mono text-xs font-black tracking-wider border ${user.subscriptionPlan === 'pro'
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-helvetica text-xs font-black tracking-wider border ${user.subscriptionPlan === 'pro'
                     ? 'bg-amber-50 text-amber-700 border-amber-200'
                     : 'bg-slate-100 text-slate-500 border-slate-200'
                     }`}>
@@ -1001,7 +1001,7 @@ export default function DashboardView({
             >
               <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div>
-                  <h3 className="font-display font-black text-slate-900 tracking-tight">Register New QR Wizard</h3>
+                  <h3 className="font-serif font-black text-slate-900 tracking-tight">Register New QR Wizard</h3>
                   <p className="text-[11px] text-slate-555 mt-0.5 font-medium">Fill in standard physical QR Wizard specifications.</p>
                 </div>
                 <button
@@ -1013,7 +1013,7 @@ export default function DashboardView({
               </div>
 
               {formError && (
-                <div className="p-4 bg-red-50 border-b border-red-200 text-red-700 text-xs font-bold font-mono">
+                <div className="p-4 bg-red-50 border-b border-red-200 text-red-700 text-xs font-bold font-helvetica">
                   {formError}
                 </div>
               )}
@@ -1021,7 +1021,7 @@ export default function DashboardView({
               <form onSubmit={handleRegisterVehicleSubmit} className="p-5 space-y-4">
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-xs font-mono tracking-wider text-slate-500 mb-1 font-black">Make</label>
+                    <label className="block text-xs font-helvetica tracking-wider text-slate-500 mb-1 font-black">Make</label>
                     <input
                       type="text"
                       required
@@ -1032,7 +1032,7 @@ export default function DashboardView({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-mono tracking-wider text-slate-500 mb-1 font-black">Model</label>
+                    <label className="block text-xs font-helvetica tracking-wider text-slate-500 mb-1 font-black">Model</label>
                     <input
                       type="text"
                       required
@@ -1046,7 +1046,7 @@ export default function DashboardView({
 
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-xs font-mono tracking-wider text-slate-500 mb-1 font-black">Year</label>
+                    <label className="block text-xs font-helvetica tracking-wider text-slate-500 mb-1 font-black">Year</label>
                     <input
                       type="number"
                       placeholder="2026"
@@ -1056,7 +1056,7 @@ export default function DashboardView({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-mono tracking-wider text-slate-500 mb-1 font-black">Color</label>
+                    <label className="block text-xs font-helvetica tracking-wider text-slate-500 mb-1 font-black">Color</label>
                     <input
                       type="text"
                       required
@@ -1069,7 +1069,7 @@ export default function DashboardView({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono tracking-wider text-slate-500 mb-1 font-black">License Plate Number</label>
+                  <label className="block text-xs font-helvetica tracking-wider text-slate-500 mb-1 font-black">License Plate Number</label>
                   <input
                     type="text"
                     required

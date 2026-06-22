@@ -83,7 +83,7 @@ export default function PublicScanPage({
           <div className="mx-auto w-10 h-10 flex items-center justify-center mb-3" style={{ ...clayBadge, borderRadius: '50%', width: 40, height: 40 }}>
             <AlertTriangle size={18} />
           </div>
-          <h2 className="font-display text-base font-black uppercase tracking-tight mb-1" style={{ color: '#1C398E' }}>No Vehicle Found</h2>
+          <h2 className="font-serif text-base font-black uppercase tracking-tight mb-1" style={{ color: '#1C398E' }}>No Vehicle Found</h2>
           <p className="font-sans text-[11px] font-medium mb-4" style={{ color: '#1C398E', opacity: 0.5 }}>This QR tag is not linked to any vehicle yet.</p>
           <button onClick={onNavigateHome} className="w-full py-2.5 font-sans text-[11px] font-bold uppercase tracking-wider cursor-pointer" style={clayBtn}>
             Go Home
@@ -99,13 +99,13 @@ export default function PublicScanPage({
         {/* ── Section 1: Vehicle Badge ──────────────────── */}
         <div className="p-3 mb-2.5 flex items-center justify-between gap-2" style={clayCard}>
           <div className="min-w-0">
-            <span className="font-mono text-[9px] font-bold uppercase tracking-widest" style={{ color: '#3B82F6', opacity: 0.6 }}>Scanned</span>
-            <h3 className="font-display text-sm font-black uppercase tracking-tight truncate" style={{ color: '#1C398E' }}>
+            <span className="font-helvetica text-[9px] font-bold uppercase tracking-widest" style={{ color: '#3B82F6', opacity: 0.6 }}>Scanned</span>
+            <h3 className="font-serif text-sm font-black uppercase tracking-tight truncate" style={{ color: '#1C398E' }}>
               {vehicle.color} {vehicle.make} {vehicle.model}
             </h3>
-            <p className="font-mono text-[10px] font-semibold" style={{ color: '#1C398E', opacity: 0.4 }}>{vehicle.licensePlate}</p>
+            <p className="font-helvetica text-[10px] font-semibold" style={{ color: '#1C398E', opacity: 0.4 }}>{vehicle.licensePlate}</p>
           </div>
-          <span className="px-2.5 py-1 font-mono text-[9px] font-bold uppercase tracking-wider shrink-0" style={clayBadge}>
+          <span className="px-2.5 py-1 font-helvetica text-[9px] font-bold uppercase tracking-wider shrink-0" style={clayBadge}>
             {qrCodeId}
           </span>
         </div>
@@ -141,7 +141,7 @@ export default function PublicScanPage({
                         }}
                       >
                         <Icon size={14} style={{ color: isActive ? '#fff' : '#1C398E' }} />
-                        <span className="font-display text-[9px] font-black uppercase tracking-tight" style={{ color: isActive ? '#fff' : '#1C398E' }}>
+                        <span className="font-serif text-[9px] font-black uppercase tracking-tight" style={{ color: isActive ? '#fff' : '#1C398E' }}>
                           {meta.label}
                         </span>
                       </button>
@@ -200,7 +200,7 @@ export default function PublicScanPage({
               <div className="mx-auto w-12 h-12 flex items-center justify-center mb-3" style={{ ...clayBadge, background: '#16A34A', borderRadius: '50%', width: 48, height: 48 }}>
                 <CheckCircle size={22} />
               </div>
-              <h2 className="font-display text-lg font-black uppercase tracking-tight mb-1" style={{ color: '#1C398E' }}>Alert Sent</h2>
+              <h2 className="font-serif text-lg font-black uppercase tracking-tight mb-1" style={{ color: '#1C398E' }}>Alert Sent</h2>
               <p className="font-sans text-[11px] font-medium mb-4" style={{ color: '#1C398E', opacity: 0.55 }}>
                 Owner notified. Your contact stays private.
               </p>
