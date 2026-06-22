@@ -1,0 +1,6 @@
+{
+  "name": "QR Vehicle Tag",
+  "description": "Connect vehicle owners with community alerts and security tools via lightweight QR codes.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
