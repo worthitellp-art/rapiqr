@@ -4,9 +4,9 @@
  */
 
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Lock, User, ArrowRight, ArrowLeft, Loader2, KeyRound } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, ArrowLeft, Loader2, ShieldCheck, QrCode } from 'lucide-react';
 import { UserProfile } from '../types';
+import MagneticBtn from './ui/MagneticBtn';
 
 interface LoginSignupProps {
   isNewUser: boolean;
@@ -36,7 +36,6 @@ export default function LoginSignup({ isNewUser, onLoginSuccess, onBack }: Login
     setLoading(true);
     setErrorMsg('');
 
-    // Authentic feeling authentication transition delay
     setTimeout(() => {
       const userProfile: UserProfile = {
         email: email,
@@ -69,46 +68,134 @@ export default function LoginSignup({ isNewUser, onLoginSuccess, onBack }: Login
   };
 
   return (
-    <div id="login-container" className="min-h-screen bg-[#f0f4f8] flex flex-col justify-center py-12 px-6 lg:px-8 font-sans relative overflow-hidden">
-      {/* Back button link */}
-      <div className="absolute top-6 left-6 z-20">
-        <button
-          id="back-to-landing-btn"
-          onClick={onBack}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-650 hover:text-indigo-800 transition-all cursor-pointer uppercase tracking-wider bg-white/60 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/80 shadow-md hover:scale-105"
-        >
-          <ArrowLeft size={16} /> Home
-        </button>
-      </div>
+    <div id="login-container" className="min-h-screen bg-[#ffffff] flex flex-col md:flex-row font-sans text-black relative">
+      
+      {/* ── LEFT SIDE: 50% Vibrant Graffiti Mural ── */}
+      <div className="w-full md:w-1/2 bg-[#050508] hidden md:flex flex-col justify-between p-12 relative overflow-hidden select-none border-r border-white/10">
+        
+          {/* Intense vibrant background glow */}
+          <div className="absolute top-1/4 left-1/4 w-[120%] h-[120%] bg-gradient-to-br from-[#0070d1]/35 via-[#0070d1]/5 to-transparent filter blur-3xl" />
+          
+          <svg className="absolute w-full h-full" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#0070d1" />
+                <stop offset="100%" stopColor="#53b1ff" />
+              </linearGradient>
+              {/* Neon Glow Filter */}
+              <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="6" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="text-center">
-          <div className="text-indigo-600 font-extrabold text-3xl tracking-tighter uppercase mb-1 drop-shadow-sm">
-            NAMOQR<span className="text-indigo-400 font-medium text-lg">V1</span>
+            {/* Glowing neon shield shadow (behind the main shield) */}
+            <path 
+              d="M 180,140 L 320,80 L 460,140 C 460,280 320,370 320,370 C 320,370 180,280 180,140 Z" 
+              fill="none" 
+              stroke="#0070d1" 
+              strokeWidth="12" 
+              strokeLinejoin="round" 
+              strokeLinecap="round" 
+              filter="url(#neonGlow)"
+              opacity="0.6"
+            />
+
+            {/* Clean Main Shield Outline */}
+            <path 
+              d="M 180,140 L 320,80 L 460,140 C 460,280 320,370 320,370 C 320,370 180,280 180,140 Z" 
+              fill="none" 
+              stroke="url(#shieldGrad)" 
+              strokeWidth="10" 
+              strokeLinejoin="round" 
+              strokeLinecap="round" 
+            />
+            
+            {/* Windshield Tag horizontal lines inside shield */}
+            <line x1="220" y1="200" x2="420" y2="200" stroke="#ffffff" strokeWidth="4" strokeLinecap="round" opacity="1.0" />
+            <line x1="240" y1="240" x2="400" y2="240" stroke="#ffffff" strokeWidth="4" strokeLinecap="round" opacity="1.0" />
+            <line x1="270" y1="280" x2="370" y2="280" stroke="#ffffff" strokeWidth="4" strokeLinecap="round" opacity="1.0" />
+
+            {/* Minimalist Spray Paint Drips (Street-art/Graffiti accent) */}
+            <path d="M 314,360 L 314,460 C 314,465 326,465 326,460 L 326,360 Z" fill="#0070d1" />
+            <circle cx="320" cy="470" r="3.5" fill="#0070d1" />
+
+            <path d="M 270,300 L 270,390 C 270,394 280,394 280,390 L 280,300 Z" fill="#0070d1" opacity="1.0" />
+            <circle cx="275" cy="400" r="2.5" fill="#0070d1" opacity="1.0" />
+
+            <path d="M 360,300 L 360,420 C 360,425 370,425 370,420 L 370,300 Z" fill="#d53b00" />
+            <circle cx="365" cy="430" r="3" fill="#d53b00" />
+
+            {/* Soft splatters */}
+            <circle cx="150" cy="200" r="5" fill="#0070d1" opacity="0.6" />
+          </svg>
+
+        {/* Brand Text overlay */}
+        <div className="relative z-10">
+          <div className="font-serif font-light text-2xl uppercase tracking-tight text-white">
+            NAMO<span className="font-bold text-[#0070d1]">QR</span>
           </div>
         </div>
-        <h2 className="mt-4 text-center font-serif text-2xl font-black tracking-tight text-slate-800 uppercase">
-          {isSignMode === 'signin' ? 'Sign in to account' : 'Create dynamic tag credentials'}
-        </h2>
-        <p className="mt-1.5 text-center text-xs text-slate-550 font-semibold">
-          Or{' '}
-          <button
-            id="toggle-sign-mode-btn"
-            onClick={() => {
-              setIsSignMode(isSignMode === 'signin' ? 'signup' : 'signin');
-              setErrorMsg('');
-            }}
-            className="font-bold text-indigo-600 hover:underline hover:text-indigo-850 cursor-pointer uppercase tracking-wider"
-          >
-            {isSignMode === 'signin' ? 'Get automatic premium trial' : 'Sign in with existing key'}
-          </button>
-        </p>
+
+        {/* Bottom Editorial Callout */}
+        <div className="relative z-10 max-w-sm space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#0070d1] text-white rounded-full text-[10px] font-bold uppercase tracking-wider">
+            Secure Platform
+          </div>
+          <h3 className="text-3xl font-serif font-light text-white leading-tight uppercase">
+            Keep your vehicle accessible, privately.
+          </h3>
+          <p className="text-sm text-white/60 leading-relaxed font-sans">
+            Print secure window stickers to receive immediate notifications regarding vehicle security, parking obstruction, or emergency warnings.
+          </p>
+        </div>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="clay-morph-white py-9 px-6 sm:px-10 mx-auto w-full border border-white/60">
+      {/* ── RIGHT SIDE: 50% Login/Signup Form ── */}
+      <div className="w-full md:w-1/2 flex items-center justify-center p-8 bg-[#ffffff]">
+        
+        {/* Back button */}
+        <div className="absolute top-6 right-6 z-20">
+          <button
+            id="back-to-landing-btn"
+            onClick={onBack}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0070d1] hover:text-[#0064b7] transition-all cursor-pointer uppercase tracking-wider bg-slate-50 px-4 py-2.5 rounded-full border border-slate-200"
+          >
+            <ArrowLeft size={16} /> Home
+          </button>
+        </div>
+
+        <div className="w-full max-w-sm">
+          {/* Brand header visible only on mobile */}
+          <div className="text-center md:hidden mb-6">
+            <div className="font-serif font-light text-2xl uppercase tracking-tight mb-2">
+              NAMO<span className="font-bold text-[#0070d1]">QR</span>
+            </div>
+          </div>
+
+          <h2 className="font-serif font-light text-2xl tracking-tight text-black uppercase text-left">
+            {isSignMode === 'signin' ? 'Sign in to account' : 'Register Vehicle Portal'}
+          </h2>
+          
+          <p className="mt-2 text-left text-xs text-black/60 font-semibold mb-8">
+            Or{' '}
+            <button
+              id="toggle-sign-mode-btn"
+              onClick={() => {
+                setIsSignMode(isSignMode === 'signin' ? 'signup' : 'signin');
+                setErrorMsg('');
+              }}
+              className="font-bold text-[#0070d1] hover:underline hover:text-[#0064b7] cursor-pointer uppercase tracking-wider"
+            >
+              {isSignMode === 'signin' ? 'Get free premium trial' : 'Sign in with existing key'}
+            </button>
+          </p>
+
           {errorMsg && (
-            <div id="auth-error-box" className="mb-5 p-3.5 bg-rose-50/80 border border-rose-200 text-rose-700 text-xs rounded-xl font-bold font-helvetica shadow-sm">
+            <div id="auth-error-box" className="mb-5 p-3.5 bg-red-50 border border-red-200 text-[#c81b3a] text-xs rounded-[4px] font-bold">
               {errorMsg}
             </div>
           )}
@@ -116,11 +203,11 @@ export default function LoginSignup({ isNewUser, onLoginSuccess, onBack }: Login
           <form className="space-y-4" onSubmit={handleSubmit}>
             {isSignMode === 'signup' && (
               <div>
-                <label htmlFor="fullname-input" className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5 pl-1">
+                <label htmlFor="fullname-input" className="block text-[10px] font-bold uppercase tracking-wider text-black/55 mb-1.5 pl-1">
                   Full Name
                 </label>
-                <div className="relative rounded-md shadow-xs">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-indigo-450">
+                <div className="relative rounded-[4px]">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-black/45">
                     <User size={16} />
                   </div>
                   <input
@@ -130,18 +217,19 @@ export default function LoginSignup({ isNewUser, onLoginSuccess, onBack }: Login
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Mihir Rathod"
-                    className="w-full pl-10 pr-3.5 py-3 text-slate-800 text-sm bg-white/80 border border-slate-200/80 rounded-xl placeholder-slate-400 font-semibold shadow-[inset_2px_2px_4px_rgba(0,0,0,0.02),_inset_-2px_-2px_4px_rgba(255,255,255,0.9)] focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all"
+                    className="clay-input w-full"
+                    style={{ paddingLeft: '40px' }}
                   />
                 </div>
               </div>
             )}
 
             <div>
-              <label htmlFor="email-input" className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5 pl-1">
+              <label htmlFor="email-input" className="block text-[10px] font-bold uppercase tracking-wider text-black/55 mb-1.5 pl-1">
                 Email Address
               </label>
-              <div className="relative rounded-md shadow-xs">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-indigo-450">
+              <div className="relative rounded-[4px]">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-black/45">
                   <Mail size={16} />
                 </div>
                 <input
@@ -151,17 +239,18 @@ export default function LoginSignup({ isNewUser, onLoginSuccess, onBack }: Login
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="mihirrathod95747@gmail.com"
-                  className="w-full pl-10 pr-3.5 py-3 text-slate-800 text-sm bg-white/80 border border-slate-200/80 rounded-xl placeholder-slate-400 font-semibold shadow-[inset_2px_2px_4px_rgba(0,0,0,0.02),_inset_-2px_-2px_4px_rgba(255,255,255,0.9)] focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all"
+                  className="clay-input w-full"
+                  style={{ paddingLeft: '40px' }}
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="password-input" className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5 pl-1">
+              <label htmlFor="password-input" className="block text-[10px] font-bold uppercase tracking-wider text-black/55 mb-1.5 pl-1">
                 Password
               </label>
-              <div className="relative rounded-md shadow-xs">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-indigo-450">
+              <div className="relative rounded-[4px]">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-black/45">
                   <Lock size={16} />
                 </div>
                 <input
@@ -171,7 +260,8 @@ export default function LoginSignup({ isNewUser, onLoginSuccess, onBack }: Login
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full pl-10 pr-3.5 py-3 text-slate-800 text-sm bg-white/80 border border-slate-200/80 rounded-xl placeholder-slate-400 font-semibold shadow-[inset_2px_2px_4px_rgba(0,0,0,0.02),_inset_-2px_-2px_4px_rgba(255,255,255,0.9)] focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all"
+                  className="clay-input w-full"
+                  style={{ paddingLeft: '40px' }}
                 />
               </div>
             </div>
@@ -184,14 +274,14 @@ export default function LoginSignup({ isNewUser, onLoginSuccess, onBack }: Login
                     name="remember-me"
                     type="checkbox"
                     defaultChecked
-                    className="h-4 w-4 text-indigo-650 border-2 border-slate-200 rounded focus:ring-indigo-600"
+                    className="h-4 w-4 text-[#0070d1] border-[#cccccc] rounded-[4px] focus:ring-[#0070d1]"
                   />
-                  <label htmlFor="remember-me" className="ml-2 block text-xs text-slate-500 select-none font-bold">
+                  <label htmlFor="remember-me" className="ml-2 block text-xs text-black/60 select-none font-bold">
                     Remember session
                   </label>
                 </div>
                 <div className="text-xs">
-                  <a href="#" className="font-bold text-indigo-600 hover:underline">
+                  <a href="#" className="font-bold text-[#0070d1] hover:underline">
                     Forgot key?
                   </a>
                 </div>
@@ -203,17 +293,17 @@ export default function LoginSignup({ isNewUser, onLoginSuccess, onBack }: Login
                 type="submit"
                 id="submit-auth-btn"
                 disabled={loading}
-                className="w-full py-3.5 clay-morph-indigo-btn disabled:opacity-50 text-white rounded-xl text-sm font-black flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg focus:outline-none cursor-pointer uppercase tracking-wider"
+                className="w-full py-3.5 clay-button-primary disabled:opacity-50 text-white rounded-full text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider h-11"
               >
                 {loading ? (
                   <>
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2 size={16} className="animate-spin mr-1.5" />
                     Connecting...
                   </>
                 ) : (
                   <>
                     {isSignMode === 'signin' ? 'Sign In' : 'Create Account'}
-                    <ArrowRight size={16} />
+                    <ArrowRight size={16} className="ml-1.5" />
                   </>
                 )}
               </button>
@@ -223,10 +313,10 @@ export default function LoginSignup({ isNewUser, onLoginSuccess, onBack }: Login
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-250" />
+                <div className="w-full border-t border-slate-200" />
               </div>
               <div className="relative flex justify-center text-[10px]">
-                <span className="bg-[#fbfcff] px-3 text-slate-400 uppercase font-helvetica tracking-widest font-black">
+                <span className="bg-white px-3 text-black/45 uppercase font-sans tracking-widest font-bold">
                   Secure SSO Option
                 </span>
               </div>
@@ -237,7 +327,7 @@ export default function LoginSignup({ isNewUser, onLoginSuccess, onBack }: Login
                 type="button"
                 id="google-login-btn"
                 onClick={handleGoogleLogin}
-                className="w-full inline-flex justify-center items-center gap-2.5 py-3 px-4 clay-morph-white-btn text-slate-700 hover:text-slate-900 text-xs font-black shadow-sm focus:outline-none cursor-pointer uppercase tracking-wider"
+                className="w-full inline-flex justify-center items-center gap-2.5 py-3 px-4 clay-button-secondary text-black text-xs font-bold cursor-pointer uppercase tracking-wider h-11"
               >
                 {/* SVG Google G icon */}
                 <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none">

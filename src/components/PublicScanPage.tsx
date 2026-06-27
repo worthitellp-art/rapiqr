@@ -1,29 +1,38 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AlertTriangle, Navigation, PhoneCall, Send, Loader2, CheckCircle } from 'lucide-react';
+import { AlertTriangle, Navigation, PhoneCall, Send, Loader2, CheckCircle, Plus } from 'lucide-react';
 import { Vehicle, QRCodeData, Report } from '../types';
 
-const clayCard: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.85)',
-  backdropFilter: 'blur(16px)',
-  border: '1px solid rgba(255,255,255,0.9)',
-  borderRadius: 20,
-  boxShadow: 'inset 4px 4px 10px rgba(255,255,255,0.95), inset -4px -4px 10px rgba(59,130,246,0.06), 0 12px 28px -6px rgba(59,130,246,0.12)',
+
+const cardStyle: React.CSSProperties = {
+  background: '#ffffff',
+  border: '1px solid #e5e7eb',
+  borderRadius: 12,
+  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
 };
 
-const clayBtn: React.CSSProperties = {
-  background: '#3B82F6',
+const btnStyle: React.CSSProperties = {
+  background: '#0070d1',
   color: '#fff',
-  border: '1px solid rgba(255,255,255,0.15)',
-  borderRadius: 14,
-  boxShadow: 'inset 3px 3px 8px rgba(255,255,255,0.3), inset -3px -3px 8px rgba(0,0,0,0.1), 0 6px 16px rgba(59,130,246,0.2)',
+  border: 'none',
+  borderRadius: 9999,
+  fontSize: '15px',
+  fontWeight: 700,
+  letterSpacing: '0.5px',
+  textTransform: 'uppercase',
+  height: '52px',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 };
 
-const clayBadge: React.CSSProperties = {
-  background: '#3B82F6',
+const badgeStyle: React.CSSProperties = {
+  background: '#0070d1',
   color: '#fff',
-  borderRadius: 16,
-  boxShadow: 'inset 2px 2px 4px rgba(255,255,255,0.25), inset -2px -2px 4px rgba(0,0,0,0.08)',
+  borderRadius: 9999,
+  fontSize: '13px',
+  fontWeight: 700,
+  padding: '6px 16px',
 };
 
 type ReportType = 'wrong_parking' | 'accident' | 'contact_owner';
@@ -51,10 +60,20 @@ export default function PublicScanPage({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  // Activation form states
+  const [carMake, setCarMake] = useState('');
+  const [carModel, setCarModel] = useState('');
+  const [carColor, setCarColor] = useState('');
+  const [carPlate, setCarPlate] = useState('');
+  const [isActivating, setIsActivating] = useState(false);
+  const [activationProgress, setActivationProgress] = useState(0);
+  const [activationSuccess, setActivationSuccess] = useState(false);
+  const [activationError, setActivationError] = useState('');
+
   const reportTypeMeta: Record<ReportType, { icon: any; label: string; color: string }> = {
-    wrong_parking: { icon: Navigation, label: 'Parking', color: '#D97706' },
-    accident: { icon: AlertTriangle, label: 'Hazard', color: '#DC2626' },
-    contact_owner: { icon: PhoneCall, label: 'Contact', color: '#3B82F6' },
+    wrong_parking: { icon: Navigation, label: 'Parking', color: '#0070d1' },
+    accident: { icon: AlertTriangle, label: 'Hazard', color: '#c81b3a' },
+    contact_owner: { icon: PhoneCall, label: 'Contact', color: '#d53b00' },
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -76,36 +95,181 @@ export default function PublicScanPage({
     }, 800);
   };
 
+  const handleActivate = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsActivating(true);
+    setActivationProgress(0);
+
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += 10;
+      setActivationProgress(progress);
+      if (progress >= 100) {
+        clearInterval(interval);
+        
+        const nextVehId = `V-${Date.now().toString().slice(-4)}`;
+        const randomPlate = `N-${Math.floor(1000 + Math.random() * 9000)}`;
+        const newVehicle: Vehicle = {
+          id: nextVehId,
+          make: 'Generic',
+          model: 'Vehicle',
+          year: new Date().getFullYear(),
+          color: 'Default',
+          licensePlate: randomPlate,
+          status: 'active',
+          qrCodeUrl: qrCodeId,
+          createdAt: new Date().toISOString(),
+        };
+
+        const updatedQrCode: QRCodeData = {
+          id: qrCodeId,
+          vehicleId: nextVehId,
+          status: 'active',
+          scansCount: 0,
+          createdAt: new Date().toISOString(),
+        };
+
+        if (onActivateSticker) {
+          onActivateSticker(newVehicle, updatedQrCode);
+        }
+        setIsActivating(false);
+        setActivationSuccess(true);
+      }
+    }, 150);
+  };
+
+  // Unlinked Sticker/Tag Activation View
   if (!vehicle) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="w-full max-w-xs p-6 text-center" style={clayCard}>
-          <div className="mx-auto w-10 h-10 flex items-center justify-center mb-3" style={{ ...clayBadge, borderRadius: '50%', width: 40, height: 40 }}>
-            <AlertTriangle size={18} />
-          </div>
-          <h2 className="font-serif text-base font-black uppercase tracking-tight mb-1" style={{ color: '#1C398E' }}>No Vehicle Found</h2>
-          <p className="font-sans text-[11px] font-medium mb-4" style={{ color: '#1C398E', opacity: 0.5 }}>This QR tag is not linked to any vehicle yet.</p>
-          <button onClick={onNavigateHome} className="w-full py-2.5 font-sans text-[11px] font-bold uppercase tracking-wider cursor-pointer" style={clayBtn}>
-            Go Home
-          </button>
+      <div className="min-h-screen flex items-center justify-center p-4 md:p-8 bg-[#f5f7fa] font-sans text-black">
+        <div className="w-full max-w-md">
+          <AnimatePresence mode="wait">
+            {!activationSuccess ? (
+              <motion.div
+                key="activation-form"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                <div className="p-6 md:p-8 bg-white border border-[#e5e7eb] rounded-2xl shadow-xl transition-all duration-300 flex flex-col items-center text-center">
+                  {!isActivating ? (
+                    <>
+                      <div className="mx-auto w-12 h-12 flex items-center justify-center mb-4 text-white rounded-full bg-[#0070d1]">
+                        <Plus size={24} />
+                      </div>
+                      <h2 className="font-sans text-2xl font-bold uppercase tracking-tight text-black">Link & Activate Tag</h2>
+                      <p className="font-sans text-sm text-black/60 mt-2 mb-6">
+                        This sticker is currently unlinked. Activate protection below.
+                      </p>
+
+                      <div className="flex gap-4 w-full">
+                        <button
+                          type="button"
+                          onClick={onNavigateHome}
+                          className="flex-1 py-3 border border-slate-200 text-xs font-bold uppercase tracking-wider text-black rounded-full hover:bg-slate-50 transition-all cursor-pointer h-12 flex items-center justify-center"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleActivate}
+                          className="flex-1 py-3 bg-[#0070d1] hover:bg-[#0064b7] text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer h-12 flex items-center justify-center"
+                        >
+                          Activate Tag
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-full py-8 px-4 flex flex-col items-center">
+                      <div className="w-16 h-16 rounded-full border-4 border-[#0070d1]/20 border-t-[#0070d1] animate-spin mb-6" />
+
+                      <div className="w-full space-y-3">
+                        <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-[#0070d1]">
+                          <span>Activating QR Tag...</span>
+                          <span>{Math.round(activationProgress)}%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                          <div 
+                            className="bg-[#0070d1] h-full transition-all duration-75"
+                            style={{ width: `${activationProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="activation-success"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+              >
+                <div className="p-6 md:p-8 bg-white border border-[#e5e7eb] rounded-2xl shadow-xl transition-all duration-300 flex flex-col items-center text-center">
+                  <div className="mx-auto w-12 h-12 flex items-center justify-center mb-4 bg-emerald-100 text-emerald-600 rounded-full">
+                    <CheckCircle size={24} className="fill-emerald-100" />
+                  </div>
+                  <h2 className="font-sans text-2xl font-bold uppercase tracking-tight mb-2 text-black">Tag Activated!</h2>
+                  <p className="font-sans text-xs text-black/60 mb-6 max-w-sm leading-relaxed">
+                    Sticker Tag is now active and protecting your vehicle.
+                  </p>
+
+                  {/* Visual Windshield sticker layout preview (User Side View) */}
+                  {(() => {
+                    const scanUrl = `${window.location.origin}${window.location.pathname}#/scan/${qrCodeId}`;
+                    const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(scanUrl)}`;
+                    
+                    return (
+                      <div className="p-5 bg-black text-white rounded-md border border-white/10 flex flex-col items-center text-center w-full max-w-[240px] shadow-lg mb-6">
+                        <div className="text-[9px] font-bold text-white/50 tracking-wider uppercase mb-2.5">
+                          STICKER ID: {qrCodeId}
+                        </div>
+                        <div className="w-28 h-28 bg-white p-2 rounded-md border flex items-center justify-center border-[#0070d1]">
+                          <img src={qrImgUrl} alt={`QR Code`} className="w-full h-full object-contain" />
+                        </div>
+                        <div className="mt-3.5">
+                          <span className="font-sans font-bold text-xs block uppercase tracking-tight text-white">
+                            DEFAULT VEHICLE
+                          </span>
+                          <span className="text-[9px] font-bold block mt-1 tracking-wider uppercase text-white/60">
+                            PROTECTION ACTIVE
+                          </span>
+                          <span className="text-[7px] font-bold uppercase tracking-widest block mt-2 text-[#0070d1]">
+                            PlayStation Edition
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <button
+                    onClick={onNavigateHome}
+                    className="w-full py-3 bg-[#0070d1] hover:bg-[#0064b7] text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer h-12 flex items-center justify-center"
+                  >
+                    Go to Portal
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen flex items-center justify-center p-4 md:p-8 bg-gradient-to-tr from-slate-50 to-slate-100 font-sans text-black">
+      <div className="w-full max-w-md md:max-w-lg space-y-4">
         {/* ── Section 1: Vehicle Badge ──────────────────── */}
-        <div className="p-3 mb-2.5 flex items-center justify-between gap-2" style={clayCard}>
+        <div className="p-6 bg-white border border-[#f3f3f3] rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <span className="font-helvetica text-[9px] font-bold uppercase tracking-widest" style={{ color: '#3B82F6', opacity: 0.6 }}>Scanned</span>
-            <h3 className="font-serif text-sm font-black uppercase tracking-tight truncate" style={{ color: '#1C398E' }}>
+            <span className="font-sans text-[10px] font-bold uppercase tracking-wider text-[#0070d1]">Scanned Asset</span>
+            <h3 className="font-sans text-lg md:text-xl font-bold uppercase tracking-tight truncate text-black mt-1">
               {vehicle.color} {vehicle.make} {vehicle.model}
             </h3>
-            <p className="font-helvetica text-[10px] font-semibold" style={{ color: '#1C398E', opacity: 0.4 }}>{vehicle.licensePlate}</p>
+            <p className="font-sans text-xs text-black/60 font-semibold mt-0.5">{vehicle.licensePlate}</p>
           </div>
-          <span className="px-2.5 py-1 font-helvetica text-[9px] font-bold uppercase tracking-wider shrink-0" style={clayBadge}>
+          <span className="shrink-0 bg-[#0070d1] text-white rounded-full text-xs font-bold px-4 py-1.5 shadow-xs">
             {qrCodeId}
           </span>
         </div>
@@ -117,10 +281,11 @@ export default function PublicScanPage({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
+              className="space-y-4"
             >
               {/* ── Section 2: Issue Picker ──────────────── */}
-              <div className="p-3 mb-2.5" style={clayCard}>
-                <div className="flex gap-1.5">
+              <div className="p-5 bg-white border border-[#f3f3f3] rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+                <div className="flex gap-3">
                   {(Object.keys(reportTypeMeta) as ReportType[]).map((key) => {
                     const meta = reportTypeMeta[key];
                     const Icon = meta.icon!;
@@ -130,18 +295,14 @@ export default function PublicScanPage({
                         key={key}
                         type="button"
                         onClick={() => setReportType(key)}
-                        className="flex-1 flex flex-col items-center gap-1 py-2.5 px-2 text-center transition-all cursor-pointer active:scale-[0.97]"
-                        style={{
-                          background: isActive ? meta.color : 'rgba(255,255,255,0.4)',
-                          border: `1px solid ${isActive ? meta.color : 'rgba(255,255,255,0.6)'}`,
-                          borderRadius: 14,
-                          boxShadow: isActive
-                            ? 'inset 2px 2px 5px rgba(255,255,255,0.25), inset -2px -2px 5px rgba(0,0,0,0.08)'
-                            : 'inset 2px 2px 5px rgba(255,255,255,0.9), inset -2px -2px 5px rgba(59,130,246,0.03)',
-                        }}
+                        className={`flex-1 flex flex-col items-center gap-2.5 py-4 px-3 text-center transition-all duration-200 cursor-pointer rounded-xl border ${
+                          isActive 
+                            ? 'bg-slate-50 border-slate-900 border-2 scale-[1.02]' 
+                            : 'bg-white border-slate-200 hover:border-slate-300'
+                        }`}
                       >
-                        <Icon size={14} style={{ color: isActive ? '#fff' : '#1C398E' }} />
-                        <span className="font-serif text-[9px] font-black uppercase tracking-tight" style={{ color: isActive ? '#fff' : '#1C398E' }}>
+                        <Icon size={22} className={isActive ? 'text-black' : 'text-black/60'} />
+                        <span className="font-sans text-[10px] md:text-xs font-bold uppercase tracking-wider text-black">
                           {meta.label}
                         </span>
                       </button>
@@ -152,9 +313,9 @@ export default function PublicScanPage({
 
               {/* ── Section 3: Message + Send ────────────── */}
               <form onSubmit={handleSubmit}>
-                <div className="p-3" style={clayCard}>
+                <div className="p-6 bg-white border border-[#f3f3f3] rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
                   <textarea
-                    rows={2}
+                    rows={3}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder={
@@ -164,62 +325,49 @@ export default function PublicScanPage({
                         ? 'e.g. Window left open'
                         : 'e.g. Please call me'
                     }
-                    className="w-full px-3 py-2 text-xs outline-none transition-all font-medium resize-none mb-2.5"
-                    style={{
-                      background: 'rgba(255,255,255,0.5)',
-                      border: '1px solid rgba(255,255,255,0.7)',
-                      borderRadius: 12,
-                      boxShadow: 'inset 2px 2px 5px rgba(59,130,246,0.03), inset -2px -2px 5px rgba(255,255,255,0.8)',
-                      color: '#1C398E',
-                      minHeight: 52,
-                    }}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-[#0070d1] focus:bg-white rounded-xl outline-none transition-all font-sans text-sm md:text-base resize-none mb-4 min-h-[90px]"
                   />
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full py-2.5 font-sans text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 active:scale-[0.98]"
-                    style={clayBtn}
+                    className="w-full py-4 bg-[#0070d1] hover:bg-[#0064b7] text-white text-xs md:text-sm font-bold uppercase tracking-wider rounded-full transition-all duration-200 cursor-pointer shadow-md hover:shadow-lg active:scale-[0.98] h-14 flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     {isSubmitting ? (
-                      <><Loader2 size={14} className="animate-spin" /> Sending...</>
+                      <><Loader2 size={16} className="animate-spin mr-1.5" /> Sending...</>
                     ) : (
-                      <><Send size={14} /> Send Alert</>
+                      <><Send size={16} className="mr-1.5" /> Send Alert</>
                     )}
                   </button>
                 </div>
               </form>
             </motion.div>
           ) : (
-            <motion.div
+            <div
               key="success"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="p-5 text-center" style={clayCard}
+              className="p-8 text-center bg-white border border-[#f3f3f3] rounded-2xl shadow-xl transition-all duration-300 flex flex-col items-center"
             >
-              <div className="mx-auto w-12 h-12 flex items-center justify-center mb-3" style={{ ...clayBadge, background: '#16A34A', borderRadius: '50%', width: 48, height: 48 }}>
-                <CheckCircle size={22} />
+              <div className="w-12 h-12 flex items-center justify-center mb-4 bg-emerald-100 text-emerald-600 rounded-full">
+                <CheckCircle size={24} className="fill-emerald-100" />
               </div>
-              <h2 className="font-serif text-lg font-black uppercase tracking-tight mb-1" style={{ color: '#1C398E' }}>Alert Sent</h2>
-              <p className="font-sans text-[11px] font-medium mb-4" style={{ color: '#1C398E', opacity: 0.55 }}>
-                Owner notified. Your contact stays private.
+              <h2 className="font-sans text-2xl font-bold uppercase tracking-tight mb-2 text-black">Alert Dispatched</h2>
+              <p className="font-sans text-xs text-black/60 mb-6 max-w-sm leading-relaxed">
+                Owner has been notified privately. Your contact number remains completely secure.
               </p>
+              
               <button
                 onClick={() => { setSubmitted(false); setMessage(''); }}
-                className="w-full py-2.5 mb-2 font-sans text-[11px] font-bold uppercase tracking-wider cursor-pointer transition-all active:scale-[0.98]"
-                style={{
-                  ...clayBtn,
-                  background: 'rgba(255,255,255,0.7)',
-                  color: '#1C398E',
-                  boxShadow: 'inset 3px 3px 8px rgba(255,255,255,0.95), inset -3px -3px 8px rgba(59,130,246,0.06), 0 4px 10px rgba(59,130,246,0.06)',
-                }}
+                className="w-full py-3.5 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-black rounded-full hover:bg-slate-50 transition-all cursor-pointer h-12 flex items-center justify-center mb-3"
               >
                 Send Another
               </button>
-              <button onClick={onNavigateHome} className="w-full py-2.5 font-sans text-[11px] font-bold uppercase tracking-wider cursor-pointer active:scale-[0.98]" style={clayBtn}>
+              
+              <button 
+                onClick={onNavigateHome} 
+                className="w-full py-3.5 bg-[#0070d1] hover:bg-[#0064b7] text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer h-12 flex items-center justify-center"
+              >
                 Done
               </button>
-            </motion.div>
+            </div>
           )}
         </AnimatePresence>
       </div>
