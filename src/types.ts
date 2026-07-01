@@ -5,32 +5,109 @@
 
 export type PageRoute = 'landing' | 'login' | 'signup' | 'dashboard' | 'scan';
 
-export interface Vehicle {
+export type ProductCategory =
+  | 'car'
+  | 'bike'
+  | 'home'
+  | 'luggage'
+  | 'keychain'
+  | 'child'
+  | 'pet'
+  | 'wallet'
+  | 'employee'
+  | 'senior'
+  | 'helmet'
+  | 'bicycle'
+  | 'door'
+  | 'apartment'
+  | 'nfc'
+  | 'travel'
+  | 'wristband';
+
+export type ProductStatus = 'active' | 'inactive' | 'lost' | 'replaced';
+
+export interface NamoProduct {
   id: string;
-  make: string;
-  model: string;
-  year: number;
-  color: string;
-  licensePlate: string;
-  status: 'active' | 'inactive';
-  qrCodeUrl: string; // The URL representing this code
+  category: ProductCategory;
+  name: string; // E.g., "Mihir's Tesla" or "Home Gate Sticker"
+  status: ProductStatus;
+  qrCodeId: string; // The URL/ID representing this code
+  assignedTo: string; // E.g., "Self", "Dad", "Aarav"
   createdAt: string;
+  lastScannedAt?: string;
+  scansCount: number;
+  warrantyExpiresAt?: string;
+  details: {
+    // Car & Bike Sticker
+    make?: string;
+    model?: string;
+    year?: number;
+    color?: string;
+    licensePlate?: string;
+    insuranceDetails?: string;
+    serviceReminders?: string[];
+
+    // Home Gate Sticker
+    familyContacts?: { name: string; relation: string; phone: string }[];
+    houseProfile?: string; // E.g., "Apartment 4B, Green Glen"
+    emergencyInstructions?: string;
+    availabilityStatus?: 'available' | 'away' | 'do_not_disturb';
+
+    // Luggage Sticker
+    travelMode?: boolean;
+    ownerName?: string;
+    recoverySupportPhone?: string;
+    lostFoundNote?: string;
+
+    // Keychain
+    bloodGroup?: string;
+    medicalConditions?: string;
+    allergies?: string;
+    sosContacts?: { name: string; phone: string }[];
+    liveLocationSharing?: boolean;
+
+    // Child school bag sticker & keychain
+    parentNotificationEmail?: string;
+    guardianContacts?: { name: string; phone: string }[];
+    schoolName?: string;
+    pickupVerificationCode?: string;
+    busDetails?: string;
+    safeLocations?: string[];
+  };
 }
+
+// Backward compatibility alias for parts of codebase not fully migrated yet
+export type Vehicle = NamoProduct;
 
 export interface QRCodeData {
   id: string; // Unique code (e.g., "QR-8A3F")
-  vehicleId: string | null; // Null means unlinked/unassigned
+  vehicleId: string | null; // Null means unlinked/unassigned (keeps vehicleId name for backward compat)
   status: 'active' | 'unlinked';
   scansCount: number;
   createdAt: string;
 }
 
+export type ReportType =
+  | 'accident'
+  | 'wrong_parking'
+  | 'contact_owner'
+  | 'medical_emergency'
+  | 'fire_emergency'
+  | 'water_leakage'
+  | 'gas_leakage'
+  | 'security_alert'
+  | 'courier_arrival'
+  | 'visitor_notification'
+  | 'lost_luggage'
+  | 'lost_key'
+  | 'lost_child';
+
 export interface Report {
   id: string;
-  vehicleId: string;
-  vehicleLabel: string; // Dynamic label like "Tesla Model 3 (Black)"
-  licensePlate: string;
-  type: 'accident' | 'wrong_parking' | 'contact_owner';
+  vehicleId: string; // Maps to product ID for compatibility
+  vehicleLabel: string; // Dynamic label like "Tesla Model 3" or "Home Gate"
+  licensePlate?: string; // Optional for non-vehicles
+  type: ReportType;
   message: string;
   location: {
     lat: number;

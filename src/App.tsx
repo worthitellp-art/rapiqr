@@ -10,7 +10,7 @@ import {
   INITIAL_QR_CODES,
   INITIAL_REPORTS
 } from './data';
-import { Vehicle, QRCodeData, Report, UserProfile } from './types';
+import { NamoProduct, QRCodeData, Report, UserProfile } from './types';
 import LandingPage from './components/LandingPage';
 import LoginSignup from './components/LoginSignup';
 import DashboardView from './components/DashboardView';
@@ -23,8 +23,8 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_USER;
   });
 
-  const [vehicles, setVehicles] = useState<Vehicle[]>(() => {
-    const saved = localStorage.getItem('qr_vehicles');
+  const [products, setProducts] = useState<NamoProduct[]>(() => {
+    const saved = localStorage.getItem('qr_products');
     return saved ? JSON.parse(saved) : INITIAL_VEHICLES;
   });
 
@@ -48,8 +48,8 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
-    localStorage.setItem('qr_vehicles', JSON.stringify(vehicles));
-  }, [vehicles]);
+    localStorage.setItem('qr_products', JSON.stringify(products));
+  }, [products]);
 
   useEffect(() => {
     localStorage.setItem('qr_codes', JSON.stringify(qrCodes));
@@ -138,15 +138,30 @@ export default function App() {
         return q;
       })
     );
+
+    // Update scan counters on the associated product
+    setProducts((prevProds) =>
+      prevProds.map((p) => {
+        const matchFound = p.id === newReportData.vehicleId || p.qrCodeId === activeQrCodeId;
+        if (matchFound) {
+          return {
+            ...p,
+            scansCount: p.scansCount + 1,
+            lastScannedAt: new Date().toISOString()
+          };
+        }
+        return p;
+      })
+    );
   };
 
-  const handleActivateSticker = (newVehicle: Vehicle, updatedQrCode: QRCodeData) => {
-    setVehicles((prev) => [newVehicle, ...prev]);
+  const handleActivateSticker = (newProduct: NamoProduct, updatedQrCode: QRCodeData) => {
+    setProducts((prev) => [newProduct, ...prev]);
     setQrCodes((prev) => prev.map((q) => q.id === updatedQrCode.id ? updatedQrCode : q));
   };
 
   return (
-    <div className="bg-stone-50 min-h-screen">
+    <div className="bg-[#050508] min-h-screen text-white">
       {currentRoute === 'landing' && (
         <LandingPage
           onStart={() => navigateTo(user.isLoggedIn ? '#/dashboard' : '#/signup')}
@@ -174,11 +189,11 @@ export default function App() {
       {currentRoute === 'dashboard' && (
         <DashboardView
           user={user}
-          vehicles={vehicles}
+          products={products}
           qrCodes={qrCodes}
           reports={reports}
           onLogout={handleLogout}
-          onUpdateVehicles={(updatedVehs) => setVehicles(updatedVehs)}
+          onUpdateProducts={(updatedProds) => setProducts(updatedProds)}
           onUpdateQrCodes={(updatedQrs) => setQrCodes(updatedQrs)}
           onUpdateReports={(updatedReps) => setReports(updatedReps)}
           onUpdateUser={(updatedProf) => setUser(updatedProf)}
@@ -189,7 +204,7 @@ export default function App() {
       {currentRoute === 'scan' && (
         <PublicScanPage
           qrCodeId={activeQrCodeId}
-          vehicles={vehicles}
+          products={products}
           qrCodes={qrCodes}
           onActivateSticker={handleActivateSticker}
           onSubmitReport={handleAddNewReport}

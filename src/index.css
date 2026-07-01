@@ -5,13 +5,13 @@
   --font-serif: "Roboto", Helvetica, Arial, sans-serif;
   --font-helvetica: "Inter", Helvetica, Arial, sans-serif;
   
-  --color-primary: #0070d1;
-  --color-primary-pressed: #0064b7;
-  --color-primary-active: #004d8d;
+  --color-primary: #f97316;
+  --color-primary-pressed: #ea580c;
+  --color-primary-active: #c2410c;
   --color-commerce: #d53b00;
   --color-commerce-pressed: #aa2f00;
   --color-dark: #0f172a;
-  --color-success: #0070d1; /* PlayStation doesn't use green for main action, fallback to primary */
+  --color-success: #f97316; /* PlayStation doesn't use green for main action, fallback to primary */
   --color-warning: #c81b3a;
   --color-danger: #c81b3a;
   --color-gold: #f5a623;

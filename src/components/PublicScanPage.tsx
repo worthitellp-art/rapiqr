@@ -1,101 +1,164 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AlertTriangle, Navigation, PhoneCall, Send, Loader2, CheckCircle, Plus } from 'lucide-react';
-import { Vehicle, QRCodeData, Report } from '../types';
-
-
-const cardStyle: React.CSSProperties = {
-  background: '#ffffff',
-  border: '1px solid #e5e7eb',
-  borderRadius: 12,
-  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
-};
-
-const btnStyle: React.CSSProperties = {
-  background: '#0070d1',
-  color: '#fff',
-  border: 'none',
-  borderRadius: 9999,
-  fontSize: '15px',
-  fontWeight: 700,
-  letterSpacing: '0.5px',
-  textTransform: 'uppercase',
-  height: '52px',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-};
-
-const badgeStyle: React.CSSProperties = {
-  background: '#0070d1',
-  color: '#fff',
-  borderRadius: 9999,
-  fontSize: '13px',
-  fontWeight: 700,
-  padding: '6px 16px',
-};
-
-type ReportType = 'wrong_parking' | 'accident' | 'contact_owner';
+import { 
+  AlertTriangle, 
+  Navigation, 
+  PhoneCall, 
+  Send, 
+  Loader2, 
+  CheckCircle, 
+  Plus, 
+  Flame, 
+  Droplet, 
+  Activity, 
+  Package, 
+  ShieldAlert, 
+  Users, 
+  Briefcase, 
+  Heart, 
+  Key, 
+  Backpack, 
+  MapPin, 
+  Compass, 
+  Info,
+  ShieldCheck,
+  UserCheck,
+  Smartphone,
+  Car,
+  Bike,
+  Home,
+  Luggage
+} from 'lucide-react';
+import { NamoProduct, QRCodeData, Report, ReportType } from '../types';
 
 interface PublicScanPageProps {
   qrCodeId: string;
-  vehicles: Vehicle[];
+  products: NamoProduct[];
   qrCodes?: QRCodeData[];
-  onActivateSticker?: (newVehicle: Vehicle, updatedQrCode: QRCodeData) => void;
+  onActivateSticker?: (newProduct: NamoProduct, updatedQrCode: QRCodeData) => void;
   onSubmitReport: (report: Omit<Report, 'id' | 'createdAt' | 'status'>) => void;
   onNavigateHome: () => void;
 }
 
 export default function PublicScanPage({
   qrCodeId,
-  vehicles,
+  products,
   qrCodes,
   onActivateSticker,
   onSubmitReport,
   onNavigateHome,
 }: PublicScanPageProps) {
-  const vehicle = vehicles.find((v) => v.qrCodeUrl === qrCodeId || v.id === qrCodeId);
-  const [reportType, setReportType] = useState<ReportType>('wrong_parking');
+  // Find product by QR link
+  const product = products.find((p) => p.qrCodeId === qrCodeId || p.id === qrCodeId);
+  
+  const [reportType, setReportType] = useState<ReportType>('contact_owner');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  // Activation form states
+  // Home Gate specifically
+  const [selectedHomeAlert, setSelectedHomeAlert] = useState<ReportType>('visitor_notification');
+  
+  // Child Verification specifically
+  const [pickupCodeInput, setPickupCodeInput] = useState('');
+  const [pickupVerifierName, setPickupVerifierName] = useState('');
+  const [verificationFeedback, setVerificationFeedback] = useState<'idle' | 'success' | 'fail'>('idle');
+
+  // Key / Luggage finder contact details
+  const [finderPhone, setFinderPhone] = useState('');
+
+  // Activation flow states
+  const [activationProgress, setActivationProgress] = useState(0);
+  const [isActivating, setIsActivating] = useState(false);
+  const [activationSuccess, setActivationSuccess] = useState(false);
+  const [activationCategory, setActivationCategory] = useState<'car' | 'bike' | 'home' | 'luggage' | 'keychain' | 'child'>('car');
+
+  // Activation detail form states
   const [carMake, setCarMake] = useState('');
   const [carModel, setCarModel] = useState('');
   const [carColor, setCarColor] = useState('');
   const [carPlate, setCarPlate] = useState('');
-  const [isActivating, setIsActivating] = useState(false);
-  const [activationProgress, setActivationProgress] = useState(0);
-  const [activationSuccess, setActivationSuccess] = useState(false);
-  const [activationError, setActivationError] = useState('');
 
-  const reportTypeMeta: Record<ReportType, { icon: any; label: string; color: string }> = {
-    wrong_parking: { icon: Navigation, label: 'Parking', color: '#0070d1' },
-    accident: { icon: AlertTriangle, label: 'Hazard', color: '#c81b3a' },
-    contact_owner: { icon: PhoneCall, label: 'Contact', color: '#d53b00' },
+  // Map report types to label & design styles
+  const getAlertMeta = (type: ReportType) => {
+    switch (type) {
+      case 'accident':
+        return { label: 'Accident/Hazard', icon: AlertTriangle, color: '#c81b3a' };
+      case 'wrong_parking':
+        return { label: 'Wrong Parking', icon: Navigation, color: '#d53b00' };
+      case 'medical_emergency':
+        return { label: 'Medical Alert', icon: Activity, color: '#c81b3a' };
+      case 'fire_emergency':
+        return { label: 'Fire Emergency', icon: Flame, color: '#c81b3a' };
+      case 'water_leakage':
+        return { label: 'Water Leak', icon: Droplet, color: '#0070d1' };
+      case 'gas_leakage':
+        return { label: 'Gas Leak', icon: ShieldAlert, color: '#d53b00' };
+      case 'security_alert':
+        return { label: 'Security Alert', icon: ShieldCheck, color: '#c81b3a' };
+      case 'courier_arrival':
+        return { label: 'Courier Delivery', icon: Package, color: '#0070d1' };
+      case 'visitor_notification':
+        return { label: 'Visitor Ring', icon: Users, color: '#0070d1' };
+      case 'lost_luggage':
+        return { label: 'Luggage Found', icon: Briefcase, color: '#f97316' };
+      case 'lost_key':
+        return { label: 'Lost Keys Recovery', icon: Key, color: '#f97316' };
+      case 'lost_child':
+        return { label: 'Child Lost Help', icon: Backpack, color: '#c81b3a' };
+      case 'contact_owner':
+      default:
+        return { label: 'Contact Owner', icon: PhoneCall, color: '#f97316' };
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleAlertSubmit = (e: React.FormEvent, customType?: ReportType, customMsg?: string) => {
     e.preventDefault();
-    if (!vehicle) return;
+    if (!product) return;
     setIsSubmitting(true);
+    
+    const finalType = customType || reportType;
+    const finalMsg = customMsg || message || `Emergency update scanned via QR Tag ${qrCodeId}`;
+
     setTimeout(() => {
       onSubmitReport({
-        vehicleId: vehicle.id,
-        vehicleLabel: `${vehicle.color} ${vehicle.make} ${vehicle.model}`,
-        licensePlate: vehicle.licensePlate,
-        type: reportType,
-        message: message || `Alert via ${qrCodeId}`,
-        location: null,
-        reporterPhone: undefined,
+        vehicleId: product.id,
+        vehicleLabel: product.name,
+        licensePlate: product.details.licensePlate || undefined,
+        type: finalType,
+        message: finalMsg,
+        location: {
+          lat: 37.7749 + (Math.random() - 0.5) * 0.01,
+          lng: -122.4194 + (Math.random() - 0.5) * 0.01,
+          accuracy: 10,
+          timestamp: new Date().toISOString()
+        },
+        reporterPhone: finderPhone || undefined
       });
       setIsSubmitting(false);
       setSubmitted(true);
-    }, 800);
+    }, 850);
   };
 
-  const handleActivate = (e: React.FormEvent) => {
+  const handleVerifyPickup = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!product || product.category !== 'child') return;
+    if (pickupCodeInput.trim() === (product.details.pickupVerificationCode || '9574-SAFE')) {
+      setVerificationFeedback('success');
+      // Create visitor alert
+      onSubmitReport({
+        vehicleId: product.id,
+        vehicleLabel: product.name,
+        type: 'visitor_notification',
+        message: `GUARDIAN VERIFIED: ${pickupVerifierName} has verified and picked up the child.`,
+        location: null,
+      });
+    } else {
+      setVerificationFeedback('fail');
+    }
+  };
+
+  const handleActivateNewTag = (e: React.FormEvent) => {
     e.preventDefault();
     setIsActivating(true);
     setActivationProgress(0);
@@ -106,149 +169,252 @@ export default function PublicScanPage({
       setActivationProgress(progress);
       if (progress >= 100) {
         clearInterval(interval);
+
+        const nextProductId = `P-${Date.now().toString().slice(-4)}`;
         
-        const nextVehId = `V-${Date.now().toString().slice(-4)}`;
-        const randomPlate = `N-${Math.floor(1000 + Math.random() * 9000)}`;
-        const newVehicle: Vehicle = {
-          id: nextVehId,
-          make: 'Generic',
-          model: 'Vehicle',
-          year: new Date().getFullYear(),
-          color: 'Default',
-          licensePlate: randomPlate,
+        let initialDetails: NamoProduct['details'] = {};
+        if (activationCategory === 'car') {
+          initialDetails = {
+            make: carMake || 'Tesla',
+            model: carModel || 'Model Y',
+            color: carColor || 'Black',
+            licensePlate: carPlate.toUpperCase() || 'N-QR-PLAY',
+          };
+        } else if (activationCategory === 'bike') {
+          initialDetails = {
+            make: 'Honda',
+            model: 'CB300R',
+            color: 'Matte Black',
+            licensePlate: 'BK-9912',
+          };
+        } else if (activationCategory === 'home') {
+          initialDetails = {
+            houseProfile: 'Villa 12, Park Street',
+            emergencyInstructions: 'Main electrical fuse is inside the left boundary wall.',
+            availabilityStatus: 'available',
+            familyContacts: [{ name: 'Mihir Rathod', relation: 'Owner', phone: '+1 (555) 0192' }]
+          };
+        } else if (activationCategory === 'keychain') {
+          initialDetails = {
+            bloodGroup: 'B+',
+            medicalConditions: 'Asthma',
+            allergies: 'Peanuts',
+            sosContacts: [{ name: 'Family Guard', phone: '+1 (555) 0192' }]
+          };
+        }
+
+        const newProduct: NamoProduct = {
+          id: nextProductId,
+          category: activationCategory,
+          name: `My NamoQR ${activationCategory.toUpperCase()}`,
           status: 'active',
-          qrCodeUrl: qrCodeId,
+          qrCodeId: qrCodeId,
+          assignedTo: 'Self',
           createdAt: new Date().toISOString(),
+          scansCount: 0,
+          details: initialDetails,
         };
 
         const updatedQrCode: QRCodeData = {
           id: qrCodeId,
-          vehicleId: nextVehId,
+          vehicleId: nextProductId,
           status: 'active',
           scansCount: 0,
           createdAt: new Date().toISOString(),
         };
 
         if (onActivateSticker) {
-          onActivateSticker(newVehicle, updatedQrCode);
+          onActivateSticker(newProduct, updatedQrCode);
         }
         setIsActivating(false);
         setActivationSuccess(true);
       }
-    }, 150);
+    }, 120);
   };
 
-  // Unlinked Sticker/Tag Activation View
-  if (!vehicle) {
+  // ────────────────────────────────────────────────────────
+  // UNLINKED TAG ACTIVATION WIZARD VIEW
+  // ────────────────────────────────────────────────────────
+  if (!product) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 md:p-8 bg-[#f5f7fa] font-sans text-black">
-        <div className="w-full max-w-md">
+      <div className="min-h-screen flex items-center justify-center p-4 md:p-8 bg-[#050508] font-sans text-white">
+        <div className="w-full max-w-lg">
           <AnimatePresence mode="wait">
             {!activationSuccess ? (
               <motion.div
-                key="activation-form"
-                initial={{ opacity: 0, y: 10 }}
+                key="activation-wizard"
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
+                exit={{ opacity: 0, y: -15 }}
+                className="p-6 md:p-8 bg-[#111115] border border-[#222] rounded-2xl shadow-2xl"
               >
-                <div className="p-6 md:p-8 bg-white border border-[#e5e7eb] rounded-2xl shadow-xl transition-all duration-300 flex flex-col items-center text-center">
-                  {!isActivating ? (
-                    <>
-                      <div className="mx-auto w-12 h-12 flex items-center justify-center mb-4 text-white rounded-full bg-[#0070d1]">
-                        <Plus size={24} />
+                {!isActivating ? (
+                  <form onSubmit={handleActivateNewTag} className="space-y-6">
+                    <div className="flex items-center gap-3 border-b border-white/5 pb-4">
+                      <div className="w-10 h-10 rounded-full bg-[#f97316]/10 flex items-center justify-center text-[#f97316]">
+                        <QrCode size={20} />
                       </div>
-                      <h2 className="font-sans text-2xl font-bold uppercase tracking-tight text-black">Link & Activate Tag</h2>
-                      <p className="font-sans text-sm text-black/60 mt-2 mb-6">
-                        This sticker is currently unlinked. Activate protection below.
-                      </p>
-
-                      <div className="flex gap-4 w-full">
-                        <button
-                          type="button"
-                          onClick={onNavigateHome}
-                          className="flex-1 py-3 border border-slate-200 text-xs font-bold uppercase tracking-wider text-black rounded-full hover:bg-slate-50 transition-all cursor-pointer h-12 flex items-center justify-center"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleActivate}
-                          className="flex-1 py-3 bg-[#0070d1] hover:bg-[#0064b7] text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer h-12 flex items-center justify-center"
-                        >
-                          Activate Tag
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="w-full py-8 px-4 flex flex-col items-center">
-                      <div className="w-16 h-16 rounded-full border-4 border-[#0070d1]/20 border-t-[#0070d1] animate-spin mb-6" />
-
-                      <div className="w-full space-y-3">
-                        <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-[#0070d1]">
-                          <span>Activating QR Tag...</span>
-                          <span>{Math.round(activationProgress)}%</span>
-                        </div>
-                        <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                          <div 
-                            className="bg-[#0070d1] h-full transition-all duration-75"
-                            style={{ width: `${activationProgress}%` }}
-                          />
-                        </div>
+                      <div className="text-left">
+                        <h2 className="text-lg font-bold uppercase tracking-wide">Link Physical Sticker</h2>
+                        <p className="text-[10px] text-white/50 uppercase tracking-widest font-mono">Sticker Serial: {qrCodeId}</p>
                       </div>
                     </div>
-                  )}
-                </div>
+
+                    {/* Step 1: Select Category */}
+                    <div className="space-y-3">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/50">Select Product Type</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { category: 'car', icon: Car, label: 'Car Sticker' },
+                          { category: 'bike', icon: Bike, label: 'Bike Tag' },
+                          { category: 'home', icon: Home, label: 'Home Gate' },
+                          { category: 'luggage', icon: Luggage, label: 'Luggage Tag' },
+                          { category: 'keychain', icon: Key, label: 'Keychain' },
+                          { category: 'child', icon: Backpack, label: 'Child Bag' },
+                        ].map((cat) => {
+                          const Icon = cat.icon;
+                          const isSel = activationCategory === cat.category;
+                          return (
+                            <button
+                              key={cat.category}
+                              type="button"
+                              onClick={() => setActivationCategory(cat.category as any)}
+                              className={`p-3 rounded-lg border text-center flex flex-col items-center gap-2 transition-all cursor-pointer ${
+                                isSel ? 'bg-[#f97316]/15 border-[#f97316] text-[#f97316]' : 'bg-[#18181c] border-white/10 text-white/60 hover:text-white'
+                              }`}
+                            >
+                              <Icon size={20} />
+                              <span className="text-[9px] font-bold uppercase tracking-wide leading-none">{cat.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Step 2: Input product details based on choice */}
+                    {activationCategory === 'car' && (
+                      <div className="space-y-4 pt-2 border-t border-white/5 text-left">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-[#f97316]">Car Parameters</span>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[9px] font-bold text-white/60 uppercase mb-1">Make</label>
+                            <input 
+                              type="text" 
+                              required 
+                              placeholder="e.g. BMW, Tesla" 
+                              value={carMake} 
+                              onChange={(e) => setCarMake(e.target.value)}
+                              className="w-full bg-[#18181c] border border-white/10 rounded p-2.5 text-xs text-white outline-none focus:border-[#f97316]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-bold text-white/60 uppercase mb-1">Model</label>
+                            <input 
+                              type="text" 
+                              required 
+                              placeholder="e.g. M3, Model Y" 
+                              value={carModel} 
+                              onChange={(e) => setCarModel(e.target.value)}
+                              className="w-full bg-[#18181c] border border-white/10 rounded p-2.5 text-xs text-white outline-none focus:border-[#f97316]"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[9px] font-bold text-white/60 uppercase mb-1">Color</label>
+                            <input 
+                              type="text" 
+                              required 
+                              placeholder="e.g. Matte Gray" 
+                              value={carColor} 
+                              onChange={(e) => setCarColor(e.target.value)}
+                              className="w-full bg-[#18181c] border border-white/10 rounded p-2.5 text-xs text-white outline-none focus:border-[#f97316]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-bold text-white/60 uppercase mb-1">License Plate</label>
+                            <input 
+                              type="text" 
+                              required 
+                              placeholder="e.g. CA-QR-42" 
+                              value={carPlate} 
+                              onChange={(e) => setCarPlate(e.target.value)}
+                              className="w-full bg-[#18181c] border border-white/10 rounded p-2.5 text-xs text-white uppercase font-mono tracking-wider outline-none focus:border-[#f97316]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {activationCategory !== 'car' && (
+                      <div className="p-4 bg-[#18181c] border border-white/5 rounded text-left">
+                        <p className="text-xs text-white/60 leading-relaxed font-sans">
+                          You are activating a <strong className="text-white uppercase">{activationCategory} tag</strong>. Product-specific forms, SOS links, and contact parameters will be automatically pre-configured.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex gap-4 pt-4 border-t border-white/5">
+                      <button
+                        type="button"
+                        onClick={onNavigateHome}
+                        className="flex-1 py-3 bg-[#1c1c24] hover:bg-[#272733] border border-white/10 text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 py-3 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer"
+                      >
+                        Activate QR Tag
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="py-12 flex flex-col items-center">
+                    <div className="w-14 h-14 rounded-full border-4 border-[#f97316]/10 border-t-[#f97316] animate-spin mb-6" />
+                    <span className="text-sm font-bold uppercase tracking-wider text-[#f97316] animate-pulse">
+                      Activating Ecosystem Link...
+                    </span>
+                    <div className="w-48 bg-[#1c1c24] h-1.5 rounded-full overflow-hidden mt-4">
+                      <div 
+                        className="bg-[#f97316] h-full transition-all duration-150" 
+                        style={{ width: `${activationProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </motion.div>
             ) : (
               <motion.div
                 key="activation-success"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
+                className="p-6 md:p-8 bg-[#111115] border border-emerald-500/20 rounded-2xl shadow-2xl text-center"
               >
-                <div className="p-6 md:p-8 bg-white border border-[#e5e7eb] rounded-2xl shadow-xl transition-all duration-300 flex flex-col items-center text-center">
-                  <div className="mx-auto w-12 h-12 flex items-center justify-center mb-4 bg-emerald-100 text-emerald-600 rounded-full">
-                    <CheckCircle size={24} className="fill-emerald-100" />
-                  </div>
-                  <h2 className="font-sans text-2xl font-bold uppercase tracking-tight mb-2 text-black">Tag Activated!</h2>
-                  <p className="font-sans text-xs text-black/60 mb-6 max-w-sm leading-relaxed">
-                    Sticker Tag is now active and protecting your vehicle.
-                  </p>
-
-                  {/* Visual Windshield sticker layout preview (User Side View) */}
-                  {(() => {
-                    const scanUrl = `${window.location.origin}${window.location.pathname}#/scan/${qrCodeId}`;
-                    const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(scanUrl)}`;
-                    
-                    return (
-                      <div className="p-5 bg-black text-white rounded-md border border-white/10 flex flex-col items-center text-center w-full max-w-[240px] shadow-lg mb-6">
-                        <div className="text-[9px] font-bold text-white/50 tracking-wider uppercase mb-2.5">
-                          STICKER ID: {qrCodeId}
-                        </div>
-                        <div className="w-28 h-28 bg-white p-2 rounded-md border flex items-center justify-center border-[#0070d1]">
-                          <img src={qrImgUrl} alt={`QR Code`} className="w-full h-full object-contain" />
-                        </div>
-                        <div className="mt-3.5">
-                          <span className="font-sans font-bold text-xs block uppercase tracking-tight text-white">
-                            DEFAULT VEHICLE
-                          </span>
-                          <span className="text-[9px] font-bold block mt-1 tracking-wider uppercase text-white/60">
-                            PROTECTION ACTIVE
-                          </span>
-                          <span className="text-[7px] font-bold uppercase tracking-widest block mt-2 text-[#0070d1]">
-                            PlayStation Edition
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  <button
-                    onClick={onNavigateHome}
-                    className="w-full py-3 bg-[#0070d1] hover:bg-[#0064b7] text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer h-12 flex items-center justify-center"
-                  >
-                    Go to Portal
-                  </button>
+                <div className="mx-auto w-12 h-12 flex items-center justify-center mb-4 bg-emerald-500/10 text-emerald-500 rounded-full">
+                  <CheckCircle size={24} />
                 </div>
+                <h2 className="text-xl font-bold uppercase tracking-wide text-white">QR Sticker Activated</h2>
+                <p className="text-xs text-white/50 leading-relaxed mt-2 mb-6 max-w-xs mx-auto">
+                  Security shield is now operational. Place the hardware sticker on your physical asset to enable private scan alerts.
+                </p>
+
+                <div className="p-4 bg-[#18181c] border border-white/5 rounded-lg text-left mb-6 space-y-2">
+                  <span className="text-[10px] font-bold text-[#f97316] uppercase tracking-wide block">Next Steps & Safety Tips</span>
+                  <div className="text-[11px] text-white/80 space-y-1.5 leading-relaxed font-sans">
+                    <p>1. Clean the target surface thoroughly before application.</p>
+                    <p>2. Sticker works best on glass or plastic surfaces.</p>
+                    <p>3. Do not scratch or pierce the black printed QR matrix.</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={onNavigateHome}
+                  className="w-full py-3.5 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer h-12 flex items-center justify-center"
+                >
+                  Enter User Dashboard
+                </button>
               </motion.div>
             )}
           </AnimatePresence>
@@ -257,119 +423,471 @@ export default function PublicScanPage({
     );
   }
 
+  // ────────────────────────────────────────────────────────
+  // ACTIVE PRODUCTS PUBLIC SCAN VIEWS
+  // ────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 md:p-8 bg-gradient-to-tr from-slate-50 to-slate-100 font-sans text-black">
-      <div className="w-full max-w-md md:max-w-lg space-y-4">
-        {/* ── Section 1: Vehicle Badge ──────────────────── */}
-        <div className="p-6 bg-white border border-[#f3f3f3] rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <span className="font-sans text-[10px] font-bold uppercase tracking-wider text-[#0070d1]">Scanned Asset</span>
-            <h3 className="font-sans text-lg md:text-xl font-bold uppercase tracking-tight truncate text-black mt-1">
-              {vehicle.color} {vehicle.make} {vehicle.model}
-            </h3>
-            <p className="font-sans text-xs text-black/60 font-semibold mt-0.5">{vehicle.licensePlate}</p>
+    <div className="min-h-screen flex items-center justify-center p-4 md:p-8 bg-[#050508] font-sans text-white relative">
+      <div className="w-full max-w-xl space-y-4">
+        
+        {/* Header Ribbon: Scanned Product Context */}
+        <div className="p-4 bg-[#111115] border border-white/5 rounded-xl flex items-center justify-between gap-4">
+          <div className="text-left">
+            <span className="text-[9px] font-bold uppercase tracking-widest text-[#f97316]">Scanned Device</span>
+            <h3 className="text-base font-bold uppercase tracking-tight text-white mt-0.5">{product.name}</h3>
+            <span className="text-[10px] text-white/50 block font-mono">{product.qrCodeId}</span>
           </div>
-          <span className="shrink-0 bg-[#0070d1] text-white rounded-full text-xs font-bold px-4 py-1.5 shadow-xs">
-            {qrCodeId}
-          </span>
+
+          <div className="flex items-center gap-2">
+            {product.category === 'car' && <Car className="text-[#f97316]" size={20} />}
+            {product.category === 'bike' && <Bike className="text-[#f97316]" size={20} />}
+            {product.category === 'home' && <Home className="text-[#f97316]" size={20} />}
+            {product.category === 'luggage' && <Luggage className="text-[#f97316]" size={20} />}
+            {product.category === 'keychain' && <Key className="text-[#f97316]" size={20} />}
+            {product.category === 'child' && <Backpack className="text-[#f97316]" size={20} />}
+            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[9px] font-bold uppercase tracking-widest">
+              Live Shield
+            </span>
+          </div>
         </div>
 
         <AnimatePresence mode="wait">
           {!submitted ? (
             <motion.div
-              key="form"
+              key="scan-form-container"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               className="space-y-4"
             >
-              {/* ── Section 2: Issue Picker ──────────────── */}
-              <div className="p-5 bg-white border border-[#f3f3f3] rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                <div className="flex gap-3">
-                  {(Object.keys(reportTypeMeta) as ReportType[]).map((key) => {
-                    const meta = reportTypeMeta[key];
-                    const Icon = meta.icon!;
-                    const isActive = reportType === key;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setReportType(key)}
-                        className={`flex-1 flex flex-col items-center gap-2.5 py-4 px-3 text-center transition-all duration-200 cursor-pointer rounded-xl border ${
-                          isActive 
-                            ? 'bg-slate-50 border-slate-900 border-2 scale-[1.02]' 
-                            : 'bg-white border-slate-200 hover:border-slate-300'
-                        }`}
-                      >
-                        <Icon size={22} className={isActive ? 'text-black' : 'text-black/60'} />
-                        <span className="font-sans text-[10px] md:text-xs font-bold uppercase tracking-wider text-black">
-                          {meta.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              
+              {/* CAR & BIKE SCANNING INTERFACE */}
+              {(product.category === 'car' || product.category === 'bike') && (
+                <div className="p-6 bg-[#111115] border border-white/5 rounded-2xl space-y-6">
+                  <div className="text-left space-y-1">
+                    <h4 className="text-sm font-bold uppercase tracking-wide">Vehicle Incident Form</h4>
+                    <p className="text-xs text-white/50 leading-relaxed font-sans">
+                      Select the issue below to notify the owner. Your contact details remain anonymous.
+                    </p>
+                  </div>
 
-              {/* ── Section 3: Message + Send ────────────── */}
-              <form onSubmit={handleSubmit}>
-                <div className="p-6 bg-white border border-[#f3f3f3] rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                  <textarea
-                    rows={3}
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder={
-                      reportType === 'wrong_parking'
-                        ? 'e.g. Blocking driveway #14'
-                        : reportType === 'accident'
-                        ? 'e.g. Window left open'
-                        : 'e.g. Please call me'
-                    }
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-[#0070d1] focus:bg-white rounded-xl outline-none transition-all font-sans text-sm md:text-base resize-none mb-4 min-h-[90px]"
-                  />
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full py-4 bg-[#0070d1] hover:bg-[#0064b7] text-white text-xs md:text-sm font-bold uppercase tracking-wider rounded-full transition-all duration-200 cursor-pointer shadow-md hover:shadow-lg active:scale-[0.98] h-14 flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {isSubmitting ? (
-                      <><Loader2 size={16} className="animate-spin mr-1.5" /> Sending...</>
-                    ) : (
-                      <><Send size={16} className="mr-1.5" /> Send Alert</>
-                    )}
-                  </button>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { type: 'wrong_parking', label: 'Wrong Parking', icon: Navigation },
+                      { type: 'accident', label: 'Crash / Accident', icon: AlertTriangle },
+                      { type: 'contact_owner', label: 'General Message', icon: PhoneCall },
+                    ].map((btn) => {
+                      const Icon = btn.icon;
+                      const isSel = reportType === btn.type;
+                      return (
+                        <button
+                          key={btn.type}
+                          type="button"
+                          onClick={() => setReportType(btn.type as any)}
+                          className={`p-4 rounded-xl border text-center flex flex-col items-center gap-2.5 transition-all cursor-pointer ${
+                            isSel ? 'bg-[#f97316]/15 border-[#f97316] text-[#f97316]' : 'bg-[#18181c] border-white/5 text-white/60 hover:text-white'
+                          }`}
+                        >
+                          <Icon size={20} />
+                          <span className="text-[10px] font-bold uppercase tracking-wider leading-none">{btn.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {product.category === 'car' && reportType === 'accident' && (
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-left flex items-start gap-3">
+                      <ShieldCheck size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                      <div className="text-[11px] leading-relaxed text-amber-500/90 font-sans font-medium">
+                        <strong>AI Crash Assistance Active:</strong> Scanning this triggers real-time accident support telemetry to the owner's emergency contact list.
+                      </div>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleAlertSubmit} className="space-y-4">
+                    <div className="text-left">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1.5 pl-1">Message Detail</label>
+                      <textarea
+                        rows={3}
+                        required
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        placeholder="e.g. Your car is blocking my garage door, please help shift it."
+                        className="w-full p-3 bg-[#18181c] border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#f97316]"
+                      />
+                    </div>
+
+                    <div className="text-left">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1.5 pl-1">Your Callback Phone (Optional)</label>
+                      <input
+                        type="tel"
+                        placeholder="e.g. +1 (555) 992-0192"
+                        value={finderPhone}
+                        onChange={(e) => setFinderPhone(e.target.value)}
+                        className="w-full p-3 bg-[#18181c] border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#f97316]"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full py-4 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {isSubmitting ? <><Loader2 size={14} className="animate-spin" /> Dispatched...</> : <><Send size={14} /> Send Anonymous Alert</>}
+                    </button>
+                  </form>
                 </div>
-              </form>
+              )}
+
+              {/* HOME GATE SCANNING INTERFACE */}
+              {product.category === 'home' && (
+                <div className="p-6 bg-[#111115] border border-white/5 rounded-2xl space-y-6">
+                  <div className="flex justify-between items-start border-b border-white/5 pb-4">
+                    <div className="text-left space-y-0.5">
+                      <h4 className="text-sm font-bold uppercase tracking-wide">Home Gate Alert</h4>
+                      <p className="text-[11px] text-white/50 font-sans">{product.details.houseProfile || 'Resident Gateway'}</p>
+                    </div>
+
+                    {/* Availability Indicator */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold text-white/50">Status:</span>
+                      {product.details.availabilityStatus === 'available' && (
+                        <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[9px] font-bold uppercase tracking-wider rounded">
+                          Available
+                        </span>
+                      )}
+                      {product.details.availabilityStatus === 'away' && (
+                        <span className="px-2 py-0.5 bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[9px] font-bold uppercase tracking-wider rounded">
+                          Away
+                        </span>
+                      )}
+                      {product.details.availabilityStatus === 'do_not_disturb' && (
+                        <span className="px-2 py-0.5 bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-bold uppercase tracking-wider rounded">
+                          Silent / DND
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {product.details.emergencyInstructions && (
+                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-left">
+                      <span className="text-[9px] font-bold text-red-500 uppercase tracking-widest block mb-1">Emergency Instructions</span>
+                      <p className="text-xs text-white/80 font-sans leading-relaxed">{product.details.emergencyInstructions}</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-white/50 text-left">Select Alert Option</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {[
+                        { type: 'visitor_notification', label: 'Visitor Ring', icon: Users },
+                        { type: 'courier_arrival', label: 'Courier Arrival', icon: Package },
+                        { type: 'medical_emergency', label: 'Medical Emergency', icon: Activity },
+                        { type: 'fire_emergency', label: 'Fire Emergency', icon: Flame },
+                        { type: 'water_leakage', label: 'Water Leakage', icon: Droplet },
+                        { type: 'gas_leakage', label: 'Gas Leakage', icon: ShieldAlert },
+                      ].map((item) => {
+                        const Icon = item.icon;
+                        const isSel = selectedHomeAlert === item.type;
+                        return (
+                          <button
+                            key={item.type}
+                            type="button"
+                            onClick={() => setSelectedHomeAlert(item.type as any)}
+                            className={`p-3 rounded-lg border text-left flex items-center gap-2 transition-all cursor-pointer ${
+                              isSel ? 'bg-[#f97316]/15 border-[#f97316] text-[#f97316]' : 'bg-[#18181c] border-white/5 text-white/70 hover:text-white'
+                            }`}
+                          >
+                            <Icon size={16} className="shrink-0" />
+                            <span className="text-[9px] font-bold uppercase tracking-wide leading-none">{item.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <form onSubmit={(e) => handleAlertSubmit(e, selectedHomeAlert, message || `Resident alert sent for ${selectedHomeAlert}`)} className="space-y-4">
+                    <div className="text-left">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1.5 pl-1">Optional Details</label>
+                      <textarea
+                        rows={2}
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        placeholder="e.g. Neighbors water pipe is dripping into gate driveway..."
+                        className="w-full p-3 bg-[#18181c] border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#f97316]"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full py-3.5 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {isSubmitting ? <><Loader2 size={14} className="animate-spin" /> Sending...</> : 'Send Resident Notification'}
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* LUGGAGE SCANNING INTERFACE */}
+              {product.category === 'luggage' && (
+                <div className="p-6 bg-[#111115] border border-white/5 rounded-2xl space-y-6">
+                  <div className="text-center space-y-2">
+                    <div className="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center mx-auto border border-emerald-500/20">
+                      <UserCheck size={24} />
+                    </div>
+                    <h4 className="text-base font-bold uppercase tracking-wide">Owner Verified Security</h4>
+                    <p className="text-xs text-white/50 leading-relaxed font-sans max-w-sm mx-auto">
+                      You have scanned a verified luggage asset. Check the owner's status note below to assist in recovery.
+                    </p>
+                  </div>
+
+                  {product.details.lostFoundNote && (
+                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-left space-y-1">
+                      <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest block">Owner Lost-Found Note</span>
+                      <p className="text-xs text-white/80 font-sans italic">"{product.details.lostFoundNote}"</p>
+                    </div>
+                  )}
+
+                  <div className="p-4 bg-[#18181c] border border-white/5 rounded-xl space-y-4">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-white/50 text-left">Connect with Owner</span>
+                    
+                    <form onSubmit={(e) => handleAlertSubmit(e, 'lost_luggage', message || `Luggage Tag Scanned`)} className="space-y-3">
+                      <div>
+                        <input
+                          type="tel"
+                          required
+                          placeholder="Your Phone Number"
+                          value={finderPhone}
+                          onChange={(e) => setFinderPhone(e.target.value)}
+                          className="w-full p-3 bg-black border border-white/10 rounded-lg text-xs text-white outline-none focus:border-[#f97316]"
+                        />
+                      </div>
+                      <div>
+                        <textarea
+                          rows={2}
+                          value={message}
+                          onChange={(e) => setMessage(e.target.value)}
+                          placeholder="Where is the luggage? (e.g. Munich Terminal 2 Baggage Counter)"
+                          className="w-full p-3 bg-black border border-white/10 rounded-lg text-xs text-white outline-none focus:border-[#f97316]"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="w-full py-3 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        {isSubmitting ? <><Loader2 size={14} className="animate-spin" /> Dispatching...</> : 'Send Recovery Update'}
+                      </button>
+                    </form>
+                  </div>
+
+                  <div className="flex items-center gap-2 justify-center text-[10px] font-bold uppercase text-white/40 font-sans">
+                    <Globe size={12} />
+                    <span>International Recovery Support Integrated</span>
+                  </div>
+                </div>
+              )}
+
+              {/* KEYCHAIN SCANNING INTERFACE */}
+              {product.category === 'keychain' && (
+                <div className="p-6 bg-[#111115] border border-white/5 rounded-2xl space-y-6">
+                  <div className="text-left border-b border-white/5 pb-4">
+                    <h4 className="text-sm font-bold uppercase tracking-wide">Emergency SOS Profile</h4>
+                    <p className="text-xs text-white/50 font-sans mt-0.5">Assigned: {product.assignedTo}</p>
+                  </div>
+
+                  {/* Medical Parameter Grid */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded text-center">
+                      <span className="text-[9px] font-bold text-red-500 uppercase tracking-wide block">Blood Group</span>
+                      <span className="text-lg font-bold text-white block mt-1">{product.details.bloodGroup || '—'}</span>
+                    </div>
+                    <div className="p-3 bg-[#18181c] border border-white/5 rounded text-center col-span-2">
+                      <span className="text-[9px] font-bold text-white/50 uppercase tracking-wide block text-left pl-1">Medical Conditions</span>
+                      <span className="text-xs font-semibold text-white block text-left pl-1 mt-1 truncate">{product.details.medicalConditions || 'None Declared'}</span>
+                    </div>
+                  </div>
+
+                  {product.details.allergies && (
+                    <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded text-left">
+                      <span className="text-[9px] font-bold text-amber-500 uppercase tracking-wide block">Allergy Records</span>
+                      <span className="text-xs font-semibold text-white block mt-1 leading-normal font-sans">{product.details.allergies}</span>
+                    </div>
+                  )}
+
+                  {/* SOS Actions panel */}
+                  <div className="space-y-3 pt-2">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-white/50 text-left">SOS Fast Action Link</span>
+                    
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={(e) => handleAlertSubmit(e, 'medical_emergency', 'SOS Triggered: Scanner alerted for Keychain Medical SOS!')}
+                        className="flex-1 py-3 bg-[#c81b3a] hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer border-none"
+                      >
+                        <ShieldAlert size={14} /> Notify Family SOS
+                      </button>
+                      
+                      <button 
+                        onClick={() => {
+                          alert("Live location sharing simulated. Coordinates logged to server.");
+                          onSubmitReport({
+                            vehicleId: product.id,
+                            vehicleLabel: product.name,
+                            type: 'lost_key',
+                            message: `LOCATION TRACKING PINNED: Finder shares approximate location.`,
+                            location: {
+                              lat: 37.7749,
+                              lng: -122.4194,
+                              accuracy: 5
+                            }
+                          });
+                        }}
+                        className="flex-1 py-3 bg-[#0070d1] hover:bg-[#0064b7] text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer border-none"
+                      >
+                        <MapPin size={14} /> Share Live Location
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Finder Recovery Input Form */}
+                  <div className="p-4 bg-[#18181c] border border-white/5 rounded-xl text-left space-y-3">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-white/50">Found this item? Connect securely</span>
+                    <form onSubmit={(e) => handleAlertSubmit(e, 'lost_key', message || 'Keychain found report!')} className="space-y-3">
+                      <input
+                        type="tel"
+                        required
+                        placeholder="Your contact number"
+                        value={finderPhone}
+                        onChange={(e) => setFinderPhone(e.target.value)}
+                        className="w-full p-2.5 bg-black border border-white/10 rounded-lg text-xs outline-none focus:border-[#f97316]"
+                      />
+                      <textarea
+                        rows={2}
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        placeholder="Leave recovery details (e.g. Left keys at counter 4)"
+                        className="w-full p-2.5 bg-black border border-white/10 rounded-lg text-xs outline-none focus:border-[#f97316]"
+                      />
+                      <button type="submit" className="w-full py-2.5 bg-[#f97316] text-xs font-bold uppercase rounded-lg">
+                        Submit Recovery Message
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* CHILD SCHOOL BAG STICKER & KEYCHAIN */}
+              {product.category === 'child' && (
+                <div className="p-6 bg-[#111115] border border-white/5 rounded-2xl space-y-6">
+                  <div className="text-left border-b border-white/5 pb-4">
+                    <h4 className="text-sm font-bold uppercase tracking-wide">Child Outing Safety Shield</h4>
+                    <p className="text-xs text-white/50 font-sans mt-0.5">School: {product.details.schoolName || 'Not Declared'}</p>
+                  </div>
+
+                  {/* Pickup Verification Box */}
+                  <div className="p-4 bg-[#18181c] border border-white/5 rounded-xl text-left space-y-3">
+                    <div className="flex items-center gap-1.5">
+                      <UserCheck size={16} className="text-[#f97316]" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-white">Guardian Pickup Verification</span>
+                    </div>
+
+                    <form onSubmit={handleVerifyPickup} className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <input
+                          type="text"
+                          required
+                          placeholder="Your Name (e.g. Driver, Uncle)"
+                          value={pickupVerifierName}
+                          onChange={(e) => setPickupVerifierName(e.target.value)}
+                          className="p-2.5 bg-black border border-white/10 rounded text-xs outline-none focus:border-[#f97316]"
+                        />
+                        <input
+                          type="text"
+                          required
+                          placeholder="Enter Pickup Code"
+                          value={pickupCodeInput}
+                          onChange={(e) => setPickupCodeInput(e.target.value)}
+                          className="p-2.5 bg-black border border-white/10 rounded text-xs font-bold uppercase text-center tracking-widest outline-none focus:border-[#f97316]"
+                        />
+                      </div>
+                      <button type="submit" className="w-full py-2 bg-[#f97316] text-xs font-bold uppercase tracking-wider rounded-lg transition-all">
+                        Verify Authorization
+                      </button>
+                    </form>
+
+                    {verificationFeedback === 'success' && (
+                      <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-bold rounded uppercase tracking-wide text-center">
+                        ✓ Verification Success: Guardian Authorized
+                      </div>
+                    )}
+                    {verificationFeedback === 'fail' && (
+                      <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold rounded uppercase tracking-wide text-center">
+                        ⚠ Verification Failure: Code Incorrect
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bus details section */}
+                  {product.details.busDetails && (
+                    <div className="p-3 bg-[#18181c] border border-white/5 rounded-lg text-left flex items-start gap-2.5 font-sans">
+                      <Compass size={16} className="text-[#f97316] shrink-0 mt-0.5" />
+                      <div className="text-xs">
+                        <span className="font-bold text-white block">Bus Route Logistics</span>
+                        <span className="text-white/60 block mt-0.5">{product.details.busDetails}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SOS Notification Trigger */}
+                  <div className="p-4 bg-red-950/20 border border-red-500/15 rounded-xl space-y-4">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-red-400 text-left">Emergency SOS trigger</span>
+                    
+                    <button 
+                      onClick={(e) => handleAlertSubmit(e, 'lost_child', 'SOS ACTION: Child found lost alert dispatcher!')}
+                      className="w-full py-3.5 bg-[#c81b3a] hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all flex items-center justify-center gap-1.5 cursor-pointer border-none"
+                    >
+                      <ShieldAlert size={14} /> Notify Parent Instantly
+                    </button>
+                  </div>
+                </div>
+              )}
+
             </motion.div>
           ) : (
-            <div
-              key="success"
-              className="p-8 text-center bg-white border border-[#f3f3f3] rounded-2xl shadow-xl transition-all duration-300 flex flex-col items-center"
+            <motion.div
+              key="alert-dispatched"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="p-8 text-center bg-[#111115] border border-[#222] rounded-2xl shadow-2xl flex flex-col items-center"
             >
-              <div className="w-12 h-12 flex items-center justify-center mb-4 bg-emerald-100 text-emerald-600 rounded-full">
-                <CheckCircle size={24} className="fill-emerald-100" />
+              <div className="w-12 h-12 flex items-center justify-center mb-4 bg-emerald-500/10 text-emerald-500 rounded-full">
+                <CheckCircle size={24} />
               </div>
-              <h2 className="font-sans text-2xl font-bold uppercase tracking-tight mb-2 text-black">Alert Dispatched</h2>
-              <p className="font-sans text-xs text-black/60 mb-6 max-w-sm leading-relaxed">
-                Owner has been notified privately. Your contact number remains completely secure.
+              <h2 className="text-xl font-bold uppercase tracking-wide text-white">Message Dispatched</h2>
+              <p className="text-xs text-white/50 mt-2 mb-6 max-w-xs mx-auto leading-relaxed">
+                Your notification has been routed securely to the owner. Your contact details remain protected by NamoQR.
               </p>
-              
-              <button
-                onClick={() => { setSubmitted(false); setMessage(''); }}
-                className="w-full py-3.5 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-black rounded-full hover:bg-slate-50 transition-all cursor-pointer h-12 flex items-center justify-center mb-3"
-              >
-                Send Another
-              </button>
-              
-              <button 
-                onClick={onNavigateHome} 
-                className="w-full py-3.5 bg-[#0070d1] hover:bg-[#0064b7] text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer h-12 flex items-center justify-center"
-              >
-                Done
-              </button>
-            </div>
+
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => { setSubmitted(false); setMessage(''); setFinderPhone(''); }}
+                  className="flex-1 py-3.5 bg-[#18181c] border border-white/5 text-xs font-bold uppercase rounded-full hover:bg-slate-900 transition-all cursor-pointer h-12 flex items-center justify-center text-white"
+                >
+                  Send Another
+                </button>
+                <button 
+                  onClick={onNavigateHome} 
+                  className="flex-1 py-3.5 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase rounded-full transition-all cursor-pointer h-12 flex items-center justify-center border-none"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
           )}
         </AnimatePresence>
+
       </div>
     </div>
   );
