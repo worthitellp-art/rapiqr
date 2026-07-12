@@ -176,7 +176,7 @@ export default function DashboardView({
             </div>
             {activeTab === 'my_products' && (
               <button onClick={() => setIsWizardOpen(true)} className="inline-flex items-center justify-center gap-2 font-bold text-[13.5px] px-5 py-3 rounded-full bg-[#E25822] text-white shadow-[0_12px_22px_-10px_rgba(226,88,34,0.5)] hover:bg-[#C4471A] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97] transition-all cursor-pointer">
-                <Plus size={14} /> Register Sticker
+                <Plus size={14} /> Create Sticker 
               </button>
             )}
           </div>
