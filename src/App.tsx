@@ -1,9 +1,4 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import {
   INITIAL_USER,
   INITIAL_VEHICLES,
@@ -11,13 +6,25 @@ import {
   INITIAL_REPORTS
 } from './data';
 import { NamoProduct, QRCodeData, Report, UserProfile } from './types';
-import LandingPage from './components/LandingPage';
-import LoginSignup from './components/LoginSignup';
-import DashboardView from './components/DashboardView';
-import PublicScanPage from './components/PublicScanPage';
+
+const LandingPageMaster = lazy(() => import('./components/landing/LandingPageMaster'));
+const LoginPage = lazy(() => import('./components/auth/LoginPage'));
+const RegisterPage = lazy(() => import('./components/auth/RegisterPage'));
+const DashboardView = lazy(() => import('./components/DashboardView'));
+const PublicScanPage = lazy(() => import('./components/PublicScanPage'));
+
+function PageLoader() {
+  return (
+    <div className="min-h-screen bg-[var(--cream)] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-2 border-[var(--orange)] border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm font-semibold text-[var(--ink-soft)]">Loading...</span>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
-  // --- Persistent Storage State Synchronizers ---
   const [user, setUser] = useState<UserProfile>(() => {
     const saved = localStorage.getItem('qr_user_profile');
     return saved ? JSON.parse(saved) : INITIAL_USER;
@@ -38,32 +45,18 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_REPORTS;
   });
 
-  // Simple client-hash route state
   const [currentRoute, setCurrentRoute] = useState<'landing' | 'login' | 'signup' | 'dashboard' | 'scan'>('landing');
   const [activeQrCodeId, setActiveQrCodeId] = useState<string>('');
 
-  // Write changes to localStorage on updates
-  useEffect(() => {
-    localStorage.setItem('qr_user_profile', JSON.stringify(user));
-  }, [user]);
+  useEffect(() => { localStorage.setItem('qr_user_profile', JSON.stringify(user)); }, [user]);
+  useEffect(() => { localStorage.setItem('qr_products', JSON.stringify(products)); }, [products]);
+  useEffect(() => { localStorage.setItem('qr_codes', JSON.stringify(qrCodes)); }, [qrCodes]);
+  useEffect(() => { localStorage.setItem('qr_reports', JSON.stringify(reports)); }, [reports]);
 
-  useEffect(() => {
-    localStorage.setItem('qr_products', JSON.stringify(products));
-  }, [products]);
-
-  useEffect(() => {
-    localStorage.setItem('qr_codes', JSON.stringify(qrCodes));
-  }, [qrCodes]);
-
-  useEffect(() => {
-    localStorage.setItem('qr_reports', JSON.stringify(reports));
-  }, [reports]);
-
-  // --- Client Hash Routing Hook ---
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash || '';
-      
+
       if (hash.startsWith('#/scan/')) {
         const parts = hash.split('/');
         const id = parts[2] || '';
@@ -74,7 +67,6 @@ export default function App() {
       } else if (hash === '#/signup') {
         setCurrentRoute('signup');
       } else if (hash === '#/dashboard') {
-        // Authenticate route guard
         if (user.isLoggedIn) {
           setCurrentRoute('dashboard');
         } else {
@@ -82,40 +74,27 @@ export default function App() {
           setCurrentRoute('login');
         }
       } else {
-        // Default Landing Page
         setCurrentRoute('landing');
       }
     };
 
-    // Parse hash on initial mounting
     handleHashChange();
-
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, [user.isLoggedIn]);
 
-  // Helper route dispatchers
-  const navigateTo = (hashRoute: string) => {
-    window.location.hash = hashRoute;
-  };
+  const navigateTo = (hashRoute: string) => { window.location.hash = hashRoute; };
 
-  // Log in user handler
   const handleLoginSuccess = (profile: UserProfile) => {
     setUser(profile);
     navigateTo('#/dashboard');
   };
 
-  // Sign out handler
   const handleLogout = () => {
-    const signedOut: UserProfile = {
-      ...user,
-      isLoggedIn: false,
-    };
-    setUser(signedOut);
+    setUser({ ...user, isLoggedIn: false });
     navigateTo('#/');
   };
 
-  // Dynamic alert report creator submitted from scanned bystander
   const handleAddNewReport = (newReportData: Omit<Report, 'id' | 'createdAt' | 'status'>) => {
     const nextReportId = `R-${Date.now().toString().slice(-4)}`;
     const freshReport: Report = {
@@ -124,31 +103,19 @@ export default function App() {
       status: 'unread',
       createdAt: new Date().toISOString(),
     };
-
-    // Append to reports
     setReports((prev) => [freshReport, ...prev]);
-
-    // Increment scanCount on the scanned QR code
     setQrCodes((prevQrs) =>
       prevQrs.map((q) => {
-        const matchFound = q.vehicleId === newReportData.vehicleId || q.id === activeQrCodeId;
-        if (matchFound) {
+        if (q.vehicleId === newReportData.vehicleId || q.id === activeQrCodeId) {
           return { ...q, scansCount: q.scansCount + 1 };
         }
         return q;
       })
     );
-
-    // Update scan counters on the associated product
     setProducts((prevProds) =>
       prevProds.map((p) => {
-        const matchFound = p.id === newReportData.vehicleId || p.qrCodeId === activeQrCodeId;
-        if (matchFound) {
-          return {
-            ...p,
-            scansCount: p.scansCount + 1,
-            lastScannedAt: new Date().toISOString()
-          };
+        if (p.id === newReportData.vehicleId || p.qrCodeId === activeQrCodeId) {
+          return { ...p, scansCount: p.scansCount + 1, lastScannedAt: new Date().toISOString() };
         }
         return p;
       })
@@ -161,56 +128,57 @@ export default function App() {
   };
 
   return (
-    <div className="bg-[#050508] min-h-screen text-white">
-      {currentRoute === 'landing' && (
-        <LandingPage
-          onStart={() => navigateTo(user.isLoggedIn ? '#/dashboard' : '#/signup')}
-          onLogin={() => navigateTo('#/login')}
-          onSimulateScan={(qrId) => navigateTo(`#/scan/${qrId}`)}
-        />
-      )}
+    <Suspense fallback={<PageLoader />}>
+      <div className="min-h-screen bg-[var(--cream)] text-[var(--ink)]">
+        {currentRoute === 'landing' && (
+          <LandingPageMaster
+            onStart={() => navigateTo(user.isLoggedIn ? '#/dashboard' : '#/signup')}
+            onLogin={() => navigateTo('#/login')}
+          />
+        )}
 
-      {currentRoute === 'login' && (
-        <LoginSignup
-          isNewUser={false}
-          onLoginSuccess={handleLoginSuccess}
-          onBack={() => navigateTo('#/')}
-        />
-      )}
+        {currentRoute === 'login' && (
+          <LoginPage
+            onLoginSuccess={handleLoginSuccess}
+            onSwitchToSignup={() => navigateTo('#/signup')}
+            onBack={() => navigateTo('#/')}
+          />
+        )}
 
-      {currentRoute === 'signup' && (
-        <LoginSignup
-          isNewUser={true}
-          onLoginSuccess={handleLoginSuccess}
-          onBack={() => navigateTo('#/')}
-        />
-      )}
+        {currentRoute === 'signup' && (
+          <RegisterPage
+            onLoginSuccess={handleLoginSuccess}
+            onSwitchToLogin={() => navigateTo('#/login')}
+            onBack={() => navigateTo('#/')}
+          />
+        )}
 
-      {currentRoute === 'dashboard' && (
-        <DashboardView
-          user={user}
-          products={products}
-          qrCodes={qrCodes}
-          reports={reports}
-          onLogout={handleLogout}
-          onUpdateProducts={(updatedProds) => setProducts(updatedProds)}
-          onUpdateQrCodes={(updatedQrs) => setQrCodes(updatedQrs)}
-          onUpdateReports={(updatedReps) => setReports(updatedReps)}
-          onUpdateUser={(updatedProf) => setUser(updatedProf)}
-          onSimulatePublicScan={(qrId) => navigateTo(`#/scan/${qrId}`)}
-        />
-      )}
+        {currentRoute === 'dashboard' && (
+          <DashboardView
+            user={user}
+            products={products}
+            qrCodes={qrCodes}
+            reports={reports}
+            onLogout={handleLogout}
+            onUpdateProducts={(updatedProds) => setProducts(updatedProds)}
+            onUpdateQrCodes={(updatedQrs) => setQrCodes(updatedQrs)}
+            onUpdateReports={(updatedReps) => setReports(updatedReps)}
+            onUpdateUser={(updatedProf) => setUser(updatedProf)}
+            onSimulatePublicScan={(qrId) => navigateTo(`#/scan/${qrId}`)}
+          />
+        )}
 
-      {currentRoute === 'scan' && (
-        <PublicScanPage
-          qrCodeId={activeQrCodeId}
-          products={products}
-          qrCodes={qrCodes}
-          onActivateSticker={handleActivateSticker}
-          onSubmitReport={handleAddNewReport}
-          onNavigateHome={() => navigateTo('#/')}
-        />
-      )}
-    </div>
+        {currentRoute === 'scan' && (
+          <PublicScanPage
+            qrCodeId={activeQrCodeId}
+            products={products}
+            qrCodes={qrCodes}
+            onActivateSticker={handleActivateSticker}
+            onSubmitReport={handleAddNewReport}
+            onNavigateHome={() => navigateTo('#/')}
+          />
+        )}
+      </div>
+    </Suspense>
   );
 }

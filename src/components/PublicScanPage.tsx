@@ -18,8 +18,10 @@ import {
   Heart, 
   Key, 
   Backpack, 
-  MapPin, 
-  Compass, 
+  MapPin,
+  Compass,
+  QrCode,
+  Globe,
   Info,
   ShieldCheck,
   UserCheck,
@@ -101,14 +103,14 @@ export default function PublicScanPage({
       case 'visitor_notification':
         return { label: 'Visitor Ring', icon: Users, color: '#0070d1' };
       case 'lost_luggage':
-        return { label: 'Luggage Found', icon: Briefcase, color: '#f97316' };
+        return { label: 'Luggage Found', icon: Briefcase, color: '#E25822' };
       case 'lost_key':
-        return { label: 'Lost Keys Recovery', icon: Key, color: '#f97316' };
+        return { label: 'Lost Keys Recovery', icon: Key, color: '#E25822' };
       case 'lost_child':
         return { label: 'Child Lost Help', icon: Backpack, color: '#c81b3a' };
       case 'contact_owner':
       default:
-        return { label: 'Contact Owner', icon: PhoneCall, color: '#f97316' };
+        return { label: 'Contact Owner', icon: PhoneCall, color: '#E25822' };
     }
   };
 
@@ -237,7 +239,7 @@ export default function PublicScanPage({
   // ────────────────────────────────────────────────────────
   if (!product) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 md:p-8 bg-[#050508] font-sans text-white">
+      <div className="min-h-screen flex items-center justify-center p-4 md:p-8 bg-[var(--cream)] font-sans text-[var(--ink)]">
         <div className="w-full max-w-lg">
           <AnimatePresence mode="wait">
             {!activationSuccess ? (
@@ -246,23 +248,23 @@ export default function PublicScanPage({
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -15 }}
-                className="p-6 md:p-8 bg-[#111115] border border-[#222] rounded-2xl shadow-2xl"
+                className="p-6 md:p-8 bg-[var(--paper)] border border-[var(--line)] rounded-2xl"
               >
                 {!isActivating ? (
                   <form onSubmit={handleActivateNewTag} className="space-y-6">
-                    <div className="flex items-center gap-3 border-b border-white/5 pb-4">
-                      <div className="w-10 h-10 rounded-full bg-[#f97316]/10 flex items-center justify-center text-[#f97316]">
+                    <div className="flex items-center gap-3 border-b border-[var(--line)] pb-4">
+                      <div className="w-10 h-10 rounded-full bg-[var(--orange)]/10 flex items-center justify-center text-[var(--orange)]">
                         <QrCode size={20} />
                       </div>
                       <div className="text-left">
                         <h2 className="text-lg font-bold uppercase tracking-wide">Link Physical Sticker</h2>
-                        <p className="text-[10px] text-white/50 uppercase tracking-widest font-mono">Sticker Serial: {qrCodeId}</p>
+                        <p className="text-[10px] text-[var(--ink-soft)] uppercase tracking-widest font-mono">Sticker Serial: {qrCodeId}</p>
                       </div>
                     </div>
 
                     {/* Step 1: Select Category */}
                     <div className="space-y-3">
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/50">Select Product Type</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)]">Select Product Type</label>
                       <div className="grid grid-cols-3 gap-2">
                         {[
                           { category: 'car', icon: Car, label: 'Car Sticker' },
@@ -280,7 +282,7 @@ export default function PublicScanPage({
                               type="button"
                               onClick={() => setActivationCategory(cat.category as any)}
                               className={`p-3 rounded-lg border text-center flex flex-col items-center gap-2 transition-all cursor-pointer ${
-                                isSel ? 'bg-[#f97316]/15 border-[#f97316] text-[#f97316]' : 'bg-[#18181c] border-white/10 text-white/60 hover:text-white'
+                                isSel ? 'bg-[var(--orange)]/15 border-[var(--orange)] text-[var(--orange)]' : 'bg-[var(--cream-deep)] border-[var(--line)] text-[var(--ink-soft)] hover:text-[var(--ink)]'
                               }`}
                             >
                               <Icon size={20} />
@@ -293,53 +295,53 @@ export default function PublicScanPage({
 
                     {/* Step 2: Input product details based on choice */}
                     {activationCategory === 'car' && (
-                      <div className="space-y-4 pt-2 border-t border-white/5 text-left">
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-[#f97316]">Car Parameters</span>
+                      <div className="space-y-4 pt-2 border-t border-[var(--line)] text-left">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--orange)]">Car Parameters</span>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-[9px] font-bold text-white/60 uppercase mb-1">Make</label>
+                            <label className="block text-[9px] font-bold text-[var(--ink-soft)] uppercase mb-1">Make</label>
                             <input 
                               type="text" 
                               required 
                               placeholder="e.g. BMW, Tesla" 
                               value={carMake} 
                               onChange={(e) => setCarMake(e.target.value)}
-                              className="w-full bg-[#18181c] border border-white/10 rounded p-2.5 text-xs text-white outline-none focus:border-[#f97316]"
+                              className="w-full clay-input text-xs placeholder:text-[var(--ink-faint)]"
                             />
                           </div>
                           <div>
-                            <label className="block text-[9px] font-bold text-white/60 uppercase mb-1">Model</label>
+                            <label className="block text-[9px] font-bold text-[var(--ink-soft)] uppercase mb-1">Model</label>
                             <input 
                               type="text" 
                               required 
                               placeholder="e.g. M3, Model Y" 
                               value={carModel} 
                               onChange={(e) => setCarModel(e.target.value)}
-                              className="w-full bg-[#18181c] border border-white/10 rounded p-2.5 text-xs text-white outline-none focus:border-[#f97316]"
+                              className="w-full clay-input text-xs placeholder:text-[var(--ink-faint)]"
                             />
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-[9px] font-bold text-white/60 uppercase mb-1">Color</label>
+                            <label className="block text-[9px] font-bold text-[var(--ink-soft)] uppercase mb-1">Color</label>
                             <input 
                               type="text" 
                               required 
                               placeholder="e.g. Matte Gray" 
                               value={carColor} 
                               onChange={(e) => setCarColor(e.target.value)}
-                              className="w-full bg-[#18181c] border border-white/10 rounded p-2.5 text-xs text-white outline-none focus:border-[#f97316]"
+                              className="w-full clay-input text-xs placeholder:text-[var(--ink-faint)]"
                             />
                           </div>
                           <div>
-                            <label className="block text-[9px] font-bold text-white/60 uppercase mb-1">License Plate</label>
+                            <label className="block text-[9px] font-bold text-[var(--ink-soft)] uppercase mb-1">License Plate</label>
                             <input 
                               type="text" 
                               required 
                               placeholder="e.g. CA-QR-42" 
                               value={carPlate} 
                               onChange={(e) => setCarPlate(e.target.value)}
-                              className="w-full bg-[#18181c] border border-white/10 rounded p-2.5 text-xs text-white uppercase font-mono tracking-wider outline-none focus:border-[#f97316]"
+                              className="w-full clay-input text-xs uppercase font-mono tracking-wider placeholder:text-[var(--ink-faint)]"
                             />
                           </div>
                         </div>
@@ -347,24 +349,25 @@ export default function PublicScanPage({
                     )}
 
                     {activationCategory !== 'car' && (
-                      <div className="p-4 bg-[#18181c] border border-white/5 rounded text-left">
-                        <p className="text-xs text-white/60 leading-relaxed font-sans">
-                          You are activating a <strong className="text-white uppercase">{activationCategory} tag</strong>. Product-specific forms, SOS links, and contact parameters will be automatically pre-configured.
+                      <div className="p-4 bg-[var(--cream-deep)] border border-[var(--line)] rounded text-left">
+                        <p className="text-xs text-[var(--ink-soft)] leading-relaxed font-sans">
+                          You are activating a <strong className="text-[var(--ink)] uppercase">{activationCategory} tag</strong>. Product-specific forms, SOS links, and contact parameters will be automatically pre-configured.
                         </p>
                       </div>
                     )}
 
-                    <div className="flex gap-4 pt-4 border-t border-white/5">
+                    <div className="flex gap-4 pt-4 border-t border-[var(--line)]">
                       <button
                         type="button"
                         onClick={onNavigateHome}
-                        className="flex-1 py-3 bg-[#1c1c24] hover:bg-[#272733] border border-white/10 text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer"
+                        style={{background: 'var(--ink)', color: 'var(--cream)'}}
+                        className="flex-1 clay-btn text-xs"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
-                        className="flex-1 py-3 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer"
+                        className="flex-1 clay-btn clay-btn-primary text-xs"
                       >
                         Activate QR Tag
                       </button>
@@ -372,13 +375,13 @@ export default function PublicScanPage({
                   </form>
                 ) : (
                   <div className="py-12 flex flex-col items-center">
-                    <div className="w-14 h-14 rounded-full border-4 border-[#f97316]/10 border-t-[#f97316] animate-spin mb-6" />
-                    <span className="text-sm font-bold uppercase tracking-wider text-[#f97316] animate-pulse">
+                    <div className="w-14 h-14 rounded-full border-4 border-[var(--orange)]/10 border-t-[var(--orange)] animate-spin mb-6" />
+                    <span className="text-sm font-bold uppercase tracking-wider text-[var(--orange)] animate-pulse">
                       Activating Ecosystem Link...
                     </span>
-                    <div className="w-48 bg-[#1c1c24] h-1.5 rounded-full overflow-hidden mt-4">
+                    <div className="w-48 bg-[var(--cream-deep)] h-1.5 rounded-full overflow-hidden mt-4">
                       <div 
-                        className="bg-[#f97316] h-full transition-all duration-150" 
+                        className="bg-[var(--orange)] h-full transition-all duration-150" 
                         style={{ width: `${activationProgress}%` }}
                       />
                     </div>
@@ -390,19 +393,19 @@ export default function PublicScanPage({
                 key="activation-success"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="p-6 md:p-8 bg-[#111115] border border-emerald-500/20 rounded-2xl shadow-2xl text-center"
+                className="p-6 md:p-8 bg-[var(--paper)] border border-[var(--green)]/20 rounded-2xl text-center"
               >
-                <div className="mx-auto w-12 h-12 flex items-center justify-center mb-4 bg-emerald-500/10 text-emerald-500 rounded-full">
+                <div className="mx-auto w-12 h-12 flex items-center justify-center mb-4 bg-[var(--green-soft)] text-[var(--green)] rounded-full">
                   <CheckCircle size={24} />
                 </div>
-                <h2 className="text-xl font-bold uppercase tracking-wide text-white">QR Sticker Activated</h2>
-                <p className="text-xs text-white/50 leading-relaxed mt-2 mb-6 max-w-xs mx-auto">
+                <h2 className="text-xl font-bold uppercase tracking-wide text-[var(--ink)]">QR Sticker Activated</h2>
+                <p className="text-xs text-[var(--ink-soft)] leading-relaxed mt-2 mb-6 max-w-xs mx-auto">
                   Security shield is now operational. Place the hardware sticker on your physical asset to enable private scan alerts.
                 </p>
 
-                <div className="p-4 bg-[#18181c] border border-white/5 rounded-lg text-left mb-6 space-y-2">
-                  <span className="text-[10px] font-bold text-[#f97316] uppercase tracking-wide block">Next Steps & Safety Tips</span>
-                  <div className="text-[11px] text-white/80 space-y-1.5 leading-relaxed font-sans">
+                <div className="p-4 bg-[var(--cream-deep)] border border-[var(--line)] rounded-lg text-left mb-6 space-y-2">
+                  <span className="text-[10px] font-bold text-[var(--orange)] uppercase tracking-wide block">Next Steps & Safety Tips</span>
+                  <div className="text-[11px] text-[var(--ink)] space-y-1.5 leading-relaxed font-sans">
                     <p>1. Clean the target surface thoroughly before application.</p>
                     <p>2. Sticker works best on glass or plastic surfaces.</p>
                     <p>3. Do not scratch or pierce the black printed QR matrix.</p>
@@ -411,7 +414,7 @@ export default function PublicScanPage({
 
                 <button
                   onClick={onNavigateHome}
-                  className="w-full py-3.5 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer h-12 flex items-center justify-center"
+                  className="w-full clay-btn clay-btn-primary text-xs h-12"
                 >
                   Enter User Dashboard
                 </button>
@@ -427,25 +430,25 @@ export default function PublicScanPage({
   // ACTIVE PRODUCTS PUBLIC SCAN VIEWS
   // ────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 md:p-8 bg-[#050508] font-sans text-white relative">
+    <div className="min-h-screen flex items-center justify-center p-4 md:p-8 bg-[var(--cream)] font-sans text-[var(--ink)] relative">
       <div className="w-full max-w-xl space-y-4">
         
         {/* Header Ribbon: Scanned Product Context */}
-        <div className="p-4 bg-[#111115] border border-white/5 rounded-xl flex items-center justify-between gap-4">
+        <div className="p-4 bg-[var(--paper)] border border-[var(--line)] rounded-xl flex items-center justify-between gap-4">
           <div className="text-left">
-            <span className="text-[9px] font-bold uppercase tracking-widest text-[#f97316]">Scanned Device</span>
-            <h3 className="text-base font-bold uppercase tracking-tight text-white mt-0.5">{product.name}</h3>
-            <span className="text-[10px] text-white/50 block font-mono">{product.qrCodeId}</span>
+            <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--orange)]">Scanned Device</span>
+            <h3 className="text-base font-bold uppercase tracking-tight text-[var(--ink)] mt-0.5">{product.name}</h3>
+            <span className="text-[10px] text-[var(--ink-soft)] block font-mono">{product.qrCodeId}</span>
           </div>
 
           <div className="flex items-center gap-2">
-            {product.category === 'car' && <Car className="text-[#f97316]" size={20} />}
-            {product.category === 'bike' && <Bike className="text-[#f97316]" size={20} />}
-            {product.category === 'home' && <Home className="text-[#f97316]" size={20} />}
-            {product.category === 'luggage' && <Luggage className="text-[#f97316]" size={20} />}
-            {product.category === 'keychain' && <Key className="text-[#f97316]" size={20} />}
-            {product.category === 'child' && <Backpack className="text-[#f97316]" size={20} />}
-            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[9px] font-bold uppercase tracking-widest">
+            {product.category === 'car' && <Car className="text-[var(--orange)]" size={20} />}
+            {product.category === 'bike' && <Bike className="text-[var(--orange)]" size={20} />}
+            {product.category === 'home' && <Home className="text-[var(--orange)]" size={20} />}
+            {product.category === 'luggage' && <Luggage className="text-[var(--orange)]" size={20} />}
+            {product.category === 'keychain' && <Key className="text-[var(--orange)]" size={20} />}
+            {product.category === 'child' && <Backpack className="text-[var(--orange)]" size={20} />}
+            <span className="px-2 py-0.5 rounded bg-[var(--green-soft)] text-[var(--green)] border border-[var(--green)]/20 text-[9px] font-bold uppercase tracking-widest">
               Live Shield
             </span>
           </div>
@@ -463,10 +466,10 @@ export default function PublicScanPage({
               
               {/* CAR & BIKE SCANNING INTERFACE */}
               {(product.category === 'car' || product.category === 'bike') && (
-                <div className="p-6 bg-[#111115] border border-white/5 rounded-2xl space-y-6">
+                <div className="p-6 bg-[var(--paper)] border border-[var(--line)] rounded-2xl space-y-6">
                   <div className="text-left space-y-1">
                     <h4 className="text-sm font-bold uppercase tracking-wide">Vehicle Incident Form</h4>
-                    <p className="text-xs text-white/50 leading-relaxed font-sans">
+                    <p className="text-xs text-[var(--ink-soft)] leading-relaxed font-sans">
                       Select the issue below to notify the owner. Your contact details remain anonymous.
                     </p>
                   </div>
@@ -485,7 +488,7 @@ export default function PublicScanPage({
                           type="button"
                           onClick={() => setReportType(btn.type as any)}
                           className={`p-4 rounded-xl border text-center flex flex-col items-center gap-2.5 transition-all cursor-pointer ${
-                            isSel ? 'bg-[#f97316]/15 border-[#f97316] text-[#f97316]' : 'bg-[#18181c] border-white/5 text-white/60 hover:text-white'
+                            isSel ? 'bg-[var(--orange)]/15 border-[var(--orange)] text-[var(--orange)]' : 'bg-[var(--cream-deep)] border-[var(--line)] text-[var(--ink-soft)] hover:text-[var(--ink)]'
                           }`}
                         >
                           <Icon size={20} />
@@ -496,9 +499,9 @@ export default function PublicScanPage({
                   </div>
 
                   {product.category === 'car' && reportType === 'accident' && (
-                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-left flex items-start gap-3">
-                      <ShieldCheck size={16} className="text-amber-500 shrink-0 mt-0.5" />
-                      <div className="text-[11px] leading-relaxed text-amber-500/90 font-sans font-medium">
+                    <div className="p-3 bg-[var(--orange)]/10 border border-[var(--orange)]/20 rounded-lg text-left flex items-start gap-3">
+                      <ShieldCheck size={16} className="text-[var(--orange)] shrink-0 mt-0.5" />
+                      <div className="text-[11px] leading-relaxed text-[var(--orange)]/90 font-sans font-medium">
                         <strong>AI Crash Assistance Active:</strong> Scanning this triggers real-time accident support telemetry to the owner's emergency contact list.
                       </div>
                     </div>
@@ -506,32 +509,32 @@ export default function PublicScanPage({
 
                   <form onSubmit={handleAlertSubmit} className="space-y-4">
                     <div className="text-left">
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1.5 pl-1">Message Detail</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)] mb-1.5 pl-1">Message Detail</label>
                       <textarea
                         rows={3}
                         required
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         placeholder="e.g. Your car is blocking my garage door, please help shift it."
-                        className="w-full p-3 bg-[#18181c] border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#f97316]"
+                        className="w-full p-3 bg-[var(--paper)] border border-[var(--line)] rounded-xl text-xs text-[var(--ink)] outline-none focus:border-[var(--orange)] placeholder:text-[var(--ink-faint)]"
                       />
                     </div>
 
                     <div className="text-left">
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1.5 pl-1">Your Callback Phone (Optional)</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)] mb-1.5 pl-1">Your Callback Phone (Optional)</label>
                       <input
                         type="tel"
                         placeholder="e.g. +1 (555) 992-0192"
                         value={finderPhone}
                         onChange={(e) => setFinderPhone(e.target.value)}
-                        className="w-full p-3 bg-[#18181c] border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#f97316]"
+                        className="w-full clay-input text-xs placeholder:text-[var(--ink-faint)]"
                       />
                     </div>
 
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="w-full py-4 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                      className="w-full clay-btn clay-btn-primary text-xs disabled:opacity-50"
                     >
                       {isSubmitting ? <><Loader2 size={14} className="animate-spin" /> Dispatched...</> : <><Send size={14} /> Send Anonymous Alert</>}
                     </button>
@@ -541,28 +544,28 @@ export default function PublicScanPage({
 
               {/* HOME GATE SCANNING INTERFACE */}
               {product.category === 'home' && (
-                <div className="p-6 bg-[#111115] border border-white/5 rounded-2xl space-y-6">
-                  <div className="flex justify-between items-start border-b border-white/5 pb-4">
+                <div className="p-6 bg-[var(--paper)] border border-[var(--line)] rounded-2xl space-y-6">
+                  <div className="flex justify-between items-start border-b border-[var(--line)] pb-4">
                     <div className="text-left space-y-0.5">
                       <h4 className="text-sm font-bold uppercase tracking-wide">Home Gate Alert</h4>
-                      <p className="text-[11px] text-white/50 font-sans">{product.details.houseProfile || 'Resident Gateway'}</p>
+                      <p className="text-[11px] text-[var(--ink-soft)] font-sans">{product.details.houseProfile || 'Resident Gateway'}</p>
                     </div>
 
                     {/* Availability Indicator */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] uppercase font-bold text-white/50">Status:</span>
+                      <span className="text-[10px] uppercase font-bold text-[var(--ink-soft)]">Status:</span>
                       {product.details.availabilityStatus === 'available' && (
-                        <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[9px] font-bold uppercase tracking-wider rounded">
+                        <span className="px-2 py-0.5 bg-[var(--green-soft)] text-[var(--green)] border border-[var(--green)]/20 text-[9px] font-bold uppercase tracking-wider rounded">
                           Available
                         </span>
                       )}
                       {product.details.availabilityStatus === 'away' && (
-                        <span className="px-2 py-0.5 bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[9px] font-bold uppercase tracking-wider rounded">
+                        <span className="px-2 py-0.5 bg-[var(--orange)]/10 text-[var(--orange)] border border-[var(--orange)]/20 text-[9px] font-bold uppercase tracking-wider rounded">
                           Away
                         </span>
                       )}
                       {product.details.availabilityStatus === 'do_not_disturb' && (
-                        <span className="px-2 py-0.5 bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-bold uppercase tracking-wider rounded">
+                        <span className="px-2 py-0.5 bg-[var(--orange)]/10 text-[var(--orange)] border border-[var(--orange)]/20 text-[9px] font-bold uppercase tracking-wider rounded">
                           Silent / DND
                         </span>
                       )}
@@ -570,14 +573,14 @@ export default function PublicScanPage({
                   </div>
 
                   {product.details.emergencyInstructions && (
-                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-left">
-                      <span className="text-[9px] font-bold text-red-500 uppercase tracking-widest block mb-1">Emergency Instructions</span>
-                      <p className="text-xs text-white/80 font-sans leading-relaxed">{product.details.emergencyInstructions}</p>
+                    <div className="p-3 bg-[var(--orange)]/10 border border-[var(--orange)]/20 rounded-lg text-left">
+                      <span className="text-[9px] font-bold text-[var(--orange)] uppercase tracking-widest block mb-1">Emergency Instructions</span>
+                      <p className="text-xs text-[var(--ink)] font-sans leading-relaxed">{product.details.emergencyInstructions}</p>
                     </div>
                   )}
 
                   <div className="space-y-3">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-white/50 text-left">Select Alert Option</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)] text-left">Select Alert Option</label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {[
                         { type: 'visitor_notification', label: 'Visitor Ring', icon: Users },
@@ -595,7 +598,7 @@ export default function PublicScanPage({
                             type="button"
                             onClick={() => setSelectedHomeAlert(item.type as any)}
                             className={`p-3 rounded-lg border text-left flex items-center gap-2 transition-all cursor-pointer ${
-                              isSel ? 'bg-[#f97316]/15 border-[#f97316] text-[#f97316]' : 'bg-[#18181c] border-white/5 text-white/70 hover:text-white'
+                              isSel ? 'bg-[var(--orange)]/15 border-[var(--orange)] text-[var(--orange)]' : 'bg-[var(--cream-deep)] border-[var(--line)] text-[var(--ink-soft)] hover:text-[var(--ink)]'
                             }`}
                           >
                             <Icon size={16} className="shrink-0" />
@@ -608,20 +611,20 @@ export default function PublicScanPage({
 
                   <form onSubmit={(e) => handleAlertSubmit(e, selectedHomeAlert, message || `Resident alert sent for ${selectedHomeAlert}`)} className="space-y-4">
                     <div className="text-left">
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1.5 pl-1">Optional Details</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)] mb-1.5 pl-1">Optional Details</label>
                       <textarea
                         rows={2}
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         placeholder="e.g. Neighbors water pipe is dripping into gate driveway..."
-                        className="w-full p-3 bg-[#18181c] border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#f97316]"
+                        className="w-full p-3 bg-[var(--paper)] border border-[var(--line)] rounded-xl text-xs text-[var(--ink)] outline-none focus:border-[var(--orange)] placeholder:text-[var(--ink-faint)]"
                       />
                     </div>
 
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="w-full py-3.5 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full clay-btn clay-btn-primary text-xs"
                     >
                       {isSubmitting ? <><Loader2 size={14} className="animate-spin" /> Sending...</> : 'Send Resident Notification'}
                     </button>
@@ -631,26 +634,26 @@ export default function PublicScanPage({
 
               {/* LUGGAGE SCANNING INTERFACE */}
               {product.category === 'luggage' && (
-                <div className="p-6 bg-[#111115] border border-white/5 rounded-2xl space-y-6">
+                <div className="p-6 bg-[var(--paper)] border border-[var(--line)] rounded-2xl space-y-6">
                   <div className="text-center space-y-2">
-                    <div className="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center mx-auto border border-emerald-500/20">
+                    <div className="w-12 h-12 rounded-full bg-[var(--green-soft)] text-[var(--green)] flex items-center justify-center mx-auto border border-[var(--green)]/20">
                       <UserCheck size={24} />
                     </div>
                     <h4 className="text-base font-bold uppercase tracking-wide">Owner Verified Security</h4>
-                    <p className="text-xs text-white/50 leading-relaxed font-sans max-w-sm mx-auto">
+                    <p className="text-xs text-[var(--ink-soft)] leading-relaxed font-sans max-w-sm mx-auto">
                       You have scanned a verified luggage asset. Check the owner's status note below to assist in recovery.
                     </p>
                   </div>
 
                   {product.details.lostFoundNote && (
-                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-left space-y-1">
-                      <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest block">Owner Lost-Found Note</span>
-                      <p className="text-xs text-white/80 font-sans italic">"{product.details.lostFoundNote}"</p>
+                    <div className="p-4 bg-[var(--green-soft)] border border-[var(--green)]/20 rounded-lg text-left space-y-1">
+                      <span className="text-[10px] font-bold text-[var(--green)] uppercase tracking-widest block">Owner Lost-Found Note</span>
+                      <p className="text-xs text-[var(--ink)] font-sans italic">"{product.details.lostFoundNote}"</p>
                     </div>
                   )}
 
-                  <div className="p-4 bg-[#18181c] border border-white/5 rounded-xl space-y-4">
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-white/50 text-left">Connect with Owner</span>
+                  <div className="p-4 bg-[var(--cream-deep)] border border-[var(--line)] rounded-xl space-y-4">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)] text-left">Connect with Owner</span>
                     
                     <form onSubmit={(e) => handleAlertSubmit(e, 'lost_luggage', message || `Luggage Tag Scanned`)} className="space-y-3">
                       <div>
@@ -660,7 +663,7 @@ export default function PublicScanPage({
                           placeholder="Your Phone Number"
                           value={finderPhone}
                           onChange={(e) => setFinderPhone(e.target.value)}
-                          className="w-full p-3 bg-black border border-white/10 rounded-lg text-xs text-white outline-none focus:border-[#f97316]"
+                          className="w-full clay-input text-xs placeholder:text-[var(--ink-faint)]"
                         />
                       </div>
                       <div>
@@ -669,21 +672,21 @@ export default function PublicScanPage({
                           value={message}
                           onChange={(e) => setMessage(e.target.value)}
                           placeholder="Where is the luggage? (e.g. Munich Terminal 2 Baggage Counter)"
-                          className="w-full p-3 bg-black border border-white/10 rounded-lg text-xs text-white outline-none focus:border-[#f97316]"
+                          className="w-full p-3 bg-[var(--paper)] border border-[var(--line)] rounded-lg text-xs text-[var(--ink)] outline-none focus:border-[var(--orange)] placeholder:text-[var(--ink-faint)]"
                         />
                       </div>
 
                       <button
                         type="submit"
                         disabled={isSubmitting}
-                        className="w-full py-3 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                        className="w-full clay-btn clay-btn-primary"
                       >
                         {isSubmitting ? <><Loader2 size={14} className="animate-spin" /> Dispatching...</> : 'Send Recovery Update'}
                       </button>
                     </form>
                   </div>
 
-                  <div className="flex items-center gap-2 justify-center text-[10px] font-bold uppercase text-white/40 font-sans">
+                  <div className="flex items-center gap-2 justify-center text-[10px] font-bold uppercase text-[var(--ink-faint)] font-sans">
                     <Globe size={12} />
                     <span>International Recovery Support Integrated</span>
                   </div>
@@ -692,39 +695,39 @@ export default function PublicScanPage({
 
               {/* KEYCHAIN SCANNING INTERFACE */}
               {product.category === 'keychain' && (
-                <div className="p-6 bg-[#111115] border border-white/5 rounded-2xl space-y-6">
-                  <div className="text-left border-b border-white/5 pb-4">
+                <div className="p-6 bg-[var(--paper)] border border-[var(--line)] rounded-2xl space-y-6">
+                  <div className="text-left border-b border-[var(--line)] pb-4">
                     <h4 className="text-sm font-bold uppercase tracking-wide">Emergency SOS Profile</h4>
-                    <p className="text-xs text-white/50 font-sans mt-0.5">Assigned: {product.assignedTo}</p>
+                    <p className="text-xs text-[var(--ink-soft)] font-sans mt-0.5">Assigned: {product.assignedTo}</p>
                   </div>
 
                   {/* Medical Parameter Grid */}
                   <div className="grid grid-cols-3 gap-2">
-                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded text-center">
-                      <span className="text-[9px] font-bold text-red-500 uppercase tracking-wide block">Blood Group</span>
-                      <span className="text-lg font-bold text-white block mt-1">{product.details.bloodGroup || '—'}</span>
+                    <div className="p-3 bg-[var(--orange)]/10 border border-[var(--orange)]/20 rounded text-center">
+                      <span className="text-[9px] font-bold text-[var(--orange)] uppercase tracking-wide block">Blood Group</span>
+                      <span className="text-lg font-bold text-[var(--ink)] block mt-1">{product.details.bloodGroup || '—'}</span>
                     </div>
-                    <div className="p-3 bg-[#18181c] border border-white/5 rounded text-center col-span-2">
-                      <span className="text-[9px] font-bold text-white/50 uppercase tracking-wide block text-left pl-1">Medical Conditions</span>
-                      <span className="text-xs font-semibold text-white block text-left pl-1 mt-1 truncate">{product.details.medicalConditions || 'None Declared'}</span>
+                    <div className="p-3 bg-[var(--cream-deep)] border border-[var(--line)] rounded text-center col-span-2">
+                      <span className="text-[9px] font-bold text-[var(--ink-soft)] uppercase tracking-wide block text-left pl-1">Medical Conditions</span>
+                      <span className="text-xs font-semibold text-[var(--ink)] block text-left pl-1 mt-1 truncate">{product.details.medicalConditions || 'None Declared'}</span>
                     </div>
                   </div>
 
                   {product.details.allergies && (
-                    <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded text-left">
-                      <span className="text-[9px] font-bold text-amber-500 uppercase tracking-wide block">Allergy Records</span>
-                      <span className="text-xs font-semibold text-white block mt-1 leading-normal font-sans">{product.details.allergies}</span>
+                    <div className="p-3.5 bg-[var(--orange)]/10 border border-[var(--orange)]/20 rounded text-left">
+                      <span className="text-[9px] font-bold text-[var(--orange)] uppercase tracking-wide block">Allergy Records</span>
+                      <span className="text-xs font-semibold text-[var(--ink)] block mt-1 leading-normal font-sans">{product.details.allergies}</span>
                     </div>
                   )}
 
                   {/* SOS Actions panel */}
                   <div className="space-y-3 pt-2">
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-white/50 text-left">SOS Fast Action Link</span>
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)] text-left">SOS Fast Action Link</span>
                     
                     <div className="flex gap-3">
                       <button 
                         onClick={(e) => handleAlertSubmit(e, 'medical_emergency', 'SOS Triggered: Scanner alerted for Keychain Medical SOS!')}
-                        className="flex-1 py-3 bg-[#c81b3a] hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer border-none"
+                        className="flex-1 py-3 bg-[var(--orange-deep)] hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer border-none"
                       >
                         <ShieldAlert size={14} /> Notify Family SOS
                       </button>
@@ -744,7 +747,7 @@ export default function PublicScanPage({
                             }
                           });
                         }}
-                        className="flex-1 py-3 bg-[#0070d1] hover:bg-[#0064b7] text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer border-none"
+                        className="flex-1 py-3 bg-[var(--ink)] hover:bg-[#0064b7] text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer border-none"
                       >
                         <MapPin size={14} /> Share Live Location
                       </button>
@@ -752,8 +755,8 @@ export default function PublicScanPage({
                   </div>
 
                   {/* Finder Recovery Input Form */}
-                  <div className="p-4 bg-[#18181c] border border-white/5 rounded-xl text-left space-y-3">
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-white/50">Found this item? Connect securely</span>
+                  <div className="p-4 bg-[var(--cream-deep)] border border-[var(--line)] rounded-xl text-left space-y-3">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)]">Found this item? Connect securely</span>
                     <form onSubmit={(e) => handleAlertSubmit(e, 'lost_key', message || 'Keychain found report!')} className="space-y-3">
                       <input
                         type="tel"
@@ -761,16 +764,16 @@ export default function PublicScanPage({
                         placeholder="Your contact number"
                         value={finderPhone}
                         onChange={(e) => setFinderPhone(e.target.value)}
-                        className="w-full p-2.5 bg-black border border-white/10 rounded-lg text-xs outline-none focus:border-[#f97316]"
+                        className="w-full clay-input text-xs placeholder:text-[var(--ink-faint)]"
                       />
                       <textarea
                         rows={2}
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         placeholder="Leave recovery details (e.g. Left keys at counter 4)"
-                        className="w-full p-2.5 bg-black border border-white/10 rounded-lg text-xs outline-none focus:border-[#f97316]"
+                        className="w-full p-3 bg-[var(--paper)] border border-[var(--line)] rounded-lg text-xs text-[var(--ink)] outline-none focus:border-[var(--orange)] placeholder:text-[var(--ink-faint)]"
                       />
-                      <button type="submit" className="w-full py-2.5 bg-[#f97316] text-xs font-bold uppercase rounded-lg">
+                      <button type="submit" className="w-full clay-btn clay-btn-primary text-xs">
                         Submit Recovery Message
                       </button>
                     </form>
@@ -780,17 +783,17 @@ export default function PublicScanPage({
 
               {/* CHILD SCHOOL BAG STICKER & KEYCHAIN */}
               {product.category === 'child' && (
-                <div className="p-6 bg-[#111115] border border-white/5 rounded-2xl space-y-6">
-                  <div className="text-left border-b border-white/5 pb-4">
+                <div className="p-6 bg-[var(--paper)] border border-[var(--line)] rounded-2xl space-y-6">
+                  <div className="text-left border-b border-[var(--line)] pb-4">
                     <h4 className="text-sm font-bold uppercase tracking-wide">Child Outing Safety Shield</h4>
-                    <p className="text-xs text-white/50 font-sans mt-0.5">School: {product.details.schoolName || 'Not Declared'}</p>
+                    <p className="text-xs text-[var(--ink-soft)] font-sans mt-0.5">School: {product.details.schoolName || 'Not Declared'}</p>
                   </div>
 
                   {/* Pickup Verification Box */}
-                  <div className="p-4 bg-[#18181c] border border-white/5 rounded-xl text-left space-y-3">
+                  <div className="p-4 bg-[var(--cream-deep)] border border-[var(--line)] rounded-xl text-left space-y-3">
                     <div className="flex items-center gap-1.5">
-                      <UserCheck size={16} className="text-[#f97316]" />
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-white">Guardian Pickup Verification</span>
+                      <UserCheck size={16} className="text-[var(--orange)]" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--ink)]">Guardian Pickup Verification</span>
                     </div>
 
                     <form onSubmit={handleVerifyPickup} className="space-y-3">
@@ -801,7 +804,7 @@ export default function PublicScanPage({
                           placeholder="Your Name (e.g. Driver, Uncle)"
                           value={pickupVerifierName}
                           onChange={(e) => setPickupVerifierName(e.target.value)}
-                          className="p-2.5 bg-black border border-white/10 rounded text-xs outline-none focus:border-[#f97316]"
+                          className="w-full clay-input text-xs placeholder:text-[var(--ink-faint)]"
                         />
                         <input
                           type="text"
@@ -809,21 +812,21 @@ export default function PublicScanPage({
                           placeholder="Enter Pickup Code"
                           value={pickupCodeInput}
                           onChange={(e) => setPickupCodeInput(e.target.value)}
-                          className="p-2.5 bg-black border border-white/10 rounded text-xs font-bold uppercase text-center tracking-widest outline-none focus:border-[#f97316]"
+                          className="w-full clay-input text-xs font-bold uppercase text-center tracking-widest placeholder:text-[var(--ink-faint)]"
                         />
                       </div>
-                      <button type="submit" className="w-full py-2 bg-[#f97316] text-xs font-bold uppercase tracking-wider rounded-lg transition-all">
+                      <button type="submit" className="w-full clay-btn clay-btn-primary text-xs">
                         Verify Authorization
                       </button>
                     </form>
 
                     {verificationFeedback === 'success' && (
-                      <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-bold rounded uppercase tracking-wide text-center">
+                      <div className="p-2.5 bg-[var(--green-soft)] border border-[var(--green)]/20 text-[var(--green)] text-xs font-bold rounded uppercase tracking-wide text-center">
                         ✓ Verification Success: Guardian Authorized
                       </div>
                     )}
                     {verificationFeedback === 'fail' && (
-                      <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold rounded uppercase tracking-wide text-center">
+                      <div className="p-2.5 bg-[var(--orange)]/10 border border-[var(--orange)]/20 text-[var(--orange)] text-xs font-bold rounded uppercase tracking-wide text-center">
                         ⚠ Verification Failure: Code Incorrect
                       </div>
                     )}
@@ -831,22 +834,22 @@ export default function PublicScanPage({
 
                   {/* Bus details section */}
                   {product.details.busDetails && (
-                    <div className="p-3 bg-[#18181c] border border-white/5 rounded-lg text-left flex items-start gap-2.5 font-sans">
-                      <Compass size={16} className="text-[#f97316] shrink-0 mt-0.5" />
+                    <div className="p-3 bg-[var(--cream-deep)] border border-[var(--line)] rounded-lg text-left flex items-start gap-2.5 font-sans">
+                      <Compass size={16} className="text-[var(--orange)] shrink-0 mt-0.5" />
                       <div className="text-xs">
-                        <span className="font-bold text-white block">Bus Route Logistics</span>
-                        <span className="text-white/60 block mt-0.5">{product.details.busDetails}</span>
+                        <span className="font-bold text-[var(--ink)] block">Bus Route Logistics</span>
+                        <span className="text-[var(--ink-soft)] block mt-0.5">{product.details.busDetails}</span>
                       </div>
                     </div>
                   )}
 
                   {/* SOS Notification Trigger */}
-                  <div className="p-4 bg-red-950/20 border border-red-500/15 rounded-xl space-y-4">
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-red-400 text-left">Emergency SOS trigger</span>
+                  <div className="p-4 bg-[var(--orange-deep)]/15 border border-[var(--orange-deep)]/20 rounded-xl space-y-4">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--orange)] text-left">Emergency SOS trigger</span>
                     
                     <button 
                       onClick={(e) => handleAlertSubmit(e, 'lost_child', 'SOS ACTION: Child found lost alert dispatcher!')}
-                      className="w-full py-3.5 bg-[#c81b3a] hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all flex items-center justify-center gap-1.5 cursor-pointer border-none"
+                      className="w-full py-3.5 bg-[var(--orange-deep)] hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all flex items-center justify-center gap-1.5 cursor-pointer border-none"
                     >
                       <ShieldAlert size={14} /> Notify Parent Instantly
                     </button>
@@ -860,26 +863,27 @@ export default function PublicScanPage({
               key="alert-dispatched"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="p-8 text-center bg-[#111115] border border-[#222] rounded-2xl shadow-2xl flex flex-col items-center"
+              className="p-8 text-center bg-[var(--paper)] border border-[var(--line)] rounded-2xl flex flex-col items-center"
             >
-              <div className="w-12 h-12 flex items-center justify-center mb-4 bg-emerald-500/10 text-emerald-500 rounded-full">
+              <div className="w-12 h-12 flex items-center justify-center mb-4 bg-[var(--green-soft)] text-[var(--green)] rounded-full">
                 <CheckCircle size={24} />
               </div>
-              <h2 className="text-xl font-bold uppercase tracking-wide text-white">Message Dispatched</h2>
-              <p className="text-xs text-white/50 mt-2 mb-6 max-w-xs mx-auto leading-relaxed">
+              <h2 className="text-xl font-bold uppercase tracking-wide text-[var(--ink)]">Message Dispatched</h2>
+              <p className="text-xs text-[var(--ink-soft)] mt-2 mb-6 max-w-xs mx-auto leading-relaxed">
                 Your notification has been routed securely to the owner. Your contact details remain protected by NamoQR.
               </p>
 
               <div className="flex gap-3 w-full">
                 <button
                   onClick={() => { setSubmitted(false); setMessage(''); setFinderPhone(''); }}
-                  className="flex-1 py-3.5 bg-[#18181c] border border-white/5 text-xs font-bold uppercase rounded-full hover:bg-slate-900 transition-all cursor-pointer h-12 flex items-center justify-center text-white"
+                  style={{background: 'var(--ink)', color: 'var(--cream)'}}
+                  className="flex-1 clay-btn text-xs"
                 >
                   Send Another
                 </button>
                 <button 
                   onClick={onNavigateHome} 
-                  className="flex-1 py-3.5 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase rounded-full transition-all cursor-pointer h-12 flex items-center justify-center border-none"
+                  className="flex-1 clay-btn clay-btn-primary text-xs"
                 >
                   Done
                 </button>
