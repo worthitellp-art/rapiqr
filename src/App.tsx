@@ -1,17 +1,8 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
-import {
-  INITIAL_USER,
-  INITIAL_VEHICLES,
-  INITIAL_QR_CODES,
-  INITIAL_REPORTS
-} from './data';
-import { NamoProduct, QRCodeData, Report, UserProfile } from './types';
+import { lazy, Suspense, useState, useEffect } from 'react';
 
 const LandingPageMaster = lazy(() => import('./components/landing/LandingPageMaster'));
-const LoginPage = lazy(() => import('./components/auth/LoginPage'));
-const RegisterPage = lazy(() => import('./components/auth/RegisterPage'));
-const DashboardView = lazy(() => import('./components/DashboardView'));
-const PublicScanPage = lazy(() => import('./components/PublicScanPage'));
+const QRFleetDashboard = lazy(() => import('./components/QRFleetDashboard'));
+const ScanPage = lazy(() => import('./components/scan/ScanPage'));
 
 function PageLoader() {
   return (
@@ -24,160 +15,48 @@ function PageLoader() {
   );
 }
 
+function isScanUrl(): boolean {
+  const path = window.location.pathname;
+  const hash = window.location.hash;
+  return /\/qr\//.test(path) || /#\/qr\//.test(hash);
+}
+
 export default function App() {
-  const [user, setUser] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('qr_user_profile');
-    return saved ? JSON.parse(saved) : INITIAL_USER;
-  });
-
-  const [products, setProducts] = useState<NamoProduct[]>(() => {
-    const saved = localStorage.getItem('qr_products');
-    return saved ? JSON.parse(saved) : INITIAL_VEHICLES;
-  });
-
-  const [qrCodes, setQrCodes] = useState<QRCodeData[]>(() => {
-    const saved = localStorage.getItem('qr_codes');
-    return saved ? JSON.parse(saved) : INITIAL_QR_CODES;
-  });
-
-  const [reports, setReports] = useState<Report[]>(() => {
-    const saved = localStorage.getItem('qr_reports');
-    return saved ? JSON.parse(saved) : INITIAL_REPORTS;
-  });
-
-  const [currentRoute, setCurrentRoute] = useState<'landing' | 'login' | 'signup' | 'dashboard' | 'scan'>('landing');
-  const [activeQrCodeId, setActiveQrCodeId] = useState<string>('');
-
-  useEffect(() => { localStorage.setItem('qr_user_profile', JSON.stringify(user)); }, [user]);
-  useEffect(() => { localStorage.setItem('qr_products', JSON.stringify(products)); }, [products]);
-  useEffect(() => { localStorage.setItem('qr_codes', JSON.stringify(qrCodes)); }, [qrCodes]);
-  useEffect(() => { localStorage.setItem('qr_reports', JSON.stringify(reports)); }, [reports]);
+  const [page, setPage] = useState<'landing' | 'dashboard' | 'scan'>(() =>
+    isScanUrl() ? 'scan' : 'landing'
+  );
 
   useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash || '';
-
-      if (hash.startsWith('#/scan/')) {
-        const parts = hash.split('/');
-        const id = parts[2] || '';
-        setActiveQrCodeId(id);
-        setCurrentRoute('scan');
-      } else if (hash === '#/login') {
-        setCurrentRoute('login');
-      } else if (hash === '#/signup') {
-        setCurrentRoute('signup');
-      } else if (hash === '#/dashboard') {
-        if (user.isLoggedIn) {
-          setCurrentRoute('dashboard');
-        } else {
-          window.location.hash = '#/login';
-          setCurrentRoute('login');
-        }
-      } else {
-        setCurrentRoute('landing');
-      }
+    const handler = () => {
+      if (isScanUrl() && page !== 'scan') setPage('scan');
     };
+    window.addEventListener('popstate', handler);
+    return () => window.removeEventListener('popstate', handler);
+  }, [page]);
 
-    handleHashChange();
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [user.isLoggedIn]);
-
-  const navigateTo = (hashRoute: string) => { window.location.hash = hashRoute; };
-
-  const handleLoginSuccess = (profile: UserProfile) => {
-    setUser(profile);
-    navigateTo('#/dashboard');
-  };
-
-  const handleLogout = () => {
-    setUser({ ...user, isLoggedIn: false });
-    navigateTo('#/');
-  };
-
-  const handleAddNewReport = (newReportData: Omit<Report, 'id' | 'createdAt' | 'status'>) => {
-    const nextReportId = `R-${Date.now().toString().slice(-4)}`;
-    const freshReport: Report = {
-      ...newReportData,
-      id: nextReportId,
-      status: 'unread',
-      createdAt: new Date().toISOString(),
-    };
-    setReports((prev) => [freshReport, ...prev]);
-    setQrCodes((prevQrs) =>
-      prevQrs.map((q) => {
-        if (q.vehicleId === newReportData.vehicleId || q.id === activeQrCodeId) {
-          return { ...q, scansCount: q.scansCount + 1 };
-        }
-        return q;
-      })
+  if (page === 'scan') {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <ScanPage onBack={() => { window.history.pushState({}, '', '/'); setPage('landing'); }} />
+      </Suspense>
     );
-    setProducts((prevProds) =>
-      prevProds.map((p) => {
-        if (p.id === newReportData.vehicleId || p.qrCodeId === activeQrCodeId) {
-          return { ...p, scansCount: p.scansCount + 1, lastScannedAt: new Date().toISOString() };
-        }
-        return p;
-      })
-    );
-  };
+  }
 
-  const handleActivateSticker = (newProduct: NamoProduct, updatedQrCode: QRCodeData) => {
-    setProducts((prev) => [newProduct, ...prev]);
-    setQrCodes((prev) => prev.map((q) => q.id === updatedQrCode.id ? updatedQrCode : q));
-  };
+  if (page === 'dashboard') {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <QRFleetDashboard onBack={() => setPage('landing')} />
+      </Suspense>
+    );
+  }
 
   return (
     <Suspense fallback={<PageLoader />}>
       <div className="min-h-screen bg-[var(--cream)] text-[var(--ink)]">
-        {currentRoute === 'landing' && (
-          <LandingPageMaster
-            onStart={() => navigateTo(user.isLoggedIn ? '#/dashboard' : '#/signup')}
-            onLogin={() => navigateTo('#/login')}
-          />
-        )}
-
-        {currentRoute === 'login' && (
-          <LoginPage
-            onLoginSuccess={handleLoginSuccess}
-            onSwitchToSignup={() => navigateTo('#/signup')}
-            onBack={() => navigateTo('#/')}
-          />
-        )}
-
-        {currentRoute === 'signup' && (
-          <RegisterPage
-            onLoginSuccess={handleLoginSuccess}
-            onSwitchToLogin={() => navigateTo('#/login')}
-            onBack={() => navigateTo('#/')}
-          />
-        )}
-
-        {currentRoute === 'dashboard' && (
-          <DashboardView
-            user={user}
-            products={products}
-            qrCodes={qrCodes}
-            reports={reports}
-            onLogout={handleLogout}
-            onUpdateProducts={(updatedProds) => setProducts(updatedProds)}
-            onUpdateQrCodes={(updatedQrs) => setQrCodes(updatedQrs)}
-            onUpdateReports={(updatedReps) => setReports(updatedReps)}
-            onUpdateUser={(updatedProf) => setUser(updatedProf)}
-            onSimulatePublicScan={(qrId) => navigateTo(`#/scan/${qrId}`)}
-          />
-        )}
-
-        {currentRoute === 'scan' && (
-          <PublicScanPage
-            qrCodeId={activeQrCodeId}
-            products={products}
-            qrCodes={qrCodes}
-            onActivateSticker={handleActivateSticker}
-            onSubmitReport={handleAddNewReport}
-            onNavigateHome={() => navigateTo('#/')}
-          />
-        )}
+        <LandingPageMaster
+          onStart={() => setPage('dashboard')}
+          onLogin={() => setPage('dashboard')}
+        />
       </div>
     </Suspense>
   );

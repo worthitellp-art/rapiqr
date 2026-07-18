@@ -1,7 +1,8 @@
+import './landing.css';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Car, Bike, Home, Luggage, ShieldCheck, ShieldAlert, Package } from 'lucide-react';
 import { InfiniteMovingCards } from '../ui/infinite-moving-cards';
-import ImageSlider3D from '../ui/3d-image-slider';
+
 
 const PRODUCTS = [
   {
@@ -321,32 +322,23 @@ export default function LandingPageMaster({ onStart, onLogin }) {
 
       <section className="hero">
         <div className="wrap">
-          <div className="hero-carousel-wrap">
-            <ImageSlider3D
-              images={['/mockup.png', '/mockup2.png', '/mockup.png', '/mockup2.png', '/mockup.png', '/mockup2.png', '/mockup.png', '/mockup2.png', '/mockup.png', '/mockup2.png', '/mockup.png']}
-              duration={40}
-              cardWidth="50vw"
-              cardAspectRatio="9/5"
-              perspective="80vw"
-              rotationDirection="left"
-              withMask={true}
-              containerClassName="hero-3d-slider"
-            />
-            <div className="hero-tag-abs">
-              <div className="dot">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </div>
-              <p>Wrong parking alert sent<span>Connaught Place · Just now</span></p>
-            </div>
-          </div>
-          <div className="hero-text reveal in">
-            <p className="eyebrow" style={{ marginBottom: '18px' }}>Trusted by 10,000+ families across India</p>
+
+          <div className="hero-top">
+            <p className="eyebrow">Trusted by 10,000+ families across India</p>
             <h1 className="hero-title serif">One scan away<br />from <em>help</em>, always.</h1>
-            <p className="hero-sub">QR safety stickers for your car, bike, home gate, luggage and family — alerts reach you instantly, your number stays private.</p>
           </div>
+
+          <div className="hero-products-grid">
+            {PRODUCTS.map((p, i) => (
+              <a href="#products" className="hero-product-card" key={i}>
+                <img src={p.img} alt={p.name} loading="lazy" draggable={false} />
+                <span className="hero-product-label">{p.name}</span>
+              </a>
+            ))}
+          </div>
+
           <div className="hero-bottom">
+            <p className="hero-sub">QR safety stickers for your car, bike, home gate, luggage and family — alerts reach you instantly, your number stays private.</p>
             <div className="hero-cta">
               <a href="#products" className="btn btn-primary">Shop Now</a>
               <a href="#how" className="btn btn-ghost">See How it Works</a>
@@ -369,6 +361,7 @@ export default function LandingPageMaster({ onStart, onLogin }) {
               <div className="trust-item"><span className="trust-num serif">24/7</span><span className="trust-label">Alert Monitoring</span></div>
             </div>
           </div>
+
         </div>
         <div className="category-row">
           <div className="category-item"><Car size={18} /> Car Stickers</div>
@@ -596,38 +589,6 @@ export default function LandingPageMaster({ onStart, onLogin }) {
               </div>
               <p className="about-body">NamoQR started as a single vehicle sticker and grew into a full family-safety ecosystem — bikes, homes, luggage, keychains and school bags, all running on the same masked-calling and alert infrastructure. Every product ships with a GST invoice, is MSME-registered, and is designed in-house with a promise: no bystander, courier or stranger ever sees your real phone number.</p>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="sec" style={{ paddingTop: 0 }}>
-        <div className="wrap">
-          <div className="sec-head reveal">
-            <h2 className="sec-title serif">What families are saying.</h2>
-          </div>
-          <div style={{ display: 'flex', gap: '16px', height: '480px', overflow: 'hidden' }}>
-            <InfiniteMovingCards
-              items={TESTIMONIALS.map(t => ({
-                image: t.img,
-                quote: t.text,
-                name: t.name,
-                title: t.label,
-              }))}
-              direction="up"
-              speed="slow"
-              className="flex-1"
-            />
-            <InfiniteMovingCards
-              items={[...TESTIMONIALS].reverse().map(t => ({
-                image: t.img,
-                quote: t.text,
-                name: t.name,
-                title: t.label,
-              }))}
-              direction="down"
-              speed="slow"
-              className="flex-1"
-            />
           </div>
         </div>
       </section>
