@@ -51,6 +51,59 @@ function uid(prefix = "QR") {
   return `${prefix}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 }
 
+function qrFullUrl(qrId: string) {
+  return `${window.location.origin}${window.location.pathname}#/qr/${qrId}`;
+}
+
+function CopyLinkButton({ qrId, compact }: { qrId: string; compact?: boolean }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(qrFullUrl(qrId)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  };
+
+  const handleOpen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.open(qrFullUrl(qrId), "_blank");
+  };
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-1">
+        <button onClick={handleCopy} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400" title={copied ? "Copied!" : "Copy QR link"}>
+          {copied ? <Check size={14} className="text-emerald-500" /> : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>}
+        </button>
+        <button onClick={handleOpen} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400" title="Open scan page">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-2 w-full">
+      <button
+        onClick={handleCopy}
+        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+      >
+        {copied ? <Check size={14} className="text-emerald-500" /> : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>}
+        {copied ? "Copied!" : "Copy Link"}
+      </button>
+      <button
+        onClick={handleOpen}
+        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+        Open Page
+      </button>
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------------- */
 /*  localStorage hook                                                       */
 /* ---------------------------------------------------------------------- */
@@ -346,6 +399,9 @@ function RecentCard({ q, onOpen, templates }: { q: any; onOpen: (q: any) => void
           </div>
           <p className="text-xs text-gray-400 truncate">{q.clientId} · {fmtDate(q.createdAt)}</p>
         </div>
+        <div className="mt-3">
+          <CopyLinkButton qrId={q.id} compact />
+        </div>
       </div>
     </button>
   );
@@ -480,7 +536,7 @@ function QrCodesPage({ qrList, setQrList, templates, setToast, openQuickLook }: 
     const qrId = uid();
     const rec = {
       id: qrId,
-      qrUrl: `https://namoqr.com/qr/${qrId}`,
+      qrUrl: `${window.location.origin}${window.location.pathname}#/qr/${qrId}`,
       clientId: uid("CL"),
       vehicleName,
       vehicleNumber,
@@ -505,7 +561,7 @@ function QrCodesPage({ qrList, setQrList, templates, setToast, openQuickLook }: 
       const bulkId = uid();
       return {
         id: bulkId,
-        qrUrl: `https://namoqr.com/qr/${bulkId}`,
+        qrUrl: `${window.location.origin}${window.location.pathname}#/qr/${bulkId}`,
         clientId: uid("CL"),
         vehicleName: `Item ${i + 1}`,
         vehicleNumber: `XX00XX${(1000 + i).toString().slice(-4)}`,
@@ -715,6 +771,7 @@ function QrCodesPage({ qrList, setQrList, templates, setToast, openQuickLook }: 
                       <Pill tone={q.status === "active" ? "violet" : "red"}>{q.status}</Pill>
                     </td>
                     <td className="px-6 py-2.5 text-right flex items-center justify-end gap-1">
+                      <CopyLinkButton qrId={q.id} compact />
                       <button onClick={() => openQuickLook(q)} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400" title="Quick look">
                         <Eye size={15} />
                       </button>
@@ -807,6 +864,8 @@ function QuickLookModal({ qr, onClose, stickerPos, templates }: { qr: any; onClo
           >
             <Download size={14} /> Download
           </button>
+
+          <CopyLinkButton qrId={qr.id} />
         </div>
       </div>
     </div>
@@ -848,6 +907,7 @@ function AlertsPage({ qrList, setQrList, templates, setToast }: any) {
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">{fmtDateTime(q.createdAt)} · template: {q.template}</p>
                 </div>
+                <CopyLinkButton qrId={q.id} compact />
                 <Pill tone="violet"><ScanLine size={11} /> {q.scans}</Pill>
                 <Pill tone={q.status === "active" ? "green" : "red"}>{q.status}</Pill>
                 <IconTrash onClick={() => removeAlert(q.id)} title="Delete alert" />

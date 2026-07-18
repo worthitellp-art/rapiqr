@@ -101,7 +101,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
           }
           setQrData({
             id: found.id,
-            qrUrl: found.qrUrl || `https://namoqr.com/qr/${found.id}`,
+            qrUrl: found.qrUrl || `${window.location.origin}${window.location.pathname}#/qr/${found.id}`,
             vehicleName: found.vehicleName,
             vehicleNumber: found.vehicleNumber,
             clientId: found.clientId,
