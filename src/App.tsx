@@ -18,7 +18,11 @@ function PageLoader() {
 function isScanUrl(): boolean {
   const path = window.location.pathname;
   const hash = window.location.hash;
-  return /\/qr\//.test(path) || /#\/qr\//.test(hash);
+  // Direct QR ID path: /QR-XXXX or /CL-XXXX (from worker domain)
+  const directQrMatch = path.match(/^\/(QR-|CL-)[A-Z0-9]+/i);
+  // Legacy formats: /qr/{id} or #/qr/{id}
+  const legacyMatch = /\/qr\//.test(path) || /#\/qr\//.test(hash);
+  return !!directQrMatch || legacyMatch;
 }
 
 export default function App() {

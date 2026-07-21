@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 type Phase =
   | "validating"
+  | "activation"
   | "location-request"
   | "location-denied"
   | "gps-off"
@@ -33,14 +34,30 @@ interface GeoLocation {
 }
 
 /* ---------------------------------------------------------------------- */
-/*  Helpers                                                                 */
+/*  Constants & Helpers                                                     */
 /* ---------------------------------------------------------------------- */
 
+const QR_DOMAIN = "https://oqr.linkspace-service.workers.dev";
+
 function getQrIdFromUrl(): string | null {
+  // Support both new format (oqr.linkspace-service.workers.dev/{id}) and legacy format (#/qr/{id})
   const path = window.location.pathname;
   const hash = window.location.hash;
-  const match = path.match(/\/qr\/([^/]+)/) || hash.match(/#\/qr\/([^/]+)/);
-  return match ? decodeURIComponent(match[1]) : null;
+  // New format: direct path like /QR-XXXX or /QR-XXXX/
+  const directMatch = path.match(/^\/([^/]+)/);
+  const hashMatch = hash.match(/#\/qr\/([^/]+)/);
+  const legacyMatch = path.match(/\/qr\/([^/]+)/);
+  
+  if (directMatch && directMatch[1] !== "") {
+    const id = directMatch[1];
+    // QR IDs always start with QR- or CL- prefix (from the uid helper)
+    if (id.startsWith("QR-") || id.startsWith("CL-")) {
+      return decodeURIComponent(id);
+    }
+  }
+  if (hashMatch) return decodeURIComponent(hashMatch[1]);
+  if (legacyMatch) return decodeURIComponent(legacyMatch[1]);
+  return null;
 }
 
 function formatTime(d: string) {
@@ -65,6 +82,9 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
   const [activateProgress, setActivateProgress] = useState(0);
   const [activateStatus, setActivateStatus] = useState("");
   const [alertSent, setAlertSent] = useState(false);
+  const [visitorName, setVisitorName] = useState("");
+  const [visitorMessage, setVisitorMessage] = useState("");
+  const [activatingQr, setActivatingQr] = useState(false);
   const gpsWatchRef = useRef<number | null>(null);
 
   /* ---- Cleanup GPS watcher on unmount ---- */
@@ -99,16 +119,22 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
             setPhase("error");
             return;
           }
-          setQrData({
+          const data = {
             id: found.id,
-            qrUrl: found.qrUrl || `${window.location.origin}${window.location.pathname}#/qr/${found.id}`,
+            qrUrl: found.qrUrl || `${QR_DOMAIN}/${found.id}`,
             vehicleName: found.vehicleName,
             vehicleNumber: found.vehicleNumber,
             clientId: found.clientId,
             status: found.status,
             template: found.template,
-          });
-          setPhase("location-request");
+          };
+          setQrData(data);
+          // First-time activation required before showing emergency
+          if (found.status === "inactive") {
+            setPhase("activation");
+          } else {
+            setPhase("location-request");
+          }
         }, 400);
       }
       setProgress(Math.min(100, prog));
@@ -170,6 +196,52 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
       if (gpsWatchRef.current !== null) navigator.geolocation.clearWatch(gpsWatchRef.current);
     };
   }, [phase]);
+
+  /* ---- Step 2.5: Activation (first scan) ---- */
+  const handleActivation = useCallback(() => {
+    if (!qrData) return;
+    setActivatingQr(true);
+
+    // Brief delay so user sees the activating state
+    setTimeout(() => {
+      // Update QR status from "inactive" to "active" in localStorage
+      const stored = localStorage.getItem("namoqr-qrlist");
+      const list: any[] = stored ? JSON.parse(stored) : [];
+      const idx = list.findIndex((q: any) => q.id === qrData.id);
+      if (idx >= 0) {
+        list[idx].status = "active";
+        list[idx].scans = (list[idx].scans || 0) + 1;
+        list[idx].lastScannedAt = new Date().toISOString();
+        list[idx].activatedBy = visitorName || "Anonymous";
+        list[idx].activationNote = visitorMessage || undefined;
+        list[idx].activatedAt = new Date().toISOString();
+        localStorage.setItem("namoqr-qrlist", JSON.stringify(list));
+
+        // Also create an activation alert
+        const alerts = JSON.parse(localStorage.getItem("namoqr-alerts") || "[]");
+        alerts.unshift({
+          id: Date.now(),
+          qrId: qrData.id,
+          qrUrl: qrData.qrUrl,
+          vehicleName: qrData.vehicleName,
+          vehicleNumber: qrData.vehicleNumber,
+          visitorName: visitorName || "Anonymous",
+          message: visitorMessage || undefined,
+          latitude: null,
+          longitude: null,
+          timestamp: new Date().toISOString(),
+          status: "activated",
+          type: "activation",
+        });
+        localStorage.setItem("namoqr-alerts", JSON.stringify(alerts));
+      }
+
+      // Update local state and proceed to emergency flow
+      setActivatingQr(false);
+      setQrData({ ...qrData, status: "active" });
+      setPhase("location-request");
+    }, 800);
+  }, [qrData, visitorName, visitorMessage]);
 
   /* ---- Step 3: Send Emergency Alert ---- */
   const sendAlert = useCallback(() => {
@@ -262,6 +334,106 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
               />
             </div>
             <p className="text-white/30 text-xs mt-3 font-mono">{Math.round(progress)}%</p>
+          </div>
+        )}
+
+        {/* ============ ACTIVATION (First scan) ============ */}
+        {phase === "activation" && qrData && (
+          <div className="w-full max-w-sm animate-fade-in space-y-5">
+            {/* Header */}
+            <div className="text-center mb-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-4">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                First Activation
+              </div>
+              <h1 className="text-2xl font-bold">Activate This QR</h1>
+              <p className="text-white/40 text-sm mt-1">This QR has not been activated yet. Let the owner know you're here.</p>
+            </div>
+
+            {/* Vehicle/Product Info */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-lg">
+                  🚗
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{qrData.vehicleName}</p>
+                  <p className="text-xs text-white/40 font-mono">{qrData.vehicleNumber}</p>
+                </div>
+                <span className="text-[10px] font-mono text-white/30 bg-white/5 px-2 py-1 rounded-md">{qrData.clientId}</span>
+              </div>
+            </div>
+
+            {/* Visitor Details Form */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
+              <p className="text-[10px] text-white/30 uppercase tracking-wider font-bold">Your Details (optional)</p>
+              <div>
+                <label className="text-xs text-white/50 mb-1 block">Your Name</label>
+                <input
+                  value={visitorName}
+                  onChange={(e) => setVisitorName(e.target.value)}
+                  placeholder="Enter your name"
+                  className="w-full px-4 py-2.5 text-sm bg-white/10 border border-white/10 rounded-xl outline-none text-white placeholder-white/30 focus:border-emerald-500/50 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-white/50 mb-1 block">Message to Owner</label>
+                <textarea
+                  value={visitorMessage}
+                  onChange={(e) => setVisitorMessage(e.target.value)}
+                  placeholder="e.g., Just letting you know I\'m here..."
+                  rows={2}
+                  className="w-full px-4 py-2.5 text-sm bg-white/10 border border-white/10 rounded-xl outline-none text-white placeholder-white/30 focus:border-emerald-500/50 transition-colors resize-none"
+                />
+              </div>
+            </div>
+
+            {/* What happens next */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+              <p className="text-[10px] text-white/30 uppercase tracking-wider font-bold mb-2">After Activation</p>
+              <div className="space-y-2">
+                {[
+                  "Owner gets notified of your visit",
+                  "Time & location recorded securely",
+                  "Emergency options become available",
+                ].map((item) => (
+                  <div key={item} className="flex items-center gap-2 text-xs text-white/50">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Activate Button */}
+            <button
+              onClick={handleActivation}
+              disabled={activatingQr}
+              className="w-full py-4 rounded-2xl text-white font-bold text-base flex items-center justify-center gap-2.5 active:scale-[0.98] transition-all shadow-lg shadow-emerald-500/20"
+              style={{ background: activatingQr ? "#6B7280" : "linear-gradient(135deg, #10B981, #059669)" }}
+            >
+              {activatingQr ? (
+                <>
+                  <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3" />
+                    <path d="M12 2a10 10 0 019.95 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                  ACTIVATING...
+                </>
+              ) : (
+                <>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                  ACTIVATE &amp; NOTIFY OWNER
+                </>
+              )}
+            </button>
+
+            <p className="text-center text-[10px] text-white/20 pb-2">
+              Your name and message will be shared with the owner.
+            </p>
           </div>
         )}
 
@@ -377,8 +549,8 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
             <div>
               <p className="text-[10px] text-white/30 uppercase tracking-wider font-bold mb-2.5">Quick Actions</p>
               <div className="grid grid-cols-2 gap-2.5">
-                <ActionCard icon="📞" label="Call Owner" sub="Direct call" color="#3B82F6" onClick={() => window.open("tel:+919999999999")} />
-                <ActionCard icon="💬" label="Send Message" sub="SMS alert" color="#8B5CF6" onClick={() => window.open("sms:?body=Emergency! Vehicle ${qrData.vehicleNumber} needs assistance.")} />
+                <ActionCard icon="📞" label="Contact Owner" sub="Notify via app" color="#3B82F6" onClick={() => window.open(`${QR_DOMAIN}/${qrData.id}/contact`)} />
+                <ActionCard icon="💬" label="Send Message" sub="SMS alert" color="#8B5CF6" onClick={() => window.open(`sms:?body=Emergency! Vehicle ${qrData.vehicleNumber} needs assistance.`)} />
                 <ActionCard icon="📍" label="Share Location" sub="Live GPS" color="#10B981" onClick={() => location && window.open(`https://www.google.com/maps?q=${location.lat},${location.lng}`)} />
                 <ActionCard icon="📸" label="Upload Photo" sub="Optional" color="#F59E0B" onClick={() => {}} />
               </div>
@@ -464,10 +636,10 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
 
             <div className="flex gap-3 w-full">
               <button
-                onClick={() => window.open("tel:+919999999999")}
+                onClick={() => window.open(`${QR_DOMAIN}/${qrData.id}/contact`)}
                 className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-sm font-semibold hover:bg-white/10 transition-colors"
               >
-                📞 Call Owner
+                📞 Contact Owner
               </button>
               <button
                 onClick={onBack}

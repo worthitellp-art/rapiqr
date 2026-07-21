@@ -51,8 +51,10 @@ function uid(prefix = "QR") {
   return `${prefix}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 }
 
+const QR_DOMAIN = "https://oqr.linkspace-service.workers.dev";
+
 function qrFullUrl(qrId: string) {
-  return `${window.location.origin}${window.location.pathname}#/qr/${qrId}`;
+  return `${QR_DOMAIN}/${qrId}`;
 }
 
 function CopyLinkButton({ qrId, compact }: { qrId: string; compact?: boolean }) {
@@ -233,7 +235,7 @@ function StickerThumb({ qr, templates, size = 96 }: { qr: any; templates: any[];
     <div style={{ width: size, height: thumbH, position: "relative", overflow: "hidden", borderRadius: 6, flexShrink: 0 }}>
       <img src={STICKER_SRC} style={{ width: "100%", height: "100%", objectFit: "fill" }} draggable={false} alt="" />
       <img
-        src={qrImageUrl(`${qr.clientId}|${qr.vehicleName}|${qr.vehicleNumber}`, qrFg, qrBg, 128)}
+        src={qrImageUrl(qr.qrUrl || qrFullUrl(qr.id), qrFg, qrBg, 128)}
         style={{ position: "absolute", left: qrX, top: qrY, width: qrW, height: qrH, objectFit: "contain" }}
         draggable={false}
         alt="qr"
@@ -536,13 +538,13 @@ function QrCodesPage({ qrList, setQrList, templates, setToast, openQuickLook }: 
     const qrId = uid();
     const rec = {
       id: qrId,
-      qrUrl: `${window.location.origin}${window.location.pathname}#/qr/${qrId}`,
+      qrUrl: `${QR_DOMAIN}/${qrId}`,
       clientId: uid("CL"),
       vehicleName,
       vehicleNumber,
       createdAt: new Date().toISOString(),
       scans: 0,
-      status: "active",
+      status: "inactive",
       template: activeTemplate?.name || "Default",
       fg: activeTemplate?.fg || "D9581F",
       bg: activeTemplate?.bg || "FFFFFF",
@@ -561,13 +563,13 @@ function QrCodesPage({ qrList, setQrList, templates, setToast, openQuickLook }: 
       const bulkId = uid();
       return {
         id: bulkId,
-        qrUrl: `${window.location.origin}${window.location.pathname}#/qr/${bulkId}`,
+        qrUrl: `${QR_DOMAIN}/${bulkId}`,
         clientId: uid("CL"),
         vehicleName: `Item ${i + 1}`,
         vehicleNumber: `XX00XX${(1000 + i).toString().slice(-4)}`,
         createdAt: new Date().toISOString(),
         scans: 0,
-        status: "active",
+        status: "inactive",
         template: activeTemplate?.name || "Default",
         fg: activeTemplate?.fg || "D9581F",
         bg: activeTemplate?.bg || "FFFFFF",
@@ -812,7 +814,7 @@ function QuickLookModal({ qr, onClose, stickerPos, templates }: { qr: any; onClo
         c.getContext("2d")!.drawImage(img, 0, 0);
         resolve(c.toDataURL("image/png"));
       };
-      img.src = qrImageUrl(`${qr.clientId}|${qr.vehicleName}|${qr.vehicleNumber}`, qr?.fg || "D9581F", qr?.bg || "FFFFFF", 512);
+      img.src = qrImageUrl(qr.qrUrl || qrFullUrl(qr.id), qr?.fg || "D9581F", qr?.bg || "FFFFFF", 512);
     });
     const blob = await compositeQrOnSticker(qrDataUrl, dlPos);
     if (blob) {
