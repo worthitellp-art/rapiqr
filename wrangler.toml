@@ -1,4 +1,7 @@
 name = "namoqr"
+main = "src/worker.ts"
 compatibility_date = "2025-04-01"
-workers_dev = true
-pages_build_output_dir = "dist"
+compatibility_flags = ["nodejs_compat"]
+
+# Serve static assets from the dist/ folder
+assets = { directory = "./dist" }

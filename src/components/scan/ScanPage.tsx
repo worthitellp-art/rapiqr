@@ -37,7 +37,7 @@ interface GeoLocation {
 /*  Constants & Helpers                                                     */
 /* ---------------------------------------------------------------------- */
 
-const QR_DOMAIN = "https://oqr.linkspace-service.workers.dev";
+const QR_DOMAIN = "https://namoqr.linkspace-service.workers.dev";
 
 function getQrIdFromUrl(): string | null {
   // Support both new format (oqr.linkspace-service.workers.dev/{id}) and legacy format (#/qr/{id})

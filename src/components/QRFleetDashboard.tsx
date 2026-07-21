@@ -51,7 +51,7 @@ function uid(prefix = "QR") {
   return `${prefix}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 }
 
-const QR_DOMAIN = "https://oqr.linkspace-service.workers.dev";
+const QR_DOMAIN = "https://namoqr.linkspace-service.workers.dev";
 
 function qrFullUrl(qrId: string) {
   return `${QR_DOMAIN}/${qrId}`;
