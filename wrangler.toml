@@ -1,0 +1,4 @@
+name = "namoqr"
+compatibility_date = "2025-04-01"
+workers_dev = true
+pages_build_output_dir = "dist"
