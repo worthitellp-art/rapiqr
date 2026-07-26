@@ -1,0 +1,278 @@
+import { supabase, isSupabaseConfigured } from './supabase';
+import type { Report } from '../types';
+
+/**
+ * Fetch registered QR codes from Supabase with explicit field selection
+ */
+export async function getQrCodesFromDb(limitCount = 100) {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { data, error } = await supabase
+      .from('qr_codes')
+      .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, created_at, activation_code')
+      .order('created_at', { ascending: false })
+      .limit(limitCount);
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.warn('Supabase fetch QR codes error:', err);
+    return null;
+  }
+}
+
+/**
+ * Fetch single QR code by ID
+ */
+export async function getQrCodeByIdFromDb(qrId: string) {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { data, error } = await supabase
+      .from('qr_codes')
+      .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, created_at, activation_code')
+      .eq('id', qrId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.warn(`Supabase fetch QR ${qrId} error:`, err);
+    return null;
+  }
+}
+
+/**
+ * Save a single QR code record to Supabase
+ */
+export async function saveQrCodeToDb(qr: {
+  id: string;
+  clientId: string;
+  status: string;
+  scansCount?: number;
+  templateName?: string;
+  fgColor?: string;
+  bgColor?: string;
+  activationCode?: string;
+}) {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { data, error } = await supabase
+      .from('qr_codes')
+      .upsert({
+        id: qr.id,
+        client_id: qr.clientId,
+        status: qr.status || 'inactive',
+        scans_count: qr.scansCount || 0,
+        template_name: qr.templateName || 'Default',
+        fg_color: qr.fgColor || 'EAB308',
+        bg_color: qr.bgColor || 'FFFFFF',
+        activation_code: qr.activationCode,
+      })
+      .select('id, client_id, status, scans_count, created_at, activation_code');
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.warn('Supabase save QR code error:', err);
+    return null;
+  }
+}
+
+/**
+ * Bulk save QR codes to Supabase with batched insert
+ */
+export async function bulkSaveQrCodesToDb(qrList: any[]) {
+  if (!isSupabaseConfigured || !qrList.length) return null;
+  try {
+    const records = qrList.map((qr) => ({
+      id: qr.id,
+      client_id: qr.clientId,
+      status: qr.status || 'inactive',
+      scans_count: qr.scans || 0,
+      template_name: qr.template || 'Default',
+      fg_color: qr.fg || 'EAB308',
+      bg_color: qr.bg || 'FFFFFF',
+      activation_code: qr.activationCode,
+    }));
+
+    const { data, error } = await supabase
+      .from('qr_codes')
+      .upsert(records)
+      .select('id, client_id, status, activation_code');
+      
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.warn('Supabase bulk save QR codes error:', err);
+    return null;
+  }
+}
+
+/**
+ * Fetch sticker customization templates from Supabase
+ */
+export async function getTemplatesFromDb() {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { data, error } = await supabase
+      .from('templates')
+      .select('id, name, fg_color, bg_color, sticker_pos, is_default, created_at')
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.warn('Supabase fetch templates error:', err);
+    return null;
+  }
+}
+
+/**
+ * Save / Upsert sticker template to Supabase
+ */
+export async function saveTemplateToDb(template: {
+  id?: string;
+  name: string;
+  fgColor: string;
+  bgColor: string;
+  stickerPos?: { x: number; y: number; w: number; h: number };
+  isDefault?: boolean;
+}) {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { data, error } = await supabase
+      .from('templates')
+      .upsert({
+        id: template.id,
+        name: template.name,
+        fg_color: template.fgColor,
+        bg_color: template.bgColor,
+        sticker_pos: template.stickerPos || { x: 110, y: 40, w: 100, h: 100 },
+        is_default: template.isDefault || false,
+      })
+      .select('id, name, fg_color, bg_color, sticker_pos');
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.warn('Supabase save template error:', err);
+    return null;
+  }
+}
+
+/**
+ * Delete template from Supabase
+ */
+export async function deleteTemplateFromDb(templateId: string) {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { error } = await supabase
+      .from('templates')
+      .delete()
+      .eq('id', templateId);
+
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.warn('Supabase delete template error:', err);
+    return false;
+  }
+}
+
+/**
+ * Save sticker QR Placement coordinates (x, y, w, h) to Supabase
+ */
+export async function saveStickerPosToDb(pos: { x: number; y: number; w: number; h: number }) {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { data, error } = await supabase
+      .from('templates')
+      .upsert({
+        name: 'Default',
+        fg_color: 'EAB308',
+        bg_color: 'FFFFFF',
+        sticker_pos: pos,
+        is_default: true,
+      }, { onConflict: 'name' })
+      .select('name, sticker_pos');
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.warn('Supabase save sticker position error:', err);
+    return null;
+  }
+}
+
+/**
+ * Fetch user products/vehicles with minimal payload requirement
+ */
+export async function getProductsFromDb(userId?: string, limitCount = 100) {
+  if (!isSupabaseConfigured) return null;
+  try {
+    let query = supabase
+      .from('products')
+      .select('id, user_id, qr_code_id, category, name, vehicle_number, status, assigned_to, scans_count, details, created_at')
+      .order('created_at', { ascending: false })
+      .limit(limitCount);
+
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.warn('Supabase fetch products error:', err);
+    return null;
+  }
+}
+
+/**
+ * Create emergency scan report in Supabase
+ */
+export async function createReportInDb(report: Partial<Report>) {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { data, error } = await supabase
+      .from('reports')
+      .insert({
+        qr_code_id: report.vehicleId,
+        product_label: report.vehicleLabel || 'RapiQR Item',
+        license_plate: report.licensePlate || null,
+        type: report.type || 'contact_owner',
+        message: report.message || '',
+        reporter_phone: report.reporterPhone || null,
+        location: report.location || null,
+        status: report.status || 'unread',
+      })
+      .select('id, qr_code_id, status, created_at');
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.warn('Supabase create report error:', err);
+    return null;
+  }
+}
+
+/**
+ * Fetch unread & recent reports with column targeting
+ */
+export async function getReportsFromDb(limitCount = 50) {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { data, error } = await supabase
+      .from('reports')
+      .select('id, qr_code_id, product_id, product_label, license_plate, type, message, reporter_phone, location, status, created_at')
+      .order('created_at', { ascending: false })
+      .limit(limitCount);
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.warn('Supabase fetch reports error:', err);
+    return null;
+  }
+}

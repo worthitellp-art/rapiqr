@@ -10,7 +10,7 @@
   --color-ink: #201C15;
   --color-ink-soft: #6E6759;
   --color-ink-faint: #A79E8B;
-  --color-orange: #D9581F;
+  --color-orange: #EAB308;
   --color-orange-deep: #B84418;
   --color-orange-deeper: #A33A14;
   --color-green: #2F6B4F;
@@ -24,12 +24,13 @@ html { height: 100%; }
 body { height: 100%; -webkit-font-smoothing: antialiased; }
 #root { height: 100%; }
 
-::selection { background: var(--orange); color: #fff; }
+::selection { background: rgba(234,179,8,0.25); color: #EAB308; }
+::-moz-selection { background: rgba(234,179,8,0.25); color: #EAB308; }
 
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--cream); }
-::-webkit-scrollbar-thumb { background: var(--ink-faint); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); }
+::-webkit-scrollbar-track { background: #F7F5F0; }
+::-webkit-scrollbar-thumb { background: #CBD5E0; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #1A3A5C; }
 
 @media(prefers-reduced-motion:reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }

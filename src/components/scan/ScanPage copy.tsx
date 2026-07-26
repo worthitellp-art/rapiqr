@@ -200,111 +200,6 @@ function EmergencySirenGraphic() {
   );
 }
 
-function IconTowTruck() {
-  return (
-    <div className="w-11 h-9 relative flex items-center justify-center mb-1">
-      <svg viewBox="0 0 52 38" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-        {/* White Tow Truck Body */}
-        <path d="M 6 24 C 6 22.5 7.2 21.5 8.5 21.5 H 22 V 28 H 6 V 24 Z" fill="white" />
-        <path d="M 22 21.5 H 28.5 L 34 25.5 V 28 H 22 V 21.5 Z" fill="#F8FAFC" />
-        <rect x="23.5" y="23" width="5" height="3.5" rx="1" fill="#FF2929" />
-        {/* Crane Hook Boom Arm */}
-        <path d="M 12 21.5 L 34 9 H 37 L 26 21.5 Z" fill="white" />
-        <path d="M 36 9 V 17 L 39 20 L 37.5 21.5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-        {/* Wheels */}
-        <circle cx="13" cy="28" r="4" fill="white" stroke="#FF2929" strokeWidth="2" />
-        <circle cx="13" cy="28" r="1.5" fill="#FF2929" />
-        <circle cx="28" cy="28" r="4" fill="white" stroke="#FF2929" strokeWidth="2" />
-        <circle cx="28" cy="28" r="1.5" fill="#FF2929" />
-      </svg>
-    </div>
-  );
-}
-
-function IconMechanicHand() {
-  return (
-    <div className="w-10 h-10 relative flex items-center justify-center mb-1">
-      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-        {/* Black Wrench in Hand Graphic */}
-        <path d="M 25 7 C 22.5 5 18.5 5 16.5 7 C 15.2 8.3 14.7 10 15 11.6 L 7.5 19.1 C 6.3 20.3 6.3 22.3 7.5 23.5 C 8.7 24.7 10.7 24.7 11.9 23.5 L 19.4 16 C 21 16.3 22.7 15.8 24 14.5 C 26 12.5 26 9.5 25 7 Z" fill="black" />
-        <path d="M 17 24 C 15.5 22.5 14.5 21.5 16 20 L 24 28 C 25 29 26 29 27 28 C 28 27 28 26 27 25 L 22 20 L 24 18 L 30 24 C 32 26 31 29 28.5 30.5 L 24.5 33 C 22.5 34 19 32 17 30 Z" fill="black" />
-      </svg>
-    </div>
-  );
-}
-
-function IconAIFirstAid() {
-  return (
-    <div className="w-10 h-10 relative flex items-center justify-center mb-1">
-      <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-        {/* Robot Head */}
-        <line x1="22" y1="3" x2="22" y2="7" stroke="#1D70B8" strokeWidth="2.5" strokeLinecap="round" />
-        <circle cx="22" cy="3" r="2" fill="#1D70B8" />
-        <rect x="11" y="7" width="22" height="15" rx="5" fill="#1D70B8" />
-        <circle cx="17" cy="13" r="2" fill="white" />
-        <circle cx="27" cy="13" r="2" fill="white" />
-        <path d="M 18 17 C 19.5 19 22.5 19 24 17" stroke="white" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-        <rect x="8" y="11" width="3" height="7" rx="1.5" fill="#1D70B8" />
-        <rect x="33" y="11" width="3" height="7" rx="1.5" fill="#1D70B8" />
-        {/* Medical Case */}
-        <rect x="13" y="24" width="18" height="13" rx="3" fill="#1D70B8" />
-        <path d="M 18 24 V 22 C 18 21 19 20 20 20 H 24 C 25 20 26 21 26 22 V 24" stroke="#1D70B8" strokeWidth="2" fill="none" />
-        <path d="M 22 27 V 33 M 19 30 H 25" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-        <circle cx="33" cy="27" r="4.5" fill="#1D70B8" />
-        <path d="M 33 25 V 29 M 31 27 H 35" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    </div>
-  );
-}
-
-function IconNoParking() {
-  return (
-    <div className="w-10 h-10 relative flex items-center justify-center mb-1">
-      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-        <circle cx="20" cy="20" r="17" fill="white" />
-        <circle cx="20" cy="20" r="15" stroke="#D92D20" strokeWidth="4.5" fill="none" />
-        <line x1="9" y1="9" x2="31" y2="31" stroke="#D92D20" strokeWidth="4.5" strokeLinecap="square" />
-        <text x="19.5" y="26.5" textAnchor="middle" fill="black" fontSize="19" fontWeight="900" fontFamily="Arial, sans-serif">P</text>
-      </svg>
-    </div>
-  );
-}
-
-function IconFlatTire() {
-  return (
-    <div className="w-10 h-10 relative flex items-center justify-center mb-1">
-      <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-        <path d="M 22 6 C 31 6 38 13 38 22 C 38 29 33 34 27 34 H 17 C 11 34 6 29 6 22 C 6 13 13 6 22 6 Z" fill="black" />
-        <circle cx="22" cy="21" r="9" fill="#5B47B8" stroke="white" strokeWidth="1.5" />
-        <circle cx="22" cy="21" r="3" fill="black" />
-        <line x1="22" y1="12" x2="22" y2="18" stroke="white" strokeWidth="2" />
-        <line x1="22" y1="24" x2="22" y2="30" stroke="white" strokeWidth="2" />
-        <line x1="13" y1="21" x2="19" y2="21" stroke="white" strokeWidth="2" />
-        <line x1="25" y1="21" x2="31" y2="21" stroke="white" strokeWidth="2" />
-        <path d="M 33 6 L 27 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-        <line x1="31" y1="4" x2="35" y2="8" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-      </svg>
-    </div>
-  );
-}
-
-function IconTheftDetected() {
-  return (
-    <div className="w-11 h-9 relative flex items-center justify-center mb-1">
-      <svg viewBox="0 0 48 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-        <path d="M 6 22 L 9 14 C 10 12.5 11.5 12 13.5 12 H 24.5 C 26.5 12 28 12.5 29 14 L 32 22 H 34 C 35 22 36 23 36 24 V 27 H 4 V 24 C 4 23 5 22 6 22 Z" fill="black" />
-        <circle cx="9" cy="23" r="2" fill="#FEF08A" />
-        <circle cx="29" cy="23" r="2" fill="#FEF08A" />
-        <circle cx="10" cy="27" r="3" fill="black" stroke="#B91C1C" strokeWidth="1.5" />
-        <circle cx="28" cy="28" r="3" fill="black" stroke="#B91C1C" strokeWidth="1.5" />
-        <circle cx="37" cy="15" r="4" fill="black" />
-        <path d="M 33 15 H 41 M 34 16.5 H 40" stroke="white" strokeWidth="1" />
-        <path d="M 30 28 C 30 23 33 21 37 21 C 41 21 44 23 44 28 Z" fill="black" />
-      </svg>
-    </div>
-  );
-}
-
 /* ---------------------------------------------------------------------- */
 /*  Main Light Theme Component                                             */
 /* ---------------------------------------------------------------------- */
@@ -657,7 +552,10 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
 
       {/* Top RapiQR Brand Header Bar */}
       <header className="w-full max-w-md mx-auto pt-4 px-4 flex items-center justify-between z-20">
-        <div />
+        <button onClick={onBack} className="flex items-center cursor-pointer">
+          <img src={groupLogo} alt="RapiQR Logo" className="h-9 sm:h-10 w-auto object-contain" />
+        </button>
+
       </header>
 
       {/* Main Light Visitor Container */}
@@ -832,18 +730,22 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
 
         {/* ============ EMERGENCY SCREEN (Redesigned matching requested design mockup) ============ */}
         {phase === "emergency" && qrData && (
-          <div className="w-full max-w-md mx-auto animate-fade-in space-y-2">
+          <div className="w-full max-w-md mx-auto animate-fade-in space-y-4">
             {/* Top Red Header Banner */}
-            <div className="bg-[#B91C1C] rounded-3xl p-5 text-white shadow-xl relative overflow-hidden">
-              {/* Top Bar: Live & Logo */}
+            <div className="bg-[#B91C1C] rounded-3xl p-5 text-white shadow-xl space-y-4 relative overflow-hidden">
+              {/* Top Bar: LIVE Logo & Vehicle Emergency Pill */}
               <div className="flex items-center justify-between">
-                <span className="bg-white text-[#B91C1C] font-black text-[9px] px-1.5 py-0.5 rounded flex items-center gap-1 uppercase tracking-wider">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#B91C1C] animate-ping" />
-                  LIVE
-                </span>
-                <button onClick={onBack} className="cursor-pointer flex items-center">
-                  <img src={groupLogo} alt="RapiQR Logo" className="h-6 sm:h-7 w-auto object-contain" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <span className="bg-white text-[#B91C1C] font-black text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1 uppercase tracking-wider">
+                    <span className="w-2 h-2 rounded-full bg-[#B91C1C] animate-ping" />
+                    LIVE
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-white font-black text-lg tracking-tight">Rapi</span>
+                    <span className="text-amber-300 font-black text-lg tracking-tight">QR</span>
+                  </div>
+                </div>
+
               </div>
 
               {/* Vehicle Profile Info Row */}
@@ -873,7 +775,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
 
               {/* ============ MAIN MENU VIEW ============ */}
               {activeSubMenu === "none" && (
-                <div className="space-y-2 animate-fade-in">
+                <div className="space-y-5 animate-fade-in">
                   {/* Big Red Emergency Main Button */}
                   <button
                     onClick={() => setActiveSubMenu("emergency-main")}
@@ -883,7 +785,9 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                     <h3 className="text-lg sm:text-xl font-black text-white mt-2 tracking-tight">
                       This is emergency or an accident
                     </h3>
-                    <p className="text-xs text-white/80"> Notify/Call Contacts share location , request ambulance </p>
+                    <p className="text-xs sm:text-sm font-medium text-white/90 mt-1">
+                      Notify/Call contacts, share location, request ambulance.
+                    </p>
                   </button>
 
                   {/* Quick Actions Header */}
@@ -898,31 +802,37 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                           setActiveSubMenu("towing");
                           setTowingImage(null);
                         }}
-                        className="bg-[#FF2929] hover:bg-[#E02222] text-white rounded-3xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[110px] shadow-sm group"
+                        className="bg-[#FF2E2E] hover:bg-[#E02626] text-white rounded-2xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[105px] shadow-sm"
                       >
-                        <IconTowTruck />
-                        <span className="text-xs sm:text-sm font-black leading-tight tracking-tight">Request Tow truck</span>
+                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-2">
+                          <Truck size={22} className="text-white" />
+                        </div>
+                        <span className="text-xs font-black leading-tight">Request Tow truck</span>
                       </button>
 
                       {/* 2. Request Mechanic */}
                       <button
                         onClick={() => setActiveSubMenu("mechanical")}
-                        className="bg-[#FF7A00] hover:bg-[#E56E00] text-white rounded-3xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[110px] shadow-sm group"
+                        className="bg-[#FF8A00] hover:bg-[#E57C00] text-white rounded-2xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[105px] shadow-sm"
                       >
-                        <IconMechanicHand />
-                        <span className="text-xs sm:text-sm font-black leading-tight tracking-tight">Request Mechanic</span>
+                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-2">
+                          <Wrench size={22} className="text-white" />
+                        </div>
+                        <span className="text-xs font-black leading-tight">Request Mechanic</span>
                       </button>
 
                       {/* 3. AI First Aid Assistant */}
                       <button
                         onClick={() => setActiveSubMenu("medical")}
-                        className="bg-[#2BA84A] hover:bg-[#23903E] text-white rounded-3xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[110px] shadow-sm group"
+                        className="bg-[#28A745] hover:bg-[#23923D] text-white rounded-2xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[105px] shadow-sm"
                       >
-                        <IconAIFirstAid />
-                        <span className="text-xs sm:text-sm font-black leading-tight tracking-tight">AI First Aid Assistant</span>
+                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-2">
+                          <Bot size={22} className="text-white" />
+                        </div>
+                        <span className="text-xs font-black leading-tight">AI First Aid Assistant</span>
                       </button>
 
-                      {/* 4. Parking Issue /Blocking path */}
+                      {/* 4. Parking Issue / Blocking path */}
                       <button
                         onClick={() => {
                           if (qrData && location) {
@@ -934,45 +844,74 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                               accuracy: location.accuracy,
                               deviceId: navigator.userAgent.slice(0, 40),
                               timestamp: new Date().toISOString(),
-                              message: "Parking Issue / Blocking Path Alert",
+                              message: "No Parking / Blocking Path Alert",
                               vehicleName: qrData.vehicleName,
                               vehicleNumber: qrData.vehicleNumber,
                             };
                             const alerts = JSON.parse(localStorage.getItem("namoqr-alerts") || "[]");
                             alerts.unshift({ ...payload, id: Date.now(), status: "sent" });
                             localStorage.setItem("namoqr-alerts", JSON.stringify(alerts));
-                            alert("Parking Issue alert sent to vehicle owner!");
+                            alert("Parking Alert sent to vehicle owner!");
                           }
                         }}
-                        className="bg-[#2575CC] hover:bg-[#1E62AE] text-white rounded-3xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[110px] shadow-sm group"
+                        className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-2xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[105px] shadow-sm"
                       >
-                        <IconNoParking />
-                        <span className="text-xs sm:text-sm font-black leading-tight tracking-tight">Parking Issue /Blocking path</span>
+                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-2">
+                          <Ban size={22} className="text-white" />
+                        </div>
+                        <span className="text-xs font-black leading-tight">Parking Issue /Blocking path</span>
                       </button>
 
                       {/* 5. Flat Tire */}
                       <button
-                        onClick={() => setActiveSubMenu("mechanical")}
-                        className="bg-[#5B47B8] hover:bg-[#4B39A0] text-white rounded-3xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[110px] shadow-sm group"
+                        onClick={() => {
+                          const contacts = getTowingContacts();
+                          if (contacts.length > 0) window.open(`tel:${contacts[0].phone.replace(/[^0-9+]/g, "")}`);
+                          else alert("Flat Tire assistance ping dispatched to owner.");
+                        }}
+                        className="bg-[#6366F1] hover:bg-[#4F46E5] text-white rounded-2xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[105px] shadow-sm"
                       >
-                        <IconFlatTire />
-                        <span className="text-xs sm:text-sm font-black leading-tight tracking-tight">Flat Tire</span>
+                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-2">
+                          <Disc size={22} className="text-white" />
+                        </div>
+                        <span className="text-xs font-black leading-tight">Flat Tire</span>
                       </button>
 
                       {/* 6. Theft Detected */}
                       <button
-                        onClick={() => setActiveSubMenu("family")}
-                        className="bg-[#B91C1C] hover:bg-[#991B1B] text-white rounded-3xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[110px] shadow-sm group"
+                        onClick={() => {
+                          if (qrData && location) {
+                            const payload = {
+                              qrId: qrData.id,
+                              qrUrl: qrData.qrUrl,
+                              latitude: location.lat,
+                              longitude: location.lng,
+                              accuracy: location.accuracy,
+                              deviceId: navigator.userAgent.slice(0, 40),
+                              timestamp: new Date().toISOString(),
+                              message: "CRITICAL: Theft Detected Alert!",
+                              vehicleName: qrData.vehicleName,
+                              vehicleNumber: qrData.vehicleNumber,
+                            };
+                            const alerts = JSON.parse(localStorage.getItem("namoqr-alerts") || "[]");
+                            alerts.unshift({ ...payload, id: Date.now(), status: "sent" });
+                            localStorage.setItem("namoqr-alerts", JSON.stringify(alerts));
+                            alert("🚨 Theft alert sent to owner & emergency network!");
+                          }
+                        }}
+                        className="bg-[#B91C1C] hover:bg-[#991B1B] text-white rounded-2xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[105px] shadow-sm"
                       >
-                        <IconTheftDetected />
-                        <span className="text-xs sm:text-sm font-black leading-tight tracking-tight">Theft Detected</span>
+                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-2">
+                          <ShieldAlert size={22} className="text-white" />
+                        </div>
+                        <span className="text-xs font-black leading-tight">Theft Detected</span>
                       </button>
                     </div>
                   </div>
 
                   {/* Send Custom Message Bar */}
                   <div className="pt-2">
-                    <div className="bg-[#E8ECEF] rounded-2xl p-2 pl-4 flex items-center justify-between gap-2 shadow-xs">
+                    <div className="bg-[#EEF2F6] border border-gray-200 rounded-2xl p-1.5 pl-4 flex items-center justify-between gap-2 shadow-xs">
                       <input
                         type="text"
                         value={visitorMessage}
@@ -981,13 +920,13 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                           if (e.key === "Enter") handleSendCustomMessage();
                         }}
                         placeholder="| Send Custom message to owner"
-                        className="w-full bg-transparent text-xs font-semibold text-gray-700 placeholder-gray-500 outline-none"
+                        className="w-full bg-transparent text-xs font-semibold text-gray-800 placeholder-gray-400 outline-none"
                       />
                       <button
                         onClick={handleSendCustomMessage}
-                        className="w-10 h-10 rounded-xl bg-transparent text-[#1D70B8] hover:opacity-80 flex items-center justify-center flex-shrink-0 active:scale-95 transition-all cursor-pointer"
+                        className="w-10 h-10 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white flex items-center justify-center flex-shrink-0 active:scale-95 transition-all cursor-pointer"
                       >
-                        <Send size={22} className="fill-[#1D70B8] text-[#1D70B8]" />
+                        <Send size={16} />
                       </button>
                     </div>
                   </div>
@@ -1096,11 +1035,12 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                       className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-blue-600/20 active:scale-[0.98] transition-all cursor-pointer"
                     >
                       <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold text-2xl flex-shrink-0">
-                          📍
+                        <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold flex-shrink-0">
+                          <MapPin size={22} />
                         </div>
                         <div className="text-left min-w-0">
-                          <p className="text-sm font-black text-white tracking-tight">Share Location</p>
+                           <p className="text-sm font-black text-white tracking-tight">Share Location</p>
+
                         </div>
                       </div>
                       <div className="bg-white text-blue-700 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">

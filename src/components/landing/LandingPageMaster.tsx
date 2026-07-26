@@ -1,542 +1,970 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './landing.css';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Car, Bike, Home, Luggage, ShieldCheck, ShieldAlert, Package } from 'lucide-react';
-import { InfiniteMovingCards } from '../ui/infinite-moving-cards';
+import {
+  ShieldAlert, ShieldCheck, Car, Home, Luggage,
+  CheckCircle2, ArrowRight, ShoppingBag, X, Plus, Minus,
+  Smartphone, HeartPulse, Bell, ChevronDown, Check,
+  MapPin, Phone, MessageSquare, AlertTriangle, Lock,
+  Key, Star, RotateCcw, Eye, Navigation, Zap, Users,
+  Menu, Signal, Package, LogOut, LayoutDashboard
+} from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import groupLogo from '../../../assets/Group 1000005716.png';
+import groupLogo1 from '../../../assets/Group 1000005716-1.png';
+import groupLogo2 from '../../../assets/Group 1000005716-2.png';
+import logoForWhBg from '../../../assets/logo for wh bg.png';
 
+// ── Animated Counter Component ─────────────────────────────────────────────
 
-const PRODUCTS = [
-  {
-    name: 'Car Safety Sticker', desc: 'Wrong parking, crash-assist & blocking alerts.', price: 349, mrp: 399, img: 'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=700', chip: 'Vehicle', best: true,
-    features: ['Wrong parking & blocking alerts', 'AI crash-deceleration detection', 'Masked SOS hotline, one tap away', 'Weatherproof, rated 3+ years outdoors']
-  },
-  {
-    name: 'Bike Safety Sticker', desc: 'Insurance reminders & anti-theft SOS.', price: 249, mrp: 299, img: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=700', chip: 'Vehicle',
-    features: ['Anti-theft & suspicious activity alerts', 'Insurance & service due reminders', 'Masked SOS hotline, one tap away', 'Weatherproof, rated 3+ years outdoors']
-  },
-  {
-    name: 'Home Gate Sticker', desc: 'Visitor status & courier notifications.', price: 349, mrp: 399, img: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=700', chip: 'Home',
-    features: ['Live availability status for visitors', 'Courier & delivery instant alerts', 'Water & gas leak urgent flagging', 'Fits any gate, door or society entrance']
-  },
-  {
-    name: 'Luggage Tag', desc: 'Lost & found recovery, anywhere you fly.', price: 249, mrp: 299, img: 'https://images.unsplash.com/photo-1553531384-cc64ac80f931?auto=format&fit=crop&q=80&w=700', chip: 'Travel',
-    features: ['Anonymous finder messaging', 'Works with any airline, any airport', 'Global lost & found recovery network', 'Durable strap-mount, rated for travel']
-  },
-  {
-    name: 'SOS Keychain', desc: 'Medical ID card for first responders.', price: 249, mrp: 299, img: 'https://images.unsplash.com/photo-1584036561566-baf8f5f1b144?auto=format&fit=crop&q=80&w=700', chip: 'Family',
-    features: ['Blood group & medical notes card', 'Masked emergency call, one tap', 'Ideal for elderly parents & children', 'Compact, lightweight keychain form']
-  },
-  {
-    name: 'Child School Bag Tag', desc: 'Bus tracking & allergy alerts for kids.', price: 249, mrp: 299, img: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&q=80&w=700', chip: 'Family',
-    features: ['School bus pickup & drop tracking', 'Allergy & medical alert card', 'Parent masked contact for staff', 'Lightweight clip, fits any bag']
-  },
-];
-
-const COMBOS = [
-  { name: 'Two-Wheeler Duo', includes: '1 Bike Sticker + 1 SOS Keychain', price: 449, old: 498, save: 49, pop: false },
-  { name: 'Family Starter Pack', includes: '1 Car + 1 Home Gate + 1 Child Bag Tag', price: 899, old: 1047, save: 148, pop: true },
-  { name: "Traveller's Kit", includes: '2 Luggage Tags + 1 SOS Keychain', price: 599, old: 747, save: 148, pop: false },
-  { name: 'Full Garage Combo', includes: '1 Car Sticker + 1 Bike Sticker', price: 549, old: 598, save: 49, pop: false },
-  { name: 'Whole Home Bundle', includes: '2 Gate Tags + 2 Child Bag Tags', price: 999, old: 1196, save: 197, pop: false },
-];
-
-const TESTIMONIALS = [
-  { text: "Someone scanned my car sticker to tell me my cabin light was on — never would've known otherwise. Setup took two minutes.", name: 'Karan S.', label: 'Car Sticker · Delhi', img: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&q=80&w=200' },
-  { text: "Put keychains on both my parents. My father's medical notes have already helped a stranger get him water and call me in time.", name: 'Asha M.', label: 'SOS Keychain · Ahmedabad', img: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&q=80&w=200' },
-  { text: 'The gate sticker is genuinely useful — couriers ping us directly instead of calling the wrong flat five times.', name: 'Rahul P.', label: 'Home Gate Tag · Bengaluru', img: 'https://images.unsplash.com/photo-1607346256330-dee7af15f7c5?auto=format&fit=crop&q=80&w=200' },
-];
-
-const FAQ_DATA = [
-  { q: 'Does the person scanning see my phone number?', a: 'Never. All calls route through a masked number, and all messages route through our app — your real number stays private at all times.' },
-  { q: 'How long does the sticker last outdoors?', a: 'Every sticker is weatherproof and UV-resistant, rated for 3+ years of outdoor exposure including rain and direct sun.' },
-  { q: 'Can one account manage stickers for my whole family?', a: 'Yes — assign any sticker to a family member from your dashboard, and manage every category from one login.' },
-  { q: 'Is GST invoicing available for bulk or corporate orders?', a: 'Every order — retail or bulk — ships with a GST invoice. For distributor and corporate orders, reach out via the partner form above.' },
-];
-
-function AnimatedCounter({ value, duration = 1800 }: { value: string; duration?: number }) {
+function AnimatedCounter({ end, prefix = '', suffix = '', duration = 1800 }: { end: number; prefix?: string; suffix?: string; duration?: number }) {
   const [count, setCount] = useState(0);
+  const [hasStarted, setHasStarted] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
-  const [hasAnimated, setHasAnimated] = useState(false);
-
-  const match = value.match(/^([0-9.]+)(.*)$/);
-  const target = match ? parseFloat(match[1]) : 0;
-  const suffix = match ? match[2] : '';
-  const isFloat = value.includes('.');
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && !hasAnimated) {
-          setHasAnimated(true);
-          const startTime = performance.now();
-
-          const animate = (now: number) => {
-            const elapsed = now - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            const easeProgress = 1 - Math.pow(1 - progress, 3); // easeOutCubic
-            const current = easeProgress * target;
-            setCount(current);
-
-            if (progress < 1) {
-              requestAnimationFrame(animate);
-            } else {
-              setCount(target);
-            }
-          };
-
-          requestAnimationFrame(animate);
+        if (entry.isIntersecting && !hasStarted) {
+          setHasStarted(true);
         }
       },
       { threshold: 0.1 }
     );
 
-    observer.observe(el);
+    if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
-  }, [target, duration, hasAnimated]);
+  }, [hasStarted]);
+
+  useEffect(() => {
+    if (!hasStarted) return;
+    let startTime: number | null = null;
+
+    const step = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.floor(easeProgress * end));
+
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      }
+    };
+
+    requestAnimationFrame(step);
+  }, [hasStarted, end, duration]);
 
   return (
     <span ref={ref}>
-      {isFloat ? count.toFixed(1) : Math.floor(count)}
+      {prefix}
+      {count.toLocaleString()}
       {suffix}
     </span>
   );
 }
 
-export default function LandingPageMaster({ onStart, onLogin }) {
-  const [activeFilter, setActiveFilter] = useState('all');
-  const [cartCount, setCartCount] = useState(0);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [qvProduct, setQvProduct] = useState(null);
-  const [qvQty, setQvQty] = useState(1);
-  const [toastMsg, setToastMsg] = useState('');
-  const [toastShow, setToastShow] = useState(false);
-  const [openFaq, setOpenFaq] = useState(0);
+// ── Real SVG QR Code Component ──────────────────────────────────────────────
 
-  const toastTimer = useRef(null);
-  const navRef = useRef(null);
-  const qvOverlayRef = useRef(null);
-  const productsRef = useRef(null);
+function RealQRCode({ size = 120, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+      <rect width="100" height="100" fill="white" rx="6" />
+      
+      {/* Top-Left Finder */}
+      <rect x="8" y="8" width="28" height="28" fill="#0E1117" rx="4" />
+      <rect x="14" y="14" width="16" height="16" fill="white" rx="2" />
+      <rect x="18" y="18" width="8" height="8" fill="#0E1117" rx="1.5" />
+      
+      {/* Top-Right Finder */}
+      <rect x="64" y="8" width="28" height="28" fill="#0E1117" rx="4" />
+      <rect x="70" y="14" width="16" height="16" fill="white" rx="2" />
+      <rect x="74" y="18" width="8" height="8" fill="#0E1117" rx="1.5" />
+      
+      {/* Bottom-Left Finder */}
+      <rect x="8" y="64" width="28" height="28" fill="#0E1117" rx="4" />
+      <rect x="14" y="70" width="16" height="16" fill="white" rx="2" />
+      <rect x="18" y="74" width="8" height="8" fill="#0E1117" rx="1.5" />
 
-  const filtered = activeFilter === 'all' ? PRODUCTS : PRODUCTS.filter(p => p.chip === activeFilter);
+      {/* Alignment Box */}
+      <rect x="68" y="68" width="16" height="16" fill="#0E1117" rx="2" />
+      <rect x="72" y="72" width="8" height="8" fill="white" rx="1" />
+      <rect x="74" y="74" width="4" height="4" fill="#0E1117" rx="0.5" />
 
-  const showToast = useCallback((msg, duration = 2600) => {
-    setToastMsg(msg);
-    setToastShow(true);
-    clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToastShow(false), duration);
+      {/* Real Data Matrix Pattern */}
+      <rect x="42" y="10" width="6" height="6" fill="#0E1117" rx="1" />
+      <rect x="52" y="10" width="6" height="6" fill="#0E1117" rx="1" />
+      <rect x="42" y="20" width="6" height="6" fill="#0E1117" rx="1" />
+      <rect x="48" y="26" width="6" height="6" fill="#0E1117" rx="1" />
+      <rect x="10" y="42" width="6" height="6" fill="#0E1117" rx="1" />
+      <rect x="20" y="42" width="6" height="6" fill="#0E1117" rx="1" />
+      <rect x="26" y="48" width="6" height="6" fill="#0E1117" rx="1" />
+      <rect x="42" y="42" width="16" height="16" fill="#0E1117" rx="3" />
+      <rect x="64" y="42" width="6" height="6" fill="#0E1117" rx="1" />
+      <rect x="76" y="42" width="6" height="6" fill="#0E1117" rx="1" />
+      <rect x="84" y="48" width="6" height="6" fill="#0E1117" rx="1" />
+      <rect x="42" y="64" width="6" height="6" fill="#0E1117" rx="1" />
+      <rect x="52" y="70" width="6" height="6" fill="#0E1117" rx="1" />
+      <rect x="42" y="80" width="6" height="6" fill="#0E1117" rx="1" />
+      <rect x="52" y="84" width="6" height="6" fill="#0E1117" rx="1" />
+      <rect x="84" y="18" width="6" height="6" fill="#0E1117" rx="1" />
+      <rect x="88" y="28" width="6" height="6" fill="#0E1117" rx="1" />
+    </svg>
+  );
+}
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+interface Product {
+  id: string;
+  name: string;
+  desc: string;
+  price: number;
+  mrp: number;
+  category: 'Vehicle' | 'Home' | 'Family' | 'Travel';
+  chip: string;
+  badge: string;
+  rating: number;
+  reviewsCount: number;
+  img: string;
+  features: string[];
+}
+
+interface CartItem { product: Product; qty: number; }
+
+// ── Data ───────────────────────────────────────────────────────────────────
+
+const PRODUCTS: Product[] = [
+  {
+    id: 'car-qr', name: 'Automobile Safety Tag', category: 'Vehicle', chip: 'Vehicle',
+    badge: 'Best Seller', rating: 4.9, reviewsCount: 3420,
+    price: 349, mrp: 499,
+    img: 'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=800',
+    desc: 'Wrong-parking alerts, vehicle-blocking pings, and crash SOS — all without giving your number to anyone.',
+    features: ['Wrong parking & obstruction alerts', 'Masked call routing — number never shown', 'Crash SOS at 40G deceleration', 'Weatherproof 3M polycarbonate, 3+ years'],
+  },
+  {
+    id: 'bike-qr', name: 'Motorcycle & Helmet Tag', category: 'Vehicle', chip: 'Vehicle',
+    badge: 'Popular', rating: 4.8, reviewsCount: 2150,
+    price: 249, mrp: 399,
+    img: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=800',
+    desc: 'Anti-tamper movement alerts, first-responder medical access, and insurance reminders for riders.',
+    features: ['Emergency hotline for first responders', 'Blood group & allergy medical card', 'Insurance & PUC service reminders', 'Scratch-resistant, fits helmet or tank'],
+  },
+  {
+    id: 'home-qr', name: 'Residential Gate Tag', category: 'Home', chip: 'Home',
+    badge: 'Smart Home', rating: 4.9, reviewsCount: 1890,
+    price: 349, mrp: 499,
+    img: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=800',
+    desc: 'Courier drop-off pings, visitor check-in, and hazard reports — without publishing your number at your gate.',
+    features: ['Courier drop-off WhatsApp pings', 'Visitor check-in without number exposure', 'Hazard & pipe leak reporting by neighbours', 'Heavy-duty weatherproof acrylic mount'],
+  },
+  {
+    id: 'child-qr', name: "Pediatric School Bag Tag", category: 'Family', chip: 'Family',
+    badge: "Kids Safety", rating: 5.0, reviewsCount: 1420,
+    price: 249, mrp: 349,
+    img: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&q=80&w=800',
+    desc: 'Emergency medical card, blood group, allergy info, and masked parent hotline — for when a stranger finds your child.',
+    features: ['Blood group & allergy directives visible to finder', 'School bus pickup & drop-off alerts', 'Encrypted guardian contact for school staff', 'Child-safe non-toxic TPU clip'],
+  },
+  {
+    id: 'senior-qr', name: 'Senior Medical Keychain', category: 'Family', chip: 'Family',
+    badge: 'Senior Care', rating: 4.9, reviewsCount: 1650,
+    price: 249, mrp: 349,
+    img: 'https://images.unsplash.com/photo-1584036561566-baf8f5f1b144?auto=format&fit=crop&q=80&w=800',
+    desc: 'Vital health record access and one-tap guardian alert — essential for elderly family members out alone.',
+    features: ['Medical notes & doctor contacts for responders', 'Masked phone proxy connects finder to family', 'Designed for elderly parents on walks or travel', 'Ultra-light anodised aircraft aluminium case'],
+  },
+  {
+    id: 'luggage-qr', name: 'Smart Luggage Tag', category: 'Travel', chip: 'Travel',
+    badge: 'Travel Essential', rating: 4.8, reviewsCount: 980,
+    price: 249, mrp: 349,
+    img: 'https://images.unsplash.com/photo-1553531384-cc64ac80f931?auto=format&fit=crop&q=80&w=800',
+    desc: 'Instant scan-notification with GPS pin to your phone — and anonymous finder messaging, no address exposed.',
+    features: ['Anonymous finder messaging — no address shown', 'Instant SMS & WhatsApp scan notification', 'Works across airlines, transit hubs, globally', 'Braided stainless steel cable included'],
+  },
+];
+
+const COMBOS = [
+  {
+    id: 'starter', name: 'Starter', tag: '', popular: false,
+    price: 349, mrp: 499,
+    desc: 'One sticker, lifetime protection. Ideal for a single vehicle, gate, or bag.',
+    items: ['1 sticker of your choice', 'Lifetime platform access', 'Unlimited scan events', 'SMS + push notifications'],
+    cta: 'Get My Sticker',
+  },
+  {
+    id: 'family', name: 'Family Bundle', tag: 'Most Popular', popular: true,
+    price: 899, mrp: 1097,
+    desc: 'Cover a car, your home gate, and a child — the most common family setup.',
+    items: ['Automobile Safety Tag', 'Residential Gate Tag', 'Pediatric School Bag Tag', 'Opt-in medical profiles', 'Multi-sticker dashboard'],
+    cta: 'Protect My Family',
+  },
+  {
+    id: 'fleet', name: 'Society / Fleet', tag: 'Custom Quote', popular: false,
+    price: 0, mrp: 0,
+    desc: 'Housing societies and small fleets. Bulk pricing, central dashboard, priority support.',
+    items: ['10+ stickers, custom quantity', 'Society admin dashboard', 'Gate + vehicle management', 'Dedicated onboarding call', 'Priority support SLA'],
+    cta: 'Talk to Us',
+  },
+];
+
+const FAQ_ITEMS = [
+  {
+    q: 'Does the scanner need to download an app?',
+    a: 'No. Anyone who scans a RapiQR sticker lands on a secure web page that works in any phone browser — no app, no sign-in, no friction.',
+  },
+  {
+    q: 'Will the scanner ever see my real phone number?',
+    a: 'Never. All calls go through an encrypted proxy number and all messages route through our platform. Your actual number is never transmitted or stored on the scan page.',
+  },
+  {
+    q: 'What if my sticker is lost or damaged?',
+    a: "Every sticker has a permanent ID. If it's lost or damaged, log into your dashboard, mark it inactive, and instantly reprint an identical replacement — same ID, same settings, no new purchase needed.",
+  },
+  {
+    q: 'Is my medical or family data ever shown to anyone?',
+    a: "Only the data you choose to enable — and only on tags where it makes sense. Medical info (blood group, allergies, SOS contacts) is strictly opt-in, and you control exactly what appears to a scanner on each individual sticker.",
+  },
+  {
+    q: 'Is there a subscription or renewal fee?',
+    a: 'No. You pay once for the physical sticker. The platform access, alerts, and masked calling are included for the lifetime of that sticker — no monthly fee, no annual renewal.',
+  },
+];
+
+const TESTIMONIALS = [
+  {
+    name: 'Rajesh M.', role: 'Car Owner, Pune',
+    quote: "A traffic officer scanned my tag when I was double-parked. I got an alert and moved my car in 4 minutes. He never saw my number. This is exactly what I needed.",
+    stars: 5,
+    avatar: 'RM',
+  },
+  {
+    name: 'Priya S.', role: 'Parent of two, Bengaluru',
+    quote: "My son's school bag has the tag. When he was on the wrong bus, his teacher scanned it and messaged me instantly — without me having published my number to 30 strangers.",
+    stars: 5,
+    avatar: 'PS',
+  },
+  {
+    name: 'Arun T.', role: 'Frequent traveller, Mumbai',
+    quote: "Lost my bag at Hyderabad airport. Got a scan notification with GPS in under a minute. The airline staff found it three hours later. First time in 11 years I got a bag back.",
+    stars: 5,
+    avatar: 'AT',
+  },
+  {
+    name: 'Kavitha R.', role: 'Housing Society Secretary, Chennai',
+    quote: "We put gate tags on our entrance pillars. Now couriers ping residents instead of buzzing the intercom all day. Complaints dropped immediately. Residents love it.",
+    stars: 5,
+    avatar: 'KR',
+  },
+];
+
+const MEDIA_LOGOS = ['TOI Auto', 'Autocar India', 'TechCrunch India', 'Road Safety.in', 'Express Health', 'Mobility Digest', 'Safety First', 'Auto Journal'];
+
+const CATEGORIES = [
+  {
+    id: 'vehicles',
+    label: 'Vehicles',
+    icon: Car,
+    headline: 'Visible to strangers. Your number doesn\'t have to be.',
+    lines: [
+      'Parking alert? Get it in seconds — no windshield note.',
+      'Crash SOS connects responders to family, not voicemail.',
+      'Blocked driveway? WhatsApp alert before it turns ugly.',
+    ],
+    img: 'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=800',
+  },
+  {
+    id: 'home',
+    label: 'Home Gate',
+    icon: Home,
+    headline: 'Let people reach you. Keep your number off the gate.',
+    lines: [
+      'Courier arrives? They scan and ping you instantly.',
+      'Visitors check in. You decide if you open the gate.',
+      'Neighbour spots a leak? Alert hits your phone in 3 sec.',
+    ],
+    img: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=800',
+  },
+  {
+    id: 'luggage',
+    label: 'Luggage',
+    icon: Luggage,
+    headline: 'Lost bag. Found. Returned. No address on the label.',
+    lines: [
+      'Finder scans → messages you. Your address stays private.',
+      'You get a GPS pin of where the scan happened.',
+      'Airport, hotel, train station. No app for the finder.',
+    ],
+    img: 'https://images.unsplash.com/photo-1553531384-cc64ac80f931?auto=format&fit=crop&q=80&w=800',
+  },
+  {
+    id: 'keychains',
+    label: 'Keychains',
+    icon: Key,
+    headline: 'Found keys. Two-minute return. No stress.',
+    lines: [
+      'Finder scans, shares location, you arrange pickup.',
+      'Medical ID for seniors: blood group & contacts — opt-in.',
+      'Weatherproof. Clips to keys, bag straps, walking aids.',
+    ],
+    img: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&q=80&w=800',
+  },
+  {
+    id: 'family',
+    label: 'Family',
+    icon: Users,
+    headline: 'Safety net for kids, seniors, and pets. No phone needed.',
+    lines: [
+      'School bag tag → teacher messages you instantly.',
+      'Senior keychain shows blood group in an emergency.',
+      'Pet found? Finder calls you via masked number. Done.',
+    ],
+    img: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&q=80&w=800',
+  },
+];
+
+
+const FEATURES = [
+  { icon: Eye, title: 'Zero number exposure', body: 'Your real number is never shown. Not stored. Not transmitted. Ever.' },
+  { icon: Navigation, title: 'Live GPS sharing', body: 'Scanners share their exact location in one tap.' },
+  { icon: Bell, title: 'Multi-channel alerts', body: 'Push + SMS + WhatsApp. All at once.' },
+  { icon: Smartphone, title: 'No app for scanners', body: 'Camera → page. No download. No login.' },
+  { icon: AlertTriangle, title: '13 emergency types', body: 'Parking, crash, fire, medical, lost child, and more.' },
+  { icon: Lock, title: 'Encrypted & access-controlled', body: 'Each sticker has rules. Only the right people see the right info.' },
+  { icon: HeartPulse, title: 'Opt-in medical profile', body: 'Blood group, allergies, SOS contacts — only on tags you choose.' },
+  { icon: RotateCcw, title: 'Instant sticker restore', body: 'Lost sticker? Reprint. Same ID. Same settings. Zero cost.' },
+];
+
+// Demo phone steps
+const DEMO_STEPS = [
+  {
+    id: 'scan',
+    label: 'Scan',
+    heading: 'RapiQR Safe',
+    subhead: 'Car Tag — KA-01-MJ-9921',
+    content: 'scan',
+  },
+  {
+    id: 'contact',
+    label: 'Contact',
+    heading: 'Reach the owner',
+    subhead: 'Choose how to connect',
+    content: 'contact',
+  },
+  {
+    id: 'gps',
+    label: 'Share GPS',
+    heading: 'Your location sent',
+    subhead: 'Owner has been notified',
+    content: 'gps',
+  },
+  {
+    id: 'emergency',
+    label: 'Emergency',
+    heading: 'Emergency Alert',
+    subhead: 'Select alert type',
+    content: 'emergency',
+  },
+];
+
+// ── Main Component ─────────────────────────────────────────────────────────
+
+export default function LandingPageMaster({
+  onStart,
+  onLogin,
+}: {
+  onStart: () => void;
+  onLogin: () => void;
+}) {
+  const { isLoggedIn, profile, signOut } = useAuth();
+  const [activeCategory, setActiveCategory] = useState<'All' | 'Vehicle' | 'Home' | 'Family' | 'Travel'>('All');
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [quickView, setQuickView] = useState<Product | null>(null);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [activeCat, setActiveCat] = useState(0);
+  const [demoStep, setDemoStep] = useState(0);
+  const [demoAlert, setDemoAlert] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [partnerForm, setPartnerForm] = useState({ name: '', phone: '', city: '', business: 'Auto Accessories Shop', tier: 'Retail Kit (50 Units)' });
+  const [partnerSubmitted, setPartnerSubmitted] = useState(false);
+
+  const filteredProducts = activeCategory === 'All'
+    ? PRODUCTS
+    : PRODUCTS.filter(p => p.category === activeCategory);
+
+  const cartItemCount = cart.reduce((s, i) => s + i.qty, 0);
+  const cartSubtotal = cart.reduce((s, i) => s + i.product.price * i.qty, 0);
+
+  const addToCart = useCallback((product: Product, qty = 1) => {
+    setCart(prev => {
+      const ex = prev.find(i => i.product.id === product.id);
+      if (ex) return prev.map(i => i.product.id === product.id ? { ...i, qty: i.qty + qty } : i);
+      return [...prev, { product, qty }];
+    });
+    setIsCartOpen(true);
+
+    
   }, []);
 
-  const addToCart = useCallback((name, price) => {
-    setCartCount(c => c + 1);
-    showToast(`${name} added to cart · ₹${price}`);
-  }, [showToast]);
+  const updateQty = (id: string, delta: number) => {
+    setCart(prev =>
+      prev.map(i => i.product.id === id ? { ...i, qty: i.qty + delta } : i)
+          .filter(i => i.qty > 0)
+    );
+  };
 
-  const filterAndScroll = useCallback((category) => {
-    setActiveFilter(category);
-    setTimeout(() => {
-      document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
-    }, 0);
-  }, []);
-
-  const openQuickView = useCallback((idx) => {
-    setQvProduct(PRODUCTS[idx]);
-    setQvQty(1);
-    document.body.style.overflow = 'hidden';
-  }, []);
-
-  const closeQuickView = useCallback(() => {
-    setQvProduct(null);
-    document.body.style.overflow = '';
-  }, []);
-
-  const changeQvQty = useCallback((delta) => {
-    setQvQty(q => Math.max(1, q + delta));
-  }, []);
-
-  const addQvToCart = useCallback(() => {
-    if (!qvProduct) return;
-    for (let i = 0; i < qvQty; i++) addToCart(qvProduct.name, qvProduct.price);
-    closeQuickView();
-  }, [qvProduct, qvQty, addToCart, closeQuickView]);
-
+  // Scroll observe reveal
   useEffect(() => {
-    const nav = navRef.current;
-    if (!nav) return;
-    let lastScrollY = window.scrollY;
-    
-    const onScroll = () => {
-      const currentScrollY = window.scrollY;
-      
-      // Toggle scrolled class for full header transform
-      nav.classList.toggle('scrolled', currentScrollY > 40);
-
-      // Handle visibility based on scroll direction
-      if (currentScrollY <= 10) {
-        // At the very top of the page, always show the navbar
-        nav.classList.remove('nav-hidden');
-      } else if (currentScrollY > lastScrollY) {
-        // Scrolling DOWN -> hide navbar
-        nav.classList.add('nav-hidden');
-      } else if (currentScrollY < lastScrollY) {
-        // Scrolling UP -> show navbar smoothly
-        nav.classList.remove('nav-hidden');
-      }
-      
-      lastScrollY = currentScrollY;
-    };
-    
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('is-visible'); });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+    const onScroll = () => setIsScrolled(window.scrollY > 40);
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    return () => { obs.disconnect(); window.removeEventListener('scroll', onScroll); };
   }, []);
 
+  // Auto-advance demo every 3.5s if no interaction
   useEffect(() => {
-    const els = document.querySelectorAll('.reveal');
-    if (!els.length) return;
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('in');
-          io.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.15 });
-    els.forEach(el => io.observe(el));
-    return () => io.disconnect();
-  }, []);
+    const t = setTimeout(() => setDemoStep(s => (s + 1) % DEMO_STEPS.length), 3500);
+    return () => clearTimeout(t);
+  }, [demoStep]);
 
-  useEffect(() => {
-    if (!qvProduct) {
-      document.body.style.overflow = '';
-    }
-  }, [qvProduct]);
-
-  useEffect(() => {
-    const handleKey = (e) => {
-      if (e.key === 'Escape' && qvProduct) closeQuickView();
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [qvProduct, closeQuickView]);
-
-  const handleDistributorSubmit = useCallback((e) => {
-    e.preventDefault();
-    showToast("Application received — we'll reach out within 48 hrs", 3200);
-    e.target.reset();
-  }, [showToast]);
+  const handleDemoAction = (step: number) => {
+    if (step === 1) setDemoAlert('📱 Parking alert dispatched. Owner notified via WhatsApp + SMS.');
+    if (step === 2) setDemoAlert('📍 Your GPS location has been shared with the owner.');
+    if (step === 3) setDemoAlert('🚨 Emergency alert raised. Owner + guardians notified instantly.');
+    setDemoStep((step + 1) % DEMO_STEPS.length);
+  };
 
   return (
-    <>
+    <div className="namo-landing">
 
-      <nav className="nav" id="nav" ref={navRef}>
-        <div className="wrap nav-row">
-          <a href="#top" className="nav-logo">
-            <svg viewBox="0 0 32 32" fill="none">
-              <rect x="2" y="2" width="11" height="11" rx="3" stroke="#D9581F" strokeWidth="3" />
-              <rect x="19" y="2" width="11" height="11" rx="3" stroke="#D9581F" strokeWidth="3" />
-              <rect x="2" y="19" width="11" height="11" rx="3" stroke="#D9581F" strokeWidth="3" />
-              <rect x="19" y="19" width="5" height="5" rx="1" fill="#D9581F" />
-              <rect x="26" y="26" width="4" height="4" rx="1" fill="#D9581F" />
-              <rect x="19" y="26" width="4" height="4" rx="1" fill="#D9581F" />
-              <rect x="26" y="19" width="4" height="4" rx="1" fill="#D9581F" />
-            </svg>
-            Namo<span>QR</span>
-          </a>
-          <div className="nav-links">
-            <div className="nav-item-mega">
-              <span className="mega-trigger">Shop Stickers <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg></span>
-              <div className="mega-panel">
-                <div className="mega-inner">
-                  <div className="mega-list">
-                    <div className="mega-list-label">Browse by category</div>
-                    <button onClick={() => filterAndScroll('all')}>All Stickers</button>
-                    <button onClick={() => filterAndScroll('Vehicle')}>Vehicle Safety</button>
-                    <button onClick={() => filterAndScroll('Home')}>Home & Family</button>
-                    <button onClick={() => filterAndScroll('Travel')}>Travel & Kids</button>
-                    <button onClick={() => document.getElementById('combos')?.scrollIntoView({ behavior: 'smooth' })}>Combo Packs</button>
-                  </div>
-                  <div className="mega-visual-grid">
-                    <div className="mega-visual-card" onClick={() => filterAndScroll('Vehicle')}>
-                      <img src="https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&q=80&w=400" alt="Car Sticker" loading="lazy" />
-                      <span className="mega-visual-label">Car Sticker</span>
-                      <span className="mega-visual-price">₹349</span>
-                    </div>
-                    <div className="mega-visual-card" onClick={() => filterAndScroll('Home')}>
-                      <img src="https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&q=80&w=400" alt="Home Gate Sticker" loading="lazy" />
-                      <span className="mega-visual-label">Home Gate</span>
-                      <span className="mega-visual-price">₹349</span>
-                    </div>
-                    <div className="mega-visual-card" onClick={() => filterAndScroll('Travel')}>
-                      <img src="https://images.unsplash.com/photo-1523171613936-cee4809f8c5b?auto=format&fit=crop&q=80&w=400" alt="Luggage Tag" loading="lazy" />
-                      <span className="mega-visual-label">Luggage Tag</span>
-                      <span className="mega-visual-price">₹249</span>
-                    </div>
-                    <div className="mega-visual-card" onClick={() => filterAndScroll('Family')}>
-                      <img src="https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=400" alt="SOS Keychain" loading="lazy" />
-                      <span className="mega-visual-label">SOS Keychain</span>
-                      <span className="mega-visual-price">₹249</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <a href="#how">How it Works</a>
-            <a href="#about">About Us</a>
-            <a href="#distributor">Become a Partner</a>
-            <a href="#faq">FAQs</a>
-          </div>
-          <div className="nav-actions">
-            <a href="#" className="cart-btn" aria-label="My Account / Dashboard" title="My Account" onClick={(e) => { e.preventDefault(); onLogin(); }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-            </a>
-            <button className="cart-btn" onClick={() => onStart()} aria-label="Go to checkout">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="9" cy="21" r="1"></circle>
-                <circle cx="20" cy="21" r="1"></circle>
-                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-              </svg>
-              <span className="cart-count" id="cart-count">{cartCount}</span>
-            </button>
-            <a href="#products" className="btn btn-primary" style={{ display: 'inline-flex' }}>Shop Now</a>
-            <button className="hamburger" onClick={() => setMobileOpen(true)}><span></span><span></span><span></span></button>
-          </div>
-        </div>
-      </nav>
+      {/* ── NAV ─────────────────────────────────────────────────────── */}
+      <nav className={`namo-nav${isScrolled ? ' scrolled' : ''}`}>
+        <div className="namo-wrap flex items-center justify-between gap-6">
 
-      <div className={`mobile-menu${mobileOpen ? ' open' : ''}`} id="mobile-menu">
-        <button className="mobile-close" onClick={() => setMobileOpen(false)}>✕</button>
-        <a href="#products" className="mob-link" onClick={() => setMobileOpen(false)}>Shop Stickers</a>
-        <a href="#how" className="mob-link" onClick={() => setMobileOpen(false)}>How it Works</a>
-        <a href="#about" className="mob-link" onClick={() => setMobileOpen(false)}>About Us</a>
-        <a href="#distributor" className="mob-link" onClick={() => setMobileOpen(false)}>Become a Partner</a>
-        <a href="#faq" className="mob-link" onClick={() => setMobileOpen(false)}>FAQs</a>
-      </div>
+          {/* Logo - Text Only */}
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="flex items-center flex-shrink-0 cursor-pointer py-1"
+            aria-label="RapiQR home"
+          >
+            <img src={groupLogo1} alt="RapiQR Logo" className="h-6.5 sm:h-8 w-auto object-contain max-h-8" />
+          </button>
 
-      <div id="top"></div>
-
-      <section className="hero">
-        <div className="wrap">
-
-          <div className="hero-top">
-            <p className="eyebrow">Trusted by 10,000+ families across India</p>
-            <h1 className="hero-title serif">One scan away<br />from <em>help</em>, always.</h1>
+          {/* Desktop nav */}
+          <div className="hidden md:flex items-center gap-7">
+            <a href="#how-it-works" className="nav-link">How It Works</a>
+            <a href="#categories"   className="nav-link">Use Cases</a>
+            <a href="#pricing"      className="nav-link">Pricing</a>
+            <a href="#distributorship" className="nav-link">Partner Program</a>
+            <a href="#faq"          className="nav-link">FAQ</a>
           </div>
 
-          <div className="hero-products-grid">
-            {PRODUCTS.map((p, i) => (
-              <a href="#products" className="hero-product-card" key={i}>
-                <img src={p.img} alt={p.name} loading="lazy" draggable={false} />
-                <span className="hero-product-label">{p.name}</span>
-              </a>
-            ))}
-          </div>
-
-          <div className="hero-bottom">
-            <p className="hero-sub">QR safety stickers for your car, bike, home gate, luggage and family — alerts reach you instantly, your number stays private.</p>
-            <div className="hero-cta">
-              <a href="#products" className="btn btn-primary">Shop Now</a>
-              <a href="#how" className="btn btn-ghost">See How it Works</a>
-            </div>
-            <div className="secure-chip">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2 4 6v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6l-8-4Z"></path>
-              </svg>
-              Secure checkout · SSL encrypted · GST invoice always
-            </div>
-            <div className="hero-trust">
-              <div className="trust-item">
-                <span className="trust-num serif" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <AnimatedCounter value="4.8" />
-                  <span style={{ fontSize: '14px', color: 'var(--orange)' }}>★</span>
-                </span>
-                <span className="trust-label">2,400+ Reviews</span>
-              </div>
-              <div className="trust-item"><span className="trust-num serif"><AnimatedCounter value="10K+" /></span><span className="trust-label">Families Protected</span></div>
-              <div className="trust-item"><span className="trust-num serif">24/7</span><span className="trust-label">Alert Monitoring</span></div>
-            </div>
-          </div>
-
-        </div>
-        <div className="category-row">
-          <div className="category-item"><Car size={18} /> Car Stickers</div>
-          <div className="category-item"><Bike size={18} /> Bike Stickers</div>
-          <div className="category-item"><Home size={18} /> Home Gate Tags</div>
-          <div className="category-item"><Luggage size={18} /> Luggage Tags</div>
-          <div className="category-item"><ShieldCheck size={18} /> Child Safety Bags</div>
-          <div className="category-item"><ShieldAlert size={18} /> SOS Keychains</div>
-        </div>
-        <div className="scroll-cue" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-        </div>
-      </section>
-
-      <section className="sec" style={{ padding: '40px 0' }}>
-        <div className="wrap">
-          <div className="how reveal">
-            <div className="wrap" style={{ padding: '0 44px' }}>
-              <p className="eyebrow">The Mechanics</p>
-              <h2 className="sec-title serif" style={{ color: 'var(--cream)', maxWidth: '560px', marginTop: '14px' }}>From a scratched sticker to a resolved alert, in three steps.</h2>
-              <div className="how-grid">
-                <div className="how-card">
-                  <div className="how-num">01 — Stick it</div>
-                  <h3 className="how-title serif">Peel, stick, register</h3>
-                  <p className="how-desc">Apply the weatherproof sticker to your car, bike, gate, bag or keychain, then register it to your account in under a minute.</p>
-                  <div className="how-line"></div>
-                </div>
-                <div className="how-card">
-                  <div className="how-num">02 — Someone scans</div>
-                  <h3 className="how-title serif">A bystander finds it</h3>
-                  <p className="how-desc">Anyone — a guard, a courier, a stranger — scans the QR and picks a reason: parking, a lost bag, a medical emergency.</p>
-                  <div className="how-line"></div>
-                </div>
-                <div className="how-card">
-                  <div className="how-num">03 — You're notified</div>
-                  <h3 className="how-title serif">Alert reaches you, privately</h3>
-                  <p className="how-desc">You get an SMS, WhatsApp ping or a masked call instantly — your real number is never revealed to the scanner.</p>
-                  <div className="how-line"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="sec" id="how" style={{ paddingTop: 0 }}>
-        <div className="wrap">
-
-          <div className="edit-block reveal">
-            <div className="edit-media">
-              <img src="https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&q=80&w=900" alt="Car protected with NamoQR sticker" loading="lazy" decoding="async" />
-            </div>
-            <div className="edit-copy">
-              <p className="eyebrow">Vehicle Safety</p>
-              <h3 className="edit-title serif">Never get an angry knock at 2 AM again.</h3>
-              <p className="edit-desc">Wrong parking, blocked exits, cabin lights left on — bystanders resolve it directly with you, without ever seeing your number.</p>
-              <ul className="edit-list">
-                <li>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  AI crash deceleration alerts (Car)
-                </li>
-                <li>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  Insurance & service reminders (Bike)
-                </li>
-                <li>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  Masked SOS hotline, one tap away
-                </li>
-              </ul>
-              <a href="#products" className="btn btn-dark btn-sm edit-cta">Shop Car & Bike Stickers</a>
-            </div>
-          </div>
-
-          <div className="edit-block rev reveal">
-            <div className="edit-media">
-              <img src="https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&q=80&w=900" alt="Home gate protected with NamoQR sticker" loading="lazy" decoding="async" />
-            </div>
-            <div className="edit-copy">
-              <p className="eyebrow">Home & Family</p>
-              <h3 className="edit-title serif">Your gate knows when you're away, so guests don't have to guess.</h3>
-              <p className="edit-desc">Couriers, visitors and security get exactly the instructions you set — while your family's routine stays completely private.</p>
-              <ul className="edit-list">
-                <li>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  Live availability status for visitors
-                </li>
-                <li>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  Water & gas leak urgent flagging
-                </li>
-                <li>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  School bus & child bag tracking
-                </li>
-              </ul>
-              <a href="#products" className="btn btn-dark btn-sm edit-cta">Shop Home & Family Tags</a>
-            </div>
-          </div>
-
-          <div className="edit-block reveal">
-            <div className="edit-media">
-              <img src="https://images.unsplash.com/photo-1523171613936-cee4809f8c5b?auto=format&fit=crop&q=80&w=900" alt="Luggage and keychain protected with NamoQR" loading="lazy" decoding="async" />
-            </div>
-            <div className="edit-copy">
-              <p className="eyebrow">On the Move</p>
-              <h3 className="edit-title serif">Lost luggage finds its way back, wherever you land.</h3>
-              <p className="edit-desc">From Heathrow to home, a finder can message you instantly — and your SOS keychain carries the medical details first responders need.</p>
-              <ul className="edit-list">
-                <li>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  Works with any airline, any airport
-                </li>
-                <li>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  Blood group & allergy medical card
-                </li>
-                <li>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  Anonymous finder messaging
-                </li>
-              </ul>
-              <a href="#products" className="btn btn-dark btn-sm edit-cta">Shop Luggage & Keychains</a>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      <section className="sec" id="products" ref={productsRef} style={{ paddingTop: 0 }}>
-        <div className="wrap">
-          <div className="sec-head reveal">
-            <h2 className="sec-title serif">Six ways to stay one scan away from the people who matter.</h2>
-            <p className="sec-desc">Every sticker links to the same private safety network — swap categories, keep the protection.</p>
-          </div>
-          <div className="filter-row reveal" id="filter-row">
-            {['all', 'Vehicle', 'Home', 'Travel', 'Family'].map(f => (
-              <button key={f} className={`filter-chip${activeFilter === f ? ' active' : ''}`} data-filter={f} onClick={() => filterAndScroll(f)}>
-                {f === 'all' ? 'All Stickers' : f}
-              </button>
-            ))}
-          </div>
-          <div className="prod-grid" id="product-grid">
-            {filtered.map((p, idx) => {
-              const realIdx = PRODUCTS.indexOf(p);
-              return (
-                <div key={p.name} className="prod-card reveal in" onClick={() => openQuickView(realIdx)} style={{ cursor: 'pointer' }}>
-                  <div className="prod-media">
-                    <span className="prod-chip">{p.chip}</span>
-                    {p.best && (
-                      <span className="prod-best">
-                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.6L22 9.3l-5 4.9 1.2 7.1L12 17.8l-6.2 3.5L7 14.2l-5-4.9 7.1-.7z" /></svg>
-                        Bestseller
-                      </span>
-                    )}
-                    <div className="prod-peel"></div>
-                    <img
-                      src={p.img}
-                      alt={p.name}
-                      loading="lazy"
-                      decoding="async"
-                      onLoad={(e) => e.currentTarget.classList.add('loaded')}
-                    />
-                  </div>
-                  <div className="prod-body">
-                    <div className="prod-name serif">{p.name}</div>
-                    <div className="prod-desc">{p.desc}</div>
-                    <div className="prod-foot">
-                      <div className="prod-price serif" aria-label={`Price: ₹${p.price}`}>₹{p.price}</div>
-                      <button className="add-btn" onClick={(e) => { e.stopPropagation(); addToCart(p.name, p.price); }}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                        Add
+          {/* Right actions */}
+          <div className="flex items-center gap-3">
+            {isLoggedIn ? (
+              <div className="relative">
+                <button
+                  onClick={() => setIsProfileOpen(o => !o)}
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold transition-all cursor-pointer"
+                  style={{ background: 'var(--brand)' }}
+                >
+                  {profile?.fullName?.charAt(0)?.toUpperCase() || 'U'}
+                </button>
+                {isProfileOpen && (
+                  <>
+                    <div className="fixed inset-0" style={{ zIndex: 250 }} onClick={() => setIsProfileOpen(false)} />
+                    <div
+                      className="absolute right-0 top-full mt-2 w-56 rounded-xl shadow-lg overflow-hidden"
+                      style={{ background: 'var(--paper-white)', border: '1px solid var(--border)', zIndex: 260 }}
+                    >
+                      <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
+                        <p className="text-sm font-bold" style={{ color: 'var(--ink)' }}>{profile?.fullName || 'User'}</p>
+                        <p className="text-xs" style={{ color: 'var(--ink-soft)' }}>{profile?.email || ''}</p>
+                      </div>
+                      <button
+                        onClick={() => { setIsProfileOpen(false); onStart(); }}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-black/5"
+                        style={{ color: 'var(--ink)' }}
+                      >
+                        <LayoutDashboard size={15} />
+                        My Dashboard
+                      </button>
+                      <button
+                        onClick={async () => { setIsProfileOpen(false); await signOut(); }}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-red-50"
+                        style={{ color: '#DC2626' }}
+                      >
+                        <LogOut size={15} />
+                        Log Out
                       </button>
                     </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <button onClick={onLogin} className="hidden sm:block nav-link" style={{ fontSize: 13 }}>
+                Log in
+              </button>
+            )}
+            <button onClick={() => setIsCartOpen(true)} className="cart-btn" aria-label="Open cart">
+              <ShoppingBag style={{ width: 17, height: 17, color: 'var(--ink)' }} />
+              {cartItemCount > 0 && <span className="cart-badge">{cartItemCount}</span>}
+            </button>
+            <button onClick={onStart} className="btn-cta hidden sm:inline-flex" style={{ padding: '10px 22px', fontSize: 13 }}>
+              {isLoggedIn ? <><LayoutDashboard size={14} /> My Dashboard</> : <>Get My Sticker <ArrowRight size={14} /></>}
+            </button>
+            <button
+              className="md:hidden p-2 rounded-lg"
+              style={{ background: 'var(--paper-white)', border: '1px solid var(--border)' }}
+              onClick={() => setMobileMenuOpen(o => !o)}
+              aria-label="Menu"
+            >
+              <Menu size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden px-4 pb-4 pt-2 flex flex-col gap-3 border-t mt-2" style={{ borderColor: 'var(--border)' }}>
+            <a href="#how-it-works" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>How It Works</a>
+            <a href="#categories"   className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>Use Cases</a>
+            <a href="#pricing"      className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
+            <a href="#faq"          className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>FAQ</a>
+            {isLoggedIn ? (
+              <>
+                <div className="flex items-center gap-2 py-2">
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
+                    style={{ background: 'var(--brand)' }}
+                  >
+                    {profile?.fullName?.charAt(0)?.toUpperCase() || 'U'}
                   </div>
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: 'var(--ink)' }}>{profile?.fullName || 'User'}</p>
+                    <p className="text-xs" style={{ color: 'var(--ink-soft)' }}>{profile?.email || ''}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setMobileMenuOpen(false); onStart(); }}
+                  className="btn-ghost mt-1 flex items-center gap-2 justify-center"
+                >
+                  <LayoutDashboard size={15} /> My Dashboard
+                </button>
+                <button
+                  onClick={async () => { setMobileMenuOpen(false); await signOut(); }}
+                  className="flex items-center gap-2 justify-center py-2 text-sm font-medium rounded-lg transition-colors hover:bg-red-50"
+                  style={{ color: '#DC2626' }}
+                >
+                  <LogOut size={15} /> Log Out
+                </button>
+              </>
+            ) : (
+              <button onClick={() => { setMobileMenuOpen(false); onStart(); }} className="btn-cta mt-1">
+                Get My Sticker <ArrowRight size={14} />
+              </button>
+            )}
+          </div>
+        )}
+      </nav>
+
+      {/* ── HERO ────────────────────────────────────────────────────── */}
+      <section className="hero-section">
+        {/* QR dot grid background */}
+        <div
+          className="qr-dot-bg absolute inset-0 pointer-events-none"
+          aria-hidden="true"
+        />
+
+        <div className="namo-wrap relative">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center pb-12">
+            
+            {/* Left Column: Plus Jakarta Sans Headline & CTAs */}
+            <div className="lg:col-span-6 text-left">
+              <div className="reveal">
+                <span className="hero-eyebrow">
+                  <Signal size={12} />
+                  Smart Safety Sticker
+                </span>
+              </div>
+
+              <h1 className="display-title text-5xl sm:text-6xl lg:text-6xl reveal delay-1 mb-6" style={{ color: 'var(--ink)' }}>
+                One QR.
+                <br />
+                <span style={{ color: 'var(--brand)' }}>Lifetime protection.</span>
+              </h1>
+
+              <p className="reveal delay-2 text-base sm:text-lg leading-relaxed mb-8" style={{ color: 'var(--ink-soft)', maxWidth: 480 }}>
+                Instant QR safety for your family, vehicles & home. No app needed. Zero subscription.
+              </p>
+
+              <div className="reveal delay-3 flex flex-wrap items-center gap-3 mb-8">
+                <button onClick={onStart} className="btn-cta">
+                  Get My Sticker <ArrowRight size={16} />
+                </button>
+                <a href="#demo" className="btn-ghost">
+                  See It In Action
+                </a>
+              </div>
+
+              <div className="reveal delay-4 flex items-center gap-4 text-xs font-semibold" style={{ color: 'var(--ink-soft)' }}>
+                <div className="flex -space-x-2">
+                  {['RM', 'PS', 'KR', 'AM'].map((av, i) => (
+                    <div key={i} className="w-7 h-7 rounded-full text-white text-[10px] font-bold flex items-center justify-center border-2 border-white" style={{ background: 'var(--brand)' }}>
+                      {av}
+                    </div>
+                  ))}
+                </div>
+                <span>Trusted by 10,000+ vehicle & home owners</span>
+              </div>
+            </div>
+
+            {/* Right Column: Real Physical Sticker + Real Phone Scan View Mockup */}
+            <div className="lg:col-span-6 reveal delay-2">
+              <div className="relative flex items-center justify-center py-4">
+                
+                {/* Physical Product Sticker Mockup (Left back - Auto Floating) */}
+                <div className="relative z-10 w-56 sm:w-64 bg-white p-5 rounded-3xl shadow-2xl border border-gray-200 animate-float-tag">
+                  <div className="flex items-center justify-between mb-3 border-b pb-2 border-gray-100">
+                    <div className="flex items-center gap-1.5">
+                      <ShieldAlert size={16} style={{ color: 'var(--accent)' }} />
+                      <div className="text-xs font-extrabold text-gray-900 tracking-wider uppercase">RapiQR Safe Tag</div>
+                    </div>
+                  </div>
+                  
+                  {/* Real SVG QR Sticker Graphic */}
+                  <div className="bg-gray-950 p-4 rounded-2xl text-center relative overflow-hidden group">
+                    <div className="hero-scan-beam" />
+                    <RealQRCode size={128} className="mx-auto rounded-xl p-2 shadow-inner bg-white" />
+                    <div className="mt-3 text-[10px] font-black text-white tracking-widest uppercase">
+                      SAFETY STICKER
+                    </div>
+                    <div className="text-[9px] text-gray-400 font-mono">KA-01-MJ-9921</div>
+                  </div>
+                  
+                  <div className="text-[10px] text-gray-500 text-center mt-2.5 font-semibold">
+                    Outdoor Weatherproof Tag
+                  </div>
+                </div>
+
+                {/* Real Phone Scan View Screen Mockup (Right front overlap - Auto Floating) */}
+                <div className="relative z-20 w-64 sm:w-72 bg-gray-950 p-3 rounded-[38px] shadow-2xl border-4 border-gray-800 -ml-14 sm:-ml-16 mt-10 animate-float-phone">
+                  {/* Phone Notch */}
+                  <div className="w-20 h-4 bg-gray-950 rounded-b-xl mx-auto absolute top-3 left-1/2 -translate-x-1/2 z-30" />
+                  
+                  {/* Phone Screen UI */}
+                  <div className="bg-[#0E1117] text-white p-4 pt-7 rounded-[30px] border border-gray-800 text-left space-y-2.5">
+                    <div className="text-[10px] text-gray-400 text-center font-medium">
+                      📷 Real Scanner Browser View
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-gray-900/90 border border-gray-800 space-y-1">
+                      <div className="text-xs font-bold text-white flex items-center justify-between">
+                        <span>Car KA-01-MJ-9921</span>
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                      </div>
+                      <div className="text-[10px] text-gray-400">Owner Registered · Private Mode</div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <button className="w-full py-2.5 px-3 rounded-xl bg-amber-500 text-gray-950 font-bold text-xs flex items-center justify-center gap-2 shadow-md">
+                      <Phone size={13} /> Call Owner (Private Proxy)
+                    </button>
+
+                    <button className="w-full py-2 px-3 rounded-xl bg-gray-800 text-white font-semibold text-[11px] flex items-center justify-center gap-2">
+                      <MessageSquare size={12} /> Send Message
+                    </button>
+
+                    <button className="w-full py-2 px-3 rounded-xl bg-gray-800 text-amber-400 font-semibold text-[11px] flex items-center justify-center gap-2">
+                      <MapPin size={12} /> Share GPS Location
+                    </button>
+
+                    <button className="w-full py-2 px-3 rounded-xl bg-red-600 text-white font-bold text-[11px] flex items-center justify-center gap-2">
+                      <AlertTriangle size={12} /> Emergency SOS
+                    </button>
+                  </div>
+                </div>
+
+                {/* Floating Speed Badge */}
+                <div className="hidden sm:flex items-center gap-2 absolute -bottom-2 right-0 bg-white px-3.5 py-2 rounded-xl shadow-xl border border-gray-100 z-30 animate-bounce-slow">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                  <span className="text-xs font-extrabold text-gray-900">⚡ Alert Speed &lt;1.8s</span>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
+          {/* Floating Command Bar Stats Dock — Ultra High End UX */}
+          <div className="reveal delay-4 pt-10 pb-2 mt-8">
+            <div className="max-w-5xl mx-auto bg-[#0E1117] text-white rounded-3xl p-4 sm:p-6 shadow-2xl border border-gray-800/80 relative overflow-hidden">
+              
+              {/* Ambient Glow Backlight */}
+              <div className="absolute -top-24 left-1/4 w-96 h-96 bg-red-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-24 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 relative z-10">
+
+                {/* Pill 1: 10,000+ Families */}
+                <div className="flex items-center gap-3.5 p-3.5 sm:p-4 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all duration-300 group cursor-default">
+                  <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl flex-shrink-0 group-hover:scale-110 transition-transform">
+                    🛡️
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-2xl sm:text-3xl font-black text-white tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        <AnimatedCounter end={10000} suffix="+" />
+                      </span>
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    </div>
+                    <div className="text-[11px] font-semibold text-gray-400 tracking-wide uppercase mt-0.5">
+                      Families protected
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pill 2: <3 sec Alert Speed */}
+                <div className="flex items-center gap-3.5 p-3.5 sm:p-4 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all duration-300 group cursor-default">
+                  <div className="w-11 h-11 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center text-xl flex-shrink-0 group-hover:scale-110 transition-transform">
+                    ⚡
+                  </div>
+                  <div>
+                    <div className="text-2xl sm:text-3xl font-black text-[#FF4D4D] tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      <AnimatedCounter prefix="<" end={3} suffix=" sec" />
+                    </div>
+                    <div className="text-[11px] font-semibold text-gray-400 tracking-wide uppercase mt-0.5">
+                      Alert delivery
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pill 3: 13 Emergency Types */}
+                <div className="flex items-center gap-3.5 p-3.5 sm:p-4 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all duration-300 group cursor-default">
+                  <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-xl flex-shrink-0 group-hover:scale-110 transition-transform">
+                    🚨
+                  </div>
+                  <div>
+                    <div className="text-2xl sm:text-3xl font-black text-sky-300 tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      <AnimatedCounter end={13} />
+                    </div>
+                    <div className="text-[11px] font-semibold text-gray-400 tracking-wide uppercase mt-0.5">
+                      Emergency types
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pill 4: 100% Anonymous */}
+                <div className="flex items-center gap-3.5 p-3.5 sm:p-4 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all duration-300 group cursor-default">
+                  <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl flex-shrink-0 group-hover:scale-110 transition-transform">
+                    🔒
+                  </div>
+                  <div>
+                    <div className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      <AnimatedCounter end={100} suffix="%" />
+                    </div>
+                    <div className="text-[11px] font-semibold text-gray-400 tracking-wide uppercase mt-0.5">
+                      Anonymous by default
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── PROBLEM ─────────────────────────────────────────────────── */}
+      <section className="problem-section" aria-labelledby="problem-heading">
+        <div className="namo-wrap">
+          <div className="text-center mb-14 reveal">
+            <div className="section-label mb-4" style={{ color: 'rgba(255,255,255,0.4)' }}>The problem</div>
+            <h2 id="problem-heading" className="display-title text-4xl sm:text-5xl" style={{ color: 'white' }}>
+              Show your number to everyone.
+              <br /><em style={{ color: 'var(--signal)', fontStyle: 'italic' }}>Or be unreachable.</em>
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+            <div className="problem-card problem-card-bad reveal delay-1">
+              <div className="flex items-center gap-3 mb-5">
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(232,59,46,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <X size={18} style={{ color: 'var(--signal)' }} />
+                </div>
+                <span style={{ fontWeight: 700, color: 'white', fontSize: 15 }}>The old way</span>
+              </div>
+              <ul className="space-y-3">
+                {[
+                  'Number visible to every stranger',
+                  'Anyone calls, any time, for any reason',
+                  'Zero record of who or why',
+                  'Sticker gone? Start from scratch.',
+                ].map((l, i) => (
+                  <li key={i} className="flex items-start gap-3 text-sm" style={{ color: 'rgba(255,255,255,0.65)' }}>
+                    <span style={{ color: 'var(--signal)', marginTop: 2, flexShrink: 0 }}>✕</span>
+                    {l}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="problem-card problem-card-good reveal delay-2">
+              <div className="flex items-center gap-3 mb-5">
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(240,165,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ShieldCheck size={18} style={{ color: 'var(--accent)' }} />
+                </div>
+                <span style={{ fontWeight: 700, color: 'white', fontSize: 15 }}>RapiQR</span>
+              </div>
+              <ul className="space-y-3">
+                {[
+                  'Your number is never shown or stored',
+                  'All calls routed through encrypted proxy',
+                  'Full scan & alert log on your dashboard',
+                  'Lost sticker? Reprint instantly. Same ID.',
+                ].map((l, i) => (
+                  <li key={i} className="flex items-start gap-3 text-sm" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                    <Check size={14} style={{ color: 'var(--accent)', marginTop: 3, flexShrink: 0 }} />
+                    {l}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── HOW IT WORKS ────────────────────────────────────────────── */}
+      <section id="how-it-works" className="hiw-section" aria-labelledby="hiw-heading">
+        <div className="namo-wrap max-w-3xl">
+          <div className="text-center mb-16 reveal">
+            <div className="section-divider justify-center">
+              <span className="section-label">How it works</span>
+            </div>
+            <h2 id="hiw-heading" className="display-title text-4xl sm:text-5xl mt-4" style={{ color: 'var(--ink)' }}>
+              Five steps. Done.
+            </h2>
+          </div>
+
+          <div className="space-y-10">
+            {[
+              { title: 'Order your sticker', body: 'Pick a type — vehicle, gate, bag, keychain. Ships in 2–3 days.' },
+              { title: 'Stick it on', body: 'Weatherproof 3M adhesive. Rated 3+ years outdoors.' },
+              { title: 'Anyone scans — no app', body: 'Camera → secure page. Nothing to install.' },
+              { title: 'They reach you', body: 'Call, message, GPS, or alert. Your number? Never visible.' },
+              { title: 'You get pinged instantly', body: 'Push + SMS + WhatsApp. Resolve in one tap.' },
+            ].map((step, i) => (
+              <div key={i} className={`hiw-step reveal delay-${i + 1}`}>
+                <div className="hiw-num">{i + 1}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--ink)', marginBottom: 6 }}>{step.title}</div>
+                  <div style={{ fontSize: 14.5, color: 'var(--ink-soft)', lineHeight: 1.65 }}>{step.body}</div>
+                </div>
+                {i < 4 && <div className="hiw-connector" />}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CATEGORY EXPLORER ───────────────────────────────────────── */}
+      <section id="categories" className="cat-section" aria-labelledby="cat-heading">
+        <div className="namo-wrap">
+          <div className="text-center mb-12 reveal">
+            <div className="section-divider justify-center">
+              <span className="section-label">Use cases</span>
+            </div>
+            <h2 id="cat-heading" className="display-title text-4xl sm:text-5xl mt-4" style={{ color: 'var(--ink)' }}>
+              One QR. Every situation.
+            </h2>
+          </div>
+
+          {/* Tab bar */}
+          <div className="cat-tabs-scroll flex flex-wrap gap-3 justify-center mb-10 reveal delay-1">
+            {CATEGORIES.map((cat, i) => {
+              const Icon = cat.icon;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCat(i)}
+                  className={`cat-tab${activeCat === i ? ' active' : ''}`}
+                >
+                  <Icon size={14} />
+                  {cat.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Content panel */}
+          <div style={{ position: 'relative', minHeight: 340 }}>
+            {CATEGORIES.map((cat, i) => (
+              <div key={cat.id} className={`cat-panel${activeCat === i ? ' active' : ''}`}>
+                <div>
+                  <h3 className="display-title text-2xl sm:text-3xl mb-6" style={{ color: 'var(--ink)' }}>
+                    {cat.headline}
+                  </h3>
+                  <ul className="space-y-4">
+                    {cat.lines.map((line, li) => (
+                      <li key={li} className="flex items-start gap-3 text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
+                        <div style={{
+                          width: 20, height: 20, borderRadius: 6, background: 'var(--brand-light)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2,
+                        }}>
+                          <Check size={11} style={{ color: 'var(--brand)' }} />
+                        </div>
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-8">
+                    <button onClick={onStart} className="btn-brand">
+                      Get {cat.label} Tag <ArrowRight size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div className="rounded-2xl overflow-hidden" style={{ boxShadow: 'var(--shadow-lg)' }}>
+                  <img
+                    src={cat.img}
+                    alt={cat.label}
+                    className="w-full h-72 object-cover"
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FEATURE GRID ────────────────────────────────────────────── */}
+      <section className="feat-section" aria-labelledby="feat-heading">
+        <div className="namo-wrap">
+          <div className="text-center mb-14 reveal">
+            <div className="section-divider justify-center">
+              <span className="section-label">What's inside</span>
+            </div>
+            <h2 id="feat-heading" className="display-title text-4xl sm:text-5xl mt-4" style={{ color: 'var(--ink)' }}>
+              Built to answer every doubt
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {FEATURES.map((feat, i) => {
+              const Icon = feat.icon;
+              return (
+                <div key={i} className={`feat-card reveal delay-${(i % 4) + 1}`}>
+                  <div className="feat-icon">
+                    <Icon size={22} style={{ color: 'var(--brand)' }} />
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)', marginBottom: 8 }}>{feat.title}</div>
+                  <div style={{ fontSize: 13.5, color: 'var(--ink-soft)', lineHeight: 1.6 }}>{feat.body}</div>
                 </div>
               );
             })}
@@ -544,95 +972,425 @@ export default function LandingPageMaster({ onStart, onLogin }) {
         </div>
       </section>
 
-      <section className="sec" id="combos">
-        <div className="wrap">
-          <div className="sec-head reveal">
-            <h2 className="sec-title serif">Combo packs, for families who need more than one.</h2>
-            <p className="sec-desc">Bundle categories and save — every combo ships together with one invoice.</p>
+      {/* ── LIVE DEMO (signature interaction) ───────────────────────── */}
+      <section id="demo" className="demo-section" aria-labelledby="demo-heading">
+        {/* Dot grid */}
+        <div className="qr-dot-bg-light absolute inset-0 pointer-events-none" aria-hidden="true" />
+
+        <div className="namo-wrap relative">
+          <div className="text-center mb-14 reveal">
+            <div className="section-label mb-4" style={{ color: 'rgba(255,255,255,0.4)' }}>Try it now</div>
+            <h2 id="demo-heading" className="display-title text-4xl sm:text-5xl" style={{ color: 'white' }}>
+              What the scanner sees
+            </h2>
+            <p className="mt-4 text-base" style={{ color: 'rgba(255,255,255,0.55)', maxWidth: 380, margin: '16px auto 0' }}>
+              Tap through every action. See what stays private.
+            </p>
           </div>
-          <div className="combo-scroller">
-            {COMBOS.map((c, i) => (
-              <div key={c.name} className={`combo-card reveal${c.pop ? ' pop' : ''}`}>
-                {c.pop && <div className="combo-pop-tag">Most Loved</div>}
-                <div className="combo-name serif">{c.name}</div>
-                <div className="combo-includes">{c.includes}</div>
-                <div className="combo-price-row">
-                  <span className="combo-price serif" aria-label={`Combo price: ₹${c.price}`}>₹{c.price}</span>
+
+          <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20 justify-center">
+
+            {/* Phone */}
+            <div className="phone-shell flex-shrink-0 reveal delay-1">
+              <div className="phone-notch" />
+              <div className="phone-screen" style={{ paddingTop: 28 }}>
+
+                {/* Step: scan landing */}
+                <div className={`phone-scan-step${demoStep === 0 ? ' active-step' : ''}`}
+                  style={{ padding: '12px 16px', gap: 10, display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ textAlign: 'center', fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>
+                    RapiQR Safe · Car Tag
+                  </div>
+                  <div className="py-1">
+                    <RealQRCode size={110} className="mx-auto rounded-xl p-2 shadow-sm bg-white" />
+                  </div>
+                  <div style={{ textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'white' }}>KA-01-MJ-9921</div>
+                  <div style={{ textAlign: 'center', fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Registered vehicle · Mumbai</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 4, fontWeight: 600 }}>TAP AN ACTION ↓</div>
+                  <button className="demo-action-btn primary" style={{ fontSize: 11 }} onClick={() => setDemoStep(1)}>
+                    <Phone size={12} /> Call Owner (Private)
+                  </button>
+                  <button className="demo-action-btn ghost" style={{ fontSize: 11 }} onClick={() => setDemoStep(1)}>
+                    <MessageSquare size={12} /> Send a Message
+                  </button>
+                  <button className="demo-action-btn ghost" style={{ fontSize: 11, borderColor: 'rgba(240,165,0,0.3)', color: 'rgba(240,165,0,0.85)' }} onClick={() => setDemoStep(2)}>
+                    <MapPin size={12} /> Share My Location
+                  </button>
+                  <button style={{
+                    borderRadius: 12, fontSize: 11, padding: '10px 14px', background: 'var(--signal)',
+                    color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: 8,
+                    justifyContent: 'center', fontWeight: 700, fontFamily: 'Inter,sans-serif', cursor: 'pointer',
+                  }} className="signal-pulse" onClick={() => setDemoStep(3)}>
+                    <AlertTriangle size={12} /> Emergency Alert
+                  </button>
                 </div>
-                <button className="add-btn" onClick={() => addToCart(c.name, c.price)}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                  </svg>
-                  Add Combo
+
+                {/* Step: contact owner */}
+                <div className={`phone-scan-step${demoStep === 1 ? ' active-step' : ''}`}
+                  style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <button onClick={() => setDemoStep(0)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 10, cursor: 'pointer', textAlign: 'left', marginBottom: 4 }}>
+                    ← Back
+                  </button>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>Calling owner</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Connected via private proxy number</div>
+                  <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: '16px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontSize: 24, marginBottom: 6 }}>📞</div>
+                    <div style={{ fontSize: 12, color: 'white', fontWeight: 600 }}>+91 98×× ××××XX</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Masked proxy number · Your real number is never shared</div>
+                  </div>
+                  <div className="notif-toast" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontSize: 16 }}>✅</div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'white' }}>Owner notified</div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Push + SMS delivered in 0.4 sec</div>
+                    </div>
+                  </div>
+                  <button className="demo-action-btn primary" style={{ fontSize: 11, marginTop: 4 }} onClick={() => { handleDemoAction(1); }}>
+                    Next: Share Location <ArrowRight size={11} />
+                  </button>
+                </div>
+
+                {/* Step: GPS shared */}
+                <div className={`phone-scan-step${demoStep === 2 ? ' active-step' : ''}`}
+                  style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <button onClick={() => setDemoStep(0)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 10, cursor: 'pointer', textAlign: 'left', marginBottom: 4 }}>
+                    ← Back
+                  </button>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>Location shared</div>
+                  <div style={{ background: 'rgba(240,165,0,0.08)', borderRadius: 12, padding: '14px', border: '1px solid rgba(240,165,0,0.2)' }}>
+                    <div style={{ fontSize: 10, color: 'rgba(240,165,0,0.8)', fontWeight: 700, marginBottom: 6 }}>📍 GPS PIN SENT TO OWNER</div>
+                    <div style={{ height: 80, background: 'rgba(255,255,255,0.04)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>
+                      🗺️
+                    </div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 6, textAlign: 'center' }}>Bandra West, Mumbai · accurate to 5m</div>
+                  </div>
+                  <div className="notif-toast" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontSize: 16 }}>📱</div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'white' }}>Owner sees your location</div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>They can coordinate pickup in real time</div>
+                    </div>
+                  </div>
+                  <button className="demo-action-btn primary" style={{ fontSize: 11, marginTop: 4 }} onClick={() => { handleDemoAction(2); }}>
+                    See Emergency Flow <ArrowRight size={11} />
+                  </button>
+                </div>
+
+                {/* Step: Emergency alert — signal red */}
+                <div className={`phone-scan-step${demoStep === 3 ? ' active-step' : ''}`}
+                  style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <button onClick={() => setDemoStep(0)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 10, cursor: 'pointer', textAlign: 'left' }}>
+                    ← Back
+                  </button>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--signal)' }}>🚨 Emergency Alert</div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Select the type of emergency</div>
+                  {['Accident / Collision', 'Medical Emergency', 'Fire / Gas Leak', 'Wrong Parking'].map((type, ti) => (
+                    <button
+                      key={ti}
+                      onClick={() => { handleDemoAction(3); }}
+                      style={{
+                        background: ti === 0 ? 'var(--signal)' : 'rgba(232,59,46,0.10)',
+                        border: `1px solid ${ti === 0 ? 'var(--signal)' : 'rgba(232,59,46,0.25)'}`,
+                        color: ti === 0 ? 'white' : 'rgba(232,59,46,0.85)',
+                        borderRadius: 10, padding: '9px 12px', fontSize: 10, fontWeight: 700,
+                        fontFamily: 'Inter,sans-serif', cursor: 'pointer', textAlign: 'left',
+                      }}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 2 }}>
+                    Alert fires instantly · Owner + guardians notified
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Explanation panel */}
+            <div className="max-w-sm w-full reveal delay-2">
+              {/* Step tabs */}
+              <div className="flex flex-wrap gap-2 mb-8">
+                {DEMO_STEPS.map((s, i) => (
+                  <button
+                    key={s.id}
+                    onClick={() => { setDemoStep(i); setDemoAlert(null); }}
+                    className={`demo-step-tab${demoStep === i ? ' active' : ''}`}
+                  >
+                    {i + 1}. {s.label}
+                  </button>
+                ))}
+              </div>
+
+              <h3 className="display-title text-2xl mb-3" style={{ color: 'white' }}>
+                {DEMO_STEPS[demoStep].heading}
+              </h3>
+              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, marginBottom: 20 }}>
+                {demoStep === 0 && "The scanner lands on a clean, private page. No app download, no login. Just a clear set of actions — each of which reaches you without exposing a single character of your number."}
+                {demoStep === 1 && "Every call goes through an encrypted proxy. The scanner hears a ring; you pick up. Neither party ever learns the other's real number. Your privacy is structural, not a policy."}
+                {demoStep === 2 && "The scanner shares their precise GPS location in one tap. You receive a live pin via push, SMS, and WhatsApp. Useful for lost luggage, parked cars, or anything that needs a pickup."}
+                {demoStep === 3 && "Emergency alerts are the only place the signal red appears on the scanner's screen — because it should mean something. Tapping fires an immediate multi-channel alert to you and your chosen SOS contacts."}
+              </p>
+
+              {demoAlert && (
+                <div style={{
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 14, padding: '16px 18px', fontSize: 13, color: 'rgba(255,255,255,0.85)',
+                  marginBottom: 16,
+                }}>
+                  {demoAlert}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {demoStep < DEMO_STEPS.length - 1 ? (
+                  <button className="btn-cta" onClick={() => setDemoStep(s => s + 1)}>
+                    Next: {DEMO_STEPS[demoStep + 1].label} <ArrowRight size={14} />
+                  </button>
+                ) : (
+                  <button className="btn-cta" onClick={onStart}>
+                    Get My Sticker <ArrowRight size={14} />
+                  </button>
+                )}
+                <button className="btn-ghost" style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'white' }}
+                  onClick={() => { setDemoStep(0); setDemoAlert(null); }}>
+                  Restart
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── PRODUCTS ────────────────────────────────────────────────── */}
+      <section id="products" className="products-section" aria-labelledby="products-heading">
+        <div className="namo-wrap">
+          <div className="text-center mb-12 reveal">
+            <div className="section-divider justify-center">
+              <span className="section-label">Safety tags</span>
+            </div>
+            <h2 id="products-heading" className="display-title text-4xl sm:text-5xl mt-4" style={{ color: 'var(--ink)' }}>
+              One QR. Lifetime protection.
+            </h2>
+            <p className="mt-4 text-sm" style={{ color: 'var(--ink-soft)', maxWidth: 360, margin: '12px auto 0' }}>
+              Buy once. Stick it. Done.
+            </p>
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap justify-center gap-3 mb-10 reveal delay-1" style={{ overflowX: 'auto' }}>
+            {(['All', 'Vehicle', 'Home', 'Family', 'Travel'] as const).map(cat => (
+              <button key={cat} onClick={() => setActiveCategory(cat)}
+                className={`filter-chip${activeCategory === cat ? ' active' : ''}`}>
+                {cat === 'All' ? 'All Products' : cat}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
+            {filteredProducts.map((product, pi) => (
+              <div key={product.id} className={`prod-card reveal delay-${(pi % 3) + 1}`}>
+                <div style={{ padding: '20px 20px 0' }}>
+                  <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', marginBottom: 18 }}>
+                    <img
+                      src={product.img}
+                      alt={product.name}
+                      className="w-full object-cover"
+                      style={{ height: 200 }}
+                      loading="lazy"
+                    />
+                    <span style={{
+                      position: 'absolute', top: 12, left: 12,
+                      background: 'var(--brand)', color: 'white',
+                      fontSize: 10, fontWeight: 800, padding: '4px 12px',
+                      borderRadius: 99, textTransform: 'uppercase',
+                    }}>{product.badge}</span>
+                    <button
+                      onClick={() => setQuickView(product)}
+                      aria-label={`Quick view ${product.name}`}
+                      style={{
+                        position: 'absolute', bottom: 12, right: 12,
+                        background: 'rgba(255,255,255,0.92)', border: 'none',
+                        borderRadius: '50%', width: 34, height: 34, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 4px 12px rgba(14,17,23,0.14)',
+                        transition: 'transform 0.2s ease',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.1)')}
+                      onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+                    >
+                      <Eye size={15} style={{ color: 'var(--ink)' }} />
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: 'var(--accent-deep)' }}>
+                      <Star size={13} style={{ fill: 'var(--accent)', color: 'var(--accent)' }} />
+                      {product.rating} <span style={{ color: 'var(--ink-faint)', fontWeight: 400 }}>({product.reviewsCount.toLocaleString()})</span>
+                    </div>
+                    <span style={{ fontSize: 12, color: 'var(--ink-faint)', textDecoration: 'line-through' }}>₹{product.mrp}</span>
+                  </div>
+
+                  <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>{product.name}</h3>
+                  <p style={{ fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.6, marginBottom: 16 }}>{product.desc}</p>
+
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, marginBottom: 0 }}>
+                    {product.features.map((f, fi) => (
+                      <li key={fi} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: 'var(--ink-soft)', marginBottom: 7 }}>
+                        <CheckCircle2 size={14} style={{ color: 'var(--brand)', flexShrink: 0, marginTop: 2 }} />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Card footer */}
+                <div style={{
+                  marginTop: 'auto', padding: '16px 20px 20px',
+                  borderTop: '1px solid var(--border)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}>
+                  <div>
+                    <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--ink)', lineHeight: 1 }}>₹{product.price}</div>
+                    <div style={{ fontSize: 10, color: '#10B981', fontWeight: 700, marginTop: 2 }}>Lifetime · ₹0 subscription</div>
+                  </div>
+                  <button onClick={() => addToCart(product)} className="btn-brand" style={{ padding: '10px 18px', fontSize: 13 }}>
+                    <Plus size={14} /> Add to Cart
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="sec" id="about">
-        <div className="wrap">
-          <div className="about-grid">
-            <div className="about-media reveal">
-              <img src="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&q=80&w=800" alt="NamoQR founding team at work in Rajkot" loading="lazy" decoding="async" />
+      {/* ── SECURITY & PRIVACY ──────────────────────────────────────── */}
+      <section className="security-section" aria-labelledby="security-heading">
+        <div className="namo-wrap">
+          <div className="text-center mb-14 reveal">
+            <div className="section-divider justify-center">
+              <span className="section-label">Security & privacy</span>
             </div>
-            <div className="reveal">
-              <p className="eyebrow">Our Story</p>
-              <p className="about-quote serif">"We built NamoQR after one too many notes under a windshield wiper. <em>Safety shouldn't cost you your privacy</em> — so we built a network where a scan can reach you without ever reaching your number."</p>
-              <div className="about-attrib">
-                <div className="about-attrib-photo">
-                  <img src="https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&q=80&w=200" alt="Founder" loading="lazy" decoding="async" />
+            <h2 id="security-heading" className="display-title text-4xl sm:text-5xl mt-4" style={{ color: 'var(--ink)' }}>
+              Private by design.
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[
+              {
+                icon: Eye,
+                title: 'Anonymous by default',
+                body: 'Scanners see nothing about you unless you enable it.',
+              },
+              {
+                icon: Lock,
+                title: 'Encrypted at rest',
+                body: 'Contacts, alerts, medical info — encrypted in storage.',
+              },
+              {
+                icon: ShieldCheck,
+                title: 'Access-controlled',
+                body: 'Medical info shows only on tags you configure for it.',
+              },
+              {
+                icon: Users,
+                title: 'Opt-in only',
+                body: 'No data is ever shown without your explicit choice.',
+              },
+            ].map((p, i) => {
+              const Icon = p.icon;
+              return (
+                <div key={i} className={`security-pillar reveal delay-${i + 1}`}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--brand-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon size={20} style={{ color: 'var(--brand)' }} />
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>{p.title}</div>
+                  <div style={{ fontSize: 13.5, color: 'var(--ink-soft)', lineHeight: 1.65 }}>{p.body}</div>
                 </div>
-                <div><b>Divyang · Founder</b><span>Worthite Private Limited, Rajkot</span></div>
-              </div>
-              <p className="about-body">NamoQR started as a single vehicle sticker and grew into a full family-safety ecosystem — bikes, homes, luggage, keychains and school bags, all running on the same masked-calling and alert infrastructure. Every product ships with a GST invoice, is MSME-registered, and is designed in-house with a promise: no bystander, courier or stranger ever sees your real phone number.</p>
-            </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      <section className="sec" style={{ paddingTop: 0 }}>
-        <div className="wrap">
-          <div className="stats-bar reveal">
-            <div className="stat">
-              <div className="stat-num serif"><AnimatedCounter value="45K+" /></div>
-              <div className="stat-label">Alerts Delivered</div>
+      {/* ── PRICING ─────────────────────────────────────────────────── */}
+      <section id="pricing" className="pricing-section" aria-labelledby="pricing-heading">
+        <div className="namo-wrap">
+          <div className="text-center mb-14 reveal">
+            <div className="section-divider justify-center">
+              <span className="section-label">Pricing</span>
             </div>
-            <div className="stat">
-              <div className="stat-num serif"><AnimatedCounter value="0" /></div>
-              <div className="stat-label">Numbers Ever Shared</div>
-            </div>
-            <div className="stat">
-              <div className="stat-num serif"><AnimatedCounter value="3+" /></div>
-              <div className="stat-label">Year Sticker Life</div>
-            </div>
-            <div className="stat">
-              <div className="stat-num serif"><AnimatedCounter value="100%" /></div>
-              <div className="stat-label">Privacy Guaranteed</div>
-            </div>
+            <h2 id="pricing-heading" className="display-title text-4xl sm:text-5xl mt-4" style={{ color: 'var(--ink)' }}>
+              Buy once. Done forever.
+            </h2>
+            <p className="mt-4 text-sm" style={{ color: 'var(--ink-soft)', maxWidth: 320, margin: '12px auto 0' }}>
+              No monthly fees. No renewals.
+              <span style={{ color: 'var(--ink-faint)', fontStyle: 'italic' }}> (Sample prices — replace before launch.)</span>
+            </p>
           </div>
-        </div>
-      </section>
 
-      <section className="sec" id="faq">
-        <div className="wrap">
-          <div className="sec-head reveal">
-            <h2 className="sec-title serif">Questions, answered.</h2>
-          </div>
-          <div className="faq-wrap reveal">
-            {FAQ_DATA.map((item, i) => (
-              <div key={i} className={`faq-item${openFaq === i ? ' open' : ''}`}>
-                <button className="faq-q" onClick={() => setOpenFaq(openFaq === i ? -1 : i)}>
-                  {item.q}
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                  </svg>
-                </button>
-                <div className="faq-a">
-                  <p>{item.a}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+            {COMBOS.map((plan, pi) => (
+              <div key={plan.id} className={`price-card reveal delay-${pi + 1}${plan.popular ? ' featured' : ''}`}>
+                {plan.tag && (
+                  <div style={{
+                    display: 'inline-block', fontSize: 11, fontWeight: 800, letterSpacing: '0.06em',
+                    textTransform: 'uppercase', marginBottom: 16,
+                    padding: '5px 14px', borderRadius: 99,
+                    background: plan.popular ? 'rgba(240,165,0,0.18)' : 'var(--brand-light)',
+                    color: plan.popular ? 'var(--accent)' : 'var(--brand)',
+                  }}>
+                    {plan.tag}
+                  </div>
+                )}
+
+                <div style={{ marginBottom: 6, fontSize: 20, fontWeight: 800, color: plan.popular ? 'white' : 'var(--ink)' }}>
+                  {plan.name}
+                </div>
+                <p style={{ fontSize: 13.5, color: plan.popular ? 'rgba(255,255,255,0.65)' : 'var(--ink-soft)', marginBottom: 24, lineHeight: 1.6 }}>
+                  {plan.desc}
+                </p>
+
+                <div style={{ marginBottom: 28 }}>
+                  {plan.price > 0 ? (
+                    <>
+                      <span style={{ fontSize: 42, fontWeight: 900, color: plan.popular ? 'white' : 'var(--ink)', lineHeight: 1 }}>
+                        ₹{plan.price}
+                      </span>
+                      {plan.mrp > 0 && (
+                        <span style={{ fontSize: 15, color: plan.popular ? 'rgba(255,255,255,0.4)' : 'var(--ink-faint)', textDecoration: 'line-through', marginLeft: 10 }}>
+                          ₹{plan.mrp}
+                        </span>
+                      )}
+                      <div style={{ fontSize: 12, color: plan.popular ? 'rgba(240,165,0,0.8)' : 'var(--ink-faint)', marginTop: 4 }}>
+                        One-time · lifetime access
+                      </div>
+                    </>
+                  ) : (
+                    <span style={{ fontSize: 32, fontWeight: 800, color: plan.popular ? 'white' : 'var(--ink)', lineHeight: 1 }}>
+                      Custom quote
+                    </span>
+                  )}
+                </div>
+
+                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {plan.items.map((item, ii) => (
+                    <li key={ii} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13.5, color: plan.popular ? 'rgba(255,255,255,0.8)' : 'var(--ink-soft)' }}>
+                      <Check size={14} style={{ color: plan.popular ? 'var(--accent)' : 'var(--brand)', flexShrink: 0, marginTop: 2 }} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+
+                <div style={{ marginTop: 'auto' }}>
+                  <button
+                    onClick={onStart}
+                    className={plan.popular ? 'btn-cta' : 'btn-ghost'}
+                    style={{ width: '100%', justifyContent: 'center' }}
+                  >
+                    {plan.cta} <ArrowRight size={14} />
+                  </button>
                 </div>
               </div>
             ))}
@@ -640,156 +1398,490 @@ export default function LandingPageMaster({ onStart, onLogin }) {
         </div>
       </section>
 
-      <section className="sec" style={{ paddingTop: 0 }}>
-        <div className="wrap">
-          <div className="cta-band reveal">
-            <h3 className="serif">Your first sticker ships in 24 hours. Protect what matters, today.</h3>
-            <a href="#products" className="btn btn-dark">Shop Now</a>
+      {/* ── DISTRIBUTORSHIP & PARTNER PROGRAM ──────────────────────── */}
+      <section id="distributorship" className="distributor-section py-20 relative overflow-hidden" style={{ background: 'var(--brand)', color: 'white' }}>
+        {/* QR dot background motif */}
+        <div className="qr-dot-bg-light absolute inset-0 pointer-events-none opacity-20" aria-hidden="true" />
+
+        <div className="namo-wrap relative">
+          
+          {/* Section Header */}
+          <div className="text-center mb-16 reveal">
+            <h2 className="display-title text-4xl sm:text-5xl lg:text-6xl text-white mb-4">
+              Become a RapiQR Distributor.
+            </h2>
+            <p className="text-base sm:text-lg text-gray-300 max-w-2xl mx-auto leading-relaxed">
+              High margins, zero tech hassle, and instant product demand. Sell smart QR safety stickers in your shop, city, or dealer network.
+            </p>
+          </div>
+
+          {/* Highlights 4-Grid — Clean & Typography Driven */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+            {[
+              {
+                title: '50%+ Profit Margins',
+                desc: 'High retail markup per sticker. Earn healthy profits from day one with bulk wholesale pricing.',
+              },
+              {
+                title: 'Free POS Counter Display',
+                desc: 'Includes attractive acrylic counter stands, promotional posters, and QR scan demos for your shop.',
+              },
+              {
+                title: 'Partner Admin Portal',
+                desc: 'Manage inventory, assign tags to customers in 5 seconds, and track reseller commissions live.',
+              },
+              {
+                title: 'Territory Lock Rights',
+                desc: 'Exclusive city/district dealership rights available for qualified regional distributors.',
+              },
+            ].map((h, i) => (
+              <div key={i} className={`reveal delay-${i + 1} p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm hover:bg-white/10 transition-all text-left`}>
+                <div className="text-xl font-extrabold text-white mb-2">{h.title}</div>
+                <div className="text-xs text-gray-300 leading-relaxed">{h.desc}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Distributor Packages / Tiers */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-stretch mb-12 text-left">
+            
+            {/* Tier 1: Retail Starter Kit */}
+            <div className="reveal delay-1 p-8 rounded-3xl bg-white text-gray-900 shadow-2xl flex flex-col justify-between border border-gray-100">
+              <div>
+                <span className="px-3 py-1 rounded-full text-xs font-black bg-blue-100 text-blue-800 uppercase tracking-wider">
+                  Shopkeeper Starter Kit
+                </span>
+                <div className="text-2xl font-black text-gray-900 mt-4 mb-2">Retail Partner</div>
+                <p className="text-xs text-gray-600 mb-6">Ideal for car accessory shops, helmet stores, society gates &amp; local retailers.</p>
+                
+                <div className="text-3xl font-black text-gray-900 mb-6">
+                  ₹4,999 <span className="text-xs font-normal text-gray-500">/ 50 Stickers Kit</span>
+                </div>
+
+                <ul className="space-y-3 mb-8 text-xs font-medium text-gray-700">
+                  <li className="flex items-center gap-2">✓ 50 Assorted Safety QR Stickers</li>
+                  <li className="flex items-center gap-2">✓ Acrylic Tabletop Counter Stand Display</li>
+                  <li className="flex items-center gap-2">✓ 45% Retail Profit Margin</li>
+                  <li className="flex items-center gap-2">✓ Basic Partner Activation Access</li>
+                </ul>
+              </div>
+
+              <button onClick={() => setIsPartnerModalOpen(true)} className="w-full py-3.5 rounded-xl font-bold bg-gray-900 text-white hover:bg-gray-800 transition-all text-xs flex items-center justify-center gap-2">
+                Apply for Retail Kit →
+              </button>
+            </div>
+
+            {/* Tier 2: Exclusive City Distributor */}
+            <div className="reveal delay-2 p-8 rounded-3xl bg-gradient-to-br from-amber-500 to-orange-600 text-gray-950 shadow-2xl flex flex-col justify-between relative overflow-hidden">
+              <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+              
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="px-3 py-1 rounded-full text-xs font-black bg-gray-950 text-white uppercase tracking-wider">
+                    Exclusive Franchise
+                  </span>
+                  <span className="text-xs font-extrabold bg-white/30 text-gray-950 px-2.5 py-0.5 rounded-full">
+                    High Income
+                  </span>
+                </div>
+                
+                <div className="text-2xl font-black text-gray-950 mb-2">City Master Distributor</div>
+                <p className="text-xs text-gray-900/80 mb-6 font-medium">Exclusive supply rights for your entire city or district.</p>
+                
+                <div className="text-3xl font-black text-gray-950 mb-6">
+                  ₹24,999 <span className="text-xs font-normal text-gray-900/70">/ 300 Stickers + Exclusive Lock</span>
+                </div>
+
+                <ul className="space-y-3 mb-8 text-xs font-bold text-gray-950">
+                  <li className="flex items-center gap-2">✓ 300 QR Stickers + City Exclusive Rights</li>
+                  <li className="flex items-center gap-2">✓ 5 Counter Stands + Marketing Banners</li>
+                  <li className="flex items-center gap-2">✓ 60% Profit Margin + Sub-dealer Admin</li>
+                  <li className="flex items-center gap-2">✓ Dedicated Relationship Manager &amp; Leads</li>
+                </ul>
+              </div>
+
+              <button onClick={() => setIsPartnerModalOpen(true)} className="w-full py-3.5 rounded-xl font-black bg-gray-950 text-white hover:bg-gray-900 transition-all text-xs flex items-center justify-center gap-2 shadow-lg">
+                Apply for City Distributorship →
+              </button>
+            </div>
+
+          </div>
+
+          <div className="text-center text-xs text-gray-300 font-medium">
+            Questions? Call our B2B Partner Desk directly at <span className="text-amber-400 font-bold">+91 98765 43210</span> or email <span className="text-amber-400 font-bold">b2b@rapiqr.com</span>
+          </div>
+
+        </div>
+      </section>
+
+      {/* ── SOCIAL PROOF ────────────────────────────────────────────── */}
+      <section className="proof-section" aria-labelledby="proof-heading">
+        <div className="namo-wrap">
+          <div className="text-center mb-12 reveal">
+            <div className="section-divider justify-center">
+              <span className="section-label">What people say</span>
+            </div>
+            <h2 id="proof-heading" className="display-title text-4xl sm:text-5xl mt-4" style={{ color: 'var(--ink)' }}>
+              Real people. Real scans.
+            </h2>
+            <p className="mt-3 text-xs italic" style={{ color: 'var(--ink-faint)' }}>
+              ↓ Sample testimonials — replace with real ones before launch
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {TESTIMONIALS.map((t, ti) => (
+              <div key={ti} className={`proof-card reveal delay-${ti + 1}`}>
+                <div className="proof-stars">{'★'.repeat(t.stars)}</div>
+                <p style={{ fontSize: 14, color: 'var(--ink-soft)', lineHeight: 1.7, fontStyle: 'italic', flex: 1 }}>
+                  "{t.quote}"
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                  <div style={{
+                    width: 38, height: 38, borderRadius: '50%', background: 'var(--brand-light)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 800, fontSize: 12, color: 'var(--brand)', flexShrink: 0,
+                  }}>
+                    {t.avatar}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--ink)' }}>{t.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ink-faint)' }}>{t.role}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      <section className="sec" id="distributor">
-        <div className="wrap">
-          <div className="distrib reveal">
-            <div>
-              <p className="eyebrow">Partner With Us</p>
-              <h2 className="distrib-title serif">Bring NamoQR to your city, society or store.</h2>
-              <p className="distrib-desc">We're onboarding distributors, housing society tie-ups, automobile dealerships and retail partners across India. Low minimum order, healthy margins, full marketing support.</p>
-              <div className="distrib-points">
-                <div>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  Territory-exclusive distributor pricing
-                </div>
-                <div>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  Co-branded marketing material provided
-                </div>
-                <div>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  Dedicated onboarding & dashboard training
-                </div>
-              </div>
+      {/* ── FAQ ─────────────────────────────────────────────────────── */}
+      <section id="faq" className="faq-section" aria-labelledby="faq-heading">
+        <div className="namo-wrap" style={{ maxWidth: 720 }}>
+          <div className="text-center mb-14 reveal">
+            <div className="section-divider justify-center">
+              <span className="section-label">FAQ</span>
             </div>
-            <form className="distrib-form" id="distrib-form" onSubmit={handleDistributorSubmit}>
-              <h4>Apply to Partner</h4>
-              <div className="form-row"><label>Full Name</label><input type="text" placeholder="Your name" required /></div>
-              <div className="form-row"><label>Business / City</label><input type="text" placeholder="e.g. Sharma Traders, Rajkot" required /></div>
-              <div className="form-row"><label>Phone Number</label><input type="tel" placeholder="+91" required /></div>
-              <div className="form-row">
-                <label>Partner Type</label>
-                <select required>
-                  <option value="">Select one</option>
-                  <option>City Distributor</option>
-                  <option>Retail Store</option>
-                  <option>Housing Society Tie-up</option>
-                  <option>Automobile Dealership</option>
-                </select>
+            <h2 id="faq-heading" className="display-title text-4xl sm:text-5xl mt-4" style={{ color: 'var(--ink)' }}>
+              Quick answers.
+            </h2>
+          </div>
+
+          <div className="reveal delay-1">
+            {FAQ_ITEMS.map((item, i) => (
+              <div key={i} className="faq-item">
+                <button
+                  className={`faq-question${openFaq === i ? ' open' : ''}`}
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  aria-expanded={openFaq === i}
+                >
+                  <span>{item.q}</span>
+                  <span className="faq-chevron">
+                    <ChevronDown size={12} />
+                  </span>
+                </button>
+                <div className={`faq-answer${openFaq === i ? ' open' : ''}`} aria-hidden={openFaq !== i}>
+                  <div className="faq-answer-inner">{item.a}</div>
+                </div>
               </div>
-              <button type="submit" className="btn btn-primary">Submit Application</button>
-            </form>
+            ))}
           </div>
         </div>
       </section>
 
-      <footer>
-        <div className="wrap">
-          <div className="foot-grid">
-            <div>
-              <div className="foot-logo">
-                <svg viewBox="0 0 32 32" fill="none">
-                  <rect x="2" y="2" width="11" height="11" rx="3" stroke="#D9581F" strokeWidth="3" />
-                  <rect x="19" y="2" width="11" height="11" rx="3" stroke="#D9581F" strokeWidth="3" />
-                  <rect x="2" y="19" width="11" height="11" rx="3" stroke="#D9581F" strokeWidth="3" />
-                  <rect x="19" y="19" width="5" height="5" rx="1" fill="#D9581F" />
-                  <rect x="26" y="26" width="4" height="4" rx="1" fill="#D9581F" />
-                  <rect x="19" y="26" width="4" height="4" rx="1" fill="#D9581F" />
-                  <rect x="26" y="19" width="4" height="4" rx="1" fill="#D9581F" />
-                </svg>
-                Namo<span>QR</span>
-              </div>
-              <p className="foot-desc">A Worthite Private Limited venture, built in Rajkot, Gujarat. Family safety, one scan away.</p>
-              <div className="foot-social" style={{ marginTop: '20px' }}>
-                <a href="#"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.56 9.88v-6.99H7.9V12h2.54V9.8c0-2.5 1.5-3.89 3.78-3.89 1.1 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56V12h2.78l-.44 2.89h-2.34v6.99A10 10 0 0 0 22 12Z" /></svg></a>
-                <a href="#"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.2c3.2 0 3.58.01 4.85.07 3.25.15 4.77 1.69 4.92 4.92.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.15 3.23-1.66 4.77-4.92 4.92-1.27.06-1.64.07-4.85.07s-3.58-.01-4.85-.07c-3.26-.15-4.77-1.7-4.92-4.92-.06-1.27-.07-1.65-.07-4.85s.01-3.58.07-4.85C2.38 3.9 3.9 2.38 7.15 2.27 8.42 2.21 8.8 2.2 12 2.2Zm0 5.35A4.45 4.45 0 1 0 12 16.5a4.45 4.45 0 0 0 0-8.9Zm0 7.34A2.9 2.9 0 1 1 12 9a2.9 2.9 0 0 1 0 5.8Zm4.63-7.51a1.04 1.04 0 1 1 0-2.08 1.04 1.04 0 0 1 0 2.08Z" /></svg></a>
-                <a href="#"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3.5a17.4 17.4 0 0 1-2.9 1.15 4.13 4.13 0 0 0-7.15 3.75A11.7 11.7 0 0 1 2.9 4.4a4.12 4.12 0 0 0 1.28 5.5 4.06 4.06 0 0 1-1.87-.5v.05a4.13 4.13 0 0 0 3.3 4.05 4.1 4.1 0 0 1-1.86.07 4.13 4.13 0 0 0 3.86 2.87A8.3 8.3 0 0 1 2 18.13 11.7 11.7 0 0 0 8.29 20c7.55 0 11.68-6.26 11.68-11.69l-.01-.53A8.3 8.3 0 0 0 22 5.6a8.2 8.2 0 0 1-2.37.65A4.1 4.1 0 0 0 19 3.5Z" /></svg></a>
-              </div>
-            </div>
-            <div className="foot-col">
-              <h5>Shop</h5>
-              <a href="#products"><Car size={16} /> Car Stickers</a>
-              <a href="#products"><Bike size={16} /> Bike Stickers</a>
-              <a href="#products"><Home size={16} /> Home Gate Tags</a>
-              <a href="#products"><Package size={16} /> Combo Packs</a>
-            </div>
-            <div className="foot-col">
-              <h5>Company</h5>
-              <a href="#about">About Us</a>
-              <a href="#distributor">Become a Partner</a>
-              <a href="#faq">FAQs</a>
-              <a href="#">Contact</a>
-            </div>
-            <div className="foot-col">
-              <h5>Legal</h5>
-              <a href="#">Privacy Policy</a>
-              <a href="#">Terms of Service</a>
-              <a href="#">Shipping & Returns</a>
-              <a href="#">Refund Policy</a>
-            </div>
+      {/* ── FINAL CTA BANNER ────────────────────────────────────────── */}
+      <section className="cta-banner qr-dot-bg-light" aria-labelledby="cta-heading">
+        <div className="namo-wrap text-center reveal">
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            background: 'rgba(240,165,0,0.12)', border: '1px solid rgba(240,165,0,0.25)',
+            borderRadius: 99, padding: '6px 16px', fontSize: 12, fontWeight: 700,
+            color: 'var(--accent)', marginBottom: 28,
+          }}>
+            <Zap size={13} /> One-time purchase · Lifetime protection
           </div>
-          <div className="foot-bottom">
-            <p className="foot-legal">© 2026 Worthite Private Limited. NamoQR is a registered trademark application. GSTIN available on invoice.</p>
+
+          <h2 id="cta-heading" className="display-title text-4xl sm:text-5xl md:text-6xl" style={{ color: 'white', maxWidth: 700, margin: '0 auto 20px' }}>
+            Protect everyone you care for.<br />Keep your number private.
+          </h2>
+
+          <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.60)', maxWidth: 380, margin: '0 auto 36px', lineHeight: 1.7 }}>
+            Stick it on. Scan happens. You're protected.
+          </p>
+
+          <div className="flex flex-wrap justify-center gap-4">
+            <button onClick={onStart} className="btn-cta">
+              Get My Sticker <ArrowRight size={16} />
+            </button>
+            <a href="#demo" className="btn-ghost" style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'white' }}>
+              Try the Demo First
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOOTER ──────────────────────────────────────────────────── */}
+      <footer className="namo-footer" aria-label="Site footer">
+        <div className="namo-wrap">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
+            <div>
+              <div style={{ marginBottom: 16 }} className="flex items-center">
+                <img src={groupLogo1} alt="RapiQR Logo" className="h-10 sm:h-12 w-auto object-contain" />
+              </div>
+              <p style={{ fontSize: 13, lineHeight: 1.7 }}>
+                One QR. Lifetime protection.
+              </p>
+            </div>
+
+            {[
+              {
+                title: 'Product', links: ['How It Works', 'Vehicle Tags', 'Home Gate Tags', 'Family Tags', 'Luggage Tags'],
+              },
+              {
+                title: 'Company', links: ['About', 'Privacy Policy', 'Terms of Service', 'Refund Policy', 'Contact'],
+              },
+              {
+                title: 'Support', links: ['Help Centre', 'FAQ', 'Track Your Order', 'Replace a Sticker', 'Enterprise / Fleet'],
+              },
+            ].map((col, ci) => (
+              <div key={ci}>
+                <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 14 }}>
+                  {col.title}
+                </div>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {col.links.map(link => (
+                    <li key={link}>
+                      <a href="#" style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.55)', textDecoration: 'none', transition: 'color 0.2s' }}
+                        onMouseEnter={e => (e.currentTarget.style.color = 'white')}
+                        onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.55)')}>
+                        {link}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 28, display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <div style={{ fontSize: 12 }}>© 2026 RapiQR. All rights reserved.</div>
+            <div style={{ fontSize: 12 }}>
+              Made in India 🇮🇳 · Privacy-first by design
+            </div>
           </div>
         </div>
       </footer>
 
-      <div className={`toast${toastShow ? ' show' : ''}`} id="toast">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-        <span id="toast-text">{toastMsg}</span>
-      </div>
-
-      <div className={`qv-overlay${qvProduct ? ' show' : ''}`} id="qv-overlay" ref={qvOverlayRef} onClick={(e) => { if (e.target === qvOverlayRef.current) closeQuickView(); }}>
-        {qvProduct && (
-          <div className="qv-modal" id="qv-body-content">
-            <button className="qv-close" onClick={closeQuickView}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      {/* ── QUICK VIEW MODAL ────────────────────────────────────────── */}
+      {quickView && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(14,17,23,0.6)', backdropFilter: 'blur(8px)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={() => setQuickView(null)}
+        >
+          <div
+            style={{ background: 'white', maxWidth: 520, width: '100%', borderRadius: 24, overflow: 'hidden', boxShadow: '0 40px 80px rgba(14,17,23,0.3)', position: 'relative' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <img src={quickView.img} alt={quickView.name} style={{ width: '100%', height: 220, objectFit: 'cover' }} />
+            <button
+              onClick={() => setQuickView(null)}
+              style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(14,17,23,0.6)', border: 'none', borderRadius: '50%', width: 34, height: 34, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              aria-label="Close"
+            >
+              <X size={16} style={{ color: 'white' }} />
             </button>
-            <div className="qv-media"><img src={qvProduct.img.replace('w=700', 'w=900')} alt={qvProduct.name} /></div>
-            <div className="qv-body">
-              <span className="qv-chip">{qvProduct.chip}</span>
-              <h3 className="qv-title serif">{qvProduct.name}</h3>
-              <div className="qv-stars"><span>★★★★★</span> 4.8 · 2,400+ reviews</div>
-              <p className="qv-desc">{qvProduct.desc}</p>
-              <div className="qv-features">
-                {qvProduct.features.map((f, i) => (
-                  <div key={i}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                    {f}
+            <div style={{ padding: '24px 28px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)' }}>{quickView.name}</h3>
+                <div style={{ fontSize: 10, color: 'var(--ink-faint)', textDecoration: 'line-through' }}>₹{quickView.mrp}</div>
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--brand)', marginBottom: 12 }}>₹{quickView.price}</div>
+              <p style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginBottom: 20, lineHeight: 1.65 }}>{quickView.desc}</p>
+              <button onClick={() => { addToCart(quickView); setQuickView(null); }} className="btn-brand" style={{ width: '100%', justifyContent: 'center' }}>
+                Add to Cart <ArrowRight size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CART DRAWER ─────────────────────────────────────────────── */}
+      <div className={`cart-overlay${isCartOpen ? ' open' : ''}`} onClick={() => setIsCartOpen(false)}>
+        <div className="cart-panel" onClick={e => e.stopPropagation()}>
+          <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <ShoppingBag size={18} style={{ color: 'var(--brand)' }} />
+              <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--ink)' }}>Your Cart ({cartItemCount})</span>
+            </div>
+            <button onClick={() => setIsCartOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }} aria-label="Close cart">
+              <X size={20} style={{ color: 'var(--ink-soft)' }} />
+            </button>
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+            {cart.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--ink-faint)', fontSize: 14 }}>
+                Your cart is empty.<br />
+                <span style={{ fontSize: 12, marginTop: 6, display: 'block' }}>Browse our safety tags above.</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {cart.map(item => (
+                  <div key={item.product.id} style={{ display: 'flex', gap: 12, padding: 14, borderRadius: 14, background: 'var(--paper)', border: '1px solid var(--border)' }}>
+                    <img src={item.product.img} alt={item.product.name} style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.product.name}</div>
+                      <div style={{ fontSize: 13, color: 'var(--brand)', fontWeight: 700 }}>₹{item.product.price}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      <button onClick={() => updateQty(item.product.id, -1)} style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--paper-white)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Decrease qty">
+                        <Minus size={11} style={{ color: 'var(--ink)' }} />
+                      </button>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', width: 18, textAlign: 'center' }}>{item.qty}</span>
+                      <button onClick={() => updateQty(item.product.id, 1)} style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--paper-white)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Increase qty">
+                        <Plus size={11} style={{ color: 'var(--ink)' }} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
-              <div className="qv-price-row">
-                <span className="qv-price serif" aria-label={`Price: ₹${qvProduct.price}`}>₹{qvProduct.price}</span>
-              </div>
-              <div className="qv-qty-row">
-                <div className="qv-stepper">
-                  <button onClick={() => changeQvQty(-1)}>−</button>
-                  <span id="qv-qty-display">{qvQty}</span>
-                  <button onClick={() => changeQvQty(1)}>+</button>
-                </div>
-                <button className="btn btn-primary qv-add-btn" onClick={addQvToCart}>Add to Cart</button>
-              </div>
-              <div className="qv-ship-note">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2 4 6v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6l-8-4Z"></path></svg>
-                Ships in 24 hrs · Secure checkout · GST invoice included
-              </div>
-            </div>
+            )}
           </div>
-        )}
+
+          {cart.length > 0 && (
+            <div style={{ padding: '16px 24px 24px', borderTop: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14, fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>
+                <span>Subtotal</span>
+                <span style={{ color: 'var(--brand)' }}>₹{cartSubtotal}</span>
+              </div>
+              <button onClick={onStart} className="btn-cta" style={{ width: '100%', justifyContent: 'center' }}>
+                Checkout <ArrowRight size={14} />
+              </button>
+              <p style={{ fontSize: 11, color: 'var(--ink-faint)', textAlign: 'center', marginTop: 10 }}>
+                Free shipping · Lifetime protection included
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
-    </>
+      {/* ── DISTRIBUTORSHIP APPLICATION MODAL ── */}
+      {isPartnerModalOpen && (
+        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden relative border border-gray-100 p-8 text-left">
+            <button
+              onClick={() => { setIsPartnerModalOpen(false); setPartnerSubmitted(false); }}
+              className="absolute top-5 right-5 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors"
+            >
+              <X size={18} />
+            </button>
+
+            {!partnerSubmitted ? (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                    <Zap size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-gray-900">Become a Partner</h3>
+                    <p className="text-xs text-gray-500">Apply for RapiQR Distributorship & Franchise</p>
+                  </div>
+                </div>
+
+                <form onSubmit={(e) => { e.preventDefault(); setPartnerSubmitted(true); }} className="space-y-4 pt-2">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Full Name / Company Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Ramesh Auto Accessories"
+                      value={partnerForm.name}
+                      onChange={e => setPartnerForm({ ...partnerForm, name: e.target.value })}
+                      className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Phone / WhatsApp Number</label>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="+91 98765 43210"
+                        value={partnerForm.phone}
+                        onChange={e => setPartnerForm({ ...partnerForm, phone: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">City & State</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Pune, Maharashtra"
+                        value={partnerForm.city}
+                        onChange={e => setPartnerForm({ ...partnerForm, city: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Business Type</label>
+                    <select
+                      value={partnerForm.business}
+                      onChange={e => setPartnerForm({ ...partnerForm, business: e.target.value })}
+                      className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-amber-500"
+                    >
+                      <option value="Auto Accessories Shop">Auto Accessories / Helmet Shop</option>
+                      <option value="Car Dealership / Service Center">Car Dealership / Service Center</option>
+                      <option value="Security Agency / Society Admin">Security Agency / Housing Society Admin</option>
+                      <option value="Retail Store / Gift Shop">Retail Store / General Merchant</option>
+                      <option value="Individual Reseller">Individual Reseller / Entrepreneur</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Interested Partner Package</label>
+                    <select
+                      value={partnerForm.tier}
+                      onChange={e => setPartnerForm({ ...partnerForm, tier: e.target.value })}
+                      className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-amber-500"
+                    >
+                      <option value="Retail Kit (50 Units)">Retail Partner Kit (50 Stickers - 45% Margin)</option>
+                      <option value="City Franchise (300 Units)">City Master Franchise (300 Stickers + Exclusive Lock)</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 rounded-xl font-bold bg-amber-500 text-gray-950 text-xs flex items-center justify-center gap-2 hover:bg-amber-600 transition-all shadow-md mt-4"
+                  >
+                    Submit Partner Application <ArrowRight size={14} />
+                  </button>
+                </form>
+              </>
+            ) : (
+              <div className="py-8 text-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-2xl font-bold">
+                  ✓
+                </div>
+                <h3 className="text-2xl font-black text-gray-900">Application Received!</h3>
+                <p className="text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
+                  Thank you <span className="font-bold text-gray-900">{partnerForm.name}</span>. Our B2B Partner Manager will call you at <span className="font-bold text-gray-900">{partnerForm.phone}</span> within 2 business hours with your wholesale pricing kit.
+                </p>
+                <button
+                  onClick={() => { setIsPartnerModalOpen(false); setPartnerSubmitted(false); }}
+                  className="px-6 py-2.5 rounded-xl font-bold bg-gray-900 text-white text-xs inline-block"
+                >
+                  Close Window
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+    </div>
   );
 }
