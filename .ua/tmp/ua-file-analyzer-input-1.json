@@ -1,0 +1,49 @@
+{
+  "projectRoot": "E:\\NamoQR",
+  "batchFiles": [
+    {
+      "path": "src/components/ClientDashboard.tsx",
+      "language": "typescript",
+      "sizeLines": 815,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/components/auth/AdminAuthModal.tsx",
+      "language": "typescript",
+      "sizeLines": 136,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/components/landing/LandingPageMaster.tsx",
+      "language": "typescript",
+      "sizeLines": 1887,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/context/AuthContext.tsx",
+      "language": "typescript",
+      "sizeLines": 282,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/lib/authService.ts",
+      "language": "typescript",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/lib/supabase.ts",
+      "language": "typescript",
+      "sizeLines": 17,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "src/components/ClientDashboard.tsx": ["src/context/AuthContext.tsx"],
+    "src/components/auth/AdminAuthModal.tsx": ["src/context/AuthContext.tsx"],
+    "src/components/landing/LandingPageMaster.tsx": ["src/components/landing/landing.css", "src/context/AuthContext.tsx"],
+    "src/context/AuthContext.tsx": ["src/lib/authService.ts", "src/lib/supabase.ts"],
+    "src/lib/authService.ts": ["src/lib/supabase.ts"],
+    "src/lib/supabase.ts": []
+  }
+}

@@ -1,0 +1,237 @@
+-- ============================================================================
+-- NAMOQR SUPABASE DATABASE SCHEMA (OPTIMIZED PRODUCTION ENGINE)
+-- Clean tables, composite & partial indexes, optimized RLS policies & fast queries
+-- ============================================================================
+
+-- 1. EXTENSIONS
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- 2. ENUM TYPES
+DO $$ BEGIN
+    CREATE TYPE product_category AS ENUM (
+        'car', 'bike', 'home', 'luggage', 'keychain', 'child', 'pet', 
+        'wallet', 'employee', 'senior', 'helmet', 'bicycle', 'door', 
+        'apartment', 'nfc', 'travel', 'wristband'
+    );
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE product_status AS ENUM ('active', 'inactive', 'lost', 'replaced');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE report_type AS ENUM (
+        'accident', 'wrong_parking', 'contact_owner', 'medical_emergency',
+        'fire_emergency', 'water_leakage', 'gas_leakage', 'security_alert',
+        'courier_arrival', 'visitor_notification', 'lost_luggage', 'lost_key', 'lost_child'
+    );
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE report_status AS ENUM ('unread', 'acknowledged', 'resolved');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE subscription_plan AS ENUM ('free', 'pro', 'enterprise');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+-- 3. PROFILES TABLE (Extends auth.users)
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT UNIQUE NOT NULL,
+    full_name TEXT NOT NULL DEFAULT '',
+    phone_number TEXT,
+    avatar_url TEXT,
+    subscription_plan subscription_plan NOT NULL DEFAULT 'free',
+    is_subscribed BOOLEAN NOT NULL DEFAULT false,
+    role TEXT NOT NULL DEFAULT 'user',
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 4. QR CODES TABLE (Fleet Registry for physical QR stickers)
+CREATE TABLE IF NOT EXISTS public.qr_codes (
+    id TEXT PRIMARY KEY, -- e.g. 'QR-8A3F', 'CL-CXTF2'
+    client_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'inactive', -- 'active' | 'inactive' | 'unlinked'
+    scans_count INT NOT NULL DEFAULT 0,
+    last_scanned_at TIMESTAMPTZ,
+    template_name TEXT DEFAULT 'Default',
+    fg_color TEXT DEFAULT 'D9581F',
+    bg_color TEXT DEFAULT 'FFFFFF',
+    created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 5. PRODUCTS TABLE (User assigned vehicles, home gates, keychains, luggage)
+CREATE TABLE IF NOT EXISTS public.products (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    qr_code_id TEXT UNIQUE REFERENCES public.qr_codes(id) ON DELETE RESTRICT,
+    category product_category NOT NULL DEFAULT 'car',
+    name TEXT NOT NULL,
+    vehicle_number TEXT,
+    status product_status NOT NULL DEFAULT 'active',
+    assigned_to TEXT DEFAULT 'Self',
+    scans_count INT NOT NULL DEFAULT 0,
+    last_scanned_at TIMESTAMPTZ,
+    warranty_expires_at TIMESTAMPTZ,
+    details JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 6. REPORTS TABLE (Emergency scan alerts & notifications)
+CREATE TABLE IF NOT EXISTS public.reports (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    qr_code_id TEXT REFERENCES public.qr_codes(id) ON DELETE CASCADE,
+    product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
+    product_label TEXT NOT NULL,
+    license_plate TEXT,
+    type report_type NOT NULL,
+    message TEXT NOT NULL DEFAULT '',
+    reporter_phone TEXT,
+    location JSONB, -- { lat, lng, accuracy, timestamp }
+    status report_status NOT NULL DEFAULT 'unread',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 7. TEMPLATES TABLE (Sticker customization templates)
+CREATE TABLE IF NOT EXISTS public.templates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL UNIQUE,
+    fg_color TEXT NOT NULL DEFAULT 'D9581F',
+    bg_color TEXT NOT NULL DEFAULT 'FFFFFF',
+    sticker_pos JSONB NOT NULL DEFAULT '{"x":110,"y":40,"w":100,"h":100}'::jsonb,
+    is_default BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ============================================================================
+-- PERFORMANCE OPTIMIZED INDEXES (B-Tree & Partial Indexes)
+-- ============================================================================
+CREATE INDEX IF NOT EXISTS idx_products_user_status ON public.products(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_products_qr_code_id ON public.products(qr_code_id);
+CREATE INDEX IF NOT EXISTS idx_qr_codes_status_created ON public.qr_codes(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reports_product_status ON public.reports(product_id, status);
+CREATE INDEX IF NOT EXISTS idx_reports_qr_code_id ON public.reports(qr_code_id);
+CREATE INDEX IF NOT EXISTS idx_reports_created_at ON public.reports(created_at DESC);
+
+-- Partial index for fast query of unread emergency alerts
+CREATE INDEX IF NOT EXISTS idx_reports_unread ON public.reports(status, created_at DESC) WHERE status = 'unread';
+
+-- ============================================================================
+-- AUTOMATIC TIMESTAMPS TRIGGER
+-- ============================================================================
+CREATE OR REPLACE FUNCTION update_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS update_profiles_modtime ON public.profiles;
+CREATE TRIGGER update_profiles_modtime BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE PROCEDURE update_timestamp();
+
+DROP TRIGGER IF EXISTS update_qr_codes_modtime ON public.qr_codes;
+CREATE TRIGGER update_qr_codes_modtime BEFORE UPDATE ON public.qr_codes FOR EACH ROW EXECUTE PROCEDURE update_timestamp();
+
+DROP TRIGGER IF EXISTS update_products_modtime ON public.products;
+CREATE TRIGGER update_products_modtime BEFORE UPDATE ON public.products FOR EACH ROW EXECUTE PROCEDURE update_timestamp();
+
+DROP TRIGGER IF EXISTS update_reports_modtime ON public.reports;
+CREATE TRIGGER update_reports_modtime BEFORE UPDATE ON public.reports FOR EACH ROW EXECUTE PROCEDURE update_timestamp();
+
+-- ============================================================================
+-- USER SIGNUP TRIGGER (Auto-creates profile entry on Supabase Auth signup)
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', SPLIT_PART(NEW.email, '@', 1))
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- ============================================================================
+-- HIGH-PERFORMANCE ROW LEVEL SECURITY (RLS) POLICIES
+-- Uses (select auth.uid()) & (select auth.role()) subquery caching pattern
+-- ============================================================================
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.qr_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.templates ENABLE ROW LEVEL SECURITY;
+
+-- Profiles Policies
+DROP POLICY IF EXISTS "Public profiles are viewable by owner" ON public.profiles;
+CREATE POLICY "Public profiles are viewable by owner" ON public.profiles FOR SELECT USING ((select auth.uid()) = id);
+
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING ((select auth.uid()) = id);
+
+-- QR Codes Policies
+DROP POLICY IF EXISTS "QR codes are viewable by everyone" ON public.qr_codes;
+CREATE POLICY "QR codes are viewable by everyone" ON public.qr_codes FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Authenticated users can insert QR codes" ON public.qr_codes;
+CREATE POLICY "Authenticated users can insert QR codes" ON public.qr_codes FOR INSERT WITH CHECK ((select auth.role()) = 'authenticated');
+
+DROP POLICY IF EXISTS "Authenticated users can update QR codes" ON public.qr_codes;
+CREATE POLICY "Authenticated users can update QR codes" ON public.qr_codes FOR UPDATE USING ((select auth.role()) = 'authenticated');
+
+-- Products Policies
+DROP POLICY IF EXISTS "Users can view own products" ON public.products;
+CREATE POLICY "Users can view own products" ON public.products FOR SELECT USING ((select auth.uid()) = user_id OR user_id IS NULL);
+
+DROP POLICY IF EXISTS "Public can view product details via active QR" ON public.products;
+CREATE POLICY "Public can view product details via active QR" ON public.products FOR SELECT USING (status = 'active');
+
+DROP POLICY IF EXISTS "Users can insert own products" ON public.products;
+CREATE POLICY "Users can insert own products" ON public.products FOR INSERT WITH CHECK ((select auth.uid()) = user_id);
+
+DROP POLICY IF EXISTS "Users can update own products" ON public.products;
+CREATE POLICY "Users can update own products" ON public.products FOR UPDATE USING ((select auth.uid()) = user_id);
+
+DROP POLICY IF EXISTS "Users can delete own products" ON public.products;
+CREATE POLICY "Users can delete own products" ON public.products FOR DELETE USING ((select auth.uid()) = user_id);
+
+-- Reports Policies
+DROP POLICY IF EXISTS "Anyone can create emergency reports" ON public.reports;
+CREATE POLICY "Anyone can create emergency reports" ON public.reports FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Product owners can view reports for their products" ON public.reports;
+CREATE POLICY "Product owners can view reports for their products" ON public.reports FOR SELECT USING (
+    EXISTS (
+        SELECT 1 FROM public.products p 
+        WHERE p.id = reports.product_id AND p.user_id = (select auth.uid())
+    ) OR (select auth.role()) = 'service_role'
+);
+
+DROP POLICY IF EXISTS "Product owners can update report status" ON public.reports;
+CREATE POLICY "Product owners can update report status" ON public.reports FOR UPDATE USING (
+    EXISTS (
+        SELECT 1 FROM public.products p 
+        WHERE p.id = reports.product_id AND p.user_id = (select auth.uid())
+    )
+);
+
+-- Templates Policies
+DROP POLICY IF EXISTS "Everyone can view templates" ON public.templates;
+CREATE POLICY "Everyone can view templates" ON public.templates FOR SELECT USING (true);

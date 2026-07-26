@@ -70,11 +70,11 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
   return (
     <div
       className="h-screen w-full flex overflow-hidden text-gray-900"
-      style={{ "--accent": `#${accent}`, fontFamily: fontCss, background: "#F5F5F0" } as React.CSSProperties}
+      style={{ "--accent": `#${accent}`, fontFamily: fontCss, background: "#F8F9FC" } as React.CSSProperties}
     >
       <Sidebar page={page} setPage={setPage} admin={admin} onBack={onBack} onSignOut={signOut} />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: "#F8F9FC" }}>
         <TopBar admin={admin} searchQuery={searchQuery} setSearchQuery={setSearchQuery} page={page} />
 
         <div className="flex-1 overflow-y-auto">

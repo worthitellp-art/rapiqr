@@ -1,0 +1,19 @@
+{
+  "projectRoot": "E:\\NamoQR",
+  "batchFiles": [
+    {"path": "src/App.tsx", "language": "typescript", "sizeLines": 133, "fileCategory": "code"},
+    {"path": "src/components/auth/AuthModal.tsx", "language": "typescript", "sizeLines": 404, "fileCategory": "code"},
+    {"path": "src/main.tsx", "language": "typescript", "sizeLines": 10, "fileCategory": "code"}
+  ],
+  "batchImportData": {
+    "src/App.tsx": [
+      {"path": "src/context/AuthContext.tsx", "batchIndex": 1, "symbols": ["AuthProvider", "useAuth"]}
+    ],
+    "src/components/auth/AuthModal.tsx": [
+      {"path": "src/context/AuthContext.tsx", "batchIndex": 1, "symbols": ["useAuth"]}
+    ],
+    "src/main.tsx": [
+      {"path": "src/index.css", "batchIndex": 7, "symbols": []}
+    ]
+  }
+}

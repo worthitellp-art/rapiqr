@@ -13,6 +13,7 @@ import groupLogo from '../../../assets/Group 1000005716.png';
 import groupLogo1 from '../../../assets/Group 1000005716-1.png';
 import groupLogo2 from '../../../assets/Group 1000005716-2.png';
 import logoForWhBg from '../../../assets/logo for wh bg.png';
+import bgVideo from '../../../assets/bg.mp4';
 
 // ── Animated Counter Component ─────────────────────────────────────────────
 
@@ -68,17 +69,17 @@ function RealQRCode({ size = 120, className = "" }: { size?: number; className?:
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
       <rect width="100" height="100" fill="white" rx="6" />
-      
+
       {/* Top-Left Finder */}
       <rect x="8" y="8" width="28" height="28" fill="#0E1117" rx="4" />
       <rect x="14" y="14" width="16" height="16" fill="white" rx="2" />
       <rect x="18" y="18" width="8" height="8" fill="#0E1117" rx="1.5" />
-      
+
       {/* Top-Right Finder */}
       <rect x="64" y="8" width="28" height="28" fill="#0E1117" rx="4" />
       <rect x="70" y="14" width="16" height="16" fill="white" rx="2" />
       <rect x="74" y="18" width="8" height="8" fill="#0E1117" rx="1.5" />
-      
+
       {/* Bottom-Left Finder */}
       <rect x="8" y="64" width="28" height="28" fill="#0E1117" rx="4" />
       <rect x="14" y="70" width="16" height="16" fill="white" rx="2" />
@@ -382,6 +383,8 @@ export default function LandingPageMaster({
   const [quickView, setQuickView] = useState<Product | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [navHidden, setNavHidden] = useState(false);
+  const lastScrollY = useRef(0);
   const [activeCat, setActiveCat] = useState(0);
   const [demoStep, setDemoStep] = useState(0);
   const [demoAlert, setDemoAlert] = useState<string | null>(null);
@@ -406,13 +409,13 @@ export default function LandingPageMaster({
     });
     setIsCartOpen(true);
 
-    
+
   }, []);
 
   const updateQty = (id: string, delta: number) => {
     setCart(prev =>
       prev.map(i => i.product.id === id ? { ...i, qty: i.qty + delta } : i)
-          .filter(i => i.qty > 0)
+        .filter(i => i.qty > 0)
     );
   };
 
@@ -422,7 +425,12 @@ export default function LandingPageMaster({
       entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('is-visible'); });
     }, { threshold: 0.12 });
     document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
-    const onScroll = () => setIsScrolled(window.scrollY > 40);
+    const onScroll = () => {
+      const y = window.scrollY;
+      setIsScrolled(y > 40);
+      setNavHidden(y > 80 && y > lastScrollY.current);
+      lastScrollY.current = y;
+    };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => { obs.disconnect(); window.removeEventListener('scroll', onScroll); };
   }, []);
@@ -444,7 +452,7 @@ export default function LandingPageMaster({
     <div className="namo-landing">
 
       {/* ── NAV ─────────────────────────────────────────────────────── */}
-      <nav className={`namo-nav${isScrolled ? ' scrolled' : ''}`}>
+      <nav className={`namo-nav${isScrolled ? ' scrolled' : ''}${navHidden ? ' nav-hidden' : ''}`}>
         <div className="namo-wrap flex items-center justify-between gap-6">
 
           {/* Logo - Text Only */}
@@ -459,10 +467,10 @@ export default function LandingPageMaster({
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-7">
             <a href="#how-it-works" className="nav-link">How It Works</a>
-            <a href="#categories"   className="nav-link">Use Cases</a>
-            <a href="#pricing"      className="nav-link">Pricing</a>
+            <a href="#categories" className="nav-link">Use Cases</a>
+            <a href="#pricing" className="nav-link">Pricing</a>
             <a href="#distributorship" className="nav-link">Partner Program</a>
-            <a href="#faq"          className="nav-link">FAQ</a>
+            <a href="#faq" className="nav-link">FAQ</a>
           </div>
 
           {/* Right actions */}
@@ -534,9 +542,9 @@ export default function LandingPageMaster({
         {mobileMenuOpen && (
           <div className="md:hidden px-4 pb-4 pt-2 flex flex-col gap-3 border-t mt-2" style={{ borderColor: 'var(--border)' }}>
             <a href="#how-it-works" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>How It Works</a>
-            <a href="#categories"   className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>Use Cases</a>
-            <a href="#pricing"      className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
-            <a href="#faq"          className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>FAQ</a>
+            <a href="#categories" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>Use Cases</a>
+            <a href="#pricing" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
+            <a href="#faq" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>FAQ</a>
             {isLoggedIn ? (
               <>
                 <div className="flex items-center gap-2 py-2">
@@ -575,16 +583,26 @@ export default function LandingPageMaster({
       </nav>
 
       {/* ── HERO ────────────────────────────────────────────────────── */}
-      <section className="hero-section">
+      <section className="hero-section relative overflow-hidden" style={{ background: 'transparent' }}>
+        {/* Background Video */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+          src={bgVideo}
+        />
+
         {/* QR dot grid background */}
         <div
           className="qr-dot-bg absolute inset-0 pointer-events-none"
           aria-hidden="true"
         />
 
-        <div className="namo-wrap relative">
+        <div className="namo-wrap relative" style={{ zIndex: 10 }}>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center pb-12">
-            
+
             {/* Left Column: Plus Jakarta Sans Headline & CTAs */}
             <div className="lg:col-span-6 text-left">
               <div className="reveal">
@@ -594,13 +612,13 @@ export default function LandingPageMaster({
                 </span>
               </div>
 
-              <h1 className="display-title text-5xl sm:text-6xl lg:text-6xl reveal delay-1 mb-6" style={{ color: 'var(--ink)' }}>
-                One QR.
+              <h1 className="display-title text-5xl sm:text-6xl lg:text-6xl reveal delay-1 mb-6" style={{ color: '#FFFFFF' }}>
+                India's #1st 
                 <br />
-                <span style={{ color: 'var(--brand)' }}>Lifetime protection.</span>
+                <span style={{ color: 'var(--accent)' }}>Emergency Platform</span>
               </h1>
 
-              <p className="reveal delay-2 text-base sm:text-lg leading-relaxed mb-8" style={{ color: 'var(--ink-soft)', maxWidth: 480 }}>
+              <p className="reveal delay-2 text-base sm:text-lg leading-relaxed mb-8" style={{ color: 'rgba(255,255,255,0.7)', maxWidth: 480 }}>
                 Instant QR safety for your family, vehicles & home. No app needed. Zero subscription.
               </p>
 
@@ -608,12 +626,12 @@ export default function LandingPageMaster({
                 <button onClick={onStart} className="btn-cta">
                   Get My Sticker <ArrowRight size={16} />
                 </button>
-                <a href="#demo" className="btn-ghost">
+                <a href="#demo" className="btn-ghost" style={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.2)' }}>
                   See It In Action
                 </a>
               </div>
 
-              <div className="reveal delay-4 flex items-center gap-4 text-xs font-semibold" style={{ color: 'var(--ink-soft)' }}>
+              <div className="reveal delay-4 flex items-center gap-4 text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.6)' }}>
                 <div className="flex -space-x-2">
                   {['RM', 'PS', 'KR', 'AM'].map((av, i) => (
                     <div key={i} className="w-7 h-7 rounded-full text-white text-[10px] font-bold flex items-center justify-center border-2 border-white" style={{ background: 'var(--brand)' }}>
@@ -628,7 +646,7 @@ export default function LandingPageMaster({
             {/* Right Column: Real Physical Sticker + Real Phone Scan View Mockup */}
             <div className="lg:col-span-6 reveal delay-2">
               <div className="relative flex items-center justify-center py-4">
-                
+
                 {/* Physical Product Sticker Mockup (Left back - Auto Floating) */}
                 <div className="relative z-10 w-56 sm:w-64 bg-white p-5 rounded-3xl shadow-2xl border border-gray-200 animate-float-tag">
                   <div className="flex items-center justify-between mb-3 border-b pb-2 border-gray-100">
@@ -637,7 +655,7 @@ export default function LandingPageMaster({
                       <div className="text-xs font-extrabold text-gray-900 tracking-wider uppercase">RapiQR Safe Tag</div>
                     </div>
                   </div>
-                  
+
                   {/* Real SVG QR Sticker Graphic */}
                   <div className="bg-gray-950 p-4 rounded-2xl text-center relative overflow-hidden group">
                     <div className="hero-scan-beam" />
@@ -647,7 +665,7 @@ export default function LandingPageMaster({
                     </div>
                     <div className="text-[9px] text-gray-400 font-mono">KA-01-MJ-9921</div>
                   </div>
-                  
+
                   <div className="text-[10px] text-gray-500 text-center mt-2.5 font-semibold">
                     Outdoor Weatherproof Tag
                   </div>
@@ -657,7 +675,7 @@ export default function LandingPageMaster({
                 <div className="relative z-20 w-64 sm:w-72 bg-gray-950 p-3 rounded-[38px] shadow-2xl border-4 border-gray-800 -ml-14 sm:-ml-16 mt-10 animate-float-phone">
                   {/* Phone Notch */}
                   <div className="w-20 h-4 bg-gray-950 rounded-b-xl mx-auto absolute top-3 left-1/2 -translate-x-1/2 z-30" />
-                  
+
                   {/* Phone Screen UI */}
                   <div className="bg-[#0E1117] text-white p-4 pt-7 rounded-[30px] border border-gray-800 text-left space-y-2.5">
                     <div className="text-[10px] text-gray-400 text-center font-medium">
@@ -705,7 +723,7 @@ export default function LandingPageMaster({
           {/* Floating Command Bar Stats Dock — Ultra High End UX */}
           <div className="reveal delay-4 pt-10 pb-2 mt-8">
             <div className="max-w-5xl mx-auto bg-[#0E1117] text-white rounded-3xl p-4 sm:p-6 shadow-2xl border border-gray-800/80 relative overflow-hidden">
-              
+
               {/* Ambient Glow Backlight */}
               <div className="absolute -top-24 left-1/4 w-96 h-96 bg-red-500/10 rounded-full blur-3xl pointer-events-none" />
               <div className="absolute -bottom-24 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -760,82 +778,110 @@ export default function LandingPageMaster({
                   </div>
                 </div>
 
-                {/* Pill 4: 100% Anonymous */}
-                <div className="flex items-center gap-3.5 p-3.5 sm:p-4 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all duration-300 group cursor-default">
-                  <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl flex-shrink-0 group-hover:scale-110 transition-transform">
-                    🔒
-                  </div>
-                  <div>
-                    <div className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                      <AnimatedCounter end={100} suffix="%" />
-                    </div>
-                    <div className="text-[11px] font-semibold text-gray-400 tracking-wide uppercase mt-0.5">
-                      Anonymous by default
-                    </div>
-                  </div>
-                </div>
-
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── PROBLEM ─────────────────────────────────────────────────── */}
-      <section className="problem-section" aria-labelledby="problem-heading">
+      {/* ── PRODUCTS ────────────────────────────────────────────────── */}
+      <section id="products" className="products-section" aria-labelledby="products-heading">
         <div className="namo-wrap">
-          <div className="text-center mb-14 reveal">
-            <div className="section-label mb-4" style={{ color: 'rgba(255,255,255,0.4)' }}>The problem</div>
-            <h2 id="problem-heading" className="display-title text-4xl sm:text-5xl" style={{ color: 'white' }}>
-              Show your number to everyone.
-              <br /><em style={{ color: 'var(--signal)', fontStyle: 'italic' }}>Or be unreachable.</em>
+          <div className="text-center mb-12 reveal">
+            <div className="section-divider justify-center">
+              <span className="section-label">Safety tags</span>
+            </div>
+            <h2 id="products-heading" className="display-title text-4xl sm:text-5xl mt-4" style={{ color: 'var(--ink)' }}>
+              One QR. Lifetime protection.
             </h2>
+            <p className="mt-4 text-sm" style={{ color: 'var(--ink-soft)', maxWidth: 360, margin: '12px auto 0' }}>
+              Buy once. Stick it. Done.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            <div className="problem-card problem-card-bad reveal delay-1">
-              <div className="flex items-center gap-3 mb-5">
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(232,59,46,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <X size={18} style={{ color: 'var(--signal)' }} />
-                </div>
-                <span style={{ fontWeight: 700, color: 'white', fontSize: 15 }}>The old way</span>
-              </div>
-              <ul className="space-y-3">
-                {[
-                  'Number visible to every stranger',
-                  'Anyone calls, any time, for any reason',
-                  'Zero record of who or why',
-                  'Sticker gone? Start from scratch.',
-                ].map((l, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm" style={{ color: 'rgba(255,255,255,0.65)' }}>
-                    <span style={{ color: 'var(--signal)', marginTop: 2, flexShrink: 0 }}>✕</span>
-                    {l}
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {/* Filters */}
+          <div className="flex flex-wrap justify-center gap-3 mb-10 reveal delay-1" style={{ overflowX: 'auto' }}>
+            {(['All', 'Vehicle', 'Home', 'Family', 'Travel'] as const).map(cat => (
+              <button key={cat} onClick={() => setActiveCategory(cat)}
+                className={`filter-chip${activeCategory === cat ? ' active' : ''}`}>
+                {cat === 'All' ? 'All Products' : cat}
+              </button>
+            ))}
+          </div>
 
-            <div className="problem-card problem-card-good reveal delay-2">
-              <div className="flex items-center gap-3 mb-5">
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(240,165,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <ShieldCheck size={18} style={{ color: 'var(--accent)' }} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
+            {filteredProducts.map((product, pi) => (
+              <div key={product.id} className={`prod-card reveal delay-${(pi % 3) + 1}`}>
+                <div style={{ padding: '20px 20px 0' }}>
+                  <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', marginBottom: 18 }}>
+                    <img
+                      src={product.img}
+                      alt={product.name}
+                      className="w-full object-cover"
+                      style={{ height: 200 }}
+                      loading="lazy"
+                    />
+                    <span style={{
+                      position: 'absolute', top: 12, left: 12,
+                      background: 'var(--brand)', color: 'white',
+                      fontSize: 10, fontWeight: 800, padding: '4px 12px',
+                      borderRadius: 99, textTransform: 'uppercase',
+                    }}>{product.badge}</span>
+                    <button
+                      onClick={() => setQuickView(product)}
+                      aria-label={`Quick view ${product.name}`}
+                      style={{
+                        position: 'absolute', bottom: 12, right: 12,
+                        background: 'rgba(255,255,255,0.92)', border: 'none',
+                        borderRadius: '50%', width: 34, height: 34, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 4px 12px rgba(14,17,23,0.14)',
+                        transition: 'transform 0.2s ease',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.1)')}
+                      onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+                    >
+                      <Eye size={15} style={{ color: 'var(--ink)' }} />
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <div style={{ display: 'flex', items: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: 'var(--accent-deep)' }}>
+                      <Star size={13} style={{ fill: 'var(--accent)', color: 'var(--accent)' }} />
+                      {product.rating} <span style={{ color: 'var(--ink-faint)', fontWeight: 400 }}>({product.reviewsCount.toLocaleString()})</span>
+                    </div>
+                    <span style={{ fontSize: 12, color: 'var(--ink-faint)', textDecoration: 'line-through' }}>₹{product.mrp}</span>
+                  </div>
+
+                  <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>{product.name}</h3>
+                  <p style={{ fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.6, marginBottom: 16 }}>{product.desc}</p>
+
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, marginBottom: 0 }}>
+                    {product.features.map((f, fi) => (
+                      <li key={fi} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: 'var(--ink-soft)', marginBottom: 7 }}>
+                        <CheckCircle2 size={14} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: 2 }} />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <span style={{ fontWeight: 700, color: 'white', fontSize: 15 }}>RapiQR</span>
+
+                {/* Card footer */}
+                <div style={{
+                  marginTop: 'auto', padding: '16px 20px 20px',
+                  borderTop: '1px solid var(--border)',
+                  display: 'flex', items: 'center', justifyContent: 'space-between',
+                }}>
+                  <div>
+                    <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--ink)', lineHeight: 1 }}>₹{product.price}</div>
+                    <div style={{ fontSize: 10, color: '#10B981', fontWeight: 700, marginTop: 2 }}>Lifetime · ₹0 subscription</div>
+                  </div>
+                  <button onClick={() => addToCart(product)} className="btn-brand" style={{ padding: '10px 18px', fontSize: 13 }}>
+                    <Plus size={14} /> Add to Cart
+                  </button>
+                </div>
               </div>
-              <ul className="space-y-3">
-                {[
-                  'Your number is never shown or stored',
-                  'All calls routed through encrypted proxy',
-                  'Full scan & alert log on your dashboard',
-                  'Lost sticker? Reprint instantly. Same ID.',
-                ].map((l, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm" style={{ color: 'rgba(255,255,255,0.75)' }}>
-                    <Check size={14} style={{ color: 'var(--accent)', marginTop: 3, flexShrink: 0 }} />
-                    {l}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            ))}
           </div>
         </div>
       </section>
@@ -914,10 +960,10 @@ export default function LandingPageMaster({
                     {cat.lines.map((line, li) => (
                       <li key={li} className="flex items-start gap-3 text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
                         <div style={{
-                          width: 20, height: 20, borderRadius: 6, background: 'var(--brand-light)',
+                          width: 20, height: 20, borderRadius: 6, background: 'var(--accent-light)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2,
                         }}>
-                          <Check size={11} style={{ color: 'var(--brand)' }} />
+                          <Check size={11} style={{ color: 'var(--accent)' }} />
                         </div>
                         {line}
                       </li>
@@ -961,7 +1007,7 @@ export default function LandingPageMaster({
               return (
                 <div key={i} className={`feat-card reveal delay-${(i % 4) + 1}`}>
                   <div className="feat-icon">
-                    <Icon size={22} style={{ color: 'var(--brand)' }} />
+                    <Icon size={22} style={{ color: 'var(--accent)' }} />
                   </div>
                   <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)', marginBottom: 8 }}>{feat.title}</div>
                   <div style={{ fontSize: 13.5, color: 'var(--ink-soft)', lineHeight: 1.6 }}>{feat.body}</div>
@@ -1162,157 +1208,8 @@ export default function LandingPageMaster({
         </div>
       </section>
 
-      {/* ── PRODUCTS ────────────────────────────────────────────────── */}
-      <section id="products" className="products-section" aria-labelledby="products-heading">
-        <div className="namo-wrap">
-          <div className="text-center mb-12 reveal">
-            <div className="section-divider justify-center">
-              <span className="section-label">Safety tags</span>
-            </div>
-            <h2 id="products-heading" className="display-title text-4xl sm:text-5xl mt-4" style={{ color: 'var(--ink)' }}>
-              One QR. Lifetime protection.
-            </h2>
-            <p className="mt-4 text-sm" style={{ color: 'var(--ink-soft)', maxWidth: 360, margin: '12px auto 0' }}>
-              Buy once. Stick it. Done.
-            </p>
-          </div>
+     
 
-          {/* Filters */}
-          <div className="flex flex-wrap justify-center gap-3 mb-10 reveal delay-1" style={{ overflowX: 'auto' }}>
-            {(['All', 'Vehicle', 'Home', 'Family', 'Travel'] as const).map(cat => (
-              <button key={cat} onClick={() => setActiveCategory(cat)}
-                className={`filter-chip${activeCategory === cat ? ' active' : ''}`}>
-                {cat === 'All' ? 'All Products' : cat}
-              </button>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
-            {filteredProducts.map((product, pi) => (
-              <div key={product.id} className={`prod-card reveal delay-${(pi % 3) + 1}`}>
-                <div style={{ padding: '20px 20px 0' }}>
-                  <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', marginBottom: 18 }}>
-                    <img
-                      src={product.img}
-                      alt={product.name}
-                      className="w-full object-cover"
-                      style={{ height: 200 }}
-                      loading="lazy"
-                    />
-                    <span style={{
-                      position: 'absolute', top: 12, left: 12,
-                      background: 'var(--brand)', color: 'white',
-                      fontSize: 10, fontWeight: 800, padding: '4px 12px',
-                      borderRadius: 99, textTransform: 'uppercase',
-                    }}>{product.badge}</span>
-                    <button
-                      onClick={() => setQuickView(product)}
-                      aria-label={`Quick view ${product.name}`}
-                      style={{
-                        position: 'absolute', bottom: 12, right: 12,
-                        background: 'rgba(255,255,255,0.92)', border: 'none',
-                        borderRadius: '50%', width: 34, height: 34, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 4px 12px rgba(14,17,23,0.14)',
-                        transition: 'transform 0.2s ease',
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.1)')}
-                      onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
-                    >
-                      <Eye size={15} style={{ color: 'var(--ink)' }} />
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: 'var(--accent-deep)' }}>
-                      <Star size={13} style={{ fill: 'var(--accent)', color: 'var(--accent)' }} />
-                      {product.rating} <span style={{ color: 'var(--ink-faint)', fontWeight: 400 }}>({product.reviewsCount.toLocaleString()})</span>
-                    </div>
-                    <span style={{ fontSize: 12, color: 'var(--ink-faint)', textDecoration: 'line-through' }}>₹{product.mrp}</span>
-                  </div>
-
-                  <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>{product.name}</h3>
-                  <p style={{ fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.6, marginBottom: 16 }}>{product.desc}</p>
-
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, marginBottom: 0 }}>
-                    {product.features.map((f, fi) => (
-                      <li key={fi} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: 'var(--ink-soft)', marginBottom: 7 }}>
-                        <CheckCircle2 size={14} style={{ color: 'var(--brand)', flexShrink: 0, marginTop: 2 }} />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* Card footer */}
-                <div style={{
-                  marginTop: 'auto', padding: '16px 20px 20px',
-                  borderTop: '1px solid var(--border)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                }}>
-                  <div>
-                    <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--ink)', lineHeight: 1 }}>₹{product.price}</div>
-                    <div style={{ fontSize: 10, color: '#10B981', fontWeight: 700, marginTop: 2 }}>Lifetime · ₹0 subscription</div>
-                  </div>
-                  <button onClick={() => addToCart(product)} className="btn-brand" style={{ padding: '10px 18px', fontSize: 13 }}>
-                    <Plus size={14} /> Add to Cart
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── SECURITY & PRIVACY ──────────────────────────────────────── */}
-      <section className="security-section" aria-labelledby="security-heading">
-        <div className="namo-wrap">
-          <div className="text-center mb-14 reveal">
-            <div className="section-divider justify-center">
-              <span className="section-label">Security & privacy</span>
-            </div>
-            <h2 id="security-heading" className="display-title text-4xl sm:text-5xl mt-4" style={{ color: 'var(--ink)' }}>
-              Private by design.
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {[
-              {
-                icon: Eye,
-                title: 'Anonymous by default',
-                body: 'Scanners see nothing about you unless you enable it.',
-              },
-              {
-                icon: Lock,
-                title: 'Encrypted at rest',
-                body: 'Contacts, alerts, medical info — encrypted in storage.',
-              },
-              {
-                icon: ShieldCheck,
-                title: 'Access-controlled',
-                body: 'Medical info shows only on tags you configure for it.',
-              },
-              {
-                icon: Users,
-                title: 'Opt-in only',
-                body: 'No data is ever shown without your explicit choice.',
-              },
-            ].map((p, i) => {
-              const Icon = p.icon;
-              return (
-                <div key={i} className={`security-pillar reveal delay-${i + 1}`}>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--brand-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Icon size={20} style={{ color: 'var(--brand)' }} />
-                  </div>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>{p.title}</div>
-                  <div style={{ fontSize: 13.5, color: 'var(--ink-soft)', lineHeight: 1.65 }}>{p.body}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
 
       {/* ── PRICING ─────────────────────────────────────────────────── */}
       <section id="pricing" className="pricing-section" aria-labelledby="pricing-heading">
@@ -1338,8 +1235,8 @@ export default function LandingPageMaster({
                     display: 'inline-block', fontSize: 11, fontWeight: 800, letterSpacing: '0.06em',
                     textTransform: 'uppercase', marginBottom: 16,
                     padding: '5px 14px', borderRadius: 99,
-                    background: plan.popular ? 'rgba(240,165,0,0.18)' : 'var(--brand-light)',
-                    color: plan.popular ? 'var(--accent)' : 'var(--brand)',
+                    background: plan.popular ? 'rgba(240,165,0,0.18)' : 'var(--accent-light)',
+                    color: plan.popular ? 'var(--accent)' : 'var(--accent-deep)',
                   }}>
                     {plan.tag}
                   </div>
@@ -1377,7 +1274,7 @@ export default function LandingPageMaster({
                 <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {plan.items.map((item, ii) => (
                     <li key={ii} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13.5, color: plan.popular ? 'rgba(255,255,255,0.8)' : 'var(--ink-soft)' }}>
-                      <Check size={14} style={{ color: plan.popular ? 'var(--accent)' : 'var(--brand)', flexShrink: 0, marginTop: 2 }} />
+                      <Check size={14} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: 2 }} />
                       {item}
                     </li>
                   ))}
@@ -1404,7 +1301,7 @@ export default function LandingPageMaster({
         <div className="qr-dot-bg-light absolute inset-0 pointer-events-none opacity-20" aria-hidden="true" />
 
         <div className="namo-wrap relative">
-          
+
           {/* Section Header */}
           <div className="text-center mb-16 reveal">
             <h2 className="display-title text-4xl sm:text-5xl lg:text-6xl text-white mb-4">
@@ -1444,7 +1341,7 @@ export default function LandingPageMaster({
 
           {/* Distributor Packages / Tiers */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-stretch mb-12 text-left">
-            
+
             {/* Tier 1: Retail Starter Kit */}
             <div className="reveal delay-1 p-8 rounded-3xl bg-white text-gray-900 shadow-2xl flex flex-col justify-between border border-gray-100">
               <div>
@@ -1453,7 +1350,7 @@ export default function LandingPageMaster({
                 </span>
                 <div className="text-2xl font-black text-gray-900 mt-4 mb-2">Retail Partner</div>
                 <p className="text-xs text-gray-600 mb-6">Ideal for car accessory shops, helmet stores, society gates &amp; local retailers.</p>
-                
+
                 <div className="text-3xl font-black text-gray-900 mb-6">
                   ₹4,999 <span className="text-xs font-normal text-gray-500">/ 50 Stickers Kit</span>
                 </div>
@@ -1472,9 +1369,9 @@ export default function LandingPageMaster({
             </div>
 
             {/* Tier 2: Exclusive City Distributor */}
-            <div className="reveal delay-2 p-8 rounded-3xl bg-gradient-to-br from-amber-500 to-orange-600 text-gray-950 shadow-2xl flex flex-col justify-between relative overflow-hidden">
+            <div className="reveal delay-2 p-8 rounded-3xl bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-400 text-gray-950 shadow-2xl flex flex-col justify-between relative overflow-hidden">
               <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-              
+
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <span className="px-3 py-1 rounded-full text-xs font-black bg-gray-950 text-white uppercase tracking-wider">
@@ -1484,10 +1381,10 @@ export default function LandingPageMaster({
                     High Income
                   </span>
                 </div>
-                
+
                 <div className="text-2xl font-black text-gray-950 mb-2">City Master Distributor</div>
                 <p className="text-xs text-gray-900/80 mb-6 font-medium">Exclusive supply rights for your entire city or district.</p>
-                
+
                 <div className="text-3xl font-black text-gray-950 mb-6">
                   ₹24,999 <span className="text-xs font-normal text-gray-900/70">/ 300 Stickers + Exclusive Lock</span>
                 </div>
@@ -1695,7 +1592,7 @@ export default function LandingPageMaster({
                 <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)' }}>{quickView.name}</h3>
                 <div style={{ fontSize: 10, color: 'var(--ink-faint)', textDecoration: 'line-through' }}>₹{quickView.mrp}</div>
               </div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--brand)', marginBottom: 12 }}>₹{quickView.price}</div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--accent)', marginBottom: 12 }}>₹{quickView.price}</div>
               <p style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginBottom: 20, lineHeight: 1.65 }}>{quickView.desc}</p>
               <button onClick={() => { addToCart(quickView); setQuickView(null); }} className="btn-brand" style={{ width: '100%', justifyContent: 'center' }}>
                 Add to Cart <ArrowRight size={14} />
@@ -1710,7 +1607,7 @@ export default function LandingPageMaster({
         <div className="cart-panel" onClick={e => e.stopPropagation()}>
           <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <ShoppingBag size={18} style={{ color: 'var(--brand)' }} />
+              <ShoppingBag size={18} style={{ color: 'var(--accent)' }} />
               <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--ink)' }}>Your Cart ({cartItemCount})</span>
             </div>
             <button onClick={() => setIsCartOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }} aria-label="Close cart">
@@ -1731,7 +1628,7 @@ export default function LandingPageMaster({
                     <img src={item.product.img} alt={item.product.name} style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.product.name}</div>
-                      <div style={{ fontSize: 13, color: 'var(--brand)', fontWeight: 700 }}>₹{item.product.price}</div>
+                      <div style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 700 }}>₹{item.product.price}</div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                       <button onClick={() => updateQty(item.product.id, -1)} style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--paper-white)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Decrease qty">
@@ -1752,7 +1649,7 @@ export default function LandingPageMaster({
             <div style={{ padding: '16px 24px 24px', borderTop: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14, fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>
                 <span>Subtotal</span>
-                <span style={{ color: 'var(--brand)' }}>₹{cartSubtotal}</span>
+                <span style={{ color: 'var(--accent)' }}>₹{cartSubtotal}</span>
               </div>
               <button onClick={onStart} className="btn-cta" style={{ width: '100%', justifyContent: 'center' }}>
                 Checkout <ArrowRight size={14} />

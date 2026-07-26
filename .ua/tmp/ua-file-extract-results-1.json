@@ -1,0 +1,2166 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 6,
+  "filesSkipped": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 6,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 6,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "src/components/ClientDashboard.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 815,
+      "nonEmptyLines": 754,
+      "functions": [
+        {
+          "name": "ClientDashboard",
+          "startLine": 35,
+          "endLine": 815,
+          "params": [
+            "{ onBack, switchToAdminFleet }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "ClientDashboard",
+          "line": 35,
+          "isDefault": true
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ClientDashboard",
+          "callee": "useAuth",
+          "lineNumber": 36
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useState",
+          "lineNumber": 37
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useState",
+          "lineNumber": 40
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "localStorage.getItem",
+          "lineNumber": 41
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "JSON.parse",
+          "lineNumber": 42
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "new Date().toISOString",
+          "lineNumber": 54
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "new Date().toISOString",
+          "lineNumber": 68
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useState",
+          "lineNumber": 78
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "localStorage.getItem",
+          "lineNumber": 79
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "JSON.parse",
+          "lineNumber": 80
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "new Date(Date.now() - 1000 * 60 * 25).toISOString",
+          "lineNumber": 91
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "Date.now",
+          "lineNumber": 91
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useState",
+          "lineNumber": 97
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "localStorage.getItem",
+          "lineNumber": 98
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "JSON.parse",
+          "lineNumber": 99
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "new Date().toISOString",
+          "lineNumber": 107
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useState",
+          "lineNumber": 113
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useState",
+          "lineNumber": 114
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useState",
+          "lineNumber": 115
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useState",
+          "lineNumber": 116
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useState",
+          "lineNumber": 117
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useState",
+          "lineNumber": 118
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useState",
+          "lineNumber": 119
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useState",
+          "lineNumber": 120
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useState",
+          "lineNumber": 123
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useState",
+          "lineNumber": 124
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useState",
+          "lineNumber": 125
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useEffect",
+          "lineNumber": 127
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "localStorage.setItem",
+          "lineNumber": 128
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "JSON.stringify",
+          "lineNumber": 128
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useEffect",
+          "lineNumber": 131
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "localStorage.setItem",
+          "lineNumber": 132
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "JSON.stringify",
+          "lineNumber": 132
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useEffect",
+          "lineNumber": 135
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "localStorage.setItem",
+          "lineNumber": 136
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "JSON.stringify",
+          "lineNumber": 136
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "useEffect",
+          "lineNumber": 139
+        },
+        {
+          "caller": "handleUpdate",
+          "callee": "localStorage.getItem",
+          "lineNumber": 141
+        },
+        {
+          "caller": "handleUpdate",
+          "callee": "setPendingActivations",
+          "lineNumber": 142
+        },
+        {
+          "caller": "handleUpdate",
+          "callee": "JSON.parse",
+          "lineNumber": 142
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "window.addEventListener",
+          "lineNumber": 144
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "window.removeEventListener",
+          "lineNumber": 145
+        },
+        {
+          "caller": "showToast",
+          "callee": "setToast",
+          "lineNumber": 149
+        },
+        {
+          "caller": "showToast",
+          "callee": "setTimeout",
+          "lineNumber": 150
+        },
+        {
+          "caller": "showToast",
+          "callee": "setToast",
+          "lineNumber": 150
+        },
+        {
+          "caller": "handleCopyLink",
+          "callee": "navigator.clipboard.writeText",
+          "lineNumber": 155
+        },
+        {
+          "caller": "handleCopyLink",
+          "callee": "setCopiedId",
+          "lineNumber": 156
+        },
+        {
+          "caller": "handleCopyLink",
+          "callee": "showToast",
+          "lineNumber": 157
+        },
+        {
+          "caller": "handleCopyLink",
+          "callee": "setTimeout",
+          "lineNumber": 158
+        },
+        {
+          "caller": "handleCopyLink",
+          "callee": "setCopiedId",
+          "lineNumber": 158
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "e.preventDefault",
+          "lineNumber": 162
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "setActivationError",
+          "lineNumber": 163
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "newQrId.trim().toUpperCase",
+          "lineNumber": 165
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "newQrId.trim",
+          "lineNumber": 165
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "newActivationCode.trim().toUpperCase",
+          "lineNumber": 166
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "newActivationCode.trim",
+          "lineNumber": 166
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "pendingActivations.find",
+          "lineNumber": 169
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "p.id.toUpperCase",
+          "lineNumber": 169
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "JSON.parse",
+          "lineNumber": 170
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "localStorage.getItem",
+          "lineNumber": 170
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "globalQrList.find",
+          "lineNumber": 171
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "q.id.toUpperCase",
+          "lineNumber": 171
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "cleanId.replace",
+          "lineNumber": 173
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "expectedCode.toUpperCase",
+          "lineNumber": 176
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "cleanCode.startsWith",
+          "lineNumber": 176
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "setActivationError",
+          "lineNumber": 177
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "setActivationError",
+          "lineNumber": 182
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "newName.trim",
+          "lineNumber": 188
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "newRegNumber.trim",
+          "lineNumber": 190
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "newOwnerPhone.trim",
+          "lineNumber": 191
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "newSecondaryPhone.trim",
+          "lineNumber": 192
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "newRoadsidePhone.trim",
+          "lineNumber": 193
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "new Date().toISOString",
+          "lineNumber": 196
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "setMyStickers",
+          "lineNumber": 204
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "pendingActivations.filter",
+          "lineNumber": 207
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "p.id.toUpperCase",
+          "lineNumber": 207
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "setPendingActivations",
+          "lineNumber": 208
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "globalQrList.map",
+          "lineNumber": 211
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "q.id.toUpperCase",
+          "lineNumber": 212
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "updatedGlobal.some",
+          "lineNumber": 225
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "q.id.toUpperCase",
+          "lineNumber": 225
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "updatedGlobal.unshift",
+          "lineNumber": 226
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "localStorage.setItem",
+          "lineNumber": 228
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "JSON.stringify",
+          "lineNumber": 228
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "setNewQrId",
+          "lineNumber": 230
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "setNewActivationCode",
+          "lineNumber": 231
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "setNewName",
+          "lineNumber": 232
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "setNewRegNumber",
+          "lineNumber": 233
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "setNewOwnerPhone",
+          "lineNumber": 234
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "setNewSecondaryPhone",
+          "lineNumber": 235
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "setNewRoadsidePhone",
+          "lineNumber": 236
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "setActivationError",
+          "lineNumber": 237
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "setActiveTab",
+          "lineNumber": 238
+        },
+        {
+          "caller": "handleRegisterSticker",
+          "callee": "showToast",
+          "lineNumber": 239
+        },
+        {
+          "caller": "handleToggleAlertStatus",
+          "callee": "setAlerts",
+          "lineNumber": 243
+        },
+        {
+          "caller": "handleToggleAlertStatus",
+          "callee": "prev.map",
+          "lineNumber": 244
+        },
+        {
+          "caller": "handleToggleAlertStatus",
+          "callee": "showToast",
+          "lineNumber": 252
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "alerts.filter",
+          "lineNumber": 255
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "profile.fullName.charAt(0).toUpperCase",
+          "lineNumber": 283
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "profile.fullName.charAt",
+          "lineNumber": 283
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "pendingActivations.map",
+          "lineNumber": 324
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setNewQrId",
+          "lineNumber": 339
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setNewActivationCode",
+          "lineNumber": 340
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setNewName",
+          "lineNumber": 341
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setActiveTab",
+          "lineNumber": 342
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "showToast",
+          "lineNumber": 343
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setActiveTab",
+          "lineNumber": 374
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setActiveTab",
+          "lineNumber": 385
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setActiveTab",
+          "lineNumber": 396
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setActiveTab",
+          "lineNumber": 412
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setActiveTab",
+          "lineNumber": 423
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setActiveTab",
+          "lineNumber": 445
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "myStickers.map",
+          "lineNumber": 453
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "handleCopyLink",
+          "lineNumber": 491
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "window.open",
+          "lineNumber": 498
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "alerts.map",
+          "lineNumber": 527
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "alert.type.replace",
+          "lineNumber": 544
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "new Date(alert.createdAt).toLocaleString",
+          "lineNumber": 549
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "handleToggleAlertStatus",
+          "lineNumber": 572
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "alert.status.toUpperCase",
+          "lineNumber": 581
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setNewCategory",
+          "lineNumber": 609
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setNewQrId",
+          "lineNumber": 628
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setNewActivationCode",
+          "lineNumber": 647
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setActivationError",
+          "lineNumber": 647
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setNewName",
+          "lineNumber": 674
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setNewRegNumber",
+          "lineNumber": 686
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setNewOwnerPhone",
+          "lineNumber": 704
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setNewSecondaryPhone",
+          "lineNumber": 716
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setNewRoadsidePhone",
+          "lineNumber": 727
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setBloodGroup",
+          "lineNumber": 763
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'].map",
+          "lineNumber": 766
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setSosPhone",
+          "lineNumber": 777
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "setAllergies",
+          "lineNumber": 787
+        },
+        {
+          "caller": "ClientDashboard",
+          "callee": "showToast",
+          "lineNumber": 795
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/components/auth/AdminAuthModal.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 136,
+      "nonEmptyLines": 123,
+      "functions": [
+        {
+          "name": "AdminAuthModal",
+          "startLine": 11,
+          "endLine": 136,
+          "params": [
+            "{ isOpen, onClose, onSuccess }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "AdminAuthModal",
+          "line": 11,
+          "isDefault": true
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "AdminAuthModal",
+          "callee": "useAuth",
+          "lineNumber": 12
+        },
+        {
+          "caller": "AdminAuthModal",
+          "callee": "useState",
+          "lineNumber": 13
+        },
+        {
+          "caller": "AdminAuthModal",
+          "callee": "useState",
+          "lineNumber": 14
+        },
+        {
+          "caller": "AdminAuthModal",
+          "callee": "useState",
+          "lineNumber": 15
+        },
+        {
+          "caller": "AdminAuthModal",
+          "callee": "useState",
+          "lineNumber": 16
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "e.preventDefault",
+          "lineNumber": 21
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "setErrorMsg",
+          "lineNumber": 22
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "setLoading",
+          "lineNumber": 23
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "adminSignIn",
+          "lineNumber": 26
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "setErrorMsg",
+          "lineNumber": 28
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "onSuccess",
+          "lineNumber": 30
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "onClose",
+          "lineNumber": 31
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "setLoading",
+          "lineNumber": 34
+        },
+        {
+          "caller": "handleAdminDemo",
+          "callee": "adminDemoLogin",
+          "lineNumber": 39
+        },
+        {
+          "caller": "handleAdminDemo",
+          "callee": "onSuccess",
+          "lineNumber": 40
+        },
+        {
+          "caller": "handleAdminDemo",
+          "callee": "onClose",
+          "lineNumber": 41
+        },
+        {
+          "caller": "AdminAuthModal",
+          "callee": "e.stopPropagation",
+          "lineNumber": 48
+        },
+        {
+          "caller": "AdminAuthModal",
+          "callee": "setEmail",
+          "lineNumber": 86
+        },
+        {
+          "caller": "AdminAuthModal",
+          "callee": "setPassword",
+          "lineNumber": 101
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/components/landing/LandingPageMaster.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1887,
+      "nonEmptyLines": 1733,
+      "functions": [
+        {
+          "name": "AnimatedCounter",
+          "startLine": 19,
+          "endLine": 63,
+          "params": [
+            "{ end, prefix = '', suffix = '', duration = 1800 }"
+          ]
+        },
+        {
+          "name": "RealQRCode",
+          "startLine": 67,
+          "endLine": 112,
+          "params": [
+            "{ size = 120, className = \"\" }"
+          ]
+        },
+        {
+          "name": "LandingPageMaster",
+          "startLine": 371,
+          "endLine": 1887,
+          "params": [
+            "{\n  onStart,\n  onLogin,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "LandingPageMaster",
+          "line": 371,
+          "isDefault": true
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "AnimatedCounter",
+          "callee": "useState",
+          "lineNumber": 20
+        },
+        {
+          "caller": "AnimatedCounter",
+          "callee": "useState",
+          "lineNumber": 21
+        },
+        {
+          "caller": "AnimatedCounter",
+          "callee": "useRef",
+          "lineNumber": 22
+        },
+        {
+          "caller": "AnimatedCounter",
+          "callee": "useEffect",
+          "lineNumber": 24
+        },
+        {
+          "caller": "AnimatedCounter",
+          "callee": "setHasStarted",
+          "lineNumber": 28
+        },
+        {
+          "caller": "AnimatedCounter",
+          "callee": "observer.observe",
+          "lineNumber": 34
+        },
+        {
+          "caller": "AnimatedCounter",
+          "callee": "observer.disconnect",
+          "lineNumber": 35
+        },
+        {
+          "caller": "AnimatedCounter",
+          "callee": "useEffect",
+          "lineNumber": 38
+        },
+        {
+          "caller": "step",
+          "callee": "Math.min",
+          "lineNumber": 44
+        },
+        {
+          "caller": "step",
+          "callee": "Math.pow",
+          "lineNumber": 45
+        },
+        {
+          "caller": "step",
+          "callee": "setCount",
+          "lineNumber": 46
+        },
+        {
+          "caller": "step",
+          "callee": "Math.floor",
+          "lineNumber": 46
+        },
+        {
+          "caller": "step",
+          "callee": "requestAnimationFrame",
+          "lineNumber": 49
+        },
+        {
+          "caller": "AnimatedCounter",
+          "callee": "requestAnimationFrame",
+          "lineNumber": 53
+        },
+        {
+          "caller": "AnimatedCounter",
+          "callee": "count.toLocaleString",
+          "lineNumber": 59
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useAuth",
+          "lineNumber": 378
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useState",
+          "lineNumber": 379
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useState",
+          "lineNumber": 380
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useState",
+          "lineNumber": 381
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useState",
+          "lineNumber": 382
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useState",
+          "lineNumber": 383
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useState",
+          "lineNumber": 384
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useState",
+          "lineNumber": 385
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useState",
+          "lineNumber": 386
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useState",
+          "lineNumber": 387
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useState",
+          "lineNumber": 388
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useState",
+          "lineNumber": 389
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useState",
+          "lineNumber": 390
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useState",
+          "lineNumber": 391
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useState",
+          "lineNumber": 392
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "PRODUCTS.filter",
+          "lineNumber": 396
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "cart.reduce",
+          "lineNumber": 398
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "cart.reduce",
+          "lineNumber": 399
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useCallback",
+          "lineNumber": 401
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setCart",
+          "lineNumber": 402
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "prev.find",
+          "lineNumber": 403
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "prev.map",
+          "lineNumber": 404
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setIsCartOpen",
+          "lineNumber": 407
+        },
+        {
+          "caller": "updateQty",
+          "callee": "setCart",
+          "lineNumber": 413
+        },
+        {
+          "caller": "updateQty",
+          "callee": "prev.map(i => i.product.id === id ? { ...i, qty: i.qty + delta } : i)\n          .filter",
+          "lineNumber": 414
+        },
+        {
+          "caller": "updateQty",
+          "callee": "prev.map",
+          "lineNumber": 414
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useEffect",
+          "lineNumber": 420
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "entries.forEach",
+          "lineNumber": 422
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "e.target.classList.add",
+          "lineNumber": 422
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "document.querySelectorAll('.reveal').forEach",
+          "lineNumber": 424
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "document.querySelectorAll",
+          "lineNumber": 424
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "obs.observe",
+          "lineNumber": 424
+        },
+        {
+          "caller": "onScroll",
+          "callee": "setIsScrolled",
+          "lineNumber": 425
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "window.addEventListener",
+          "lineNumber": 426
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "obs.disconnect",
+          "lineNumber": 427
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "window.removeEventListener",
+          "lineNumber": 427
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "useEffect",
+          "lineNumber": 431
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setTimeout",
+          "lineNumber": 432
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setDemoStep",
+          "lineNumber": 432
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "clearTimeout",
+          "lineNumber": 433
+        },
+        {
+          "caller": "handleDemoAction",
+          "callee": "setDemoAlert",
+          "lineNumber": 437
+        },
+        {
+          "caller": "handleDemoAction",
+          "callee": "setDemoAlert",
+          "lineNumber": 438
+        },
+        {
+          "caller": "handleDemoAction",
+          "callee": "setDemoAlert",
+          "lineNumber": 439
+        },
+        {
+          "caller": "handleDemoAction",
+          "callee": "setDemoStep",
+          "lineNumber": 440
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "window.scrollTo",
+          "lineNumber": 452
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setIsProfileOpen",
+          "lineNumber": 473
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "profile?.fullName?.charAt(0)?.toUpperCase",
+          "lineNumber": 477
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "profile?.fullName?.charAt",
+          "lineNumber": 477
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setIsProfileOpen",
+          "lineNumber": 481
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setIsProfileOpen",
+          "lineNumber": 491
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "onStart",
+          "lineNumber": 491
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setIsProfileOpen",
+          "lineNumber": 499
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "signOut",
+          "lineNumber": 499
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setIsCartOpen",
+          "lineNumber": 515
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setMobileMenuOpen",
+          "lineNumber": 525
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setMobileMenuOpen",
+          "lineNumber": 536
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setMobileMenuOpen",
+          "lineNumber": 537
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setMobileMenuOpen",
+          "lineNumber": 538
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setMobileMenuOpen",
+          "lineNumber": 539
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "profile?.fullName?.charAt(0)?.toUpperCase",
+          "lineNumber": 547
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "profile?.fullName?.charAt",
+          "lineNumber": 547
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setMobileMenuOpen",
+          "lineNumber": 555
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "onStart",
+          "lineNumber": 555
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setMobileMenuOpen",
+          "lineNumber": 561
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "signOut",
+          "lineNumber": 561
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setMobileMenuOpen",
+          "lineNumber": 569
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "onStart",
+          "lineNumber": 569
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "['RM', 'PS', 'KR', 'AM'].map",
+          "lineNumber": 618
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "[\n                  'Number visible to every stranger',\n                  'Anyone calls, any time, for any reason',\n                  'Zero record of who or why',\n                  'Sticker gone? Start from scratch.',\n                ].map",
+          "lineNumber": 804
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "[\n                  'Your number is never shown or stored',\n                  'All calls routed through encrypted proxy',\n                  'Full scan & alert log on your dashboard',\n                  'Lost sticker? Reprint instantly. Same ID.',\n                ].map",
+          "lineNumber": 826
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "[\n              { title: 'Order your sticker', body: 'Pick a type — vehicle, gate, bag, keychain. Ships in 2–3 days.' },\n              { title: 'Stick it on', body: 'Weatherproof 3M adhesive. Rated 3+ years outdoors.' },\n              { title: 'Anyone scans — no app', body: 'Camera → secure page. Nothing to install.' },\n              { title: 'They reach you', body: 'Call, message, GPS, or alert. Your number? Never visible.' },\n              { title: 'You get pinged instantly', body: 'Push + SMS + WhatsApp. Resolve in one tap.' },\n            ].map",
+          "lineNumber": 856
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "CATEGORIES.map",
+          "lineNumber": 890
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setActiveCat",
+          "lineNumber": 895
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "CATEGORIES.map",
+          "lineNumber": 907
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "cat.lines.map",
+          "lineNumber": 914
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "FEATURES.map",
+          "lineNumber": 959
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setDemoStep",
+          "lineNumber": 1010
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setDemoStep",
+          "lineNumber": 1013
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setDemoStep",
+          "lineNumber": 1016
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setDemoStep",
+          "lineNumber": 1023
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setDemoStep",
+          "lineNumber": 1031
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "handleDemoAction",
+          "lineNumber": 1048
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setDemoStep",
+          "lineNumber": 1056
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "handleDemoAction",
+          "lineNumber": 1074
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setDemoStep",
+          "lineNumber": 1082
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "['Accident / Collision', 'Medical Emergency', 'Fire / Gas Leak', 'Wrong Parking'].map",
+          "lineNumber": 1087
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "handleDemoAction",
+          "lineNumber": 1090
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "DEMO_STEPS.map",
+          "lineNumber": 1114
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setDemoStep",
+          "lineNumber": 1117
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setDemoAlert",
+          "lineNumber": 1117
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setDemoStep",
+          "lineNumber": 1147
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setDemoStep",
+          "lineNumber": 1156
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setDemoAlert",
+          "lineNumber": 1156
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "(['All', 'Vehicle', 'Home', 'Family', 'Travel'] as const).map",
+          "lineNumber": 1182
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setActiveCategory",
+          "lineNumber": 1183
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "filteredProducts.map",
+          "lineNumber": 1191
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setQuickView",
+          "lineNumber": 1209
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "product.reviewsCount.toLocaleString",
+          "lineNumber": 1229
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "product.features.map",
+          "lineNumber": 1238
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "addToCart",
+          "lineNumber": 1257
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "[\n              {\n                icon: Eye,\n                title: 'Anonymous by default',\n                body: 'Scanners see nothing about you unless you enable it.',\n              },\n              {\n                icon: Lock,\n                title: 'Encrypted at rest',\n                body: 'Contacts, alerts, medical info — encrypted in storage.',\n              },\n              {\n                icon: ShieldCheck,\n                title: 'Access-controlled',\n                body: 'Medical info shows only on tags you configure for it.',\n              },\n              {\n                icon: Users,\n                title: 'Opt-in only',\n                body: 'No data is ever shown without your explicit choice.',\n              },\n            ].map",
+          "lineNumber": 1280
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "COMBOS.map",
+          "lineNumber": 1334
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "plan.items.map",
+          "lineNumber": 1378
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "[\n              {\n                title: '50%+ Profit Margins',\n                desc: 'High retail markup per sticker. Earn healthy profits from day one with bulk wholesale pricing.',\n              },\n              {\n                title: 'Free POS Counter Display',\n                desc: 'Includes attractive acrylic counter stands, promotional posters, and QR scan demos for your shop.',\n              },\n              {\n                title: 'Partner Admin Portal',\n                desc: 'Manage inventory, assign tags to customers in 5 seconds, and track reseller commissions live.',\n              },\n              {\n                title: 'Territory Lock Rights',\n                desc: 'Exclusive city/district dealership rights available for qualified regional distributors.',\n              },\n            ].map",
+          "lineNumber": 1420
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setIsPartnerModalOpen",
+          "lineNumber": 1469
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setIsPartnerModalOpen",
+          "lineNumber": 1503
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "TESTIMONIALS.map",
+          "lineNumber": 1533
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "'★'.repeat",
+          "lineNumber": 1535
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "FAQ_ITEMS.map",
+          "lineNumber": 1571
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setOpenFaq",
+          "lineNumber": 1575
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "[\n              {\n                title: 'Product', links: ['How It Works', 'Vehicle Tags', 'Home Gate Tags', 'Family Tags', 'Luggage Tags'],\n              },\n              {\n                title: 'Company', links: ['About', 'Privacy Policy', 'Terms of Service', 'Refund Policy', 'Contact'],\n              },\n              {\n                title: 'Support', links: ['Help Centre', 'FAQ', 'Track Your Order', 'Replace a Sticker', 'Enterprise / Fleet'],\n              },\n            ].map",
+          "lineNumber": 1636
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "col.links.map",
+          "lineNumber": 1652
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setQuickView",
+          "lineNumber": 1679
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "e.stopPropagation",
+          "lineNumber": 1683
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setQuickView",
+          "lineNumber": 1687
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "addToCart",
+          "lineNumber": 1700
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setQuickView",
+          "lineNumber": 1700
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setIsCartOpen",
+          "lineNumber": 1709
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "e.stopPropagation",
+          "lineNumber": 1710
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setIsCartOpen",
+          "lineNumber": 1716
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "cart.map",
+          "lineNumber": 1729
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "updateQty",
+          "lineNumber": 1737
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "updateQty",
+          "lineNumber": 1741
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setIsPartnerModalOpen",
+          "lineNumber": 1773
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setPartnerSubmitted",
+          "lineNumber": 1773
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "e.preventDefault",
+          "lineNumber": 1791
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setPartnerSubmitted",
+          "lineNumber": 1791
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setPartnerForm",
+          "lineNumber": 1799
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setPartnerForm",
+          "lineNumber": 1812
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setPartnerForm",
+          "lineNumber": 1823
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setPartnerForm",
+          "lineNumber": 1833
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setPartnerForm",
+          "lineNumber": 1848
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setIsPartnerModalOpen",
+          "lineNumber": 1874
+        },
+        {
+          "caller": "LandingPageMaster",
+          "callee": "setPartnerSubmitted",
+          "lineNumber": 1874
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 1,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/context/AuthContext.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 282,
+      "nonEmptyLines": 248,
+      "functions": [
+        {
+          "name": "AuthProvider",
+          "startLine": 24,
+          "endLine": 274,
+          "params": [
+            "{ children }"
+          ]
+        },
+        {
+          "name": "useAuth",
+          "startLine": 276,
+          "endLine": 282,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "AuthProvider",
+          "line": 24,
+          "isDefault": false
+        },
+        {
+          "name": "useAuth",
+          "line": 276,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "AuthProvider",
+          "callee": "useState",
+          "lineNumber": 25
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "useState",
+          "lineNumber": 26
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "useState",
+          "lineNumber": 27
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "localStorage.getItem",
+          "lineNumber": 28
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "JSON.parse",
+          "lineNumber": 29
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "useState",
+          "lineNumber": 31
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "useEffect",
+          "lineNumber": 33
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "setLoading",
+          "lineNumber": 35
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "supabase.auth.getSession().then",
+          "lineNumber": 40
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "supabase.auth.getSession",
+          "lineNumber": 40
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "setSession",
+          "lineNumber": 41
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "setUser",
+          "lineNumber": 42
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "getUserProfile(initSession.user.id, initSession.user.email || '').then",
+          "lineNumber": 44
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "getUserProfile",
+          "lineNumber": 44
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "setProfile",
+          "lineNumber": 45
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "localStorage.setItem",
+          "lineNumber": 46
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "JSON.stringify",
+          "lineNumber": 46
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "setLoading",
+          "lineNumber": 49
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "supabase.auth.onAuthStateChange",
+          "lineNumber": 53
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "setSession",
+          "lineNumber": 54
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "setUser",
+          "lineNumber": 55
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "getUserProfile",
+          "lineNumber": 59
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "setProfile",
+          "lineNumber": 60
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "localStorage.setItem",
+          "lineNumber": 61
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "JSON.stringify",
+          "lineNumber": 61
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "setProfile",
+          "lineNumber": 64
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "localStorage.removeItem",
+          "lineNumber": 65
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "setLoading",
+          "lineNumber": 68
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "subscription.unsubscribe",
+          "lineNumber": 72
+        },
+        {
+          "caller": "signUp",
+          "callee": "Date.now",
+          "lineNumber": 81
+        },
+        {
+          "caller": "signUp",
+          "callee": "setProfile",
+          "lineNumber": 87
+        },
+        {
+          "caller": "signUp",
+          "callee": "localStorage.setItem",
+          "lineNumber": 88
+        },
+        {
+          "caller": "signUp",
+          "callee": "JSON.stringify",
+          "lineNumber": 88
+        },
+        {
+          "caller": "signUp",
+          "callee": "supabase.auth.signUp",
+          "lineNumber": 92
+        },
+        {
+          "caller": "signUp",
+          "callee": "getUserProfile",
+          "lineNumber": 106
+        },
+        {
+          "caller": "signUp",
+          "callee": "setProfile",
+          "lineNumber": 107
+        },
+        {
+          "caller": "signIn",
+          "callee": "email.toLowerCase",
+          "lineNumber": 120
+        },
+        {
+          "caller": "signIn",
+          "callee": "ADMIN_EMAIL.toLowerCase",
+          "lineNumber": 120
+        },
+        {
+          "caller": "signIn",
+          "callee": "email.split",
+          "lineNumber": 124
+        },
+        {
+          "caller": "signIn",
+          "callee": "setProfile",
+          "lineNumber": 128
+        },
+        {
+          "caller": "signIn",
+          "callee": "localStorage.setItem",
+          "lineNumber": 129
+        },
+        {
+          "caller": "signIn",
+          "callee": "JSON.stringify",
+          "lineNumber": 129
+        },
+        {
+          "caller": "signIn",
+          "callee": "supabase.auth.signInWithPassword",
+          "lineNumber": 133
+        },
+        {
+          "caller": "signIn",
+          "callee": "getUserProfile",
+          "lineNumber": 141
+        },
+        {
+          "caller": "signIn",
+          "callee": "setProfile",
+          "lineNumber": 142
+        },
+        {
+          "caller": "adminSignIn",
+          "callee": "email.includes",
+          "lineNumber": 155
+        },
+        {
+          "caller": "adminSignIn",
+          "callee": "setProfile",
+          "lineNumber": 171
+        },
+        {
+          "caller": "adminSignIn",
+          "callee": "localStorage.setItem",
+          "lineNumber": 172
+        },
+        {
+          "caller": "adminSignIn",
+          "callee": "JSON.stringify",
+          "lineNumber": 172
+        },
+        {
+          "caller": "adminSignIn",
+          "callee": "supabase.auth.signInWithPassword",
+          "lineNumber": 176
+        },
+        {
+          "caller": "adminSignIn",
+          "callee": "getUserProfile",
+          "lineNumber": 184
+        },
+        {
+          "caller": "adminSignIn",
+          "callee": "email.toLowerCase",
+          "lineNumber": 185
+        },
+        {
+          "caller": "adminSignIn",
+          "callee": "ADMIN_EMAIL.toLowerCase",
+          "lineNumber": 185
+        },
+        {
+          "caller": "adminSignIn",
+          "callee": "setProfile",
+          "lineNumber": 188
+        },
+        {
+          "caller": "signOut",
+          "callee": "supabase.auth.signOut",
+          "lineNumber": 199
+        },
+        {
+          "caller": "signOut",
+          "callee": "setSession",
+          "lineNumber": 201
+        },
+        {
+          "caller": "signOut",
+          "callee": "setUser",
+          "lineNumber": 202
+        },
+        {
+          "caller": "signOut",
+          "callee": "setProfile",
+          "lineNumber": 203
+        },
+        {
+          "caller": "signOut",
+          "callee": "localStorage.removeItem",
+          "lineNumber": 204
+        },
+        {
+          "caller": "resetPassword",
+          "callee": "supabase.auth.resetPasswordForEmail",
+          "lineNumber": 213
+        },
+        {
+          "caller": "demoLogin",
+          "callee": "Date.now",
+          "lineNumber": 226
+        },
+        {
+          "caller": "demoLogin",
+          "callee": "setProfile",
+          "lineNumber": 233
+        },
+        {
+          "caller": "demoLogin",
+          "callee": "localStorage.setItem",
+          "lineNumber": 234
+        },
+        {
+          "caller": "demoLogin",
+          "callee": "JSON.stringify",
+          "lineNumber": 234
+        },
+        {
+          "caller": "adminDemoLogin",
+          "callee": "setProfile",
+          "lineNumber": 246
+        },
+        {
+          "caller": "adminDemoLogin",
+          "callee": "localStorage.setItem",
+          "lineNumber": 247
+        },
+        {
+          "caller": "adminDemoLogin",
+          "callee": "JSON.stringify",
+          "lineNumber": 247
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "Boolean",
+          "lineNumber": 250
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "profile?.email.toLowerCase",
+          "lineNumber": 251
+        },
+        {
+          "caller": "AuthProvider",
+          "callee": "ADMIN_EMAIL.toLowerCase",
+          "lineNumber": 251
+        },
+        {
+          "caller": "useAuth",
+          "callee": "useContext",
+          "lineNumber": 277
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 2,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/lib/authService.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 87,
+      "nonEmptyLines": 77,
+      "functions": [
+        {
+          "name": "getUserProfile",
+          "startLine": 20,
+          "endLine": 87,
+          "params": [
+            "userId",
+            "email"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "ADMIN_EMAIL",
+          "line": 13,
+          "isDefault": false
+        },
+        {
+          "name": "getUserProfile",
+          "line": 20,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "getUserProfile",
+          "callee": "email.toLowerCase",
+          "lineNumber": 21
+        },
+        {
+          "caller": "getUserProfile",
+          "callee": "ADMIN_EMAIL.toLowerCase",
+          "lineNumber": 21
+        },
+        {
+          "caller": "getUserProfile",
+          "callee": "email.split",
+          "lineNumber": 28
+        },
+        {
+          "caller": "getUserProfile",
+          "callee": "supabase\n      .from('profiles')\n      .select('id, email, full_name, avatar_url, role, subscription_plan, is_subscribed')\n      .eq('id', userId)\n      .maybeSingle",
+          "lineNumber": 36
+        },
+        {
+          "caller": "getUserProfile",
+          "callee": "supabase\n      .from('profiles')\n      .select('id, email, full_name, avatar_url, role, subscription_plan, is_subscribed')\n      .eq",
+          "lineNumber": 36
+        },
+        {
+          "caller": "getUserProfile",
+          "callee": "supabase\n      .from('profiles')\n      .select",
+          "lineNumber": 36
+        },
+        {
+          "caller": "getUserProfile",
+          "callee": "supabase\n      .from",
+          "lineNumber": 36
+        },
+        {
+          "caller": "getUserProfile",
+          "callee": "email.split",
+          "lineNumber": 48
+        },
+        {
+          "caller": "getUserProfile",
+          "callee": "email.split",
+          "lineNumber": 60
+        },
+        {
+          "caller": "getUserProfile",
+          "callee": "supabase.from('profiles').upsert",
+          "lineNumber": 66
+        },
+        {
+          "caller": "getUserProfile",
+          "callee": "supabase.from",
+          "lineNumber": 66
+        },
+        {
+          "caller": "getUserProfile",
+          "callee": "console.warn",
+          "lineNumber": 77
+        },
+        {
+          "caller": "getUserProfile",
+          "callee": "email.split",
+          "lineNumber": 81
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/lib/supabase.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 17,
+      "nonEmptyLines": 14,
+      "exports": [
+        {
+          "name": "isSupabaseConfigured",
+          "line": 6,
+          "isDefault": false
+        },
+        {
+          "name": "supabase",
+          "line": 12,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    }
+  ]
+}

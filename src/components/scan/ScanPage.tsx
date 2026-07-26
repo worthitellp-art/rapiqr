@@ -3,6 +3,11 @@ import { getQrCodeByIdFromDb } from "../../lib/supabaseService";
 import groupLogo from "../../../assets/Group 1000005716.png";
 import groupLogo1 from "../../../assets/Group 1000005716-1.png";
 import groupLogo2 from "../../../assets/Group 1000005716-2.png";
+import logoForWhBg from "../../../assets/logo for wh bg.png";
+import theftIcon from "../../../assets/therft.png";
+import towIcon from "../../../assets/tow.png";
+import mechanicIcon from "../../../assets/mechanic.png";
+import flatTireIcon from "../../../assets/flat-tire.png";
 import {
   PhoneCall,
   ShieldAlert,
@@ -34,7 +39,8 @@ import {
   Send,
   Bot,
   Disc,
-  Siren
+  Siren,
+  Lightbulb
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -203,19 +209,27 @@ function EmergencySirenGraphic() {
 function IconTowTruck() {
   return (
     <div className="w-11 h-9 relative flex items-center justify-center mb-1">
-      <svg viewBox="0 0 52 38" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-        {/* White Tow Truck Body */}
-        <path d="M 6 24 C 6 22.5 7.2 21.5 8.5 21.5 H 22 V 28 H 6 V 24 Z" fill="white" />
-        <path d="M 22 21.5 H 28.5 L 34 25.5 V 28 H 22 V 21.5 Z" fill="#F8FAFC" />
-        <rect x="23.5" y="23" width="5" height="3.5" rx="1" fill="#FF2929" />
-        {/* Crane Hook Boom Arm */}
-        <path d="M 12 21.5 L 34 9 H 37 L 26 21.5 Z" fill="white" />
-        <path d="M 36 9 V 17 L 39 20 L 37.5 21.5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <svg viewBox="0 0 52 38" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-sm">
+        {/* Flatbed Tow Truck - proper realistic icon */}
+        {/* Cab body */}
+        <path d="M 4 18 L 7 10 C 7.5 8.5 9 8 10.5 8 H 18 V 18 H 4 Z" fill="white" />
+        {/* Windshield */}
+        <path d="M 7 10 L 9.5 8.5 L 10.5 8" stroke="rgba(255,255,255,0.5)" strokeWidth="1" fill="none" />
+        {/* Flatbed / Tray */}
+        <rect x="16" y="10" width="22" height="8" rx="1" fill="white" />
+        {/* Tow Boom Arm */}
+        <path d="M 28 10 L 38 4 L 40 5.5 L 32 12" fill="white" />
+        {/* Tow Hook */}
+        <path d="M 38 4 C 40 2 42 3 41 5 L 40 5.5" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" />
+        {/* Light bar on cab */}
+        <rect x="6" y="7" width="8" height="2" rx="1" fill="#FFD700" opacity="0.9" />
         {/* Wheels */}
-        <circle cx="13" cy="28" r="4" fill="white" stroke="#FF2929" strokeWidth="2" />
-        <circle cx="13" cy="28" r="1.5" fill="#FF2929" />
-        <circle cx="28" cy="28" r="4" fill="white" stroke="#FF2929" strokeWidth="2" />
-        <circle cx="28" cy="28" r="1.5" fill="#FF2929" />
+        <circle cx="12" cy="28" r="5" fill="white" />
+        <circle cx="12" cy="28" r="2.5" fill="rgba(255,255,255,0.3)" />
+        <circle cx="34" cy="28" r="5" fill="white" />
+        <circle cx="34" cy="28" r="2.5" fill="rgba(255,255,255,0.3)" />
+        {/* Ground line */}
+        <line x1="2" y1="34" x2="46" y2="34" stroke="rgba(255,255,255,0.3)" strokeWidth="1" strokeLinecap="round" />
       </svg>
     </div>
   );
@@ -224,10 +238,17 @@ function IconTowTruck() {
 function IconMechanicHand() {
   return (
     <div className="w-10 h-10 relative flex items-center justify-center mb-1">
-      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-        {/* Black Wrench in Hand Graphic */}
-        <path d="M 25 7 C 22.5 5 18.5 5 16.5 7 C 15.2 8.3 14.7 10 15 11.6 L 7.5 19.1 C 6.3 20.3 6.3 22.3 7.5 23.5 C 8.7 24.7 10.7 24.7 11.9 23.5 L 19.4 16 C 21 16.3 22.7 15.8 24 14.5 C 26 12.5 26 9.5 25 7 Z" fill="black" />
-        <path d="M 17 24 C 15.5 22.5 14.5 21.5 16 20 L 24 28 C 25 29 26 29 27 28 C 28 27 28 26 27 25 L 22 20 L 24 18 L 30 24 C 32 26 31 29 28.5 30.5 L 24.5 33 C 22.5 34 19 32 17 30 Z" fill="black" />
+      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-sm">
+        {/* Crossed Wrench & Screwdriver — proper mechanic icon */}
+        {/* Wrench (diagonal) */}
+        <path d="M 8 32 L 24 16 L 26 18 L 10 34 Z" fill="white" />
+        <path d="M 24 16 C 25 15 27 15 28 16 L 30 18 C 31 19 31 21 30 22 L 26 18" fill="white" />
+        <circle cx="28" cy="18" r="2" fill="rgba(255,255,255,0.3)" />
+        {/* Screwdriver (cross diagonal) */}
+        <rect x="13" y="9" width="2.5" height="24" rx="1" fill="white" transform="rotate(-40, 14, 21)" />
+        {/* Handle grip lines */}
+        <line x1="9" y1="27" x2="11" y2="29" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" transform="rotate(-40, 10, 28)" />
+        <line x1="10" y1="28" x2="12" y2="30" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" transform="rotate(-40, 11, 29)" />
       </svg>
     </div>
   );
@@ -236,21 +257,21 @@ function IconMechanicHand() {
 function IconAIFirstAid() {
   return (
     <div className="w-10 h-10 relative flex items-center justify-center mb-1">
-      <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-sm">
         {/* Robot Head */}
-        <line x1="22" y1="3" x2="22" y2="7" stroke="#1D70B8" strokeWidth="2.5" strokeLinecap="round" />
-        <circle cx="22" cy="3" r="2" fill="#1D70B8" />
-        <rect x="11" y="7" width="22" height="15" rx="5" fill="#1D70B8" />
+        <line x1="22" y1="3" x2="22" y2="7" stroke="#1A1A1A" strokeWidth="2.5" strokeLinecap="round" />
+        <circle cx="22" cy="3" r="2" fill="#1A1A1A" />
+        <rect x="11" y="7" width="22" height="15" rx="5" fill="#1A1A1A" />
         <circle cx="17" cy="13" r="2" fill="white" />
         <circle cx="27" cy="13" r="2" fill="white" />
         <path d="M 18 17 C 19.5 19 22.5 19 24 17" stroke="white" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-        <rect x="8" y="11" width="3" height="7" rx="1.5" fill="#1D70B8" />
-        <rect x="33" y="11" width="3" height="7" rx="1.5" fill="#1D70B8" />
+        <rect x="8" y="11" width="3" height="7" rx="1.5" fill="#1A1A1A" />
+        <rect x="33" y="11" width="3" height="7" rx="1.5" fill="#1A1A1A" />
         {/* Medical Case */}
-        <rect x="13" y="24" width="18" height="13" rx="3" fill="#1D70B8" />
-        <path d="M 18 24 V 22 C 18 21 19 20 20 20 H 24 C 25 20 26 21 26 22 V 24" stroke="#1D70B8" strokeWidth="2" fill="none" />
+        <rect x="13" y="24" width="18" height="13" rx="3" fill="#1A1A1A" />
+        <path d="M 18 24 V 22 C 18 21 19 20 20 20 H 24 C 25 20 26 21 26 22 V 24" stroke="#1A1A1A" strokeWidth="2" fill="none" />
         <path d="M 22 27 V 33 M 19 30 H 25" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-        <circle cx="33" cy="27" r="4.5" fill="#1D70B8" />
+        <circle cx="33" cy="27" r="4.5" fill="#1A1A1A" />
         <path d="M 33 25 V 29 M 31 27 H 35" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
     </div>
@@ -273,16 +294,24 @@ function IconNoParking() {
 function IconFlatTire() {
   return (
     <div className="w-10 h-10 relative flex items-center justify-center mb-1">
-      <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-        <path d="M 22 6 C 31 6 38 13 38 22 C 38 29 33 34 27 34 H 17 C 11 34 6 29 6 22 C 6 13 13 6 22 6 Z" fill="black" />
-        <circle cx="22" cy="21" r="9" fill="#5B47B8" stroke="white" strokeWidth="1.5" />
-        <circle cx="22" cy="21" r="3" fill="black" />
-        <line x1="22" y1="12" x2="22" y2="18" stroke="white" strokeWidth="2" />
-        <line x1="22" y1="24" x2="22" y2="30" stroke="white" strokeWidth="2" />
-        <line x1="13" y1="21" x2="19" y2="21" stroke="white" strokeWidth="2" />
-        <line x1="25" y1="21" x2="31" y2="21" stroke="white" strokeWidth="2" />
-        <path d="M 33 6 L 27 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-        <line x1="31" y1="4" x2="35" y2="8" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+      <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-sm">
+        {/* Flat tire — squished/deflated at the bottom */}
+        {/* Outer tire (deflated shape — oval but flat on bottom) */}
+        <path d="M 22 6 C 31 6 38 12 38 20 C 38 27 34 31 28 33 C 26 34 24 34.5 22 34.5 C 20 34.5 18 34 16 33 C 10 31 6 27 6 20 C 6 12 13 6 22 6 Z" fill="white" />
+        {/* Flat/deflated bottom edge — the key visual */}
+        <path d="M 14 32 C 14 32 18 35 22 35 C 26 35 30 32 30 32" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" strokeLinecap="round" />
+        {/* Inner rim */}
+        <circle cx="22" cy="21" r="9" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" />
+        {/* Hub cap */}
+        <circle cx="22" cy="21" r="4" fill="rgba(255,255,255,0.6)" />
+        <circle cx="22" cy="21" r="1.5" fill="white" />
+        {/* Tread marks */}
+        <line x1="13" y1="14" x2="15" y2="16" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="29" y1="14" x2="31" y2="16" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="11" y1="20" x2="13" y2="22" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="31" y1="20" x2="33" y2="22" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" />
+        {/* Warning crack line */}
+        <path d="M 22 14 L 22 25" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2" />
       </svg>
     </div>
   );
@@ -291,15 +320,25 @@ function IconFlatTire() {
 function IconTheftDetected() {
   return (
     <div className="w-11 h-9 relative flex items-center justify-center mb-1">
-      <svg viewBox="0 0 48 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-        <path d="M 6 22 L 9 14 C 10 12.5 11.5 12 13.5 12 H 24.5 C 26.5 12 28 12.5 29 14 L 32 22 H 34 C 35 22 36 23 36 24 V 27 H 4 V 24 C 4 23 5 22 6 22 Z" fill="black" />
-        <circle cx="9" cy="23" r="2" fill="#FEF08A" />
-        <circle cx="29" cy="23" r="2" fill="#FEF08A" />
-        <circle cx="10" cy="27" r="3" fill="black" stroke="#B91C1C" strokeWidth="1.5" />
-        <circle cx="28" cy="28" r="3" fill="black" stroke="#B91C1C" strokeWidth="1.5" />
-        <circle cx="37" cy="15" r="4" fill="black" />
-        <path d="M 33 15 H 41 M 34 16.5 H 40" stroke="white" strokeWidth="1" />
-        <path d="M 30 28 C 30 23 33 21 37 21 C 41 21 44 23 44 28 Z" fill="black" />
+      <svg viewBox="0 0 48 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-sm">
+        {/* Shield with broken lock — proper theft alert icon */}
+        {/* Shield body */}
+        <path d="M 24 4 L 42 11 C 42 24 34 34 24 38 C 14 34 6 24 6 11 Z" fill="white" />
+        {/* Shield inner border */}
+        <path d="M 24 8 L 38 14 C 38 24 31 31 24 34 C 17 31 10 24 10 14 Z" fill="none" stroke="rgba(0,0,0,0.15)" strokeWidth="1.5" />
+        {/* Broken padlock — lower half (body) */}
+        <rect x="16" y="20" width="16" height="12" rx="2" fill="rgba(0,0,0,0.9)" />
+        {/* Keyhole */}
+        <circle cx="24" cy="26" r="2.5" fill="white" />
+        <path d="M 24 26.5 L 24 30" stroke="white" strokeWidth="2" strokeLinecap="round" />
+        {/* Broken shackle — split in two pieces */}
+        <path d="M 18 20 V 16 C 18 12.5 20.5 10 24 10 C 27.5 10 30 12.5 30 16 V 20" fill="none" stroke="rgba(0,0,0,0.9)" strokeWidth="3" strokeLinecap="round" />
+        {/* Break / crack in shackle */}
+        <path d="M 22 14 L 20 16 M 26 14 L 28 16" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+        {/* Alert crack lines on the right side of shield */}
+        <line x1="34" y1="16" x2="37" y2="14" stroke="rgba(232,59,46,0.6)" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="35" y1="20" x2="38" y2="18" stroke="rgba(232,59,46,0.6)" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="34" y1="24" x2="36" y2="22" stroke="rgba(232,59,46,0.6)" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
     </div>
   );
@@ -656,17 +695,17 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
       />
 
       {/* Top RapiQR Brand Header Bar */}
-      <header className="w-full max-w-md mx-auto pt-4 px-4 flex items-center justify-between z-20">
-        <div />
+      <header className="w-full max-w-md mx-auto pt-3 px-4 flex items-center justify-between z-20">
+
       </header>
 
       {/* Main Light Visitor Container */}
-      <main className="flex-1 w-full max-w-md mx-auto px-4 py-4 pb-12 z-10 flex flex-col justify-center items-center">
+      <main className="flex-1 w-full max-w-md mx-auto px-4 py-2 pb-10 z-10 flex flex-col justify-center items-center">
         {/* ============ VALIDATING (Minimalist Boxless Grid) ============ */}
         {phase === "validating" && (
-          <div className="flex flex-col items-center w-full max-w-sm px-2 animate-fade-in space-y-5 text-center">
+          <div className="flex flex-col items-center w-full max-w-sm px-2 animate-fade-in space-y-3 text-center">
             {/* Sleek Minimalist Ring Spinner */}
-            <div className="relative flex items-center justify-center py-2">
+            <div className="relative flex items-center justify-center py-1">
               <div className="w-12 h-12 rounded-full border-2 border-gray-100 border-t-orange-500 animate-spin" />
             </div>
 
@@ -731,9 +770,9 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
         {/* ============ ACTIVATION (Super Clean & Minimal) ============ */}
         {phase === "activation" && qrData && (
           <div className="w-full max-w-sm mx-auto animate-fade-in">
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50 p-6 space-y-5">
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50 p-4 space-y-4">
               {/* Sleek Vehicle Header */}
-              <div className="flex items-center gap-3.5 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-3.5 pb-3 border-b border-gray-100">
                 <div className="w-11 h-11 rounded-2xl bg-[#EAB308] text-white flex items-center justify-center font-bold flex-shrink-0 shadow-md shadow-orange-500/20">
                   <Car size={20} />
                 </div>
@@ -755,7 +794,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
               </div>
 
               {/* Minimal Message Form */}
-              <div className="space-y-3 pt-1">
+              <div className="space-y-2 pt-1">
                 <input
                   type="text"
                   value={visitorName}
@@ -776,7 +815,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
               <button
                 onClick={handleActivation}
                 disabled={activatingQr}
-                className="w-full py-3.5 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-md cursor-pointer disabled:opacity-60"
+                className="w-full py-3 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-md cursor-pointer disabled:opacity-60"
                 style={{ background: activatingQr ? "#6B7280" : "#EAB308" }}
               >
                 {activatingQr ? (
@@ -832,17 +871,17 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
 
         {/* ============ EMERGENCY SCREEN (Redesigned matching requested design mockup) ============ */}
         {phase === "emergency" && qrData && (
-          <div className="w-full max-w-md mx-auto animate-fade-in space-y-2">
-            {/* Top Red Header Banner */}
-            <div className="bg-[#B91C1C] rounded-3xl p-5 text-white shadow-xl relative overflow-hidden">
-              {/* Top Bar: Live & Logo */}
+          <div className="w-full max-w-md mx-auto animate-fade-in space-y-2 pb-6">
+            {/* 1. TOP VEHICLE CARD */}
+            <div className="bg-white rounded-3xl p-3.5 sm:p-4 border border-gray-100 shadow-sm space-y-2">
+              {/* Header Row: Live Badge & Brand Logo */}
               <div className="flex items-center justify-between">
-                <span className="bg-white text-[#B91C1C] font-black text-[9px] px-1.5 py-0.5 rounded flex items-center gap-1 uppercase tracking-wider">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#B91C1C] animate-ping" />
+                <span className="bg-red-50 text-[#D92D20] border border-red-100 font-bold text-[11px] px-2.5 py-1 rounded-full flex items-center gap-1.5 uppercase tracking-wider">
+                  <span className="w-2 h-2 rounded-full bg-[#D92D20] animate-pulse" />
                   LIVE
                 </span>
                 <button onClick={onBack} className="cursor-pointer flex items-center">
-                  <img src={groupLogo} alt="RapiQR Logo" className="h-6 sm:h-7 w-auto object-contain" />
+                  <img src={logoForWhBg} alt="RapiQR Logo" className="h-5 sm:h-6 w-auto object-contain" />
                 </button>
               </div>
 
@@ -854,423 +893,558 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                     "https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=400&q=80"
                   }
                   alt={qrData.vehicleName}
-                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover border-2 border-white/30 shadow-md flex-shrink-0"
+                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border border-gray-100 shadow-xs flex-shrink-0"
                 />
-                <div className="min-w-0 space-y-0">
-                  <h1 className="text-base sm:text-lg font-black text-white truncate tracking-tight">
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-xl sm:text-2xl font-black text-gray-900 truncate tracking-tight">
                     {qrData.vehicleName}
                   </h1>
-                  <p className="text-[11px] sm:text-xs font-bold text-white/90">
-                    Vehicle NO.- {qrData.vehicleNumber}
+                  <p className="text-xs sm:text-sm font-semibold text-gray-600 mt-0.5">
+                    Vehicle No. <span className="text-[#D92D20] font-black">{qrData.vehicleNumber}</span>
                   </p>
+
                 </div>
               </div>
             </div>
 
-            {/* Main Content Area (White Card Container) */}
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-5 space-y-5">
+            {/* ============ MAIN MENU VIEW ============ */}
+            {activeSubMenu === "none" && (
+              <div className="space-y-3 animate-fade-in">
+                {/* 2. EMERGENCY ASSISTANCE RED GRADIENT CARD */}
+                <div className="bg-gradient-to-br from-[#D91C1C] via-[#C01515] to-[#800C0C] rounded-3xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden space-y-3">
+                  {/* Background Concentric Rings Overlay */}
+                  <div className="absolute -right-12 -top-12 w-48 h-48 rounded-full border border-white/10 pointer-events-none" />
+                  <div className="absolute -right-6 -top-6 w-36 h-36 rounded-full border border-white/10 pointer-events-none" />
 
+                  {/* Top Header & Siren Graphic */}
+                  <div className="flex items-start justify-between relative z-10 gap-2">
+                    <div>
+                      <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white mb-2 shadow-xs backdrop-blur-xs">
+                        <AlertTriangle size={22} className="text-white" />
+                      </div>
+                      <h2 className="text-lg sm:text-xl font-black tracking-tight text-white">
+                        This is Emergency or an accident
+                      </h2>
+                      <p className="text-xs text-white/80 font-medium mt-0.5">
+                        We've detected an emergency or accident
+                      </p>
+                    </div>
 
-              {/* ============ MAIN MENU VIEW ============ */}
-              {activeSubMenu === "none" && (
-                <div className="space-y-2 animate-fade-in">
-                  {/* Big Red Emergency Main Button */}
+                    {/* Siren Graphic */}
+                    <div className="flex-shrink-0 pt-1">
+                      <EmergencySirenGraphic />
+                    </div>
+                  </div>
+
+                  {/* 3 Quick Specs Row */}
+                  <div className="grid grid-cols-3 divide-x divide-white/20 py-2 border-y border-white/15 text-center text-white relative z-10">
+                    <div className="flex flex-col items-center px-1">
+                      <div className="flex items-center justify-center gap-1.5 mb-1">
+                        <MapPin size={16} className="text-white" />
+                      </div>
+                      <span className="text-[11px] font-bold leading-tight">Share Live</span>
+                      <span className="text-[10px] text-white/80">Location</span>
+                    </div>
+
+                    <div className="flex flex-col items-center px-1">
+                      <div className="flex items-center justify-center gap-1.5 mb-1">
+                        <PhoneCall size={16} className="text-white" />
+                      </div>
+                      <span className="text-[11px] font-bold leading-tight">Notify</span>
+                      <span className="text-[10px] text-white/80">Contacts</span>
+                    </div>
+
+                    <div className="flex flex-col items-center px-1">
+                      <div className="flex items-center justify-center gap-1.5 mb-1">
+                        <Stethoscope size={16} className="text-white" />
+                      </div>
+                      <span className="text-[11px] font-bold leading-tight">Request</span>
+                      <span className="text-[10px] text-white/80">Ambulance</span>
+                    </div>
+                  </div>
+
+                  {/* SEND SOS Button */}
                   <button
                     onClick={() => setActiveSubMenu("emergency-main")}
-                    className="w-full bg-[#B91C1C] hover:bg-[#A01818] text-white rounded-3xl p-5 sm:p-6 text-center shadow-lg shadow-red-700/20 active:scale-[0.98] transition-all cursor-pointer block group"
+                    className="w-full bg-white hover:bg-gray-50 text-[#C01515] font-black py-3 px-6 rounded-full flex items-center justify-center gap-3 shadow-md active:scale-98 transition-all cursor-pointer group relative z-10"
                   >
-                    <EmergencySirenGraphic />
-                    <h3 className="text-lg sm:text-xl font-black text-white mt-2 tracking-tight">
-                      This is emergency or an accident
-                    </h3>
-                    <p className="text-xs text-white/80"> Notify/Call Contacts share location , request ambulance </p>
+                    <div className="w-8 h-8 rounded-full bg-[#C01515] text-white flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
+                      <PhoneCall size={16} className="fill-white text-white" />
+                    </div>
+                    <span className="text-base sm:text-lg font-black tracking-wider text-[#C01515]">
+                      Get Help  </span>
                   </button>
 
-                  {/* Quick Actions Header */}
-                  <div>
-                    <h3 className="text-lg font-black text-gray-900 mb-3">Quick Actions</h3>
-
-                    {/* 3 Columns x 2 Rows Grid */}
-                    <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-                      {/* 1. Request Tow truck */}
-                      <button
-                        onClick={() => {
-                          setActiveSubMenu("towing");
-                          setTowingImage(null);
-                        }}
-                        className="bg-[#FF2929] hover:bg-[#E02222] text-white rounded-3xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[110px] shadow-sm group"
-                      >
-                        <IconTowTruck />
-                        <span className="text-xs sm:text-sm font-black leading-tight tracking-tight">Request Tow truck</span>
-                      </button>
-
-                      {/* 2. Request Mechanic */}
-                      <button
-                        onClick={() => setActiveSubMenu("mechanical")}
-                        className="bg-[#FF7A00] hover:bg-[#E56E00] text-white rounded-3xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[110px] shadow-sm group"
-                      >
-                        <IconMechanicHand />
-                        <span className="text-xs sm:text-sm font-black leading-tight tracking-tight">Request Mechanic</span>
-                      </button>
-
-                      {/* 3. AI First Aid Assistant */}
-                      <button
-                        onClick={() => setActiveSubMenu("medical")}
-                        className="bg-[#2BA84A] hover:bg-[#23903E] text-white rounded-3xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[110px] shadow-sm group"
-                      >
-                        <IconAIFirstAid />
-                        <span className="text-xs sm:text-sm font-black leading-tight tracking-tight">AI First Aid Assistant</span>
-                      </button>
-
-                      {/* 4. Parking Issue /Blocking path */}
-                      <button
-                        onClick={() => {
-                          if (qrData && location) {
-                            const payload = {
-                              qrId: qrData.id,
-                              qrUrl: qrData.qrUrl,
-                              latitude: location.lat,
-                              longitude: location.lng,
-                              accuracy: location.accuracy,
-                              deviceId: navigator.userAgent.slice(0, 40),
-                              timestamp: new Date().toISOString(),
-                              message: "Parking Issue / Blocking Path Alert",
-                              vehicleName: qrData.vehicleName,
-                              vehicleNumber: qrData.vehicleNumber,
-                            };
-                            const alerts = JSON.parse(localStorage.getItem("namoqr-alerts") || "[]");
-                            alerts.unshift({ ...payload, id: Date.now(), status: "sent" });
-                            localStorage.setItem("namoqr-alerts", JSON.stringify(alerts));
-                            alert("Parking Issue alert sent to vehicle owner!");
-                          }
-                        }}
-                        className="bg-[#2575CC] hover:bg-[#1E62AE] text-white rounded-3xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[110px] shadow-sm group"
-                      >
-                        <IconNoParking />
-                        <span className="text-xs sm:text-sm font-black leading-tight tracking-tight">Parking Issue /Blocking path</span>
-                      </button>
-
-                      {/* 5. Flat Tire */}
-                      <button
-                        onClick={() => setActiveSubMenu("mechanical")}
-                        className="bg-[#5B47B8] hover:bg-[#4B39A0] text-white rounded-3xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[110px] shadow-sm group"
-                      >
-                        <IconFlatTire />
-                        <span className="text-xs sm:text-sm font-black leading-tight tracking-tight">Flat Tire</span>
-                      </button>
-
-                      {/* 6. Theft Detected */}
-                      <button
-                        onClick={() => setActiveSubMenu("family")}
-                        className="bg-[#B91C1C] hover:bg-[#991B1B] text-white rounded-3xl p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition-all min-h-[110px] shadow-sm group"
-                      >
-                        <IconTheftDetected />
-                        <span className="text-xs sm:text-sm font-black leading-tight tracking-tight">Theft Detected</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Send Custom Message Bar */}
-                  <div className="pt-2">
-                    <div className="bg-[#E8ECEF] rounded-2xl p-2 pl-4 flex items-center justify-between gap-2 shadow-xs">
-                      <input
-                        type="text"
-                        value={visitorMessage}
-                        onChange={(e) => setVisitorMessage(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleSendCustomMessage();
-                        }}
-                        placeholder="| Send Custom message to owner"
-                        className="w-full bg-transparent text-xs font-semibold text-gray-700 placeholder-gray-500 outline-none"
-                      />
-                      <button
-                        onClick={handleSendCustomMessage}
-                        className="w-10 h-10 rounded-xl bg-transparent text-[#1D70B8] hover:opacity-80 flex items-center justify-center flex-shrink-0 active:scale-95 transition-all cursor-pointer"
-                      >
-                        <Send size={22} className="fill-[#1D70B8] text-[#1D70B8]" />
-                      </button>
-                    </div>
-                  </div>
+            
                 </div>
-              )}
 
-              {/* ============ EMERGENCY MAIN BUTTON SUB-MENU (3 BUTTONS) ============ */}
-              {activeSubMenu === "emergency-main" && (
-                <div className="space-y-4 animate-fade-in">
-                  {/* Header bar with Back button */}
-                  <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-2xl p-3 shadow-2xs">
-                    <button
-                      onClick={() => setActiveSubMenu("none")}
-                      className="flex items-center gap-1.5 text-xs font-black text-red-600 hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-xl shadow-2xs border border-red-200 cursor-pointer"
-                    >
-                      <ArrowLeft size={14} /> Back
-                    </button>
-                    <div className="text-right">
-                      <span className="text-xs font-black text-gray-900 flex items-center gap-1.5 justify-end">
-                        <ShieldAlert size={16} className="text-red-600" /> Emergency Options
-                      </span>
-                      <p className="text-[10px] font-bold text-gray-500">Choose action to proceed</p>
-                    </div>
+                {/* 3. QUICK ACTIONS SECTION */}
+                <div className="bg-white rounded-3xl p-3.5 sm:p-4 border border-gray-100 shadow-sm space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm sm:text-base font-bold text-gray-900">Quick Actions</h3>
+                    <span className="text-xs text-gray-400 font-normal">Tap on any service</span>
                   </div>
 
-                  {/* 3 Main Emergency Action Buttons */}
-                  <div className="space-y-3">
-                    {/* Button 1: Vehicle Owner Primary Contact */}
-                    <button
-                      onClick={() => {
-                        const contacts = getTowingContacts();
-                        const primary = contacts.find((c) => c.primary) || contacts[0];
-                        if (primary) {
-                          window.open(`tel:${primary.phone.replace(/[^0-9+]/g, "")}`);
-                        } else {
-                          alert("No vehicle owner phone number registered.");
-                        }
-                      }}
-                      className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-red-600/20 active:scale-[0.98] transition-all cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold flex-shrink-0">
-                          <Car size={22} />
-                        </div>
-                        <div className="text-left min-w-0">
-                          <p className="text-sm font-black text-white tracking-tight">Request Ambulance</p>
-                          <p className="text-[11px] font-medium text-white/80 truncate">
-                            Immediate connection to ambulance
-                          </p>
-                        </div>
-                      </div>
-                      <div className="bg-white text-red-600 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
-                        Get Help
-                      </div>
-                    </button>
-
-                    {/* Button 2: Call Family Members */}
-                    <button
-                      onClick={() => setActiveSubMenu("family")}
-                      className="w-full bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-green-600/20 active:scale-[0.98] transition-all cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold flex-shrink-0">
-                          <User size={22} />
-                        </div>
-                        <div className="text-left min-w-0">
-                          <p className="text-sm font-black text-white tracking-tight">Call Family Members</p>
-                          <p className="text-[11px] font-medium text-white/80">
-                            Let loved ones find you faster.
-                          </p>
-                        </div>
-                      </div>
-                      <div className="bg-white text-emerald-700 font-black text-xs px-3 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
-                        Call
-                      </div>
-                    </button>
-
-                    {/* Button 3: Share Location */}
-                    <button
-                      onClick={() => {
-                        if (location) {
-                          const mapsUrl = `https://www.google.com/maps?q=${location.lat},${location.lng}`;
-                          window.open(mapsUrl);
-                          if (qrData) {
-                            const payload = {
-                              qrId: qrData.id,
-                              qrUrl: qrData.qrUrl,
-                              latitude: location.lat,
-                              longitude: location.lng,
-                              accuracy: location.accuracy,
-                              deviceId: navigator.userAgent.slice(0, 40),
-                              timestamp: new Date().toISOString(),
-                              message: `EMERGENCY GPS LOCATION: ${mapsUrl}`,
-                              vehicleName: qrData.vehicleName,
-                              vehicleNumber: qrData.vehicleNumber,
-                            };
-                            const alerts = JSON.parse(localStorage.getItem("namoqr-alerts") || "[]");
-                            alerts.unshift({ ...payload, id: Date.now(), status: "sent" });
-                            localStorage.setItem("namoqr-alerts", JSON.stringify(alerts));
-                            alert("Emergency location link generated & dispatched!");
-                          }
-                        } else {
-                          requestLocation();
-                        }
-                      }}
-                      className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-blue-600/20 active:scale-[0.98] transition-all cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold text-2xl flex-shrink-0">
-                          📍
-                        </div>
-                        <div className="text-left min-w-0">
-                          <p className="text-sm font-black text-white tracking-tight">Share Location</p>
-                        </div>
-                      </div>
-                      <div className="bg-white text-blue-700 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
-                        <Navigation size={14} /> SEND
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* ============ VEHICLE HELP SUB-MENU CARD ============ */}
-              {activeSubMenu === "mechanical" && (
-                <div className="space-y-3 animate-fade-in">
-                  {/* Header bar with Back button */}
-                  <div className="flex items-center justify-between bg-[#FFF0F2] border border-[#FFD6DB] rounded-2xl p-3 shadow-2xs">
-                    <button
-                      onClick={() => setActiveSubMenu("none")}
-                      className="flex items-center gap-1.5 text-xs font-black text-[#E52E3D] hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-xl shadow-2xs border border-[#FFD6DB] cursor-pointer"
-                    >
-                      <ArrowLeft size={14} /> Back
-                    </button>
-                    <div className="text-right">
-                      <span className="text-xs font-black text-gray-900 flex items-center gap-1.5 justify-end">
-                        <Wrench size={16} className="text-[#E52E3D]" /> Mechanical Options
-                      </span>
-                      <p className="text-[10px] font-bold text-gray-500">Select specific service</p>
-                    </div>
-                  </div>
-
-                  {/* Sub-Category Options Grid */}
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {/* Towing Assistance */}
+                  {/* 3x2 Grid */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {/* 1. Tow Truck */}
                     <button
                       onClick={() => {
                         setActiveSubMenu("towing");
                         setTowingImage(null);
                       }}
-                      className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-red-300 hover:bg-red-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                      className="bg-white border border-gray-100 hover:border-red-200 rounded-2xl p-2.5 flex flex-col items-center justify-between text-center cursor-pointer active:scale-95 transition-all min-h-[100px] shadow-2xs hover:shadow-sm relative group"
                     >
-                      <div className="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center font-bold shadow-2xs">
-                        <Truck size={18} />
+                      <ChevronRight size={12} className="text-gray-300 absolute top-2 right-2 group-hover:text-gray-500 transition-colors" />
+                      <div className="w-10 h-10 rounded-full bg-[#FEE2E2] flex items-center justify-center mb-1 flex-shrink-0 group-hover:scale-105 transition-transform">
+                        <img src={towIcon} alt="Tow Truck" className="w-6 h-6 object-contain" />
                       </div>
                       <div>
-                        <p className="text-xs font-black text-gray-900 group-hover:text-red-600 transition-colors">Towing Service</p>
-                        <p className="text-[10px] font-bold text-gray-500 mt-0.5">24x7 Flatbed Tow</p>
+                        <p className="text-[11px] sm:text-xs font-bold text-gray-900 leading-tight">Tow Truck</p>
+                        <p className="text-[9px] sm:text-[10px] text-gray-400 font-normal mt-0.5">Roadside recovery</p>
                       </div>
                     </button>
 
-                    {/* Flat Tire / Puncher */}
+                    {/* 2. Mechanic */}
                     <button
-                      onClick={() => {
-                        const contacts = getTowingContacts();
-                        if (contacts.length > 0) window.open(`tel:${contacts[0].phone.replace(/[^0-9+]/g, "")}`);
-                      }}
-                      className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-red-300 hover:bg-red-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                      onClick={() => setActiveSubMenu("mechanical")}
+                      className="bg-white border border-gray-100 hover:border-orange-200 rounded-2xl p-2.5 flex flex-col items-center justify-between text-center cursor-pointer active:scale-95 transition-all min-h-[100px] shadow-2xs hover:shadow-sm relative group"
                     >
-                      <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold shadow-2xs">
-                        <Car size={18} />
+                      <ChevronRight size={12} className="text-gray-300 absolute top-2 right-2 group-hover:text-gray-500 transition-colors" />
+                      <div className="w-10 h-10 rounded-full bg-[#FFEDD5] flex items-center justify-center mb-1 flex-shrink-0 group-hover:scale-105 transition-transform">
+                        <img src={mechanicIcon} alt="Mechanic" className="w-6 h-6 object-contain" />
                       </div>
                       <div>
-                        <p className="text-xs font-black text-gray-900 group-hover:text-red-600 transition-colors">Flat Tire Fix</p>
-                        <p className="text-[10px] font-bold text-gray-500 mt-0.5">On-site Puncture</p>
+                        <p className="text-[11px] sm:text-xs font-bold text-gray-900 leading-tight">Mechanic</p>
+                        <p className="text-[9px] sm:text-[10px] text-gray-400 font-normal mt-0.5">On-site repair</p>
                       </div>
                     </button>
 
-                    {/* Fuel & Battery */}
+                    {/* 3. Parking Issue */}
                     <button
                       onClick={() => {
-                        const contacts = getTowingContacts();
-                        if (contacts.length > 0) window.open(`tel:${contacts[0].phone.replace(/[^0-9+]/g, "")}`);
+                        if (qrData && location) {
+                          const payload = {
+                            qrId: qrData.id,
+                            qrUrl: qrData.qrUrl,
+                            latitude: location.lat,
+                            longitude: location.lng,
+                            accuracy: location.accuracy,
+                            deviceId: navigator.userAgent.slice(0, 40),
+                            timestamp: new Date().toISOString(),
+                            message: "Parking Issue / Blocking Path Alert",
+                            vehicleName: qrData.vehicleName,
+                            vehicleNumber: qrData.vehicleNumber,
+                          };
+                          const alerts = JSON.parse(localStorage.getItem("namoqr-alerts") || "[]");
+                          alerts.unshift({ ...payload, id: Date.now(), status: "sent" });
+                          localStorage.setItem("namoqr-alerts", JSON.stringify(alerts));
+                          alert("Parking Issue alert sent to vehicle owner!");
+                        }
                       }}
-                      className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-red-300 hover:bg-red-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                      className="bg-white border border-gray-100 hover:border-blue-200 rounded-2xl p-2.5 flex flex-col items-center justify-between text-center cursor-pointer active:scale-95 transition-all min-h-[100px] shadow-2xs hover:shadow-sm relative group"
                     >
-                      <div className="w-8 h-8 rounded-xl bg-yellow-100 text-yellow-700 flex items-center justify-center font-bold shadow-2xs">
-                        <Fuel size={18} />
+                      <ChevronRight size={12} className="text-gray-300 absolute top-2 right-2 group-hover:text-gray-500 transition-colors" />
+                      <div className="w-10 h-10 rounded-full bg-[#DBEAFE] flex items-center justify-center mb-1 flex-shrink-0 group-hover:scale-105 transition-transform">
+                        <div className="w-6 h-6 rounded-full bg-[#2563EB] text-white flex items-center justify-center font-extrabold text-xs">
+                          P
+                        </div>
                       </div>
                       <div>
-                        <p className="text-xs font-black text-gray-900 group-hover:text-red-600 transition-colors">Battery</p>
-                        <p className="text-[10px] font-bold text-gray-500 mt-0.5">Jumpstart Assist</p>
+                        <p className="text-[11px] sm:text-xs font-bold text-gray-900 leading-tight">Parking Issue</p>
+                        <p className="text-[9px] sm:text-[10px] text-gray-400 font-normal mt-0.5">Blocking path</p>
                       </div>
                     </button>
 
-                    {/* Engine Repair / Breakdown */}
+                    {/* 4. Flat Tyre */}
                     <button
-                      onClick={() => {
-                        const contacts = getTowingContacts();
-                        if (contacts.length > 0) window.open(`tel:${contacts[0].phone.replace(/[^0-9+]/g, "")}`);
-                      }}
-                      className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-red-300 hover:bg-red-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                      onClick={() => setActiveSubMenu("mechanical")}
+                      className="bg-white border border-gray-100 hover:border-purple-200 rounded-2xl p-2.5 flex flex-col items-center justify-between text-center cursor-pointer active:scale-95 transition-all min-h-[100px] shadow-2xs hover:shadow-sm relative group"
                     >
-                      <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold shadow-2xs">
-                        <Wrench size={18} />
+                      <ChevronRight size={12} className="text-gray-300 absolute top-2 right-2 group-hover:text-gray-500 transition-colors" />
+                      <div className="w-10 h-10 rounded-full bg-[#F3E8FF] flex items-center justify-center mb-1 flex-shrink-0 group-hover:scale-105 transition-transform">
+                        <img src={flatTireIcon} alt="Flat Tyre" className="w-6 h-6 object-contain" />
                       </div>
                       <div>
-                        <p className="text-xs font-black text-gray-900 group-hover:text-red-600 transition-colors">Other</p>
-                        <p className="text-[10px] font-bold text-gray-500 mt-0.5">Mobile Mechanic</p>
+                        <p className="text-[11px] sm:text-xs font-bold text-gray-900 leading-tight">Flat Tyre</p>
+                        <p className="text-[9px] sm:text-[10px] text-gray-400 font-normal mt-0.5">Tyre assistance</p>
                       </div>
+                    </button>
+
+                    {/* 5. Theft Detected */}
+                    <button
+                      onClick={() => setActiveSubMenu("family")}
+                      className="bg-white border border-gray-100 hover:border-rose-200 rounded-2xl p-2.5 flex flex-col items-center justify-between text-center cursor-pointer active:scale-95 transition-all min-h-[100px] shadow-2xs hover:shadow-sm relative group"
+                    >
+                      <ChevronRight size={12} className="text-gray-300 absolute top-2 right-2 group-hover:text-gray-500 transition-colors" />
+                      <div className="w-10 h-10 rounded-full bg-[#FFE4E6] flex items-center justify-center mb-1 flex-shrink-0 group-hover:scale-105 transition-transform">
+                        <img src={theftIcon} alt="Theft Detected" className="w-6 h-6 object-contain" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] sm:text-xs font-bold text-gray-900 leading-tight">Theft Alert</p>
+                        <p className="text-[9px] sm:text-[10px] text-gray-400 font-normal mt-0.5">Report and alert</p>
+                      </div>
+                    </button>
+
+                    {/* 6. Headlights */}
+                    <button
+                      onClick={() => setActiveSubMenu("medical")}
+                      className="bg-white border border-gray-100 hover:border-slate-300 rounded-2xl p-2.5 flex flex-col items-center justify-between text-center cursor-pointer active:scale-95 transition-all min-h-[100px] shadow-2xs hover:shadow-sm relative group"
+                    >
+                      <ChevronRight size={12} className="text-gray-300 absolute top-2 right-2 group-hover:text-gray-500 transition-colors" />
+                      <div className="w-10 h-10 rounded-full bg-[#FEF3C7] flex items-center justify-center mb-1 flex-shrink-0 group-hover:scale-105 transition-transform">
+                        {/* Car Headlight Icon */}
+                        <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
+                          {/* Headlight body */}
+                          <rect x="13" y="7" width="8" height="10" rx="3" stroke="#D97706" strokeWidth="2" />
+                          {/* Inner lens */}
+                          <circle cx="17" cy="12" r="2" fill="#D97706" />
+                          {/* Light beam rays */}
+                          <line x1="4" y1="10" x2="11" y2="11" stroke="#FBBF24" strokeWidth="1.5" strokeLinecap="round" />
+                          <line x1="3" y1="12" x2="11" y2="12" stroke="#FBBF24" strokeWidth="2" strokeLinecap="round" />
+                          <line x1="4" y1="14" x2="11" y2="13" stroke="#FBBF24" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-[11px] sm:text-xs font-bold text-gray-900 leading-tight">Headlights</p>
+                        <p className="text-[9px] sm:text-[10px] text-gray-400 font-normal mt-0.5">are on</p>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* 4. AI ASSISTANT LAVENDER BANNER */}
+                  <div className="bg-gradient-to-r from-[#F5F3FF] via-[#F3E8FF] to-[#FAF5FF] border border-[#DDD6FE] rounded-2xl p-3 flex items-center justify-between shadow-2xs mt-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
+                        <Bot size={22} />
+                      </div>
+                      <div>
+                        <p className="text-xs sm:text-sm font-bold text-gray-900">AI Assistant</p>
+                        <p className="text-[11px] text-gray-500 font-normal">Need help choosing the right action?</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveSubMenu("medical")}
+                      className="border border-[#7C3AED] text-[#7C3AED] hover:bg-[#7C3AED] hover:text-white font-bold text-xs py-1.5 px-3.5 rounded-full flex items-center gap-1 transition-all cursor-pointer flex-shrink-0 active:scale-95"
+                    >
+                      Ask Now <ChevronRight size={14} />
                     </button>
                   </div>
                 </div>
-              )}
 
-              {/* ============ TOWING BREAKDOWN STEP VIEW ============ */}
-              {activeSubMenu === "towing" && (
-                <div className="space-y-3 animate-fade-in">
-                  <div className="flex items-center justify-between bg-[#FFF0F2] border border-[#FFD6DB] rounded-2xl p-3 shadow-2xs">
-                    <button
-                      onClick={() => setActiveSubMenu("mechanical")}
-                      className="flex items-center gap-1.5 text-xs font-black text-[#E52E3D] hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-xl shadow-2xs border border-[#FFD6DB] cursor-pointer"
-                    >
-                      <ArrowLeft size={14} /> Back
-                    </button>
-                    <div className="text-right">
-                      <span className="text-xs font-black text-gray-900 flex items-center gap-1.5 justify-end">
-                        <Truck size={16} className="text-[#E52E3D]" /> Towing Helpline
-                      </span>
+                {/* 5. MESSAGE VEHICLE OWNER CARD */}
+                <div className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm flex items-center justify-between gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#DBEAFE] text-[#2563EB] flex items-center justify-center flex-shrink-0">
+                    <MessageSquare size={18} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <label className="block text-xs font-bold text-gray-900 leading-tight">
+                      Message Vehicle Owner
+                    </label>
+                    <input
+                      type="text"
+                      value={visitorMessage}
+                      onChange={(e) => setVisitorMessage(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleSendCustomMessage();
+                      }}
+                      placeholder="Type your message here..."
+                      className="w-full bg-transparent text-xs text-gray-700 placeholder-gray-400 outline-none font-normal mt-0.5"
+                    />
+                  </div>
+                  <button
+                    onClick={handleSendCustomMessage}
+                    className="h-10 px-4 rounded-full bg-[#6366F1] hover:bg-[#4F46E5] text-white flex items-center gap-1.5 shadow-xs flex-shrink-0 active:scale-95 transition-all cursor-pointer font-bold text-xs"
+                  >
+                    <Send size={14} className="fill-white text-white" />
+                    Send
+                  </button>
+                </div>
+
+                {/* 6. BOTTOM PROTECTION & SUPPORT BAR */}
+                <div className="bg-white rounded-2xl p-2.5 border border-gray-100 shadow-sm flex items-center justify-between divide-x divide-gray-100">
+                  {/* Left Half: You're Protected */}
+                  <div className="flex items-center gap-2.5 pr-2 flex-1 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-[#DCFCE7] text-[#16A34A] flex items-center justify-center flex-shrink-0">
+                      <ShieldCheck size={18} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-gray-900 truncate">You're Protected</p>
+                      <p className="text-[10px] text-gray-400 font-normal truncate">We care about your safety</p>
                     </div>
                   </div>
 
-                  {!towingImage ? (
-                    <div className="bg-white border border-gray-200/80 rounded-2xl p-4 space-y-3 shadow-2xs">
-                      <div className="grid grid-cols-2 gap-3">
-                        <label className="bg-[#FF5500] hover:bg-[#E64D00] text-white font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95 transition-all text-center">
-                          <Camera size={18} />
-                          <span>Take Photo</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => setTowingImage(reader.result as string);
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                          />
-                        </label>
-
-                        <label className="bg-white border-2 border-[#FFD6B3] hover:bg-orange-50/50 text-[#FF5500] font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-xs cursor-pointer active:scale-95 transition-all text-center">
-                          <Upload size={18} />
-                          <span>Upload Picture</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => setTowingImage(reader.result as string);
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                          />
-                        </label>
+                  {/* Right Half: 24/7 Support */}
+                  <div className="flex items-center justify-between pl-3 flex-1 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-[#DBEAFE] text-[#2563EB] flex items-center justify-center flex-shrink-0">
+                        <PhoneCall size={16} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-gray-900 truncate">24/7 Support</p>
+                        <p className="text-[10px] text-gray-400 font-normal truncate">Always here to help</p>
                       </div>
                     </div>
-                  ) : (
+                    <ChevronRight size={14} className="text-gray-300 flex-shrink-0 ml-1" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ============ SUB-MENUS (when activeSubMenu !== "none") ============ */}
+            {activeSubMenu !== "none" && (
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-5 space-y-4">
+                {/* ============ EMERGENCY MAIN BUTTON SUB-MENU (3 BUTTONS) ============ */}
+                {activeSubMenu === "emergency-main" && (
+                  <div className="space-y-4 animate-fade-in">
+                    {/* Header bar with Back button */}
+                    <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-2xl p-3 shadow-2xs">
+                      <button
+                        onClick={() => setActiveSubMenu("none")}
+                        className="flex items-center gap-1.5 text-xs font-black text-red-600 hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-xl shadow-2xs border border-red-200 cursor-pointer"
+                      >
+                        <ArrowLeft size={14} /> Back
+                      </button>
+                      <div className="text-right">
+                        <span className="text-xs font-black text-gray-900 flex items-center gap-1.5 justify-end">
+                          <ShieldAlert size={16} className="text-red-600" /> Emergency Options
+                        </span>
+                        <p className="text-[10px] font-bold text-gray-500">Choose action to proceed</p>
+                      </div>
+                    </div>
+
+                    {/* 3 Main Emergency Action Buttons */}
                     <div className="space-y-3">
-                      <div className="relative rounded-2xl overflow-hidden border-2 border-emerald-400 h-28 bg-gray-900 flex items-center justify-center shadow-xs">
-                        <img src={towingImage} alt="Vehicle Breakdown" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end justify-between p-2.5">
-                          <span className="text-white font-extrabold text-xs flex items-center gap-1">
-                            <Check size={14} className="text-emerald-400" /> Photo Uploaded
-                          </span>
-                          <label className="bg-white/90 hover:bg-white text-gray-900 font-extrabold text-[10px] px-2.5 py-1 rounded-lg cursor-pointer transition-all active:scale-95">
-                            Change Photo
+                      {/* Button 1: Vehicle Owner Primary Contact */}
+                      <button
+                        onClick={() => {
+                          const contacts = getTowingContacts();
+                          const primary = contacts.find((c) => c.primary) || contacts[0];
+                          if (primary) {
+                            window.open(`tel:${primary.phone.replace(/[^0-9+]/g, "")}`);
+                          } else {
+                            alert("No vehicle owner phone number registered.");
+                          }
+                        }}
+                        className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-red-600/20 active:scale-[0.98] transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold flex-shrink-0">
+                            <Car size={22} />
+                          </div>
+                          <div className="text-left min-w-0">
+                            <p className="text-sm font-black text-white tracking-tight">Request Ambulance</p>
+                            <p className="text-[11px] font-medium text-white/80 truncate">
+                              Immediate connection to ambulance
+                            </p>
+                          </div>
+                        </div>
+                        <div className="bg-white text-red-600 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
+                          Get Help
+                        </div>
+                      </button>
+
+                      {/* Button 2: Call Family Members */}
+                      <button
+                        onClick={() => setActiveSubMenu("family")}
+                        className="w-full bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-green-600/20 active:scale-[0.98] transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold flex-shrink-0">
+                            <User size={22} />
+                          </div>
+                          <div className="text-left min-w-0">
+                            <p className="text-sm font-black text-white tracking-tight">Call Family Members</p>
+                            <p className="text-[11px] font-medium text-white/80">
+                              Let loved ones find you faster.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="bg-white text-emerald-700 font-black text-xs px-3 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
+                          Call
+                        </div>
+                      </button>
+
+                      {/* Button 3: Share Location */}
+                      <button
+                        onClick={() => {
+                          if (location) {
+                            const mapsUrl = `https://www.google.com/maps?q=${location.lat},${location.lng}`;
+                            window.open(mapsUrl);
+                            if (qrData) {
+                              const payload = {
+                                qrId: qrData.id,
+                                qrUrl: qrData.qrUrl,
+                                latitude: location.lat,
+                                longitude: location.lng,
+                                accuracy: location.accuracy,
+                                deviceId: navigator.userAgent.slice(0, 40),
+                                timestamp: new Date().toISOString(),
+                                message: `EMERGENCY GPS LOCATION: ${mapsUrl}`,
+                                vehicleName: qrData.vehicleName,
+                                vehicleNumber: qrData.vehicleNumber,
+                              };
+                              const alerts = JSON.parse(localStorage.getItem("namoqr-alerts") || "[]");
+                              alerts.unshift({ ...payload, id: Date.now(), status: "sent" });
+                              localStorage.setItem("namoqr-alerts", JSON.stringify(alerts));
+                              alert("Emergency location link generated & dispatched!");
+                            }
+                          } else {
+                            requestLocation();
+                          }
+                        }}
+                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-blue-600/20 active:scale-[0.98] transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold text-2xl flex-shrink-0">
+                            📍
+                          </div>
+                          <div className="text-left min-w-0">
+                            <p className="text-sm font-black text-white tracking-tight">Share Location</p>
+                          </div>
+                        </div>
+                        <div className="bg-white text-blue-700 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
+                          <Navigation size={14} /> SEND
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ============ VEHICLE HELP SUB-MENU CARD ============ */}
+                {activeSubMenu === "mechanical" && (
+                  <div className="space-y-3 animate-fade-in">
+                    {/* Header bar with Back button */}
+                    <div className="flex items-center justify-between bg-[#FFF0F2] border border-[#FFD6DB] rounded-2xl p-3 shadow-2xs">
+                      <button
+                        onClick={() => setActiveSubMenu("none")}
+                        className="flex items-center gap-1.5 text-xs font-black text-[#E52E3D] hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-xl shadow-2xs border border-[#FFD6DB] cursor-pointer"
+                      >
+                        <ArrowLeft size={14} /> Back
+                      </button>
+                      <div className="text-right">
+                        <span className="text-xs font-black text-gray-900 flex items-center gap-1.5 justify-end">
+                          <Wrench size={16} className="text-[#E52E3D]" /> Mechanical Options
+                        </span>
+                        <p className="text-[10px] font-bold text-gray-500">Select specific service</p>
+                      </div>
+                    </div>
+
+                    {/* Sub-Category Options Grid */}
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {/* Towing Assistance */}
+                      <button
+                        onClick={() => {
+                          setActiveSubMenu("towing");
+                          setTowingImage(null);
+                        }}
+                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-red-300 hover:bg-red-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                      >
+                        <div className="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center font-bold shadow-2xs">
+                          <Truck size={18} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-gray-900 group-hover:text-red-600 transition-colors">Towing Service</p>
+                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">24x7 Flatbed Tow</p>
+                        </div>
+                      </button>
+
+                      {/* Flat Tire / Puncher */}
+                      <button
+                        onClick={() => {
+                          const contacts = getTowingContacts();
+                          if (contacts.length > 0) window.open(`tel:${contacts[0].phone.replace(/[^0-9+]/g, "")}`);
+                        }}
+                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-red-300 hover:bg-red-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                      >
+                        <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold shadow-2xs">
+                          <Car size={18} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-gray-900 group-hover:text-red-600 transition-colors">Flat Tire Fix</p>
+                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">On-site Puncture</p>
+                        </div>
+                      </button>
+
+                      {/* Fuel & Battery */}
+                      <button
+                        onClick={() => {
+                          const contacts = getTowingContacts();
+                          if (contacts.length > 0) window.open(`tel:${contacts[0].phone.replace(/[^0-9+]/g, "")}`);
+                        }}
+                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-red-300 hover:bg-red-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                      >
+                        <div className="w-8 h-8 rounded-xl bg-yellow-100 text-yellow-700 flex items-center justify-center font-bold shadow-2xs">
+                          <Fuel size={18} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-gray-900 group-hover:text-red-600 transition-colors">Battery</p>
+                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">Jumpstart Assist</p>
+                        </div>
+                      </button>
+
+                      {/* Engine Repair / Breakdown */}
+                      <button
+                        onClick={() => {
+                          const contacts = getTowingContacts();
+                          if (contacts.length > 0) window.open(`tel:${contacts[0].phone.replace(/[^0-9+]/g, "")}`);
+                        }}
+                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-red-300 hover:bg-red-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                      >
+                        <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold shadow-2xs">
+                          <Wrench size={18} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-gray-900 group-hover:text-red-600 transition-colors">Other</p>
+                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">Mobile Mechanic</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ============ TOWING BREAKDOWN STEP VIEW ============ */}
+                {activeSubMenu === "towing" && (
+                  <div className="space-y-3 animate-fade-in">
+                    <div className="flex items-center justify-between bg-[#FFF0F2] border border-[#FFD6DB] rounded-2xl p-3 shadow-2xs">
+                      <button
+                        onClick={() => setActiveSubMenu("mechanical")}
+                        className="flex items-center gap-1.5 text-xs font-black text-[#E52E3D] hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-xl shadow-2xs border border-[#FFD6DB] cursor-pointer"
+                      >
+                        <ArrowLeft size={14} /> Back
+                      </button>
+                      <div className="text-right">
+                        <span className="text-xs font-black text-gray-900 flex items-center gap-1.5 justify-end">
+                          <Truck size={16} className="text-[#E52E3D]" /> Towing Helpline
+                        </span>
+                      </div>
+                    </div>
+
+                    {!towingImage ? (
+                      <div className="bg-white border border-gray-200/80 rounded-2xl p-4 space-y-3 shadow-2xs">
+                        <div className="grid grid-cols-2 gap-3">
+                          <label className="bg-[#FF5500] hover:bg-[#E64D00] text-white font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95 transition-all text-center">
+                            <Camera size={18} />
+                            <span>Take Photo</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => setTowingImage(reader.result as string);
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+
+                          <label className="bg-white border-2 border-[#FFD6B3] hover:bg-orange-50/50 text-[#FF5500] font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-xs cursor-pointer active:scale-95 transition-all text-center">
+                            <Upload size={18} />
+                            <span>Upload Picture</span>
                             <input
                               type="file"
                               accept="image/*"
@@ -1287,202 +1461,216 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                           </label>
                         </div>
                       </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="relative rounded-2xl overflow-hidden border-2 border-emerald-400 h-28 bg-gray-900 flex items-center justify-center shadow-xs">
+                          <img src={towingImage} alt="Vehicle Breakdown" className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end justify-between p-2.5">
+                            <span className="text-white font-extrabold text-xs flex items-center gap-1">
+                              <Check size={14} className="text-emerald-400" /> Photo Uploaded
+                            </span>
+                            <label className="bg-white/90 hover:bg-white text-gray-900 font-extrabold text-[10px] px-2.5 py-1 rounded-lg cursor-pointer transition-all active:scale-95">
+                              Change Photo
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => setTowingImage(reader.result as string);
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                            </label>
+                          </div>
+                        </div>
 
-                      <div className="space-y-2">
-                        {getTowingContacts().map((c, i) => (
+                        <div className="space-y-2">
+                          {getTowingContacts().map((c, i) => (
+                            <div
+                              key={i}
+                              className={`p-3.5 rounded-2xl border flex items-center justify-between gap-2 transition-all ${c.primary ? "bg-[#FFF7ED] border-[#FFEDD5]" : "bg-white border-gray-200"
+                                }`}
+                            >
+                              <div className="min-w-0 pr-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="text-xs font-extrabold text-gray-900 leading-tight">{c.label}</p>
+                                  {c.primary && (
+                                    <span className="bg-[#FF5500] text-white text-[9px] font-black px-1.5 py-0.2 rounded-md uppercase tracking-wide">
+                                      PRIMARY
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm font-mono font-black text-gray-800 mt-1">{c.phone}</p>
+                              </div>
+
+                              <button
+                                onClick={() => window.open(`tel:${c.phone.replace(/[^0-9+]/g, "")}`)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer"
+                              >
+                                <PhoneCall size={14} /> CALL
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ============ MEDICAL HELP SUB-MENU CARD ============ */}
+                {activeSubMenu === "medical" && (
+                  <div className="space-y-3 animate-fade-in">
+                    <div className="flex items-center justify-between bg-[#F0FDF4] border border-[#BBF7D0] rounded-2xl p-3 shadow-2xs">
+                      <button
+                        onClick={() => setActiveSubMenu("none")}
+                        className="flex items-center gap-1.5 text-xs font-black text-[#16A34A] hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-xl shadow-2xs border border-[#BBF7D0] cursor-pointer"
+                      >
+                        <ArrowLeft size={14} /> Back
+                      </button>
+                      <div className="text-right">
+                        <span className="text-xs font-black text-gray-900 flex items-center gap-1.5 justify-end">
+                          <Heart size={16} className="text-[#16A34A] fill-[#16A34A]" /> Medical Options
+                        </span>
+                        <p className="text-[10px] font-bold text-gray-500">Select specific service</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => window.open("tel:108")}
+                        className="w-full bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-2xl p-3 text-left hover:opacity-95 transition-all active:scale-[0.98] shadow-md shadow-green-500/20 flex items-center justify-between cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-white text-emerald-700 flex items-center justify-center font-bold shadow-2xs">
+                            <Stethoscope size={18} />
+                          </div>
+                          <div>
+                            <p className="text-xs font-black text-white">Call Ambulance 108</p>
+                            <p className="text-[10px] font-bold text-emerald-100">National Medical Helpline</p>
+                          </div>
+                        </div>
+                        <div className="bg-white text-emerald-700 font-black text-[10px] px-3 py-1 rounded-lg">
+                          CALL 108
+                        </div>
+                      </button>
+
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <button
+                          onClick={() => alert("🚨 First Aid Advice: Stay calm, check breathing, elevate legs if dizzy, call 108 if unresponsive.")}
+                          className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-emerald-300 hover:bg-emerald-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                        >
+                          <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shadow-2xs">
+                            <Activity size={18} />
+                          </div>
+                          <div>
+                            <p className="text-xs font-black text-gray-900 group-hover:text-emerald-600 transition-colors">First Aid Guide</p>
+                            <p className="text-[10px] font-bold text-gray-500 mt-0.5">Instant Advice</p>
+                          </div>
+                        </button>
+
+                        <button
+                          onClick={() => location && window.open(`https://www.google.com/maps/search/hospitals/@${location.lat},${location.lng},14z`)}
+                          className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-emerald-300 hover:bg-emerald-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                        >
+                          <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shadow-2xs">
+                            <MapPin size={18} />
+                          </div>
+                          <div>
+                            <p className="text-xs font-black text-gray-900 group-hover:text-emerald-600 transition-colors">Nearby Hospital</p>
+                            <p className="text-[10px] font-bold text-gray-500 mt-0.5">Google Maps Search</p>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ============ FAMILY MEMBERS SUB-MENU ============ */}
+                {activeSubMenu === "family" && (
+                  <div className="space-y-3 animate-fade-in">
+                    <div className="flex items-center justify-between bg-[#F0FDF4] border border-[#BBF7D0] rounded-2xl p-3 shadow-2xs">
+                      <button
+                        onClick={() => setActiveSubMenu("none")}
+                        className="flex items-center gap-1.5 text-xs font-black text-[#16A34A] hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-xl shadow-2xs border border-[#BBF7D0] cursor-pointer"
+                      >
+                        <ArrowLeft size={14} /> Back
+                      </button>
+                      <div className="text-right">
+                        <span className="text-xs font-black text-gray-900 flex items-center gap-1.5 justify-end">
+                          <PhoneCall size={16} className="text-[#16A34A]" /> Family &amp; Owner Contacts
+                        </span>
+                        <p className="text-[10px] font-bold text-gray-500">{getTowingContacts().length} numbers available</p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => location && window.open(`https://www.google.com/maps?q=${location.lat},${location.lng}`)}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-2.5 flex items-center gap-2.5 hover:bg-gray-50 transition-all active:scale-[0.98] shadow-2xs cursor-pointer"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold flex-shrink-0">
+                        <MapPin size={16} />
+                      </div>
+                      <div className="text-left min-w-0">
+                        <p className="text-xs font-black text-gray-900">Share My Live Location</p>
+                        <p className="text-[10px] font-bold text-gray-500">Send GPS pin to contacts</p>
+                      </div>
+                      <ExternalLink size={14} className="text-gray-400 flex-shrink-0 ml-auto" />
+                    </button>
+
+                    <div className="space-y-2">
+                      {getTowingContacts().length === 0 ? (
+                        <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center">
+                          <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                            <PhoneCall size={20} className="text-gray-300" />
+                          </div>
+                          <p className="text-sm font-semibold text-gray-500">No contacts available</p>
+                          <p className="text-xs text-gray-400 mt-1">Owner has not added any numbers yet</p>
+                        </div>
+                      ) : (
+                        getTowingContacts().map((contact, i) => (
                           <div
                             key={i}
-                            className={`p-3.5 rounded-2xl border flex items-center justify-between gap-2 transition-all ${c.primary ? "bg-[#FFF7ED] border-[#FFEDD5]" : "bg-white border-gray-200"
+                            className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all ${contact.primary ? "bg-[#FFF7ED] border-[#FFEDD5] shadow-xs" : "bg-white border-gray-200"
                               }`}
                           >
-                            <div className="min-w-0 pr-1">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <p className="text-xs font-extrabold text-gray-900 leading-tight">{c.label}</p>
-                                {c.primary && (
-                                  <span className="bg-[#FF5500] text-white text-[9px] font-black px-1.5 py-0.2 rounded-md uppercase tracking-wide">
-                                    PRIMARY
-                                  </span>
-                                )}
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div
+                                className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold flex-shrink-0 shadow-2xs ${contact.primary ? "bg-[#FF5500] text-white" : "bg-emerald-100 text-emerald-600"
+                                  }`}
+                              >
+                                <User size={18} />
                               </div>
-                              <p className="text-sm font-mono font-black text-gray-800 mt-1">{c.phone}</p>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="text-xs font-extrabold text-gray-900 leading-tight truncate">{contact.label}</p>
+                                  {contact.primary && (
+                                    <span className="bg-[#FF5500] text-white text-[9px] font-black px-1.5 py-0.2 rounded-md uppercase tracking-wide flex-shrink-0">
+                                      PRIMARY
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] font-bold text-gray-500 mt-0.5">{contact.role}</p>
+                                <p className="text-sm font-mono font-black text-gray-800 mt-1">{contact.phone}</p>
+                              </div>
                             </div>
-
                             <button
-                              onClick={() => window.open(`tel:${c.phone.replace(/[^0-9+]/g, "")}`)}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer"
+                              onClick={() => window.open(`tel:${contact.phone.replace(/[^0-9+]/g, "")}`)}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer"
                             >
                               <PhoneCall size={14} /> CALL
                             </button>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ============ MEDICAL HELP SUB-MENU CARD ============ */}
-              {activeSubMenu === "medical" && (
-                <div className="space-y-3 animate-fade-in">
-                  <div className="flex items-center justify-between bg-[#F0FDF4] border border-[#BBF7D0] rounded-2xl p-3 shadow-2xs">
-                    <button
-                      onClick={() => setActiveSubMenu("none")}
-                      className="flex items-center gap-1.5 text-xs font-black text-[#16A34A] hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-xl shadow-2xs border border-[#BBF7D0] cursor-pointer"
-                    >
-                      <ArrowLeft size={14} /> Back
-                    </button>
-                    <div className="text-right">
-                      <span className="text-xs font-black text-gray-900 flex items-center gap-1.5 justify-end">
-                        <Heart size={16} className="text-[#16A34A] fill-[#16A34A]" /> Medical Options
-                      </span>
-                      <p className="text-[10px] font-bold text-gray-500">Select specific service</p>
+                        ))
+                      )}
                     </div>
                   </div>
-
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => window.open("tel:108")}
-                      className="w-full bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-2xl p-3 text-left hover:opacity-95 transition-all active:scale-[0.98] shadow-md shadow-green-500/20 flex items-center justify-between cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-white text-emerald-700 flex items-center justify-center font-bold shadow-2xs">
-                          <Stethoscope size={18} />
-                        </div>
-                        <div>
-                          <p className="text-xs font-black text-white">Call Ambulance 108</p>
-                          <p className="text-[10px] font-bold text-emerald-100">National Medical Helpline</p>
-                        </div>
-                      </div>
-                      <div className="bg-white text-emerald-700 font-black text-[10px] px-3 py-1 rounded-lg">
-                        CALL 108
-                      </div>
-                    </button>
-
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <button
-                        onClick={() => alert("🚨 First Aid Advice: Stay calm, check breathing, elevate legs if dizzy, call 108 if unresponsive.")}
-                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-emerald-300 hover:bg-emerald-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
-                      >
-                        <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shadow-2xs">
-                          <Activity size={18} />
-                        </div>
-                        <div>
-                          <p className="text-xs font-black text-gray-900 group-hover:text-emerald-600 transition-colors">First Aid Guide</p>
-                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">Instant Advice</p>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => location && window.open(`https://www.google.com/maps/search/hospitals/@${location.lat},${location.lng},14z`)}
-                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-emerald-300 hover:bg-emerald-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
-                      >
-                        <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shadow-2xs">
-                          <MapPin size={18} />
-                        </div>
-                        <div>
-                          <p className="text-xs font-black text-gray-900 group-hover:text-emerald-600 transition-colors">Nearby Hospital</p>
-                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">Google Maps Search</p>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ============ FAMILY MEMBERS SUB-MENU ============ */}
-              {activeSubMenu === "family" && (
-                <div className="space-y-3 animate-fade-in">
-                  <div className="flex items-center justify-between bg-[#F0FDF4] border border-[#BBF7D0] rounded-2xl p-3 shadow-2xs">
-                    <button
-                      onClick={() => setActiveSubMenu("none")}
-                      className="flex items-center gap-1.5 text-xs font-black text-[#16A34A] hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-xl shadow-2xs border border-[#BBF7D0] cursor-pointer"
-                    >
-                      <ArrowLeft size={14} /> Back
-                    </button>
-                    <div className="text-right">
-                      <span className="text-xs font-black text-gray-900 flex items-center gap-1.5 justify-end">
-                        <PhoneCall size={16} className="text-[#16A34A]" /> Family &amp; Owner Contacts
-                      </span>
-                      <p className="text-[10px] font-bold text-gray-500">{getTowingContacts().length} numbers available</p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => location && window.open(`https://www.google.com/maps?q=${location.lat},${location.lng}`)}
-                    className="w-full bg-white border border-gray-200 rounded-xl p-2.5 flex items-center gap-2.5 hover:bg-gray-50 transition-all active:scale-[0.98] shadow-2xs cursor-pointer"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold flex-shrink-0">
-                      <MapPin size={16} />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <p className="text-xs font-black text-gray-900">Share My Live Location</p>
-                      <p className="text-[10px] font-bold text-gray-500">Send GPS pin to contacts</p>
-                    </div>
-                    <ExternalLink size={14} className="text-gray-400 flex-shrink-0 ml-auto" />
-                  </button>
-
-                  <div className="space-y-2">
-                    {getTowingContacts().length === 0 ? (
-                      <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center">
-                        <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                          <PhoneCall size={20} className="text-gray-300" />
-                        </div>
-                        <p className="text-sm font-semibold text-gray-500">No contacts available</p>
-                        <p className="text-xs text-gray-400 mt-1">Owner has not added any numbers yet</p>
-                      </div>
-                    ) : (
-                      getTowingContacts().map((contact, i) => (
-                        <div
-                          key={i}
-                          className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all ${contact.primary ? "bg-[#FFF7ED] border-[#FFEDD5] shadow-xs" : "bg-white border-gray-200"
-                            }`}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div
-                              className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold flex-shrink-0 shadow-2xs ${contact.primary ? "bg-[#FF5500] text-white" : "bg-emerald-100 text-emerald-600"
-                                }`}
-                            >
-                              <User size={18} />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <p className="text-xs font-extrabold text-gray-900 leading-tight truncate">{contact.label}</p>
-                                {contact.primary && (
-                                  <span className="bg-[#FF5500] text-white text-[9px] font-black px-1.5 py-0.2 rounded-md uppercase tracking-wide flex-shrink-0">
-                                    PRIMARY
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[10px] font-bold text-gray-500 mt-0.5">{contact.role}</p>
-                              <p className="text-sm font-mono font-black text-gray-800 mt-1">{contact.phone}</p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => window.open(`tel:${contact.phone.replace(/[^0-9+]/g, "")}`)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer"
-                          >
-                            <PhoneCall size={14} /> CALL
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Footer Support Info Pill */}
-              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-4 flex items-center justify-around text-[11px] font-semibold text-gray-600 mt-2">
-                <span className="flex items-center gap-1.5">
-                  <ShieldCheck size={14} className="text-orange-500" />
-                  Your safety is our priority
-                </span>
-                <div className="w-px h-4 bg-gray-200" />
-                <span className="flex items-center gap-1.5">
-                  <PhoneCall size={14} className="text-blue-500" />
-                  24/7 Support
-                </span>
+                )}
               </div>
-            </div>
+            )}
           </div>
         )}
 

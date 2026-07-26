@@ -1,0 +1,49 @@
+{
+  "files": [
+    {
+      "path": "src/components/QRFleetDashboard.tsx",
+      "lineCount": 2150,
+      "language": "typescript",
+      "type": "code"
+    },
+    {
+      "path": "src/components/scan/ScanPage.tsx",
+      "lineCount": 1322,
+      "language": "typescript",
+      "type": "code"
+    },
+    {
+      "path": "src/data.ts",
+      "lineCount": 213,
+      "language": "typescript",
+      "type": "code"
+    },
+    {
+      "path": "src/lib/supabaseService.ts",
+      "lineCount": 278,
+      "language": "typescript",
+      "type": "code"
+    },
+    {
+      "path": "src/types.ts",
+      "lineCount": 132,
+      "language": "typescript",
+      "type": "code"
+    }
+  ],
+  "importData": {
+    "src/components/QRFleetDashboard.tsx": ["src/context/AuthContext.tsx", "src/lib/supabaseService.ts"],
+    "src/components/scan/ScanPage.tsx": ["src/lib/supabaseService.ts"],
+    "src/data.ts": ["src/types.ts"],
+    "src/lib/supabaseService.ts": ["src/lib/supabase.ts", "src/types.ts"],
+    "src/types.ts": []
+  },
+  "batchImportData": {
+    "src/components/QRFleetDashboard.tsx": [
+      {"path": "src/context/AuthContext.tsx", "symbols": ["AuthProvider", "useAuth"]}
+    ],
+    "src/lib/supabaseService.ts": [
+      {"path": "src/lib/supabase.ts", "symbols": ["isSupabaseConfigured", "supabase"]}
+    ]
+  }
+}

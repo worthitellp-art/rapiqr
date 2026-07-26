@@ -1,0 +1,846 @@
+{
+  "schemaVersion": 1,
+  "algorithm": "louvain",
+  "totalFiles": 80,
+  "totalBatches": 7,
+  "exportsByPath": {
+    ".ua/.understandignore": [],
+    "Server/View": [],
+    "public/_redirects": [],
+    "src/App.tsx": [
+      "App"
+    ],
+    "src/components/ClientDashboard.tsx": [
+      "ClientDashboard"
+    ],
+    "src/components/QRFleetDashboard.tsx": [
+      "QRFleetDashboard"
+    ],
+    "src/components/auth/AdminAuthModal.tsx": [
+      "AdminAuthModal"
+    ],
+    "src/components/auth/AuthModal.tsx": [
+      "AuthModal"
+    ],
+    "src/components/landing/LandingPageMaster.tsx": [
+      "LandingPageMaster"
+    ],
+    "src/components/scan/ScanPage.tsx": [
+      "ScanPage"
+    ],
+    "src/components/ui/3d-image-slider.tsx": [
+      "ImageSlider3D"
+    ],
+    "src/components/ui/hero-carousel.tsx": [
+      "HeroCarousel"
+    ],
+    "src/components/ui/infinite-moving-cards.tsx": [
+      "InfiniteMovingCards"
+    ],
+    "src/context/AuthContext.tsx": [
+      "AuthProvider",
+      "useAuth"
+    ],
+    "src/data.ts": [
+      "INITIAL_USER",
+      "INITIAL_VEHICLES",
+      "INITIAL_QR_CODES",
+      "INITIAL_REPORTS"
+    ],
+    "src/lib/authService.ts": [
+      "ADMIN_EMAIL",
+      "getUserProfile"
+    ],
+    "src/lib/supabase.ts": [
+      "isSupabaseConfigured",
+      "supabase"
+    ],
+    "src/lib/supabaseService.ts": [
+      "getQrCodesFromDb",
+      "getQrCodeByIdFromDb",
+      "saveQrCodeToDb",
+      "bulkSaveQrCodesToDb",
+      "getTemplatesFromDb",
+      "saveTemplateToDb",
+      "deleteTemplateFromDb",
+      "saveStickerPosToDb",
+      "getProductsFromDb",
+      "createReportInDb",
+      "getReportsFromDb"
+    ],
+    "src/lib/utils.ts": [
+      "cn"
+    ],
+    "src/main.tsx": [],
+    "src/types.ts": [],
+    "src/vite-env.d.ts": [],
+    "src/worker.ts": [],
+    "vite.config.ts": []
+  },
+  "batches": [
+    {
+      "batchIndex": 1,
+      "files": [
+        {
+          "path": "src/components/ClientDashboard.tsx",
+          "language": "typescript",
+          "sizeLines": 815,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/auth/AdminAuthModal.tsx",
+          "language": "typescript",
+          "sizeLines": 136,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/landing/LandingPageMaster.tsx",
+          "language": "typescript",
+          "sizeLines": 1887,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/context/AuthContext.tsx",
+          "language": "typescript",
+          "sizeLines": 282,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/lib/authService.ts",
+          "language": "typescript",
+          "sizeLines": 87,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/lib/supabase.ts",
+          "language": "typescript",
+          "sizeLines": 17,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "src/components/ClientDashboard.tsx": [
+          "src/context/AuthContext.tsx"
+        ],
+        "src/components/auth/AdminAuthModal.tsx": [
+          "src/context/AuthContext.tsx"
+        ],
+        "src/components/landing/LandingPageMaster.tsx": [
+          "src/components/landing/landing.css",
+          "src/context/AuthContext.tsx"
+        ],
+        "src/context/AuthContext.tsx": [
+          "src/lib/authService.ts",
+          "src/lib/supabase.ts"
+        ],
+        "src/lib/authService.ts": [
+          "src/lib/supabase.ts"
+        ],
+        "src/lib/supabase.ts": []
+      },
+      "neighborMap": {
+        "src/components/landing/LandingPageMaster.tsx": [
+          {
+            "path": "src/components/landing/landing.css",
+            "batchIndex": 7,
+            "symbols": []
+          }
+        ],
+        "src/context/AuthContext.tsx": [
+          {
+            "path": "src/App.tsx",
+            "batchIndex": 3,
+            "symbols": [
+              "App"
+            ]
+          },
+          {
+            "path": "src/components/QRFleetDashboard.tsx",
+            "batchIndex": 2,
+            "symbols": [
+              "QRFleetDashboard"
+            ]
+          },
+          {
+            "path": "src/components/auth/AuthModal.tsx",
+            "batchIndex": 3,
+            "symbols": [
+              "AuthModal"
+            ]
+          }
+        ],
+        "src/lib/supabase.ts": [
+          {
+            "path": "src/lib/supabaseService.ts",
+            "batchIndex": 2,
+            "symbols": [
+              "getQrCodesFromDb",
+              "getQrCodeByIdFromDb",
+              "saveQrCodeToDb",
+              "bulkSaveQrCodesToDb",
+              "getTemplatesFromDb",
+              "saveTemplateToDb",
+              "deleteTemplateFromDb",
+              "saveStickerPosToDb",
+              "getProductsFromDb",
+              "createReportInDb",
+              "getReportsFromDb"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "batchIndex": 2,
+      "files": [
+        {
+          "path": "src/components/QRFleetDashboard.tsx",
+          "language": "typescript",
+          "sizeLines": 2150,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/scan/ScanPage.tsx",
+          "language": "typescript",
+          "sizeLines": 1322,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/data.ts",
+          "language": "typescript",
+          "sizeLines": 213,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/lib/supabaseService.ts",
+          "language": "typescript",
+          "sizeLines": 278,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/types.ts",
+          "language": "typescript",
+          "sizeLines": 132,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "src/components/QRFleetDashboard.tsx": [
+          "src/context/AuthContext.tsx",
+          "src/lib/supabaseService.ts"
+        ],
+        "src/components/scan/ScanPage.tsx": [
+          "src/lib/supabaseService.ts"
+        ],
+        "src/data.ts": [
+          "src/types.ts"
+        ],
+        "src/lib/supabaseService.ts": [
+          "src/lib/supabase.ts",
+          "src/types.ts"
+        ],
+        "src/types.ts": []
+      },
+      "neighborMap": {
+        "src/components/QRFleetDashboard.tsx": [
+          {
+            "path": "src/context/AuthContext.tsx",
+            "batchIndex": 1,
+            "symbols": [
+              "AuthProvider",
+              "useAuth"
+            ]
+          }
+        ],
+        "src/lib/supabaseService.ts": [
+          {
+            "path": "src/lib/supabase.ts",
+            "batchIndex": 1,
+            "symbols": [
+              "isSupabaseConfigured",
+              "supabase"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "batchIndex": 3,
+      "files": [
+        {
+          "path": "src/App.tsx",
+          "language": "typescript",
+          "sizeLines": 133,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/auth/AuthModal.tsx",
+          "language": "typescript",
+          "sizeLines": 404,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/main.tsx",
+          "language": "typescript",
+          "sizeLines": 10,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "src/App.tsx": [
+          "src/components/auth/AuthModal.tsx",
+          "src/context/AuthContext.tsx"
+        ],
+        "src/components/auth/AuthModal.tsx": [
+          "src/context/AuthContext.tsx"
+        ],
+        "src/main.tsx": [
+          "src/App.tsx",
+          "src/index.css"
+        ]
+      },
+      "neighborMap": {
+        "src/App.tsx": [
+          {
+            "path": "src/context/AuthContext.tsx",
+            "batchIndex": 1,
+            "symbols": [
+              "AuthProvider",
+              "useAuth"
+            ]
+          }
+        ],
+        "src/components/auth/AuthModal.tsx": [
+          {
+            "path": "src/context/AuthContext.tsx",
+            "batchIndex": 1,
+            "symbols": [
+              "AuthProvider",
+              "useAuth"
+            ]
+          }
+        ],
+        "src/main.tsx": [
+          {
+            "path": "src/index.css",
+            "batchIndex": 7,
+            "symbols": []
+          }
+        ]
+      }
+    },
+    {
+      "batchIndex": 4,
+      "files": [
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/_contributing.md",
+          "language": "markdown",
+          "sizeLines": 170,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/_sections.md",
+          "language": "markdown",
+          "sizeLines": 39,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/_template.md",
+          "language": "markdown",
+          "sizeLines": 34,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/advanced-full-text-search.md",
+          "language": "markdown",
+          "sizeLines": 55,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/advanced-jsonb-indexing.md",
+          "language": "markdown",
+          "sizeLines": 49,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/conn-idle-timeout.md",
+          "language": "markdown",
+          "sizeLines": 46,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/conn-limits.md",
+          "language": "markdown",
+          "sizeLines": 44,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/conn-pooling.md",
+          "language": "markdown",
+          "sizeLines": 41,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/conn-prepared-statements.md",
+          "language": "markdown",
+          "sizeLines": 46,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/data-batch-inserts.md",
+          "language": "markdown",
+          "sizeLines": 54,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/data-n-plus-one.md",
+          "language": "markdown",
+          "sizeLines": 53,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/data-pagination.md",
+          "language": "markdown",
+          "sizeLines": 50,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/data-upsert.md",
+          "language": "markdown",
+          "sizeLines": 50,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/lock-advisory.md",
+          "language": "markdown",
+          "sizeLines": 56,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/lock-deadlock-prevention.md",
+          "language": "markdown",
+          "sizeLines": 68,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/lock-short-transactions.md",
+          "language": "markdown",
+          "sizeLines": 50,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/lock-skip-locked.md",
+          "language": "markdown",
+          "sizeLines": 54,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/monitor-explain-analyze.md",
+          "language": "markdown",
+          "sizeLines": 45,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/monitor-pg-stat-statements.md",
+          "language": "markdown",
+          "sizeLines": 55,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/monitor-vacuum-analyze.md",
+          "language": "markdown",
+          "sizeLines": 55,
+          "fileCategory": "docs"
+        }
+      ],
+      "batchImportData": {
+        ".agents/skills/supabase-postgres-best-practices/references/_contributing.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/_sections.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/_template.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/advanced-full-text-search.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/advanced-jsonb-indexing.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/conn-idle-timeout.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/conn-limits.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/conn-pooling.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/conn-prepared-statements.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/data-batch-inserts.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/data-n-plus-one.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/data-pagination.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/data-upsert.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/lock-advisory.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/lock-deadlock-prevention.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/lock-short-transactions.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/lock-skip-locked.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/monitor-explain-analyze.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/monitor-pg-stat-statements.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/monitor-vacuum-analyze.md": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 5,
+      "files": [
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/query-composite-indexes.md",
+          "language": "markdown",
+          "sizeLines": 44,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/query-covering-indexes.md",
+          "language": "markdown",
+          "sizeLines": 40,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/query-index-types.md",
+          "language": "markdown",
+          "sizeLines": 48,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/query-missing-indexes.md",
+          "language": "markdown",
+          "sizeLines": 43,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/query-partial-indexes.md",
+          "language": "markdown",
+          "sizeLines": 45,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/schema-constraints.md",
+          "language": "markdown",
+          "sizeLines": 80,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/schema-data-types.md",
+          "language": "markdown",
+          "sizeLines": 46,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/schema-foreign-key-indexes.md",
+          "language": "markdown",
+          "sizeLines": 59,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/schema-lowercase-identifiers.md",
+          "language": "markdown",
+          "sizeLines": 55,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/schema-partitioning.md",
+          "language": "markdown",
+          "sizeLines": 55,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/schema-primary-keys.md",
+          "language": "markdown",
+          "sizeLines": 61,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/security-privileges.md",
+          "language": "markdown",
+          "sizeLines": 54,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/security-rls-basics.md",
+          "language": "markdown",
+          "sizeLines": 50,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/references/security-rls-performance.md",
+          "language": "markdown",
+          "sizeLines": 63,
+          "fileCategory": "docs"
+        }
+      ],
+      "batchImportData": {
+        ".agents/skills/supabase-postgres-best-practices/references/query-composite-indexes.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/query-covering-indexes.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/query-index-types.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/query-missing-indexes.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/query-partial-indexes.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/schema-constraints.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/schema-data-types.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/schema-foreign-key-indexes.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/schema-lowercase-identifiers.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/schema-partitioning.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/schema-primary-keys.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/security-privileges.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/security-rls-basics.md": [],
+        ".agents/skills/supabase-postgres-best-practices/references/security-rls-performance.md": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 6,
+      "files": [
+        {
+          "path": ".env.example",
+          "language": "config",
+          "sizeLines": 11,
+          "fileCategory": "config"
+        },
+        {
+          "path": "README.md",
+          "language": "markdown",
+          "sizeLines": 20,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "SYSTEM_FLOW.md",
+          "language": "markdown",
+          "sizeLines": 130,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "doc.md",
+          "language": "markdown",
+          "sizeLines": 255,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "index.html",
+          "language": "html",
+          "sizeLines": 17,
+          "fileCategory": "markup"
+        },
+        {
+          "path": "metadata.json",
+          "language": "json",
+          "sizeLines": 6,
+          "fileCategory": "config"
+        },
+        {
+          "path": "package.json",
+          "language": "json",
+          "sizeLines": 38,
+          "fileCategory": "config"
+        },
+        {
+          "path": "skills-lock.json",
+          "language": "json",
+          "sizeLines": 17,
+          "fileCategory": "config"
+        },
+        {
+          "path": "task.md",
+          "language": "markdown",
+          "sizeLines": 14,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "tsconfig.json",
+          "language": "json",
+          "sizeLines": 26,
+          "fileCategory": "config"
+        },
+        {
+          "path": "wrangler.toml",
+          "language": "toml",
+          "sizeLines": 7,
+          "fileCategory": "config"
+        }
+      ],
+      "batchImportData": {
+        ".env.example": [],
+        "README.md": [],
+        "SYSTEM_FLOW.md": [],
+        "doc.md": [],
+        "index.html": [],
+        "metadata.json": [],
+        "package.json": [],
+        "skills-lock.json": [],
+        "task.md": [],
+        "tsconfig.json": [],
+        "wrangler.toml": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 7,
+      "files": [
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/CHANGELOG.md",
+          "language": "markdown",
+          "sizeLines": 43,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase-postgres-best-practices/SKILL.md",
+          "language": "markdown",
+          "sizeLines": 64,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase/CHANGELOG.md",
+          "language": "markdown",
+          "sizeLines": 53,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase/SKILL.md",
+          "language": "markdown",
+          "sizeLines": 145,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase/assets/feedback-issue-template.md",
+          "language": "markdown",
+          "sizeLines": 17,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".agents/skills/supabase/references/skill-feedback.md",
+          "language": "markdown",
+          "sizeLines": 17,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".ua/.understandignore",
+          "language": "unknown",
+          "sizeLines": 62,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Server/View",
+          "language": "unknown",
+          "sizeLines": 0,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Server/package.json",
+          "language": "json",
+          "sizeLines": 13,
+          "fileCategory": "config"
+        },
+        {
+          "path": "public/_redirects",
+          "language": "unknown",
+          "sizeLines": 1,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/landing/landing.css",
+          "language": "css",
+          "sizeLines": 1011,
+          "fileCategory": "markup"
+        },
+        {
+          "path": "src/components/ui/3d-image-slider.tsx",
+          "language": "typescript",
+          "sizeLines": 108,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/ui/hero-carousel.tsx",
+          "language": "typescript",
+          "sizeLines": 44,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/ui/infinite-moving-cards.tsx",
+          "language": "typescript",
+          "sizeLines": 127,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/index.css",
+          "language": "css",
+          "sizeLines": 82,
+          "fileCategory": "markup"
+        },
+        {
+          "path": "src/lib/utils.ts",
+          "language": "typescript",
+          "sizeLines": 3,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/vite-env.d.ts",
+          "language": "typescript",
+          "sizeLines": 1,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/worker.ts",
+          "language": "typescript",
+          "sizeLines": 13,
+          "fileCategory": "code"
+        },
+        {
+          "path": "supabase/schema.sql",
+          "language": "sql",
+          "sizeLines": 237,
+          "fileCategory": "data"
+        },
+        {
+          "path": "supabase/seed.sql",
+          "language": "sql",
+          "sizeLines": 102,
+          "fileCategory": "data"
+        },
+        {
+          "path": "vite.config.ts",
+          "language": "typescript",
+          "sizeLines": 22,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        ".agents/skills/supabase-postgres-best-practices/CHANGELOG.md": [],
+        ".agents/skills/supabase-postgres-best-practices/SKILL.md": [],
+        ".agents/skills/supabase/CHANGELOG.md": [],
+        ".agents/skills/supabase/SKILL.md": [],
+        ".agents/skills/supabase/assets/feedback-issue-template.md": [],
+        ".agents/skills/supabase/references/skill-feedback.md": [],
+        ".ua/.understandignore": [],
+        "Server/View": [],
+        "Server/package.json": [],
+        "public/_redirects": [],
+        "src/components/landing/landing.css": [],
+        "src/components/ui/3d-image-slider.tsx": [],
+        "src/components/ui/hero-carousel.tsx": [],
+        "src/components/ui/infinite-moving-cards.tsx": [
+          "src/lib/utils.ts"
+        ],
+        "src/index.css": [],
+        "src/lib/utils.ts": [],
+        "src/vite-env.d.ts": [],
+        "src/worker.ts": [],
+        "supabase/schema.sql": [],
+        "supabase/seed.sql": [],
+        "vite.config.ts": []
+      },
+      "neighborMap": {
+        "src/components/landing/landing.css": [
+          {
+            "path": "src/components/landing/LandingPageMaster.tsx",
+            "batchIndex": 1,
+            "symbols": [
+              "LandingPageMaster"
+            ]
+          }
+        ],
+        "src/index.css": [
+          {
+            "path": "src/main.tsx",
+            "batchIndex": 3,
+            "symbols": []
+          }
+        ]
+      }
+    }
+  ]
+}

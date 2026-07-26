@@ -1,0 +1,116 @@
+{
+  "files": [
+    {
+      "path": ".agents/skills/supabase-postgres-best-practices/references/query-composite-indexes.md",
+      "lines": 44,
+      "type": "markdown",
+      "category": "docs",
+      "imports": [],
+      "crossBatchNeighbors": []
+    },
+    {
+      "path": ".agents/skills/supabase-postgres-best-practices/references/query-covering-indexes.md",
+      "lines": 40,
+      "type": "markdown",
+      "category": "docs",
+      "imports": [],
+      "crossBatchNeighbors": []
+    },
+    {
+      "path": ".agents/skills/supabase-postgres-best-practices/references/query-index-types.md",
+      "lines": 48,
+      "type": "markdown",
+      "category": "docs",
+      "imports": [],
+      "crossBatchNeighbors": []
+    },
+    {
+      "path": ".agents/skills/supabase-postgres-best-practices/references/query-missing-indexes.md",
+      "lines": 43,
+      "type": "markdown",
+      "category": "docs",
+      "imports": [],
+      "crossBatchNeighbors": []
+    },
+    {
+      "path": ".agents/skills/supabase-postgres-best-practices/references/query-partial-indexes.md",
+      "lines": 45,
+      "type": "markdown",
+      "category": "docs",
+      "imports": [],
+      "crossBatchNeighbors": []
+    },
+    {
+      "path": ".agents/skills/supabase-postgres-best-practices/references/schema-constraints.md",
+      "lines": 80,
+      "type": "markdown",
+      "category": "docs",
+      "imports": [],
+      "crossBatchNeighbors": []
+    },
+    {
+      "path": ".agents/skills/supabase-postgres-best-practices/references/schema-data-types.md",
+      "lines": 46,
+      "type": "markdown",
+      "category": "docs",
+      "imports": [],
+      "crossBatchNeighbors": []
+    },
+    {
+      "path": ".agents/skills/supabase-postgres-best-practices/references/schema-foreign-key-indexes.md",
+      "lines": 59,
+      "type": "markdown",
+      "category": "docs",
+      "imports": [],
+      "crossBatchNeighbors": []
+    },
+    {
+      "path": ".agents/skills/supabase-postgres-best-practices/references/schema-lowercase-identifiers.md",
+      "lines": 55,
+      "type": "markdown",
+      "category": "docs",
+      "imports": [],
+      "crossBatchNeighbors": []
+    },
+    {
+      "path": ".agents/skills/supabase-postgres-best-practices/references/schema-partitioning.md",
+      "lines": 55,
+      "type": "markdown",
+      "category": "docs",
+      "imports": [],
+      "crossBatchNeighbors": []
+    },
+    {
+      "path": ".agents/skills/supabase-postgres-best-practices/references/schema-primary-keys.md",
+      "lines": 61,
+      "type": "markdown",
+      "category": "docs",
+      "imports": [],
+      "crossBatchNeighbors": []
+    },
+    {
+      "path": ".agents/skills/supabase-postgres-best-practices/references/security-privileges.md",
+      "lines": 54,
+      "type": "markdown",
+      "category": "docs",
+      "imports": [],
+      "crossBatchNeighbors": []
+    },
+    {
+      "path": ".agents/skills/supabase-postgres-best-practices/references/security-rls-basics.md",
+      "lines": 50,
+      "type": "markdown",
+      "category": "docs",
+      "imports": [],
+      "crossBatchNeighbors": []
+    },
+    {
+      "path": ".agents/skills/supabase-postgres-best-practices/references/security-rls-performance.md",
+      "lines": 63,
+      "type": "markdown",
+      "category": "docs",
+      "imports": [],
+      "crossBatchNeighbors": []
+    }
+  ]
+}
