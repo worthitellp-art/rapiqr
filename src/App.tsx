@@ -3,7 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthModal from './components/auth/AuthModal';
 
 const LandingPageMaster = lazy(() => import('./components/landing/LandingPageMaster'));
-const QRFleetDashboard = lazy(() => import('./components/QRFleetDashboard'));
+const QRFleetDashboard = lazy(() => import('./components/dashboard/admin'));
 const ScanPage = lazy(() => import('./components/scan/ScanPage'));
 
 function PageLoader() {

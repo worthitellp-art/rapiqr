@@ -31,7 +31,7 @@ import {
   ShieldCheck,
   MoveRight,
   ArrowLeft,
-  Fuel,
+
   Activity,
   Camera,
   Upload,
@@ -451,6 +451,16 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
     }
 
     return contacts;
+  };
+
+  /* ---- Get ONLY Admin Communication Page Contacts ---- */
+  const getAdminContacts = (filterCategory?: string) => {
+    const adminHelplines = JSON.parse(localStorage.getItem("namoqr-helplines") || "[]");
+    const active = adminHelplines.filter((p: any) => p.active !== false);
+    if (!filterCategory) return active.map((p: any) => ({ label: p.label, phone: p.phone, role: p.category, category: p.category }));
+    return active
+      .filter((p: any) => p.category === filterCategory)
+      .map((p: any) => ({ label: p.label, phone: p.phone, role: p.category, category: p.category }));
   };
   const [pingsSent, setPingsSent] = useState(0);
   const maxPings = 7;
@@ -1023,7 +1033,10 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                     {/* 3. Parking Issue */}
                     <button
                       onClick={() => {
-                        if (qrData && location) {
+                        const parking = getAdminContacts("Parking");
+                        if (parking.length > 0) {
+                          window.open(`tel:${parking[0].phone.replace(/[^0-9+]/g, "")}`);
+                        } else if (qrData && location) {
                           const payload = {
                             qrId: qrData.id,
                             qrUrl: qrData.qrUrl,
@@ -1052,7 +1065,9 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                       </div>
                       <div>
                         <p className="text-[11px] sm:text-xs font-bold text-gray-900 leading-tight">Parking Issue</p>
-                        <p className="text-[9px] sm:text-[10px] text-gray-400 font-normal mt-0.5">Blocking path</p>
+                        <p className="text-[9px] sm:text-[10px] text-gray-400 font-normal mt-0.5">
+                          {getAdminContacts("Parking").length > 0 ? getAdminContacts("Parking")[0].label : "Blocking path"}
+                        </p>
                       </div>
                     </button>
 
@@ -1073,7 +1088,14 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
 
                     {/* 5. Theft Detected */}
                     <button
-                      onClick={() => setActiveSubMenu("family")}
+                      onClick={() => {
+                        const theft = getAdminContacts("Theft");
+                        if (theft.length > 0) {
+                          window.open(`tel:${theft[0].phone.replace(/[^0-9+]/g, "")}`);
+                        } else {
+                          setActiveSubMenu("family");
+                        }
+                      }}
                       className="bg-white border border-gray-100 hover:border-rose-200 rounded-2xl p-2.5 flex flex-col items-center justify-between text-center cursor-pointer active:scale-95 transition-all min-h-[100px] shadow-2xs hover:shadow-sm relative group"
                     >
                       <ChevronRight size={12} className="text-gray-300 absolute top-2 right-2 group-hover:text-gray-500 transition-colors" />
@@ -1082,13 +1104,22 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                       </div>
                       <div>
                         <p className="text-[11px] sm:text-xs font-bold text-gray-900 leading-tight">Theft Alert</p>
-                        <p className="text-[9px] sm:text-[10px] text-gray-400 font-normal mt-0.5">Report and alert</p>
+                        <p className="text-[9px] sm:text-[10px] text-gray-400 font-normal mt-0.5">
+                          {getAdminContacts("Theft").length > 0 ? getAdminContacts("Theft")[0].label : "Report and alert"}
+                        </p>
                       </div>
                     </button>
 
                     {/* 6. Headlights */}
                     <button
-                      onClick={() => setActiveSubMenu("medical")}
+                      onClick={() => {
+                        const headlights = getAdminContacts("Headlights");
+                        if (headlights.length > 0) {
+                          window.open(`tel:${headlights[0].phone.replace(/[^0-9+]/g, "")}`);
+                        } else {
+                          setActiveSubMenu("medical");
+                        }
+                      }}
                       className="bg-white border border-gray-100 hover:border-slate-300 rounded-2xl p-2.5 flex flex-col items-center justify-between text-center cursor-pointer active:scale-95 transition-all min-h-[100px] shadow-2xs hover:shadow-sm relative group"
                     >
                       <ChevronRight size={12} className="text-gray-300 absolute top-2 right-2 group-hover:text-gray-500 transition-colors" />
@@ -1107,7 +1138,9 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                       </div>
                       <div>
                         <p className="text-[11px] sm:text-xs font-bold text-gray-900 leading-tight">Headlights</p>
-                        <p className="text-[9px] sm:text-[10px] text-gray-400 font-normal mt-0.5">are on</p>
+                        <p className="text-[9px] sm:text-[10px] text-gray-400 font-normal mt-0.5">
+                          {getAdminContacts("Headlights").length > 0 ? getAdminContacts("Headlights")[0].label : "are on"}
+                        </p>
                       </div>
                     </button>
                   </div>
@@ -1198,72 +1231,78 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                 {activeSubMenu === "emergency-main" && (
                   <div className="space-y-4 animate-fade-in">
                     {/* Header bar with Back button */}
-                    <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-2xl p-3 shadow-2xs">
+                    <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-3 shadow-2xs">
                       <button
                         onClick={() => setActiveSubMenu("none")}
-                        className="flex items-center gap-1.5 text-xs font-black text-red-600 hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-xl shadow-2xs border border-red-200 cursor-pointer"
+                        className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-gray-900 transition-colors bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-xl cursor-pointer"
                       >
                         <ArrowLeft size={14} /> Back
                       </button>
                       <div className="text-right">
-                        <span className="text-xs font-black text-gray-900 flex items-center gap-1.5 justify-end">
-                          <ShieldAlert size={16} className="text-red-600" /> Emergency Options
+                        <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5 justify-end">
+                          <ShieldAlert size={16} className="text-red-500" /> Emergency Options
                         </span>
-                        <p className="text-[10px] font-bold text-gray-500">Choose action to proceed</p>
                       </div>
                     </div>
 
-                    {/* 3 Main Emergency Action Buttons */}
+                    {/* Emergency Action Buttons */}
                     <div className="space-y-3">
-                      {/* Button 1: Vehicle Owner Primary Contact */}
-                      <button
-                        onClick={() => {
-                          const contacts = getTowingContacts();
-                          const primary = contacts.find((c) => c.primary) || contacts[0];
-                          if (primary) {
-                            window.open(`tel:${primary.phone.replace(/[^0-9+]/g, "")}`);
-                          } else {
-                            alert("No vehicle owner phone number registered.");
-                          }
-                        }}
-                        className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-red-600/20 active:scale-[0.98] transition-all cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3.5 min-w-0">
-                          <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold flex-shrink-0">
-                            <Car size={22} />
-                          </div>
-                          <div className="text-left min-w-0">
-                            <p className="text-sm font-black text-white tracking-tight">Request Ambulance</p>
-                            <p className="text-[11px] font-medium text-white/80 truncate">
-                              Immediate connection to ambulance
-                            </p>
-                          </div>
+                      {/* Button 1: Request Ambulance (from Admin Communication Page) */}
+                      {getAdminContacts("Ambulance").length > 0 ? (
+                        getAdminContacts("Ambulance").map((amb, i) => (
+                          <button
+                            key={`amb-${i}`}
+                            onClick={() => window.open(`tel:${amb.phone.replace(/[^0-9+]/g, "")}`)}
+                            className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-red-600/20 active:scale-[0.98] transition-all cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3.5 min-w-0">
+                              <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold flex-shrink-0">
+                                <Stethoscope size={22} />
+                              </div>
+                              <div className="text-left min-w-0">
+                                <p className="text-sm font-black text-white tracking-tight">Request Ambulance</p>
+                                <p className="text-[11px] font-medium text-white/80 truncate">{amb.label}</p>
+                              </div>
+                            </div>
+                            <div className="bg-white text-red-600 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
+                              <PhoneCall size={12} /> CALL
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
+                          <p className="text-xs font-semibold text-gray-400">No ambulance provider configured</p>
+                          <p className="text-[10px] text-gray-300 mt-0.5">Ask admin to add one in Communication settings</p>
                         </div>
-                        <div className="bg-white text-red-600 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
-                          Get Help
-                        </div>
-                      </button>
+                      )}
 
-                      {/* Button 2: Call Family Members */}
-                      <button
-                        onClick={() => setActiveSubMenu("family")}
-                        className="w-full bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-green-600/20 active:scale-[0.98] transition-all cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3.5 min-w-0">
-                          <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold flex-shrink-0">
-                            <User size={22} />
+                      {/* Button 2: Call Family Members (from Admin Communication Page) */}
+                      {getAdminContacts("Family").length > 0 ? (
+                        <button
+                          onClick={() => setActiveSubMenu("family")}
+                          className="w-full bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-green-600/20 active:scale-[0.98] transition-all cursor-pointer"
+                        >
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold flex-shrink-0">
+                              <User size={22} />
+                            </div>
+                            <div className="text-left min-w-0">
+                              <p className="text-sm font-black text-white tracking-tight">Call Family Members</p>
+                              <p className="text-[11px] font-medium text-white/80">
+                                {getAdminContacts("Family").length} contact{getAdminContacts("Family").length !== 1 ? "s" : ""} available
+                              </p>
+                            </div>
                           </div>
-                          <div className="text-left min-w-0">
-                            <p className="text-sm font-black text-white tracking-tight">Call Family Members</p>
-                            <p className="text-[11px] font-medium text-white/80">
-                              Let loved ones find you faster.
-                            </p>
+                          <div className="bg-white text-emerald-700 font-black text-xs px-3 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
+                            <PhoneCall size={12} /> CALL
                           </div>
+                        </button>
+                      ) : (
+                        <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
+                          <p className="text-xs font-semibold text-gray-400">No family contacts configured</p>
+                          <p className="text-[10px] text-gray-300 mt-0.5">Ask admin to add Family contacts in Communication settings</p>
                         </div>
-                        <div className="bg-white text-emerald-700 font-black text-xs px-3 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
-                          Call
-                        </div>
-                      </button>
+                      )}
 
                       {/* Button 3: Share Location */}
                       <button
@@ -1315,18 +1354,18 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                 {activeSubMenu === "mechanical" && (
                   <div className="space-y-3 animate-fade-in">
                     {/* Header bar with Back button */}
-                    <div className="flex items-center justify-between bg-[#FFF0F2] border border-[#FFD6DB] rounded-2xl p-3 shadow-2xs">
+                    <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-3 shadow-2xs">
                       <button
                         onClick={() => setActiveSubMenu("none")}
-                        className="flex items-center gap-1.5 text-xs font-black text-[#E52E3D] hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-xl shadow-2xs border border-[#FFD6DB] cursor-pointer"
+                        className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-gray-900 transition-colors bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-xl cursor-pointer"
                       >
                         <ArrowLeft size={14} /> Back
                       </button>
                       <div className="text-right">
-                        <span className="text-xs font-black text-gray-900 flex items-center gap-1.5 justify-end">
-                          <Wrench size={16} className="text-[#E52E3D]" /> Mechanical Options
+                        <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5 justify-end">
+                          <Wrench size={16} className="text-orange-500" /> Mechanical Options
                         </span>
-                        <p className="text-[10px] font-bold text-gray-500">Select specific service</p>
+                        <p className="text-[10px] font-semibold text-gray-400">Select a service</p>
                       </div>
                     </div>
 
@@ -1345,58 +1384,74 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                         </div>
                         <div>
                           <p className="text-xs font-black text-gray-900 group-hover:text-red-600 transition-colors">Towing Service</p>
-                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">24x7 Flatbed Tow</p>
+                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">
+                            {getAdminContacts("Towing").length > 0
+                              ? `${getAdminContacts("Towing").length} provider${getAdminContacts("Towing").length !== 1 ? "s" : ""}`
+                              : "Not configured"}
+                          </p>
                         </div>
                       </button>
 
                       {/* Flat Tire / Puncher */}
                       <button
                         onClick={() => {
-                          const contacts = getTowingContacts();
-                          if (contacts.length > 0) window.open(`tel:${contacts[0].phone.replace(/[^0-9+]/g, "")}`);
+                          const flatTire = getAdminContacts("Flat Tire");
+                          if (flatTire.length > 0) window.open(`tel:${flatTire[0].phone.replace(/[^0-9+]/g, "")}`);
                         }}
-                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-red-300 hover:bg-red-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-amber-300 hover:bg-amber-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
                       >
                         <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold shadow-2xs">
-                          <Car size={18} />
+                          <Wrench size={18} />
                         </div>
                         <div>
-                          <p className="text-xs font-black text-gray-900 group-hover:text-red-600 transition-colors">Flat Tire Fix</p>
-                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">On-site Puncture</p>
+                          <p className="text-xs font-black text-gray-900 group-hover:text-amber-600 transition-colors">Flat Tire Fix</p>
+                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">
+                            {getAdminContacts("Flat Tire").length > 0
+                              ? getAdminContacts("Flat Tire")[0].label
+                              : "Not configured"}
+                          </p>
                         </div>
                       </button>
 
                       {/* Fuel & Battery */}
                       <button
                         onClick={() => {
-                          const contacts = getTowingContacts();
-                          if (contacts.length > 0) window.open(`tel:${contacts[0].phone.replace(/[^0-9+]/g, "")}`);
+                          const battery = getAdminContacts("Battery");
+                          if (battery.length > 0) window.open(`tel:${battery[0].phone.replace(/[^0-9+]/g, "")}`);
                         }}
-                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-red-300 hover:bg-red-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-yellow-300 hover:bg-yellow-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
                       >
-                        <div className="w-8 h-8 rounded-xl bg-yellow-100 text-yellow-700 flex items-center justify-center font-bold shadow-2xs">
-                          <Fuel size={18} />
+                        <div className="w-8 h-8 rounded-xl bg-yellow-100 text-yellow-600 flex items-center justify-center font-bold shadow-2xs">
+                          <Battery size={18} />
                         </div>
                         <div>
-                          <p className="text-xs font-black text-gray-900 group-hover:text-red-600 transition-colors">Battery</p>
-                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">Jumpstart Assist</p>
+                          <p className="text-xs font-black text-gray-900 group-hover:text-yellow-600 transition-colors">Battery</p>
+                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">
+                            {getAdminContacts("Battery").length > 0
+                              ? getAdminContacts("Battery")[0].label
+                              : "Not configured"}
+                          </p>
                         </div>
                       </button>
 
-                      {/* Engine Repair / Breakdown */}
+                      {/* Mechanic */}
                       <button
                         onClick={() => {
-                          const contacts = getTowingContacts();
-                          if (contacts.length > 0) window.open(`tel:${contacts[0].phone.replace(/[^0-9+]/g, "")}`);
+                          const mechanic = getAdminContacts("Mechanic");
+                          if (mechanic.length > 0) window.open(`tel:${mechanic[0].phone.replace(/[^0-9+]/g, "")}`);
                         }}
-                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-red-300 hover:bg-red-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-orange-300 hover:bg-orange-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
                       >
                         <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold shadow-2xs">
-                          <Wrench size={18} />
+                          <Settings size={18} />
                         </div>
                         <div>
-                          <p className="text-xs font-black text-gray-900 group-hover:text-red-600 transition-colors">Other</p>
-                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">Mobile Mechanic</p>
+                          <p className="text-xs font-black text-gray-900 group-hover:text-orange-600 transition-colors">Mechanic</p>
+                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">
+                            {getAdminContacts("Mechanic").length > 0
+                              ? getAdminContacts("Mechanic")[0].label
+                              : "Not configured"}
+                          </p>
                         </div>
                       </button>
                     </div>
@@ -1406,16 +1461,16 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                 {/* ============ TOWING BREAKDOWN STEP VIEW ============ */}
                 {activeSubMenu === "towing" && (
                   <div className="space-y-3 animate-fade-in">
-                    <div className="flex items-center justify-between bg-[#FFF0F2] border border-[#FFD6DB] rounded-2xl p-3 shadow-2xs">
+                    <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-3 shadow-2xs">
                       <button
                         onClick={() => setActiveSubMenu("mechanical")}
-                        className="flex items-center gap-1.5 text-xs font-black text-[#E52E3D] hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-xl shadow-2xs border border-[#FFD6DB] cursor-pointer"
+                        className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-gray-900 transition-colors bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-xl cursor-pointer"
                       >
                         <ArrowLeft size={14} /> Back
                       </button>
                       <div className="text-right">
-                        <span className="text-xs font-black text-gray-900 flex items-center gap-1.5 justify-end">
-                          <Truck size={16} className="text-[#E52E3D]" /> Towing Helpline
+                        <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5 justify-end">
+                          <Truck size={16} className="text-red-500" /> Towing Service
                         </span>
                       </div>
                     </div>
@@ -1489,32 +1544,31 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                         </div>
 
                         <div className="space-y-2">
-                          {getTowingContacts().map((c, i) => (
-                            <div
-                              key={i}
-                              className={`p-3.5 rounded-2xl border flex items-center justify-between gap-2 transition-all ${c.primary ? "bg-[#FFF7ED] border-[#FFEDD5]" : "bg-white border-gray-200"
-                                }`}
-                            >
-                              <div className="min-w-0 pr-1">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <p className="text-xs font-extrabold text-gray-900 leading-tight">{c.label}</p>
-                                  {c.primary && (
-                                    <span className="bg-[#FF5500] text-white text-[9px] font-black px-1.5 py-0.2 rounded-md uppercase tracking-wide">
-                                      PRIMARY
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-sm font-mono font-black text-gray-800 mt-1">{c.phone}</p>
-                              </div>
-
-                              <button
-                                onClick={() => window.open(`tel:${c.phone.replace(/[^0-9+]/g, "")}`)}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer"
-                              >
-                                <PhoneCall size={14} /> CALL
-                              </button>
+                          {getAdminContacts("Towing").length === 0 ? (
+                            <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
+                              <p className="text-xs font-semibold text-gray-400">No towing providers configured</p>
+                              <p className="text-[10px] text-gray-300 mt-0.5">Ask admin to add Towing providers in Communication settings</p>
                             </div>
-                          ))}
+                          ) : (
+                            getAdminContacts("Towing").map((c, i) => (
+                              <div
+                                key={i}
+                                className="p-3.5 rounded-2xl border border-gray-200 bg-white flex items-center justify-between gap-2 transition-all hover:border-gray-300"
+                              >
+                                <div className="min-w-0 pr-1">
+                                  <p className="text-xs font-bold text-gray-900 leading-tight">{c.label}</p>
+                                  <p className="text-[10px] text-gray-400 font-semibold mt-0.5">{c.role}</p>
+                                  <p className="text-sm font-mono font-black text-gray-800 mt-1">{c.phone}</p>
+                                </div>
+                                <button
+                                  onClick={() => window.open(`tel:${c.phone.replace(/[^0-9+]/g, "")}`)}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer"
+                                >
+                                  <PhoneCall size={14} /> CALL
+                                </button>
+                              </div>
+                            ))
+                          )}
                         </div>
                       </div>
                     )}
@@ -1524,39 +1578,49 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                 {/* ============ MEDICAL HELP SUB-MENU CARD ============ */}
                 {activeSubMenu === "medical" && (
                   <div className="space-y-3 animate-fade-in">
-                    <div className="flex items-center justify-between bg-[#F0FDF4] border border-[#BBF7D0] rounded-2xl p-3 shadow-2xs">
+                    <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-3 shadow-2xs">
                       <button
                         onClick={() => setActiveSubMenu("none")}
-                        className="flex items-center gap-1.5 text-xs font-black text-[#16A34A] hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-xl shadow-2xs border border-[#BBF7D0] cursor-pointer"
+                        className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-gray-900 transition-colors bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-xl cursor-pointer"
                       >
                         <ArrowLeft size={14} /> Back
                       </button>
                       <div className="text-right">
-                        <span className="text-xs font-black text-gray-900 flex items-center gap-1.5 justify-end">
-                          <Heart size={16} className="text-[#16A34A] fill-[#16A34A]" /> Medical Options
+                        <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5 justify-end">
+                          <Heart size={16} className="text-emerald-500 fill-emerald-500" /> Medical Options
                         </span>
-                        <p className="text-[10px] font-bold text-gray-500">Select specific service</p>
+                        <p className="text-[10px] font-semibold text-gray-400">Select a service</p>
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <button
-                        onClick={() => window.open("tel:108")}
-                        className="w-full bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-2xl p-3 text-left hover:opacity-95 transition-all active:scale-[0.98] shadow-md shadow-green-500/20 flex items-center justify-between cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-white text-emerald-700 flex items-center justify-center font-bold shadow-2xs">
-                            <Stethoscope size={18} />
-                          </div>
-                          <div>
-                            <p className="text-xs font-black text-white">Call Ambulance 108</p>
-                            <p className="text-[10px] font-bold text-emerald-100">National Medical Helpline</p>
-                          </div>
+                      {getAdminContacts("Ambulance").length > 0 ? (
+                        getAdminContacts("Ambulance").map((amb, i) => (
+                          <button
+                            key={`med-amb-${i}`}
+                            onClick={() => window.open(`tel:${amb.phone.replace(/[^0-9+]/g, "")}`)}
+                            className="w-full bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-2xl p-3 text-left hover:opacity-95 transition-all active:scale-[0.98] shadow-md shadow-green-500/20 flex items-center justify-between cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-white text-emerald-700 flex items-center justify-center font-bold shadow-2xs">
+                                <Stethoscope size={18} />
+                              </div>
+                              <div>
+                                <p className="text-xs font-black text-white">{amb.label}</p>
+                                <p className="text-[10px] font-bold text-emerald-100">{amb.phone}</p>
+                              </div>
+                            </div>
+                            <div className="bg-white text-emerald-700 font-black text-[10px] px-3 py-1 rounded-lg">
+                              CALL
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
+                          <p className="text-xs font-semibold text-gray-400">No ambulance provider configured</p>
+                          <p className="text-[10px] text-gray-300 mt-0.5">Ask admin to add one in Communication settings</p>
                         </div>
-                        <div className="bg-white text-emerald-700 font-black text-[10px] px-3 py-1 rounded-lg">
-                          CALL 108
-                        </div>
-                      </button>
+                      )}
 
                       <div className="grid grid-cols-2 gap-2.5">
                         <button
@@ -1592,18 +1656,20 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                 {/* ============ FAMILY MEMBERS SUB-MENU ============ */}
                 {activeSubMenu === "family" && (
                   <div className="space-y-3 animate-fade-in">
-                    <div className="flex items-center justify-between bg-[#F0FDF4] border border-[#BBF7D0] rounded-2xl p-3 shadow-2xs">
+                    <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-3 shadow-2xs">
                       <button
                         onClick={() => setActiveSubMenu("none")}
-                        className="flex items-center gap-1.5 text-xs font-black text-[#16A34A] hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-xl shadow-2xs border border-[#BBF7D0] cursor-pointer"
+                        className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-gray-900 transition-colors bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-xl cursor-pointer"
                       >
                         <ArrowLeft size={14} /> Back
                       </button>
                       <div className="text-right">
-                        <span className="text-xs font-black text-gray-900 flex items-center gap-1.5 justify-end">
-                          <PhoneCall size={16} className="text-[#16A34A]" /> Family &amp; Owner Contacts
+                        <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5 justify-end">
+                          <PhoneCall size={16} className="text-emerald-500" /> Family Contacts
                         </span>
-                        <p className="text-[10px] font-bold text-gray-500">{getTowingContacts().length} numbers available</p>
+                        <p className="text-[10px] font-semibold text-gray-400">
+                          {getAdminContacts("Family").length} number{getAdminContacts("Family").length !== 1 ? "s" : ""} available
+                        </p>
                       </div>
                     </div>
 
@@ -1611,49 +1677,38 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                       onClick={() => location && window.open(`https://www.google.com/maps?q=${location.lat},${location.lng}`)}
                       className="w-full bg-white border border-gray-200 rounded-xl p-2.5 flex items-center gap-2.5 hover:bg-gray-50 transition-all active:scale-[0.98] shadow-2xs cursor-pointer"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold flex-shrink-0">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center font-bold flex-shrink-0">
                         <MapPin size={16} />
                       </div>
                       <div className="text-left min-w-0">
-                        <p className="text-xs font-black text-gray-900">Share My Live Location</p>
-                        <p className="text-[10px] font-bold text-gray-500">Send GPS pin to contacts</p>
+                        <p className="text-xs font-bold text-gray-900">Share My Live Location</p>
+                        <p className="text-[10px] font-semibold text-gray-400">Send GPS pin to contacts</p>
                       </div>
-                      <ExternalLink size={14} className="text-gray-400 flex-shrink-0 ml-auto" />
+                      <ExternalLink size={14} className="text-gray-300 flex-shrink-0 ml-auto" />
                     </button>
 
-                    <div className="space-y-2">
-                      {getTowingContacts().length === 0 ? (
-                        <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center">
-                          <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                            <PhoneCall size={20} className="text-gray-300" />
-                          </div>
-                          <p className="text-sm font-semibold text-gray-500">No contacts available</p>
-                          <p className="text-xs text-gray-400 mt-1">Owner has not added any numbers yet</p>
+                    {getAdminContacts("Family").length === 0 ? (
+                      <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
+                        <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                          <PhoneCall size={20} className="text-gray-300" />
                         </div>
-                      ) : (
-                        getTowingContacts().map((contact, i) => (
+                        <p className="text-sm font-semibold text-gray-400">No family contacts configured</p>
+                        <p className="text-[11px] text-gray-300 mt-1">Ask admin to add Family contacts in Communication settings</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {getAdminContacts("Family").map((contact, i) => (
                           <div
                             key={i}
-                            className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all ${contact.primary ? "bg-[#FFF7ED] border-[#FFEDD5] shadow-xs" : "bg-white border-gray-200"
-                              }`}
+                            className="p-4 rounded-2xl border border-gray-200 bg-white flex items-center justify-between gap-3 transition-all hover:border-gray-300"
                           >
                             <div className="flex items-center gap-3 min-w-0">
-                              <div
-                                className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold flex-shrink-0 shadow-2xs ${contact.primary ? "bg-[#FF5500] text-white" : "bg-emerald-100 text-emerald-600"
-                                  }`}
-                              >
+                              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold flex-shrink-0">
                                 <User size={18} />
                               </div>
                               <div className="min-w-0">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <p className="text-xs font-extrabold text-gray-900 leading-tight truncate">{contact.label}</p>
-                                  {contact.primary && (
-                                    <span className="bg-[#FF5500] text-white text-[9px] font-black px-1.5 py-0.2 rounded-md uppercase tracking-wide flex-shrink-0">
-                                      PRIMARY
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-[10px] font-bold text-gray-500 mt-0.5">{contact.role}</p>
+                                <p className="text-xs font-bold text-gray-900 leading-tight truncate">{contact.label}</p>
+                                <p className="text-[10px] font-semibold text-gray-400 mt-0.5">{contact.role}</p>
                                 <p className="text-sm font-mono font-black text-gray-800 mt-1">{contact.phone}</p>
                               </div>
                             </div>
@@ -1664,9 +1719,9 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                               <PhoneCall size={14} /> CALL
                             </button>
                           </div>
-                        ))
-                      )}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

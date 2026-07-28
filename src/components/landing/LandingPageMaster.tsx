@@ -13,7 +13,6 @@ import groupLogo from '../../../assets/Group 1000005716.png';
 import groupLogo1 from '../../../assets/Group 1000005716-1.png';
 import groupLogo2 from '../../../assets/Group 1000005716-2.png';
 import logoForWhBg from '../../../assets/logo for wh bg.png';
-import bgVideo from '../../../assets/bg.mp4';
 
 // ── Animated Counter Component ─────────────────────────────────────────────
 
@@ -583,17 +582,7 @@ export default function LandingPageMaster({
       </nav>
 
       {/* ── HERO ────────────────────────────────────────────────────── */}
-      <section className="hero-section relative overflow-hidden" style={{ background: 'transparent' }}>
-        {/* Background Video */}
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover"
-          src={bgVideo}
-        />
-
+      <section className="hero-section relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #0E1117 0%, #1A3A5C 100%)' }}>
         {/* QR dot grid background */}
         <div
           className="qr-dot-bg absolute inset-0 pointer-events-none"

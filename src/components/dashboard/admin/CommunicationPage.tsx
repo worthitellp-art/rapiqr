@@ -1,17 +1,26 @@
 import { useState } from "react";
-import { Plus, Trash2, Phone, Wrench, Battery, Truck, Settings } from "lucide-react";
+import { Plus, Trash2, Phone, Wrench, Battery, Truck, Settings, Users, Ambulance, ShieldAlert, Car, Lightbulb, AlertTriangle } from "lucide-react";
 import { useLocalStorage } from "./useLocalStorage";
 
-const CATEGORIES = ["Towing", "Flat Tire", "Battery", "Mechanic", "Fuel", "Ambulance", "Police"];
+const CATEGORIES = ["Ambulance", "Towing", "Mechanic", "Flat Tire", "Battery", "Fuel", "Parking", "Police", "Theft", "Headlights", "Family"];
+
+const CATEGORY_META: Record<string, { icon: React.ReactNode; color: string; bg: string; placeholder: string }> = {
+  Ambulance:  { icon: <Ambulance size={14} />,    color: "text-red-600",     bg: "bg-red-50",     placeholder: "e.g. City Ambulance Service" },
+  Towing:     { icon: <Truck size={14} />,         color: "text-red-500",     bg: "bg-red-50",     placeholder: "e.g. Highway Towing 24x7" },
+  Mechanic:   { icon: <Settings size={14} />,       color: "text-orange-600",  bg: "bg-orange-50",  placeholder: "e.g. Mobile Mechanic Near Me" },
+  "Flat Tire": { icon: <Wrench size={14} />,        color: "text-amber-600",   bg: "bg-amber-50",   placeholder: "e.g. Puncture Repair Service" },
+  Battery:    { icon: <Battery size={14} />,         color: "text-yellow-600",  bg: "bg-yellow-50",  placeholder: "e.g. Battery Jumpstart Helpline" },
+  Fuel:       { icon: <Truck size={14} />,           color: "text-blue-600",    bg: "bg-blue-50",    placeholder: "e.g. Emergency Fuel Delivery" },
+  Parking:    { icon: <Car size={14} />,             color: "text-blue-500",    bg: "bg-blue-50",    placeholder: "e.g. Parking Enforcement Helpline" },
+  Police:     { icon: <ShieldAlert size={14} />,     color: "text-indigo-600",  bg: "bg-indigo-50",  placeholder: "e.g. Local Police Control Room" },
+  Theft:      { icon: <AlertTriangle size={14} />,   color: "text-rose-600",    bg: "bg-rose-50",    placeholder: "e.g. Anti-Theft Rapid Response" },
+  Headlights: { icon: <Lightbulb size={14} />,       color: "text-amber-500",   bg: "bg-amber-50",   placeholder: "e.g. Roadside Light Assist" },
+  Family:     { icon: <Users size={14} />,           color: "text-emerald-600", bg: "bg-emerald-50", placeholder: "e.g. Father, Mother, Sibling" },
+};
 
 export default function CommunicationPage({ setToast }: { setToast: (msg: string | null) => void }) {
-  const [providers, setProviders] = useLocalStorage<any[]>("namoqr-helplines", [
-    { id: "prov-1", category: "Towing", label: "National Flatbed Towing 24x7", phone: "+91 98765 00001", active: true },
-    { id: "prov-2", category: "Flat Tire", label: "Quick Puncture Repair Assist", phone: "+91 98765 00002", active: true },
-    { id: "prov-3", category: "Battery", label: "Battery Jumpstart & Fuel Helpline", phone: "+91 98765 00003", active: true },
-    { id: "prov-4", category: "Mechanic", label: "Emergency Mobile Mechanics", phone: "+91 98765 00004", active: true },
-  ]);
-  const [category, setCategory] = useState("Towing");
+  const [providers, setProviders] = useLocalStorage<any[]>("namoqr-helplines", []);
+  const [category, setCategory] = useState("Ambulance");
   const [label, setLabel] = useState("");
   const [phone, setPhone] = useState("");
 
@@ -21,84 +30,124 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
     const p = { id: `prov-${Date.now()}`, category, label: label.trim(), phone: phone.trim(), active: true };
     setProviders([p, ...providers]);
     window.dispatchEvent(new Event("namoqr-helplines-updated"));
-    setLabel(""); setPhone("");
-    setToast("Helpline provider added"); setTimeout(() => setToast(null), 2000);
+    setLabel("");
+    setPhone("");
+    setToast("Provider added");
+    setTimeout(() => setToast(null), 2000);
   };
 
-  const inputCls = "w-full px-3.5 py-2.5 text-sm rounded-xl border bg-gray-50 outline-none focus:bg-white focus:border-gray-400 transition-all font-semibold text-gray-900";
-
-  const categoryIcons: Record<string, React.ReactNode> = {
-    Towing: <Truck size={14} />,
-    "Flat Tire": <Wrench size={14} />,
-    Battery: <Battery size={14} />,
-    Mechanic: <Settings size={14} />,
+  const handleRemove = (id: string) => {
+    setProviders((prev) => prev.filter((x: any) => x.id !== id));
+    setToast("Provider removed");
+    setTimeout(() => setToast(null), 1500);
   };
+
+  const grouped = CATEGORIES.map((cat) => ({
+    cat,
+    items: providers.filter((p: any) => p.category === cat),
+  })).filter((g) => g.items.length > 0);
 
   return (
-    <div className="px-8 pt-7 pb-10 space-y-6 text-gray-900">
-      <div className="bg-white rounded-2xl border p-6" style={{ borderColor: "#f0f0f0" }}>
-        <h3 className="font-bold text-gray-900 text-sm mb-4 flex items-center gap-2">
-          <Phone size={15} style={{ color: "var(--accent)" }} /> Add Helpline Provider
+    <div className="px-8 pt-7 pb-10 space-y-6 text-gray-900 font-sans">
+      {/* Add Provider Form */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <h3 className="font-bold text-gray-900 text-sm mb-5 flex items-center gap-2">
+          <Phone size={15} className="text-orange-500" /> Add Helpline Provider
         </h3>
         <form onSubmit={handleAdd} className="grid grid-cols-4 gap-3">
           <div>
             <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Category</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls} style={{ borderColor: "#e2e8f0" }}>
-              {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 outline-none focus:bg-white focus:border-gray-400 transition-all font-semibold text-gray-900"
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
             </select>
           </div>
           <div>
             <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Provider Name</label>
-            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Quick Towing Co." className={inputCls} style={{ borderColor: "#e2e8f0" }} />
+            <input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder={CATEGORY_META[category]?.placeholder || "e.g. Provider Name"}
+              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 outline-none focus:bg-white focus:border-gray-400 transition-all font-semibold text-gray-900"
+            />
           </div>
           <div>
             <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Phone Number</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" className={inputCls} style={{ borderColor: "#e2e8f0" }} />
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+91 98765 43210"
+              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 outline-none focus:bg-white focus:border-gray-400 transition-all font-semibold text-gray-900"
+            />
           </div>
           <div className="flex items-end">
-            <button type="submit" disabled={!label.trim() || !phone.trim()} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm" style={{ background: "var(--accent)" }}>
-              <Plus size={14} /> Add Provider
+            <button
+              type="submit"
+              disabled={!label.trim() || !phone.trim()}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm"
+            >
+              <Plus size={14} /> Add
             </button>
           </div>
         </form>
       </div>
 
-      {/* Provider list */}
-      <div className="space-y-2">
-        {CATEGORIES.map((cat) => {
-          const items = providers.filter((p: any) => p.category === cat);
-          if (items.length === 0) return null;
-          return (
-            <div key={cat} className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: "#f0f0f0" }}>
-              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: "#f7f7f7", background: "#fafafa" }}>
-                <span style={{ color: "var(--accent)" }}>{categoryIcons[cat] || <Phone size={14} />}</span>
-                <span className="text-xs font-extrabold text-gray-700 uppercase tracking-wider">{cat}</span>
-                <span className="text-[10px] text-gray-500 font-semibold">· {items.length}</span>
-              </div>
-              {items.map((p: any) => (
-                <div key={p.id} className="flex items-center justify-between px-5 py-3 border-b last:border-0 hover:bg-gray-50/50 transition-colors" style={{ borderColor: "#f7f7f7" }}>
-                  <div>
-                    <p className="text-xs font-bold text-gray-900">{p.label}</p>
-                    <p className="text-[11px] text-gray-500 font-mono font-semibold mt-0.5">{p.phone}</p>
+      {/* Provider List grouped by category */}
+      {grouped.length > 0 ? (
+        <div className="space-y-3">
+          {grouped.map(({ cat, items }) => {
+            const meta = CATEGORY_META[cat] || { icon: <Phone size={14} />, color: "text-gray-600", bg: "bg-gray-50" };
+            return (
+              <div key={cat} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                {/* Category Header */}
+                <div className="px-5 py-3 border-b border-gray-50 bg-gray-50/60 flex items-center gap-2.5">
+                  <div className={`w-6 h-6 rounded-lg ${meta.bg} ${meta.color} flex items-center justify-center`}>
+                    {meta.icon}
                   </div>
-                  <button
-                    onClick={() => { setProviders((prev) => prev.filter((x: any) => x.id !== p.id)); setToast("Provider removed"); setTimeout(() => setToast(null), 1500); }}
-                    className="w-7 h-7 rounded-lg hover:bg-red-50 hover:text-red-500 flex items-center justify-center text-gray-400 transition-all cursor-pointer"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                  <span className="text-xs font-extrabold text-gray-700 uppercase tracking-wider">{cat}</span>
+                  <span className="text-[10px] text-gray-400 font-semibold bg-gray-100 px-1.5 py-0.5 rounded-md">{items.length}</span>
                 </div>
-              ))}
-            </div>
-          );
-        })}
-        {providers.length === 0 && (
-          <div className="bg-white rounded-2xl border p-10 text-center" style={{ borderColor: "#f0f0f0" }}>
-            <p className="text-sm font-semibold text-gray-700">No helpline providers added yet.</p>
-            <p className="text-xs text-gray-500 mt-1 font-medium">Add your first provider above.</p>
+                {/* Items */}
+                {items.map((p: any) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between px-5 py-3.5 border-b last:border-0 hover:bg-gray-50/40 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-8 h-8 rounded-lg ${meta.bg} ${meta.color} flex items-center justify-center flex-shrink-0`}>
+                        {meta.icon}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-gray-900 truncate">{p.label}</p>
+                        <p className="text-[11px] text-gray-500 font-mono font-semibold mt-0.5">{p.phone}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleRemove(p.id)}
+                      className="w-7 h-7 rounded-lg hover:bg-red-50 hover:text-red-500 flex items-center justify-center text-gray-400 transition-all cursor-pointer flex-shrink-0"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+            <Phone size={20} className="text-gray-300" />
           </div>
-        )}
-      </div>
+          <p className="text-sm font-semibold text-gray-500">No providers added yet</p>
+          <p className="text-xs text-gray-400 mt-1">Add your first helpline provider above</p>
+        </div>
+      )}
     </div>
   );
 }
