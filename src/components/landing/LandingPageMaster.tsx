@@ -375,7 +375,7 @@ export default function LandingPageMaster({
   onStart: () => void;
   onLogin: () => void;
 }) {
-  const { isLoggedIn, profile, signOut } = useAuth();
+  const { isLoggedIn, isAdmin, profile, signOut } = useAuth();
   const [activeCategory, setActiveCategory] = useState<'All' | 'Vehicle' | 'Home' | 'Family' | 'Travel'>('All');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -468,7 +468,7 @@ export default function LandingPageMaster({
             <a href="#how-it-works" className="nav-link">How It Works</a>
             <a href="#categories" className="nav-link">Use Cases</a>
             <a href="#pricing" className="nav-link">Pricing</a>
-            <a href="#distributorship" className="nav-link">Partner Program</a>
+            {isAdmin && <a href="#distributorship" className="nav-link">Partner Program</a>}
             <a href="#faq" className="nav-link">FAQ</a>
           </div>
 
@@ -1284,7 +1284,8 @@ export default function LandingPageMaster({
         </div>
       </section>
 
-      {/* ── DISTRIBUTORSHIP & PARTNER PROGRAM ──────────────────────── */}
+      {/* ── DISTRIBUTORSHIP & PARTNER PROGRAM (Admin only) ──────────── */}
+      {isAdmin && (
       <section id="distributorship" className="distributor-section py-20 relative overflow-hidden" style={{ background: 'var(--brand)', color: 'white' }}>
         {/* QR dot background motif */}
         <div className="qr-dot-bg-light absolute inset-0 pointer-events-none opacity-20" aria-hidden="true" />
@@ -1393,12 +1394,11 @@ export default function LandingPageMaster({
 
           </div>
 
-          <div className="text-center text-xs text-gray-300 font-medium">
-            Questions? Call our B2B Partner Desk directly at <span className="text-amber-400 font-bold">+91 98765 43210</span> or email <span className="text-amber-400 font-bold">b2b@rapiqr.com</span>
+          <div className="text-center text-xs text-gray-300 font-medium">        Questions? Call our B2B Partner Desk directly at <span className="text-amber-400 font-bold">+91 98765 43210</span> or email <span className="text-amber-400 font-bold">b2b@rapiqr.com</span>
           </div>
-
         </div>
       </section>
+      )}
 
       {/* ── SOCIAL PROOF ────────────────────────────────────────────── */}
       <section className="proof-section" aria-labelledby="proof-heading">
@@ -1651,8 +1651,8 @@ export default function LandingPageMaster({
         </div>
       </div>
 
-      {/* ── DISTRIBUTORSHIP APPLICATION MODAL ── */}
-      {isPartnerModalOpen && (
+      {/* ── DISTRIBUTORSHIP APPLICATION MODAL (Admin only) ── */}
+      {isAdmin && isPartnerModalOpen && (
         <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden relative border border-gray-100 p-8 text-left">
             <button

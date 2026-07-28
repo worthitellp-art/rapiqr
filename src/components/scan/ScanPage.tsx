@@ -67,6 +67,7 @@ interface QrData {
   clientId: string;
   status: string;
   template: string;
+  activationCode?: string;
 }
 
 interface GeoLocation {
@@ -350,17 +351,15 @@ function IconTheftDetected() {
 
 export default function ScanPage({ onBack }: { onBack: () => void }) {
   const [phase, setPhase] = useState<Phase>("validating");
-  const [progress, setProgress] = useState(0);
   const [qrData, setQrData] = useState<QrData | null>(null);
   const [location, setLocation] = useState<GeoLocation | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
-  const [activating, setActivating] = useState(false);
-  const [activateProgress, setActivateProgress] = useState(0);
-  const [activateStatus, setActivateStatus] = useState("");
   const [alertSent, setAlertSent] = useState(false);
   const [visitorName, setVisitorName] = useState("");
   const [visitorMessage, setVisitorMessage] = useState("");
   const [activatingQr, setActivatingQr] = useState(false);
+  const [activationCodeInput, setActivationCodeInput] = useState("");
+  const [activationError, setActivationError] = useState<string | null>(null);
   const [activeSubMenu, setActiveSubMenu] = useState<"none" | "emergency-main" | "mechanical" | "medical" | "towing" | "family">("none");
   const [towingImage, setTowingImage] = useState<string | null>(null);
 
@@ -503,7 +502,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
     );
   }, []);
 
-  /* ---- QR Validation Effect ---- */
+  /* ---- QR Direct Lookup (no loading screen) ---- */
   useEffect(() => {
     const qrId = getQrIdFromUrl();
     if (!qrId) {
@@ -512,95 +511,105 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
       return;
     }
 
-    const startTime = Date.now();
-    const duration = 600;
+    const cleanQrId = qrId.trim().toUpperCase();
+    const stored = localStorage.getItem("namoqr-qrlist");
+    const list: any[] = stored ? JSON.parse(stored) : [];
 
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const prog = Math.min(100, Math.round((elapsed / duration) * 100));
-      setProgress(prog);
+    let found = list.find(
+      (q: any) =>
+        q.id?.toUpperCase() === cleanQrId ||
+        (q.clientId && q.clientId.toUpperCase() === cleanQrId) ||
+        q.qrUrl?.toUpperCase().includes(cleanQrId)
+    );
 
-      if (prog >= 100) {
-        clearInterval(interval);
-
-        setTimeout(async () => {
-          const cleanQrId = qrId.trim().toUpperCase();
-          const stored = localStorage.getItem("namoqr-qrlist");
-          const list: any[] = stored ? JSON.parse(stored) : [];
-
-          let found = list.find(
-            (q: any) =>
-              q.id?.toUpperCase() === cleanQrId ||
-              (q.clientId && q.clientId.toUpperCase() === cleanQrId) ||
-              q.qrUrl?.toUpperCase().includes(cleanQrId)
-          );
-
-          if (!found) {
-            try {
-              const dbRecord = await getQrCodeByIdFromDb(cleanQrId);
-              if (dbRecord) {
-                found = {
-                  id: dbRecord.id,
-                  clientId: dbRecord.client_id,
-                  status: dbRecord.status,
-                  vehicleName: `Vehicle (${dbRecord.id})`,
-                  vehicleNumber: `REG-${dbRecord.id.slice(-4)}`,
-                  template: dbRecord.template_name || "Default",
-                };
-              }
-            } catch {
-              // fallback below
-            }
-          }
-
-          // Universal fallback: If valid QR format (QR- or CL-), auto-initialize as activatable sticker
-          if (!found && (cleanQrId.startsWith("QR-") || cleanQrId.startsWith("CL-"))) {
-            found = {
-              id: cleanQrId,
-              clientId: cleanQrId.startsWith("CL-") ? cleanQrId : `CL-${cleanQrId.replace(/^QR-/, "")}`,
-              vehicleName: `RapiQR Safety Tag (${cleanQrId})`,
-              vehicleNumber: `REG-${cleanQrId.slice(-4)}`,
-              status: "inactive",
-              template: "Default",
-            };
-            const updatedList = [found, ...list];
-            localStorage.setItem("namoqr-qrlist", JSON.stringify(updatedList));
-          }
-
-          if (!found) {
-            setErrorMsg(`QR "${qrId}" not found or invalid.`);
-            setPhase("error");
-            return;
-          }
-
-          const data = {
-            id: found.id,
-            qrUrl: `${getQrBaseUrl()}/${found.id}`,
-            vehicleName: found.vehicleName || `Vehicle (${found.id})`,
-            vehicleNumber: found.vehicleNumber || `REG-${found.id.slice(-4)}`,
-            clientId: found.clientId || found.id,
-            status: found.status || "inactive",
-            template: found.template || "Default",
+    if (!found) {
+      // Try DB lookup (async, but we'll run it and handle result)
+      getQrCodeByIdFromDb(cleanQrId).then((dbRecord) => {
+        if (dbRecord) {
+          const dbFound = {
+            id: dbRecord.id,
+            clientId: dbRecord.client_id,
+            status: dbRecord.status,
+            vehicleName: `Vehicle (${dbRecord.id})`,
+            vehicleNumber: `REG-${dbRecord.id.slice(-4)}`,
+            template: dbRecord.template_name || "Default",
+            activationCode: dbRecord.activation_code,
           };
-          setQrData(data);
+          resolveQr(dbFound);
+        } else {
+          // Universal fallback
+          tryFallback(cleanQrId);
+        }
+      }).catch(() => {
+        tryFallback(cleanQrId);
+      });
+    } else {
+      resolveQr(found);
+    }
 
-          // Immediately switch phase upon reaching 100% progress
-          if (found.status === "inactive") {
-            setPhase("activation");
-          } else {
-            setPhase("emergency");
-            requestLocation();
-          }
-        }, 50);
+    function resolveQr(record: any) {
+      const data = {
+        id: record.id,
+        qrUrl: `${getQrBaseUrl()}/${record.id}`,
+        vehicleName: record.vehicleName || `Vehicle (${record.id})`,
+        vehicleNumber: record.vehicleNumber || `REG-${record.id.slice(-4)}`,
+        clientId: record.clientId || record.id,
+        status: record.status || "inactive",
+        template: record.template || "Default",
+        activationCode: record.activationCode,
+      };
+      setQrData(data);
+
+      // First-time scan → activation code required; Already active → emergency page
+      if (record.status === "inactive") {
+        setPhase("activation");
+      } else {
+        setPhase("emergency");
       }
-    }, 16);
+    }
 
-    return () => clearInterval(interval);
+    function tryFallback(cleanId: string) {
+      if (cleanId.startsWith("QR-") || cleanId.startsWith("CL-")) {
+        const fallback = {
+          id: cleanId,
+          clientId: cleanId.startsWith("CL-") ? cleanId : `CL-${cleanId.replace(/^QR-/, "")}`,
+          vehicleName: `RapiQR Safety Tag (${cleanId})`,
+          vehicleNumber: `REG-${cleanId.slice(-4)}`,
+          status: "inactive",
+          template: "Default",
+        };
+        const updatedList = [fallback, ...list];
+        localStorage.setItem("namoqr-qrlist", JSON.stringify(updatedList));
+        resolveQr(fallback);
+      } else {
+        setErrorMsg(`QR "${qrId}" not found or invalid.`);
+        setPhase("error");
+      }
+    }
   }, [requestLocation]);
 
-  /* ---- Activation Handler ---- */
-  const handleActivation = () => {
+  /* ---- Owner Activation Handler (verifies code) ---- */
+  const handleOwnerActivation = () => {
     if (!qrData) return;
+    setActivationError(null);
+
+    const storedCode = qrData.activationCode;
+    if (!storedCode) {
+      setActivationError("No activation code set for this sticker. Contact the admin.");
+      return;
+    }
+
+    const entered = activationCodeInput.trim().toUpperCase();
+    if (!entered) {
+      setActivationError("Please enter your activation code");
+      return;
+    }
+
+    if (entered !== storedCode.toUpperCase()) {
+      setActivationError("Invalid activation code. Please try again.");
+      return;
+    }
+
     setActivatingQr(true);
     setTimeout(() => {
       const stored = localStorage.getItem("namoqr-qrlist");
@@ -609,13 +618,14 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
       if (idx >= 0) {
         list[idx].status = "active";
         list[idx].activatedAt = new Date().toISOString();
-        list[idx].visitorName = visitorName;
-        list[idx].visitorMessage = visitorMessage;
+        list[idx].visitorName = visitorName || "Owner";
+        list[idx].visitorMessage = "Self-activated via code";
         localStorage.setItem("namoqr-qrlist", JSON.stringify(list));
       }
       setQrData((prev) => (prev ? { ...prev, status: "active" } : null));
       setActivatingQr(false);
-      requestLocation();
+      // Go directly to emergency scan page, no GPS request
+      setPhase("emergency");
     }, 1200);
   };
 
@@ -711,131 +721,102 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
 
       {/* Main Light Visitor Container */}
       <main className="flex-1 w-full max-w-md mx-auto px-4 py-2 pb-10 z-10 flex flex-col justify-center items-center">
-        {/* ============ VALIDATING (Minimalist Boxless Grid) ============ */}
-        {phase === "validating" && (
-          <div className="flex flex-col items-center w-full max-w-sm px-2 animate-fade-in space-y-3 text-center">
-            {/* Sleek Minimalist Ring Spinner */}
-            <div className="relative flex items-center justify-center py-1">
-              <div className="w-12 h-12 rounded-full border-2 border-gray-100 border-t-orange-500 animate-spin" />
-            </div>
-
-            {/* Minimalist Title */}
-            <div>
-              <h2 className="text-lg font-bold text-gray-900 tracking-tight">Verifying QR Code</h2>
-              <p className="text-[11px] text-gray-400 font-medium mt-0.5">Connecting to Safety Network</p>
-            </div>
-
-            {/* Minimalist Progress Indicator */}
-            <div className="w-full space-y-1">
-              <div className="w-full h-1 bg-gray-200/60 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-75 ease-out"
-                  style={{ width: `${progress}%`, background: "linear-gradient(90deg, #EAB308, #F59E0B)" }}
-                />
-              </div>
-              <div className="flex justify-between items-center text-[10px] font-mono font-semibold text-gray-400">
-                <span>VERIFYING</span>
-                <span>{Math.round(progress)}%</span>
-              </div>
-            </div>
-
-            {/* Clean Minimalist 2x2 Grid Checklist */}
-            <div className="grid grid-cols-2 gap-2 w-full pt-1 text-left">
-              {[
-                { label: "Safety Network", minPct: 20 },
-                { label: "Security Token", minPct: 50 },
-                { label: "Vehicle Data", minPct: 80 },
-                { label: "Live Connection", minPct: 98 },
-              ].map((step, idx) => {
-                const isDone = progress >= step.minPct;
-                const isActive = progress < step.minPct && (idx === 0 || progress >= [20, 50, 80, 98][idx - 1]);
-
-                return (
-                  <div
-                    key={step.label}
-                    className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all duration-200 ${isDone
-                      ? "bg-white border-emerald-200 text-gray-900 font-semibold shadow-2xs"
-                      : isActive
-                        ? "bg-orange-50/60 border-orange-200 text-orange-600 font-bold"
-                        : "bg-gray-50/50 border-gray-100 text-gray-400 font-normal opacity-50"
-                      }`}
-                  >
-                    <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
-                      {isDone ? (
-                        <CheckCircle2 size={15} className="text-emerald-500" />
-                      ) : isActive ? (
-                        <div className="w-3.5 h-3.5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-                      )}
-                    </div>
-                    <span className="text-[11px] tracking-tight truncate">{step.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ============ ACTIVATION (Super Clean & Minimal) ============ */}
+        {/* ============ ACTIVATION — Enter Activation Code ============ */}
         {phase === "activation" && qrData && (
           <div className="w-full max-w-sm mx-auto animate-fade-in">
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50 p-4 space-y-4">
-              {/* Sleek Vehicle Header */}
-              <div className="flex items-center gap-3.5 pb-3 border-b border-gray-100">
-                <div className="w-11 h-11 rounded-2xl bg-[#EAB308] text-white flex items-center justify-center font-bold flex-shrink-0 shadow-md shadow-orange-500/20">
-                  <Car size={20} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-extrabold text-gray-900 text-base truncate">{qrData.vehicleName}</h3>
-                  <p className="font-mono text-xs font-bold text-gray-500">{qrData.vehicleNumber}</p>
-                </div>
-                <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                  UNACTIVATED
-                </span>
-              </div>
+            <div className="overflow-hidden rounded-3xl bg-white shadow-2xl">
 
-              {/* Simple Explanation */}
-              <div className="text-center space-y-1">
-                <h2 className="text-lg font-bold text-gray-900 tracking-tight">QR Sticker Not Yet Activated</h2>
-                <p className="text-xs text-gray-500 leading-relaxed font-medium">
-                  If you are the owner, enter your activation code in the app. Otherwise, notify the owner below.
+              {/* ——— Yellow Gradient Header ——— */}
+              <div className="relative bg-gradient-to-br from-yellow-300 via-amber-300 to-orange-300 px-8 pt-10 pb-16">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-lg">
+                  🔒
+                </div>
+                <h1 className="mt-5 text-center text-3xl font-bold text-slate-900">
+                  Activate Your Sticker
+                </h1>
+                <p className="mt-2 text-center text-sm text-slate-700">
+                  Enter the activation code to unlock this QR tag
                 </p>
+                {/* Decorative circles */}
+                <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/15" />
+                <div className="absolute -left-8 bottom-4 h-20 w-20 rounded-full bg-white/10" />
               </div>
 
-              {/* Minimal Message Form */}
-              <div className="space-y-2 pt-1">
-                <input
-                  type="text"
-                  value={visitorName}
-                  onChange={(e) => setVisitorName(e.target.value)}
-                  placeholder="Your Name (Optional)"
-                  className="w-full px-4 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none text-gray-900 placeholder-gray-400 focus:bg-white focus:border-[#EAB308] transition-all font-medium"
-                />
-                <textarea
-                  rows={2}
-                  value={visitorMessage}
-                  onChange={(e) => setVisitorMessage(e.target.value)}
-                  placeholder="Message for owner (e.g. Please move vehicle)"
-                  className="w-full px-4 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none text-gray-900 placeholder-gray-400 focus:bg-white focus:border-[#EAB308] transition-all font-medium resize-none"
-                />
+              {/* ——— Overlapping White Body ——— */}
+              <div className="-mt-8 rounded-t-3xl bg-white px-6 pb-8 pt-6">
+
+                {/* Tag Card */}
+                <div className="flex items-center justify-between rounded-2xl border border-slate-200 p-4 shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-yellow-100 text-xl">
+                      🏷️
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-slate-900">
+                        {qrData.vehicleName}
+                      </h3>
+                      <p className="text-sm text-slate-500">
+                        {qrData.vehicleNumber}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                    Pending
+                  </span>
+                </div>
+
+                {/* Activation Code Input */}
+                <div className="mt-8">
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Activation Code
+                  </label>
+                  <input
+                    type="text"
+                    value={activationCodeInput}
+                    onChange={(e) => { setActivationCodeInput(e.target.value.toUpperCase()); setActivationError(null); }}
+                    placeholder="e.g. ACT-8A3F"
+                    className="h-14 w-full rounded-xl border border-slate-200 px-4 outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-mono font-bold tracking-wider"
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                  {activationError && (
+                    <p className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-red-500">
+                      <AlertTriangle size={12} />
+                      {activationError}
+                    </p>
+                  )}
+                </div>
+
+                {/* Activate Button */}
+                <button
+                  onClick={handleOwnerActivation}
+                  disabled={activatingQr || !activationCodeInput.trim()}
+                  className="mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-400 font-semibold text-slate-900 shadow-lg transition-all hover:scale-[1.02] active:scale-100 cursor-pointer disabled:opacity-50 disabled:hover:scale-100"
+                >
+                  {activatingQr ? (
+                    <>
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-900 border-t-transparent" />
+                      <span>Activating…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🛡️</span>
+                      <span>Activate Sticker</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Footer */}
+                <div className="mt-5 rounded-xl bg-yellow-50 p-4">
+                  <p className="text-center text-sm text-slate-600">
+                    Your activation code was provided by the admin.
+                    Check your dashboard for the code.
+                  </p>
+                </div>
+
               </div>
 
-              {/* Clean Single Action Button */}
-              <button
-                onClick={handleActivation}
-                disabled={activatingQr}
-                className="w-full py-3 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-md cursor-pointer disabled:opacity-60"
-                style={{ background: activatingQr ? "#6B7280" : "#EAB308" }}
-              >
-                {activatingQr ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <CheckCircle2 size={16} /> Notify Owner &amp; Continue
-                  </>
-                )}
-              </button>
             </div>
           </div>
         )}

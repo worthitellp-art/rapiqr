@@ -35,9 +35,9 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
     role: isAdmin ? "Administrator" : "Client Account",
   };
 
-  // Reset search on page change & guard admin pages for client users
+  // Reset search on page change & guard admin-only pages for client users
   useEffect(() => {
-    if (!isAdmin && (page === "overview" || page === "users")) {
+    if (!isAdmin && (page === "overview" || page === "users" || page === "communication" || page === "customize")) {
       setPage("qr");
     }
     setSearchQuery("");

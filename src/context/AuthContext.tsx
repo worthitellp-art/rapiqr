@@ -26,7 +26,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfileData | null>(() => {
     const saved = localStorage.getItem('namoqr-auth-user');
-    return saved ? JSON.parse(saved) : null;
+    if (saved) {
+      const p = JSON.parse(saved);
+      // Force role to 'user' on page load — admin only granted through adminSignIn/adminDemoLogin flow
+      if (p.role === 'admin') {
+        p.role = 'user';
+        localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+      }
+      return p;
+    }
+    return null;
   });
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -42,8 +51,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(initSession?.user ?? null);
       if (initSession?.user) {
         getUserProfile(initSession.user.id, initSession.user.email || '').then((p) => {
-          setProfile(p);
-          if (p) localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+          if (p) {
+            p.role = 'user'; // Force regular user on session restore
+            setProfile(p);
+            localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+          }
         });
       }
       setLoading(false);
@@ -57,8 +69,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         if (currentSession?.user) {
           const userProfile = await getUserProfile(currentSession.user.id, currentSession.user.email || '');
-          setProfile(userProfile);
-          if (userProfile) localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
+          // OAuth sign-ins (Google) go through this path — force role to 'user'
+          if (userProfile) {
+            userProfile.role = 'user';
+            setProfile(userProfile);
+            localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
+          }
         }
       } else if (event === 'SIGNED_OUT') {
         setProfile(null);
@@ -104,7 +120,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (data.user) {
         const p = await getUserProfile(data.user.id, data.user.email || email);
-        setProfile(p);
+        if (p) {
+          p.role = 'user';
+          setProfile(p);
+          localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+        }
       }
 
       return { success: true };
@@ -113,17 +133,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Standard login: Defaults role to 'user'
+  // Standard login: ALWAYS assigns role = 'user' so regular users go to Client Dashboard.
+  // Admin access is only available through adminSignIn() in the AdminAuthModal.
   const signIn = async (email: string, password: string) => {
     try {
       if (!isSupabaseConfigured) {
-        const isAppAdmin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
         const demoUser: UserProfileData = { 
           id: 'demo-user', 
           email, 
           fullName: email.split('@')[0] || 'User',
-          role: isAppAdmin ? 'admin' : 'user',
-          subscriptionPlan: isAppAdmin ? 'enterprise' : 'free'
+          role: 'user',
+          subscriptionPlan: 'free'
         };
         setProfile(demoUser);
         localStorage.setItem('namoqr-auth-user', JSON.stringify(demoUser));
@@ -138,8 +158,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) return { success: false, error: error.message };
 
       if (data.user) {
+        // Force role to 'user' — even if DB has admin, regular login doesn't unlock admin
         const p = await getUserProfile(data.user.id, data.user.email || email);
-        setProfile(p);
+        if (p) {
+          p.role = 'user';
+          setProfile(p);
+          localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+        }
       }
 
       return { success: true };
@@ -222,16 +247,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const demoLogin = () => {
-    const adminUser: UserProfileData = {
+    const demoAdmin: UserProfileData = {
       id: 'admin-demo-' + Date.now(),
       email: 'worthitellp@gmail.com',
-      fullName: 'WorthIT Fleet Admin',
+      fullName: 'Demo Admin',
       role: 'admin',
       subscriptionPlan: 'enterprise',
       isSubscribed: true,
     };
-    setProfile(adminUser);
-    localStorage.setItem('namoqr-auth-user', JSON.stringify(adminUser));
+    setProfile(demoAdmin);
+    localStorage.setItem('namoqr-auth-user', JSON.stringify(demoAdmin));
   };
 
   const adminDemoLogin = () => {
@@ -248,7 +273,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isLoggedIn = Boolean(user || profile);
-  const isAdmin = profile?.role === 'admin' || profile?.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  // isAdmin is purely role-based — only adminSignIn() and adminDemoLogin() produce role='admin'
+  const isAdmin = profile?.role === 'admin';
 
   return (
     <AuthContext.Provider

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import groupLogo1 from '../../../assets/Group 1000005716-1.png';
 
 const AUTH_IMAGES = [
@@ -97,11 +98,25 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
     }, 500);
   };
 
-  const handleGoogleSignIn = () => {
-    setLoading(true);
+  const handleGoogleSignIn = async () => {
+    if (isSupabaseConfigured) {
+      // Real Google OAuth via Supabase — redirects to Google, then back to callback
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + '/auth/callback',
+        },
+      });
+      // Modal stays open until redirect; AuthProvider picks up session on return
+      return;
+    }
+    // Demo fallback when Supabase is not configured
+    demoLogin();
+    setSuccessMsg('Logged in as Demo User');
     setTimeout(() => {
-      handleDemoMode();
-    }, 600);
+      onClose();
+      if (onSuccess) onSuccess();
+    }, 500);
   };
 
   return (

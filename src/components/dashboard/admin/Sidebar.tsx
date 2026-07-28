@@ -13,9 +13,8 @@ export default function Sidebar({
 
   const mainNav = isClientUser
     ? [
-        { id: "qr", label: "My Stickers", icon: NAV_ITEMS[1].icon },
-        { id: "alerts", label: "My Alerts", icon: NAV_ITEMS[3].icon },
-        { id: "communication", label: "Emergency Help", icon: NAV_ITEMS[2].icon },
+        { id: "qr", label: "Your Code", icon: NAV_ITEMS[1].icon },
+        { id: "alerts", label: "Alerts", icon: NAV_ITEMS[3].icon },
       ]
     : NAV_ITEMS.filter(n => n.id !== "customize");
 
