@@ -23,9 +23,11 @@ function requestLogger(req, res, next) {
   const startTime = Date.now();
   const timestamp = formatTimestamp();
   const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+  const origin = req.headers.origin || 'NO-ORIGIN';
 
   // Log incoming request
   console.log(`\n[${timestamp}] 📥 INCOMING ${req.method} ${req.originalUrl || req.url} - IP: ${clientIp}`);
+  console.log(`   🌐 Origin: ${origin}`);
   
   if (Object.keys(req.query || {}).length > 0) {
     console.log(`   🔎 Query: ${JSON.stringify(req.query)}`);
