@@ -72,6 +72,7 @@ class QrModel {
 
   /**
    * Activate QR Code
+   * Also upserts a products record so the client dashboard shows the registered item
    */
   static async activate(qrId, activationData) {
     try {
@@ -90,6 +91,30 @@ class QrModel {
         .single();
 
       if (error) throw error;
+
+      // Mirror the frontend's activateQrInDb: create/update the product record
+      if (activationData.ownerName || activationData.ownerPhone) {
+        const productPayload = {
+          qr_code_id: qrId,
+          user_id: activationData.userId || activationData.user_id || null,
+          name: activationData.ownerName || 'Vehicle Owner',
+          status: 'active',
+          assigned_to: activationData.ownerName || 'Vehicle Owner',
+          details: {
+            ownerPhone: activationData.ownerPhone || '',
+            emergencyPhone: activationData.emergencyPhone || '',
+            bloodGroup: activationData.bloodGroup || '',
+            allergies: activationData.allergies || '',
+            address: activationData.address || '',
+            activatedAt: new Date().toISOString(),
+          },
+        };
+
+        await supabaseAdmin
+          .from('products')
+          .upsert(productPayload, { onConflict: 'qr_code_id' });
+      }
+
       return data;
     } catch (err) {
       console.error(`QrModel.activate (${qrId}) Error:`, err);

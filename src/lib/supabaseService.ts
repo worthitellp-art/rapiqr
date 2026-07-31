@@ -1,10 +1,20 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { apiClient, isApiBackendConfigured } from './apiClient';
 import type { Report } from '../types';
 
 /**
- * Fetch registered QR codes from Supabase with explicit field selection
+ * Fetch registered QR codes.
+ * Prefers the Render/Express API when configured; falls back to direct Supabase.
  */
 export async function getQrCodesFromDb(limitCount = 100) {
+  if (isApiBackendConfigured) {
+    try {
+      const res = await apiClient.qr.getQrCodes(limitCount);
+      return (res.data || []) as any[];
+    } catch (err) {
+      console.warn('Backend fetch QR codes error (falling back to Supabase):', err);
+    }
+  }
   if (!isSupabaseConfigured) return null;
   try {
     const { data, error } = await supabase
@@ -25,6 +35,14 @@ export async function getQrCodesFromDb(limitCount = 100) {
  * Fetch single QR code by ID
  */
 export async function getQrCodeByIdFromDb(qrId: string) {
+  if (isApiBackendConfigured) {
+    try {
+      const res = await apiClient.qr.getQrCodeById(qrId);
+      return (res.data || null) as any;
+    } catch (err) {
+      console.warn(`Backend fetch QR ${qrId} error (falling back to Supabase):`, err);
+    }
+  }
   if (!isSupabaseConfigured) return null;
   try {
     const { data, error } = await supabase
@@ -54,6 +72,14 @@ export async function saveQrCodeToDb(qr: {
   bgColor?: string;
   activationCode?: string;
 }) {
+  if (isApiBackendConfigured) {
+    try {
+      const res = await apiClient.qr.saveQrCode(qr);
+      return (res.data || null) as any;
+    } catch (err) {
+      console.warn('Backend save QR code error (falling back to Supabase):', err);
+    }
+  }
   if (!isSupabaseConfigured) return null;
   try {
     const { data, error } = await supabase
@@ -82,6 +108,19 @@ export async function saveQrCodeToDb(qr: {
  * Bulk save QR codes to Supabase with batched insert
  */
 export async function bulkSaveQrCodesToDb(qrList: any[]) {
+  if (isApiBackendConfigured) {
+    try {
+      // Backend has no bulk endpoint; loop single saves.
+      const results: any[] = [];
+      for (const qr of qrList) {
+        const res = await apiClient.qr.saveQrCode(qr);
+        if (res.data) results.push(res.data);
+      }
+      return results as any;
+    } catch (err) {
+      console.warn('Backend bulk save QR codes error (falling back to Supabase):', err);
+    }
+  }
   if (!isSupabaseConfigured || !qrList.length) return null;
   try {
     const records = qrList.map((qr) => ({
@@ -218,6 +257,14 @@ export async function activateQrInDb(data: {
   address?: string;
   userId?: string;
 }) {
+  if (isApiBackendConfigured) {
+    try {
+      const res = await apiClient.qr.activateQrCode(data.qrId, data);
+      return (res.data || null) as any;
+    } catch (err) {
+      console.warn('Backend activate QR error (falling back to Supabase):', err);
+    }
+  }
   if (!isSupabaseConfigured) return null;
   try {
     // 1. Update QR code status to active
@@ -284,6 +331,14 @@ export async function getProductsFromDb(userId?: string, limitCount = 100) {
  * Create emergency scan report in Supabase
  */
 export async function createReportInDb(report: Partial<Report>) {
+  if (isApiBackendConfigured) {
+    try {
+      const res = await apiClient.alerts.createAlert(report);
+      return (res.data || null) as any;
+    } catch (err) {
+      console.warn('Backend create report error (falling back to Supabase):', err);
+    }
+  }
   if (!isSupabaseConfigured) return null;
   try {
     const { data, error } = await supabase
@@ -312,6 +367,14 @@ export async function createReportInDb(report: Partial<Report>) {
  * Fetch unread & recent reports with column targeting
  */
 export async function getReportsFromDb(limitCount = 50) {
+  if (isApiBackendConfigured) {
+    try {
+      const res = await apiClient.alerts.getAlerts(limitCount);
+      return (res.data || []) as any[];
+    } catch (err) {
+      console.warn('Backend fetch reports error (falling back to Supabase):', err);
+    }
+  }
   if (!isSupabaseConfigured) return null;
   try {
     const { data, error } = await supabase

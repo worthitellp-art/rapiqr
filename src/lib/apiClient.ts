@@ -5,6 +5,16 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
+/**
+ * True when the frontend is built with a REAL backend URL (not the placeholder).
+ * The app prefers the Render/Express API for auth, QR, and alert flows when this
+ * is true, and falls back to direct Supabase access otherwise.
+ */
+export const isApiBackendConfigured = (() => {
+  const base = import.meta.env.VITE_API_BASE_URL || '';
+  return base.startsWith('http') && !base.includes('YOUR-RENDER-SERVICE');
+})();
+
 function getAuthHeader(): Record<string, string> {
   const token = localStorage.getItem('namoqr-token');
   return token ? { Authorization: `Bearer ${token}` } : {};
