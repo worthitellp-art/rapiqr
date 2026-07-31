@@ -68,7 +68,7 @@ app.listen(PORT, () => {
   console.log('\n==================================================');
   logger.event('SERVER', '🚀', `NamoQR Backend Server running securely on port ${PORT}`);
   logger.event('SERVER', '🌐', `Expected Frontend Origin: ${FRONTEND_ORIGIN}`);
-  logger.event('SERVER', '📡', `Health Check URL: ${process.env.APP_URL || ''}/api/health (or http://localhost:${PORT}/api/health)`);
+  logger.event('SERVER', '📡', `Health Check URL: http://localhost:${PORT}/api/health${process.env.APP_URL ? ` (production: ${process.env.APP_URL}/api/health)` : ''}`);
   logger.event('SERVER', '📊', 'Live Console Request & Event Logging ENABLED');
   logger.event('SERVER', '🔍', 'Waiting for frontend connection... a 🎉 FRONTEND_CONNECTED log will appear when the site reaches this API');
   console.log('==================================================\n');
