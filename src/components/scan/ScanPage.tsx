@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { getQrCodeByIdFromDb } from "../../lib/supabaseService";
+import { getQrCodeByIdFromDb, activateQrInDb } from "../../lib/supabaseService";
 import groupLogo from "../../../assets/Group 1000005716.png";
 import groupLogo1 from "../../../assets/Group 1000005716-1.png";
 import groupLogo2 from "../../../assets/Group 1000005716-2.png";
@@ -40,7 +40,9 @@ import {
   Bot,
   Disc,
   Siren,
-  Lightbulb
+  Lightbulb,
+  Battery,
+  Settings
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -50,11 +52,11 @@ import {
 type Phase =
   | "validating"
   | "activation"
+  | "register"
   | "location-request"
   | "location-denied"
   | "gps-off"
   | "emergency"
-  | "sending"
   | "success"
   | "error"
   | "already-activated";
@@ -97,7 +99,7 @@ function getQrIdFromUrl(): string | null {
 
   if (directMatch && directMatch[1] !== "") {
     const id = directMatch[1];
-    if (id.toUpperCase().startsWith("QR-") || id.toUpperCase().startsWith("CL-")) {
+    if (id.toUpperCase().startsWith("QR") || id.toUpperCase().startsWith("CL")) {
       return decodeURIComponent(id);
     }
   }
@@ -113,6 +115,21 @@ function formatTime(d: string) {
 function formatCoord(n: number) {
   return n.toFixed(4);
 }
+
+const ACTIVATION_COUNTRIES: { name: string; code: string }[] = [
+  { name: "India", code: "+91" },
+  { name: "United States", code: "+1" },
+  { name: "United Kingdom", code: "+44" },
+  { name: "United Arab Emirates", code: "+971" },
+  { name: "Saudi Arabia", code: "+966" },
+  { name: "Singapore", code: "+65" },
+  { name: "Australia", code: "+61" },
+  { name: "Canada", code: "+1" },
+  { name: "Germany", code: "+49" },
+  { name: "Pakistan", code: "+92" },
+  { name: "Sri Lanka", code: "+94" },
+  { name: "Nepal", code: "+977" },
+];
 
 function Security3DGraphic() {
   return (
@@ -363,6 +380,122 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
   const [activeSubMenu, setActiveSubMenu] = useState<"none" | "emergency-main" | "mechanical" | "medical" | "towing" | "family">("none");
   const [towingImage, setTowingImage] = useState<string | null>(null);
 
+  // Registration form fields (after activation code is validated)
+  const [regName, setRegName] = useState("");
+  const [regPhone, setRegPhone] = useState("");
+  const [regEmergencyPhone, setRegEmergencyPhone] = useState("");
+  const [regBloodGroup, setRegBloodGroup] = useState("O+");
+  const [regAllergies, setRegAllergies] = useState("");
+  const [regAddress, setRegAddress] = useState("");
+
+  // Activation country (limited list with dial codes)
+  const [regCountry, setRegCountry] = useState("+91");
+
+  // OpenRouter AI Chat Assistant state
+  const [aiChatOpen, setAiChatOpen] = useState(false);
+  const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
+    {
+      role: 'assistant',
+      content: '🤖 Hello! I am your RapiQR Emergency AI Assistant powered by OpenRouter. Ask me anything about wrong parking, roadside help, or reaching the vehicle owner.'
+    }
+  ]);
+  const [aiInput, setAiInput] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const handleActivateNow = () => {
+    if (!qrData) return;
+    setActivationError(null);
+
+    if (!regName.trim()) {
+      setActivationError("Please enter your full name.");
+      return;
+    }
+    if (!regPhone.trim() || regPhone.trim().replace(/\D/g, "").length < 7) {
+      setActivationError("Please enter a valid phone number.");
+      return;
+    }
+
+    const storedCode = qrData.activationCode;
+    if (!storedCode) {
+      setActivationError("No activation code set for this sticker. Contact the admin.");
+      return;
+    }
+
+    const entered = activationCodeInput.trim().toUpperCase();
+    if (!entered) {
+      setActivationError("Please enter your activation code.");
+      return;
+    }
+
+    if (entered !== storedCode.toUpperCase()) {
+      setActivationError("Invalid activation code. Please try again.");
+      return;
+    }
+
+    handleRegisterSubmit();
+  };
+
+  const handleSendAiMessage = async (customPrompt?: string) => {
+    const promptToSend = customPrompt || aiInput;
+    if (!promptToSend.trim() || aiLoading) return;
+
+    const userMsg = { role: 'user' as const, content: promptToSend };
+    const updated = [...aiMessages, userMsg];
+    setAiMessages(updated);
+    if (!customPrompt) setAiInput('');
+    setAiLoading(true);
+
+    const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY || "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";
+    
+    // Array of active free models on OpenRouter
+    const freeModels = [
+      "meta-llama/llama-3.3-70b-instruct:free",
+      "google/gemini-2.5-flash:free",
+      "deepseek/deepseek-r1:free",
+      "openrouter/auto"
+    ];
+
+    let reply = "";
+    for (const modelId of freeModels) {
+      try {
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "HTTP-Referer": window.location.origin,
+            "X-Title": "RapiQR Emergency AI Assistant",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: modelId,
+            messages: [
+              {
+                role: "system",
+                content: `You are RapiQR Safety AI Assistant assisting a user who scanned vehicle QR tag ${qrData?.vehicleNumber || 'QR Tag'}. Help with wrong parking, emergency medical first aid, towing, or owner contact. Be concise, practical, direct, and polite.`
+              },
+              ...updated
+            ]
+          })
+        });
+
+        const data = await res.json();
+        if (data?.choices?.[0]?.message?.content) {
+          reply = data.choices[0].message.content;
+          break; // Success! Exit loop
+        }
+      } catch {
+        // Try next model if fetch fails
+      }
+    }
+
+    if (!reply) {
+      reply = "I am RapiQR Safety AI Assistant. How can I help you contact the vehicle owner or arrange emergency help?";
+    }
+
+    setAiMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+    setAiLoading(false);
+  };
+
   const handleSendCustomMessage = () => {
     if (!visitorMessage.trim()) return;
     if (qrData) {
@@ -569,10 +702,10 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
     }
 
     function tryFallback(cleanId: string) {
-      if (cleanId.startsWith("QR-") || cleanId.startsWith("CL-")) {
+      if (cleanId.startsWith("QR") || cleanId.startsWith("CL")) {
         const fallback = {
           id: cleanId,
-          clientId: cleanId.startsWith("CL-") ? cleanId : `CL-${cleanId.replace(/^QR-/, "")}`,
+          clientId: cleanId.startsWith("CL") ? cleanId : `CL${cleanId.replace(/^QR/, "")}`,
           vehicleName: `RapiQR Safety Tag (${cleanId})`,
           vehicleNumber: `REG-${cleanId.slice(-4)}`,
           status: "inactive",
@@ -588,45 +721,79 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
     }
   }, [requestLocation]);
 
-  /* ---- Owner Activation Handler (verifies code) ---- */
-  const handleOwnerActivation = () => {
+  /* ---- Registration Form Submit (after activation code validated) ---- */
+  const handleRegisterSubmit = () => {
     if (!qrData) return;
-    setActivationError(null);
-
-    const storedCode = qrData.activationCode;
-    if (!storedCode) {
-      setActivationError("No activation code set for this sticker. Contact the admin.");
-      return;
-    }
-
-    const entered = activationCodeInput.trim().toUpperCase();
-    if (!entered) {
-      setActivationError("Please enter your activation code");
-      return;
-    }
-
-    if (entered !== storedCode.toUpperCase()) {
-      setActivationError("Invalid activation code. Please try again.");
+    if (!regName.trim() || !regPhone.trim()) {
+      setActivationError("Please enter your name and phone number.");
       return;
     }
 
     setActivatingQr(true);
+
+    const fullPhone = regPhone.trim().startsWith("+")
+      ? regPhone.trim()
+      : `${regCountry}${regPhone.trim().replace(/\s+/g, "")}`;
+
+    // Save to Supabase
+    activateQrInDb({
+      qrId: qrData.id,
+      ownerName: regName.trim(),
+      ownerPhone: fullPhone,
+      emergencyPhone: regEmergencyPhone.trim(),
+      bloodGroup: regBloodGroup,
+      allergies: regAllergies.trim(),
+      address: regAddress.trim(),
+    });
+
     setTimeout(() => {
+      // Also save to localStorage as fallback
       const stored = localStorage.getItem("namoqr-qrlist");
       const list: any[] = stored ? JSON.parse(stored) : [];
       const idx = list.findIndex((q: any) => q.id === qrData.id);
+
+      const registrationData = {
+        ownerName: regName.trim(),
+        ownerPhone: fullPhone,
+        emergencyPhone: regEmergencyPhone.trim(),
+        bloodGroup: regBloodGroup,
+        allergies: regAllergies.trim(),
+        address: regAddress.trim(),
+        activatedAt: new Date().toISOString(),
+      };
+
       if (idx >= 0) {
         list[idx].status = "active";
-        list[idx].activatedAt = new Date().toISOString();
-        list[idx].visitorName = visitorName || "Owner";
+        list[idx].activatedAt = registrationData.activatedAt;
+        list[idx].ownerName = registrationData.ownerName;
+        list[idx].ownerPhone = registrationData.ownerPhone;
+        list[idx].secondaryPhone = registrationData.emergencyPhone;
+        list[idx].bloodGroup = registrationData.bloodGroup;
+        list[idx].allergies = registrationData.allergies;
+        list[idx].address = registrationData.address;
         list[idx].visitorMessage = "Self-activated via code";
         localStorage.setItem("namoqr-qrlist", JSON.stringify(list));
+      } else {
+        const newRecord = {
+          id: qrData.id,
+          qrUrl: qrData.qrUrl,
+          clientId: qrData.clientId,
+          vehicleName: qrData.vehicleName,
+          vehicleNumber: qrData.vehicleNumber,
+          status: "active",
+          template: qrData.template,
+          ...registrationData,
+        };
+        localStorage.setItem("namoqr-qrlist", JSON.stringify([newRecord, ...list]));
       }
+
       setQrData((prev) => (prev ? { ...prev, status: "active" } : null));
       setActivatingQr(false);
-      // Go directly to emergency scan page, no GPS request
-      setPhase("emergency");
-    }, 1200);
+      setPhase("success");
+      setTimeout(() => {
+        setPhase("emergency");
+      }, 2000);
+    }, 800);
   };
 
   /* ---- Automatic Location Ping Dispatch (Every 5s, 7 times) ---- */
@@ -753,10 +920,14 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                     </div>
                     <div>
                       <h3 className="font-semibold text-slate-900">
-                        {qrData.vehicleName}
+                        {qrData.vehicleName && !qrData.vehicleName.includes('Item ') && !qrData.vehicleName.includes('Vehicle (')
+                          ? qrData.vehicleName
+                          : `RapiQR Safety Tag (${qrData.id})`}
                       </h3>
-                      <p className="text-sm text-slate-500">
-                        {qrData.vehicleNumber}
+                      <p className="text-sm text-slate-500 font-mono">
+                        {qrData.vehicleNumber && !qrData.vehicleNumber.startsWith('XX00XX') && !qrData.vehicleNumber.startsWith('REG-')
+                          ? qrData.vehicleNumber
+                          : `Code: ${qrData.id}`}
                       </p>
                     </div>
                   </div>
@@ -765,47 +936,90 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                   </span>
                 </div>
 
-                {/* Activation Code Input */}
-                <div className="mt-8">
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Activation Code
-                  </label>
-                  <input
-                    type="text"
-                    value={activationCodeInput}
-                    onChange={(e) => { setActivationCodeInput(e.target.value.toUpperCase()); setActivationError(null); }}
-                    placeholder="e.g. ACT-8A3F"
-                    className="h-14 w-full rounded-xl border border-slate-200 px-4 outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-mono font-bold tracking-wider"
-                    autoCapitalize="characters"
-                    autoCorrect="off"
-                    spellCheck={false}
-                  />
+                {/* Single Activation Form: Name + Country + Phone + Activation Code */}
+                <div className="mt-6 space-y-4">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={regName}
+                      onChange={(e) => { setRegName(e.target.value); setActivationError(null); }}
+                      placeholder="Enter your full name"
+                      className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Country *
+                    </label>
+                    <select
+                      value={regCountry}
+                      onChange={(e) => { setRegCountry(e.target.value); setActivationError(null); }}
+                      className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-semibold bg-white"
+                    >
+                      {ACTIVATION_COUNTRIES.map((c) => (
+                        <option key={`${c.code}-${c.name}`} value={c.code}>{c.name} ({c.code})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Phone Number *
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-mono font-bold text-slate-600 border-r border-slate-200 pr-3">
+                        {regCountry}
+                      </span>
+                      <input
+                        type="tel"
+                        value={regPhone}
+                        onChange={(e) => { setRegPhone(e.target.value); setActivationError(null); }}
+                        placeholder="98765 43210"
+                        className="h-12 w-full rounded-xl border border-slate-200 pl-16 pr-4 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-mono font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Security Activation Code *
+                    </label>
+                    <input
+                      type="text"
+                      value={activationCodeInput}
+                      onChange={(e) => { setActivationCodeInput(e.target.value.toUpperCase()); setActivationError(null); }}
+                      placeholder="e.g. ACT8A3F"
+                      className="h-12 w-full rounded-xl border border-slate-200 px-4 outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-mono font-bold tracking-wider"
+                      autoCapitalize="characters"
+                    />
+                  </div>
+
                   {activationError && (
-                    <p className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-red-500">
+                    <p className="flex items-center gap-1 text-[11px] font-semibold text-red-500">
                       <AlertTriangle size={12} />
                       {activationError}
                     </p>
                   )}
-                </div>
 
-                {/* Activate Button */}
-                <button
-                  onClick={handleOwnerActivation}
-                  disabled={activatingQr || !activationCodeInput.trim()}
-                  className="mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-400 font-semibold text-slate-900 shadow-lg transition-all hover:scale-[1.02] active:scale-100 cursor-pointer disabled:opacity-50 disabled:hover:scale-100"
-                >
-                  {activatingQr ? (
-                    <>
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-900 border-t-transparent" />
-                      <span>Activating…</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>🛡️</span>
-                      <span>Activate Sticker</span>
-                    </>
-                  )}
-                </button>
+                  <button
+                    onClick={handleActivateNow}
+                    disabled={activatingQr}
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 text-white font-bold shadow-md transition-all hover:scale-[1.02] active:scale-100 cursor-pointer disabled:opacity-50 disabled:hover:scale-100 text-xs"
+                  >
+                    {activatingQr ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        <span>Activating…</span>
+                      </>
+                    ) : (
+                      <><ShieldCheck size={16} /> Activate Sticker</>
+                    )}
+                  </button>
+                </div>
 
                 {/* Footer */}
                 <div className="mt-5 rounded-xl bg-yellow-50 p-4">
@@ -817,6 +1031,24 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
 
               </div>
 
+            </div>
+          </div>
+        )}
+
+
+        {phase === "success" && (
+          <div className="w-full max-w-sm mx-auto animate-fade-in text-center">
+            <div className="rounded-3xl bg-white shadow-2xl p-8">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 shadow-lg">
+                <CheckCircle2 size={48} className="text-emerald-500" />
+              </div>
+              <h1 className="mt-6 text-2xl font-bold text-slate-900">Activation Successful!</h1>
+              <p className="mt-2 text-sm text-slate-500">
+                Your sticker has been activated. You'll be redirected to the emergency profile.
+              </p>
+              <div className="mt-6 h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                <div className="h-full w-full animate-progress rounded-full bg-gradient-to-r from-emerald-400 to-teal-500" />
+              </div>
             </div>
           </div>
         )}
@@ -1126,25 +1358,24 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                     </button>
                   </div>
 
-                  {/* 4. AI ASSISTANT LAVENDER BANNER */}
-                  <div className="bg-gradient-to-r from-[#F5F3FF] via-[#F3E8FF] to-[#FAF5FF] border border-[#DDD6FE] rounded-2xl p-3 flex items-center justify-between shadow-2xs mt-2">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
-                        <Bot size={22} />
-                      </div>
-                      <div>
-                        <p className="text-xs sm:text-sm font-bold text-gray-900">AI Assistant</p>
-                        <p className="text-[11px] text-gray-500 font-normal">Need help choosing the right action?</p>
-                      </div>
+   {/* 6. AI SAFETY ASSISTANT & SUPPORT BAR */}
+                <button
+                  onClick={() => setAiChatOpen(true)}
+                  className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-orange-500/20 active:scale-[0.98] transition-all cursor-pointer"
+                >
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold text-xl flex-shrink-0">
+                      <Bot size={22} />
                     </div>
-                    <button
-                      onClick={() => setActiveSubMenu("medical")}
-                      className="border border-[#7C3AED] text-[#7C3AED] hover:bg-[#7C3AED] hover:text-white font-bold text-xs py-1.5 px-3.5 rounded-full flex items-center gap-1 transition-all cursor-pointer flex-shrink-0 active:scale-95"
-                    >
-                      Ask Now <ChevronRight size={14} />
-                    </button>
+                    <div className="text-left min-w-0">
+                      <p className="text-sm font-black text-white tracking-tight">RapiQR AI Assistant</p>
+                      <p className="text-[11px] font-medium text-white/90">Ask AI for emergency advice &amp; owner assistance</p>
+                    </div>
                   </div>
-                </div>
+                  <div className="bg-white text-orange-700 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
+                    <Sparkles size={13} /> CHAT
+                  </div>
+                </button>                </div>
 
                 {/* 5. MESSAGE VEHICLE OWNER CARD */}
                 <div className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm flex items-center justify-between gap-3">
@@ -1175,7 +1406,8 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                   </button>
                 </div>
 
-                {/* 6. BOTTOM PROTECTION & SUPPORT BAR */}
+             
+
                 <div className="bg-white rounded-2xl p-2.5 border border-gray-100 shadow-sm flex items-center justify-between divide-x divide-gray-100">
                   {/* Left Half: You're Protected */}
                   <div className="flex items-center gap-2.5 pr-2 flex-1 min-w-0">
@@ -1710,33 +1942,6 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
-        {/* ============ SENDING (Light Mode) ============ */}
-        {phase === "sending" && qrData && (
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/60 p-8 text-center animate-fade-in w-full space-y-5">
-            <div className="relative flex items-center justify-center py-2">
-              <div className="w-16 h-16 rounded-full border-2 border-gray-100 border-t-red-500 animate-spin" />
-              <ShieldAlert size={24} className="absolute text-red-500" />
-            </div>
-            <div>
-              <h2 className="text-xl font-extrabold text-gray-900">Sending Alert</h2>
-              <p className="text-xs text-gray-500 mt-1">Please wait while we dispatch your emergency ping...</p>
-            </div>
-
-            <div className="w-full space-y-2">
-              <div className="w-full h-1.5 bg-gray-200/60 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-300 ease-out"
-                  style={{ width: `${activateProgress}%`, background: "linear-gradient(90deg, #EF4444, #DC2626)" }}
-                />
-              </div>
-              <div className="flex justify-between items-center text-[10px] font-mono font-semibold text-gray-400">
-                <span>{activateStatus}</span>
-                <span>{Math.round(activateProgress)}%</span>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* ============ SUCCESS (Light Mode) ============ */}
         {phase === "success" && qrData && (
           <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/60 p-6 sm:p-8 text-center animate-fade-in w-full space-y-4">
@@ -1763,6 +1968,118 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
             >
               Done
             </button>
+          </div>
+        )}
+
+        {/* Floating AI Assistant FAB Button */}
+        {phase === "emergency" && (
+          <button
+            onClick={() => setAiChatOpen(true)}
+            className="fixed bottom-5 right-5 z-40 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-black text-xs px-4 py-3 rounded-full shadow-2xl flex items-center gap-2 border-2 border-white/40 active:scale-95 transition-all cursor-pointer"
+          >
+            <Bot size={18} />
+            <span>AI Safety Assistant</span>
+          </button>
+        )}
+
+        {/* ============ OPENROUTER AI CHAT MODAL ============ */}
+        {aiChatOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
+            <div className="bg-white w-full max-w-md h-[85vh] sm:h-[600px] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-gray-100">
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-4 text-white flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center font-bold">
+                    <Bot size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm flex items-center gap-1.5">
+                      RapiQR Safety AI Assistant
+                      <span className="text-[10px] bg-white/20 text-white font-bold px-2 py-0.5 rounded-full">OpenRouter</span>
+                    </h3>
+                    <p className="text-[11px] text-white/80 font-medium">Instant Emergency &amp; Owner Assistance</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setAiChatOpen(false)}
+                  className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center font-bold text-sm transition-colors cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Chat Message Stream */}
+              <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-gray-50/50">
+                {aiMessages.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex items-start gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+                  >
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                      msg.role === 'user' ? 'bg-orange-500 text-white' : 'bg-gray-900 text-amber-400'
+                    }`}>
+                      {msg.role === 'user' ? 'U' : <Bot size={16} />}
+                    </div>
+                    <div className={`max-w-[80%] rounded-2xl p-3.5 text-xs font-medium leading-relaxed shadow-2xs ${
+                      msg.role === 'user'
+                        ? 'bg-orange-500 text-white rounded-tr-xs'
+                        : 'bg-white text-gray-800 border border-gray-200/80 rounded-tl-xs'
+                    }`}>
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+
+                {aiLoading && (
+                  <div className="flex items-center gap-2 text-xs font-bold text-gray-400 bg-white p-3 rounded-2xl border border-gray-200 max-w-[200px]">
+                    <Sparkles size={14} className="animate-spin text-amber-500" />
+                    <span>AI Assistant is typing...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Prompt Chips */}
+              <div className="p-2.5 bg-white border-t border-gray-100 flex items-center gap-2 overflow-x-auto">
+                {[
+                  '🚨 Vehicle Blocking Driveway',
+                  '🚗 Need Towing Assistance',
+                  '🚑 Medical Emergency Advice',
+                  '📱 How to Reach Owner'
+                ].map((chip, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleSendAiMessage(chip)}
+                    className="text-[11px] font-bold text-gray-700 bg-gray-100 hover:bg-orange-50 hover:text-orange-600 px-3 py-1.5 rounded-full whitespace-nowrap border border-gray-200/60 transition-colors flex-shrink-0 cursor-pointer"
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+
+              {/* Input Box */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendAiMessage();
+                }}
+                className="p-3 bg-white border-t border-gray-200 flex items-center gap-2"
+              >
+                <input
+                  type="text"
+                  placeholder="Ask AI safety assistant..."
+                  value={aiInput}
+                  onChange={(e) => setAiInput(e.target.value)}
+                  className="flex-1 px-4 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-medium"
+                />
+                <button
+                  type="submit"
+                  disabled={!aiInput.trim() || aiLoading}
+                  className="w-10 h-10 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white flex items-center justify-center font-bold shadow-xs transition-all flex-shrink-0 cursor-pointer"
+                >
+                  <Send size={16} />
+                </button>
+              </form>
+            </div>
           </div>
         )}
       </main>

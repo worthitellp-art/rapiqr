@@ -131,12 +131,12 @@ function fmtDateTime(d: string) {
 }
 
 function uid(prefix = "QR") {
-  return `${prefix}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+  return `${prefix}${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 }
 
 function generateActivationCode(): string {
   const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
-  let code = "ACT-";
+  let code = "ACT";
   for (let i = 0; i < 4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
   return code;
 }
@@ -879,7 +879,7 @@ function QrCodesPage({
   function downloadCsv() {
     const rows = [
       ["QR ID", "Client ID", "Activation Code", "Vehicle Name", "Vehicle Number", "Status", "Template", "Created"],
-      ...qrList.map((q) => [q.id, q.clientId, q.activationCode || "ACT-PENDING", q.vehicleName, q.vehicleNumber, q.status, q.template, fmtDate(q.createdAt)]),
+      ...qrList.map((q) => [q.id, q.clientId, q.activationCode || "ACTPENDING", q.vehicleName, q.vehicleNumber, q.status, q.template, fmtDate(q.createdAt)]),
     ];
     const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -1015,7 +1015,7 @@ function QrCodesPage({
               </thead>
               <tbody>
                 {filtered.slice(0, 60).map((q) => {
-                  const actCode = q.activationCode || "ACT-????";
+                  const actCode = q.activationCode || "ACT????";
                   return (
                     <tr key={q.id} className="border-b last:border-0 hover:bg-gray-50/60 transition-colors" style={{ borderColor: "#f7f7f7" }}>
                       <td className="px-6 py-3">
@@ -1141,7 +1141,7 @@ function QuickLookModal({
               </div>
               <div>
                 <p className="text-[9px] font-extrabold text-amber-800 uppercase tracking-wider">Activation Code</p>
-                <p className="font-mono font-black text-amber-950 text-sm">{qr.activationCode || "ACT-?????"}</p>
+                <p className="font-mono font-black text-amber-950 text-sm">{qr.activationCode || "ACT?????"}</p>
               </div>
             </div>
             <button
@@ -1210,7 +1210,7 @@ function AlertsPage({
         combined = [
           {
             id: "rep-101",
-            qr_code_id: "QR-8A3F",
+            qr_code_id: "QR8A3F",
             product_label: "Toyota Innova (GJ01AB1234)",
             type: "wrong_parking",
             message: "Vehicle is parked blocking gate #2 entrance. Please move immediately.",
@@ -1221,7 +1221,7 @@ function AlertsPage({
           },
           {
             id: "rep-102",
-            qr_code_id: "CL-CXTF2",
+            qr_code_id: "CLCXTF2",
             product_label: "Honda City (MH02CD5678)",
             type: "headlights_on",
             message: "Headlights left switched ON in basement parking level B2.",
@@ -1232,7 +1232,7 @@ function AlertsPage({
           },
           {
             id: "rep-103",
-            qr_code_id: "QR-5590",
+            qr_code_id: "QR5590",
             product_label: "Gate Security QR Tag",
             type: "emergency_contact",
             message: "Accident reported near vehicle. Emergency contact requested.",
@@ -1905,7 +1905,7 @@ function RestoreStickerModal({
     const rec: QrRecord = {
       id: cleanId,
       qrUrl: qrFullUrl(cleanId),
-      clientId: cleanId.startsWith("CL-") ? cleanId : `CL-${cleanId.replace(/^QR-/, "")}`,
+      clientId: cleanId.startsWith("CL") ? cleanId : `CL${cleanId.replace(/^QR/, "")}`,
       vehicleName: vehicleName.trim() || `Restored Sticker (${cleanId})`,
       vehicleNumber: vehicleNumber.trim() || `RE-${cleanId.slice(-4)}`,
       createdAt: new Date().toISOString(),

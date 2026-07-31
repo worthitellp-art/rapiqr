@@ -27,13 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfileData | null>(() => {
     const saved = localStorage.getItem('namoqr-auth-user');
     if (saved) {
-      const p = JSON.parse(saved);
-      // Force role to 'user' on page load — admin only granted through adminSignIn/adminDemoLogin flow
-      if (p.role === 'admin') {
-        p.role = 'user';
-        localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
-      }
-      return p;
+      return JSON.parse(saved);
     }
     return null;
   });
@@ -52,7 +46,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (initSession?.user) {
         getUserProfile(initSession.user.id, initSession.user.email || '').then((p) => {
           if (p) {
-            p.role = 'user'; // Force regular user on session restore
+            const saved = localStorage.getItem('namoqr-auth-user');
+            const savedRole = saved ? JSON.parse(saved).role : null;
+            if (savedRole === 'admin' || initSession.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+              p.role = 'admin';
+            }
             setProfile(p);
             localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
           }
@@ -69,9 +67,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         if (currentSession?.user) {
           const userProfile = await getUserProfile(currentSession.user.id, currentSession.user.email || '');
-          // OAuth sign-ins (Google) go through this path — force role to 'user'
           if (userProfile) {
-            userProfile.role = 'user';
+            const saved = localStorage.getItem('namoqr-auth-user');
+            const savedRole = saved ? JSON.parse(saved).role : null;
+            if (savedRole === 'admin' || currentSession.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+              userProfile.role = 'admin';
+            }
             setProfile(userProfile);
             localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
           }

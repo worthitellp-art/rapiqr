@@ -1,14 +1,27 @@
+import type React from "react";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Save, Grid3X3, Lock, Unlock } from "lucide-react";
+import { Save, Grid3X3, Lock, Unlock, Magnet, Copy, Trash2, Pencil, Play, Star, X } from "lucide-react";
 import { Template, StickerPos } from "./types";
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
-import { saveTemplateToDb } from "../../../lib/supabaseService";
+import { saveTemplateToDb, deleteTemplateFromDb } from "../../../lib/supabaseService";
 import { qrImageUrl } from "./helpers";
 
 const STICKER_SRC = stickerTemplateImg;
 const EDITOR_DISPLAY = { w: 320, h: 200 };
 const MIN_SIZE = 16;
 const MAX_SIZE = 300;
+const SNAP = 4;
+
+const PRESETS: { name: string; fg: string; bg: string }[] = [
+  { name: "Midnight", fg: "111111", bg: "FFFFFF" },
+  { name: "Amber", fg: "EAB308", bg: "FFFFFF" },
+  { name: "Indigo", fg: "6366F1", bg: "FFFFFF" },
+  { name: "Violet", fg: "8B5CF6", bg: "FFFFFF" },
+  { name: "Sky", fg: "0EA5E9", bg: "FFFFFF" },
+  { name: "Emerald", fg: "10B981", bg: "FFFFFF" },
+  { name: "Rose", fg: "F43F5E", bg: "FFFFFF" },
+  { name: "Ink", fg: "0F172A", bg: "FFFFFF" },
+];
 
 export default function StickerEditor({
   stickerPos, setStickerPos, templates, setTemplates, setToast,
@@ -23,13 +36,16 @@ export default function StickerEditor({
   const dragOffset = useRef({ x: 0, y: 0 });
   const startPos = useRef({ x: 0, y: 0, w: 0, h: 0 });
   const [showGrid, setShowGrid] = useState(false);
+  const [snapEnabled, setSnapEnabled] = useState(true);
   const [lockAspect, setLockAspect] = useState(true);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [tplName, setTplName] = useState("");
   const [tplFg, setTplFg] = useState("EAB308");
   const [tplBg, setTplBg] = useState("FFFFFF");
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   function clamp(val: number, min: number, max: number) { return Math.max(min, Math.min(max, val)); }
+  function snap(val: number) { return snapEnabled ? Math.round(val / SNAP) * SNAP : Math.round(val); }
 
   const handleDragDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
@@ -54,7 +70,7 @@ export default function StickerEditor({
       const dx = e.clientX - dragOffset.current.x;
       const dy = e.clientY - dragOffset.current.y;
       if (dragging) {
-        setStickerPos({ ...stickerPos, x: Math.round(clamp(startPos.current.x + dx, 0, rect.width - stickerPos.w)), y: Math.round(clamp(startPos.current.y + dy, 0, rect.height - stickerPos.h)) });
+        setStickerPos({ ...stickerPos, x: snap(clamp(startPos.current.x + dx, 0, rect.width - stickerPos.w)), y: snap(clamp(startPos.current.y + dy, 0, rect.height - stickerPos.h)) });
       }
       if (resizing) {
         const s = startPos.current;
@@ -63,36 +79,91 @@ export default function StickerEditor({
         else if (resizing === "sw") { nw = clamp(s.w - dx, MIN_SIZE, MAX_SIZE); nh = lockAspect ? nw : clamp(s.h + dy, MIN_SIZE, MAX_SIZE); nx = s.x + s.w - nw; }
         else if (resizing === "ne") { nw = clamp(s.w + dx, MIN_SIZE, MAX_SIZE); nh = lockAspect ? nw : clamp(s.h - dy, MIN_SIZE, MAX_SIZE); ny = s.y + s.h - nh; }
         else if (resizing === "nw") { nw = clamp(s.w - dx, MIN_SIZE, MAX_SIZE); nh = lockAspect ? nw : clamp(s.h - dy, MIN_SIZE, MAX_SIZE); nx = s.x + s.w - nw; ny = s.y + s.h - nh; }
-        nx = clamp(nx, 0, rect.width - nw); ny = clamp(ny, 0, rect.height - nh);
-        setStickerPos({ x: Math.round(nx), y: Math.round(ny), w: Math.round(nw), h: Math.round(nh) });
+        nx = snap(clamp(nx, 0, rect.width - nw)); ny = snap(clamp(ny, 0, rect.height - nh));
+        nw = snap(clamp(nw, MIN_SIZE, rect.width - nx)); nh = snap(clamp(nh, MIN_SIZE, rect.height - ny));
+        setStickerPos({ x: nx, y: ny, w: nw, h: nh });
       }
     };
     const handleUp = () => { setDragging(false); setResizing(null); };
     window.addEventListener("mousemove", handleMove); window.addEventListener("mouseup", handleUp);
     return () => { window.removeEventListener("mousemove", handleMove); window.removeEventListener("mouseup", handleUp); };
-  }, [dragging, resizing, stickerPos, setStickerPos, lockAspect]);
+  }, [dragging, resizing, stickerPos, setStickerPos, lockAspect, snapEnabled]);
 
   function handleSave() {
     if (saveState !== "idle") return;
     if (!tplName.trim()) { setToast("Enter a template name first"); setTimeout(() => setToast(null), 2000); return; }
     setSaveState("saving");
     setTimeout(() => {
-      const newTpl: Template = {
-        id: Date.now(),
-        name: tplName.trim(),
-        fg: tplFg,
-        bg: tplBg,
-        logo: null,
-        stickerPos: { ...stickerPos },
-        isPublicDefault: templates.length === 0,
-      };
-      setTemplates((prev) => [...prev, newTpl]);
-      saveTemplateToDb({ name: newTpl.name, fgColor: newTpl.fg, bgColor: newTpl.bg, stickerPos, isDefault: newTpl.isPublicDefault });
-      setTplName("");
-      setSaveState("saved");
-      setToast(`Template "${newTpl.name}" saved!`);
+      if (editingId !== null) {
+        setTemplates((prev) => prev.map((t) => t.id === editingId ? { ...t, name: tplName.trim(), fg: tplFg, bg: tplBg, stickerPos: { ...stickerPos } } : t));
+        const t = templates.find((x) => x.id === editingId);
+        saveTemplateToDb({ id: String(editingId), name: tplName.trim(), fgColor: tplFg, bgColor: tplBg, stickerPos, isDefault: t?.isPublicDefault || false });
+        setEditingId(null);
+        setTplName("");
+        setSaveState("saved");
+        setToast("Template updated!");
+      } else {
+        const newTpl: Template = {
+          id: Date.now(),
+          name: tplName.trim(),
+          fg: tplFg,
+          bg: tplBg,
+          logo: null,
+          stickerPos: { ...stickerPos },
+          isPublicDefault: templates.length === 0,
+        };
+        setTemplates((prev) => [...prev, newTpl]);
+        saveTemplateToDb({ name: newTpl.name, fgColor: newTpl.fg, bgColor: newTpl.bg, stickerPos, isDefault: newTpl.isPublicDefault });
+        setTplName("");
+        setSaveState("saved");
+        setToast(`Template "${newTpl.name}" saved!`);
+      }
       setTimeout(() => { setSaveState("idle"); setToast(null); }, 2000);
     }, 400);
+  }
+
+  function handleLoad(t: Template) {
+    setTplName(t.name);
+    setTplFg(t.fg);
+    setTplBg(t.bg);
+    setStickerPos(t.stickerPos);
+    setToast(`Loaded "${t.name}"`);
+    setTimeout(() => setToast(null), 2000);
+  }
+
+  function handleEdit(t: Template) {
+    setEditingId(t.id);
+    setTplName(t.name);
+    setTplFg(t.fg);
+    setTplBg(t.bg);
+    setStickerPos(t.stickerPos);
+    setToast(`Editing "${t.name}" — press Update Template to save`);
+    setTimeout(() => setToast(null), 2200);
+  }
+
+  function handleDuplicate(t: Template) {
+    const copy: Template = { ...t, id: Date.now(), name: `${t.name} (copy)`, isPublicDefault: false };
+    setTemplates((prev) => [...prev, copy]);
+    saveTemplateToDb({ id: String(copy.id), name: copy.name, fgColor: copy.fg, bgColor: copy.bg, stickerPos: copy.stickerPos, isDefault: false });
+    setToast(`Duplicated "${t.name}"`);
+    setTimeout(() => setToast(null), 2000);
+  }
+
+  function handleDelete(t: Template) {
+    if (t.isPublicDefault) { setToast("Set another template as default first"); setTimeout(() => setToast(null), 2000); return; }
+    if (editingId === t.id) setEditingId(null);
+    setTemplates((prev) => prev.filter((x) => x.id !== t.id));
+    deleteTemplateFromDb(String(t.id));
+    setToast(`Deleted "${t.name}"`);
+    setTimeout(() => setToast(null), 2000);
+  }
+
+  function handleSetDefault(t: Template) {
+    setTemplates((prev) => prev.map((x) => ({ ...x, isPublicDefault: x.id === t.id })));
+    setStickerPos(t.stickerPos);
+    templates.forEach((x) => saveTemplateToDb({ id: String(x.id), name: x.name, fgColor: x.fg, bgColor: x.bg, stickerPos: x.stickerPos, isDefault: x.id === t.id }));
+    setToast(`"${t.name}" set as default`);
+    setTimeout(() => setToast(null), 2000);
   }
 
   const previewSize = 320;
@@ -107,6 +178,9 @@ export default function StickerEditor({
             <div className="flex items-center gap-2">
               <button onClick={() => setShowGrid(!showGrid)} className={`p-1.5 rounded-lg border transition-all cursor-pointer ${showGrid ? "bg-gray-100 border-gray-300" : "border-gray-200"}`} title="Toggle grid">
                 <Grid3X3 size={14} className={showGrid ? "text-gray-900" : "text-gray-400"} />
+              </button>
+              <button onClick={() => setSnapEnabled(!snapEnabled)} className={`p-1.5 rounded-lg border transition-all cursor-pointer ${snapEnabled ? "bg-gray-100 border-gray-300" : "border-gray-200"}`} title={`Snap to ${SNAP}px grid`}>
+                <Magnet size={14} className={snapEnabled ? "text-gray-900" : "text-gray-400"} />
               </button>
               <button onClick={() => setLockAspect(!lockAspect)} className={`p-1.5 rounded-lg border transition-all cursor-pointer ${lockAspect ? "bg-gray-100 border-gray-300" : "border-gray-200"}`} title="Lock aspect ratio">
                 {lockAspect ? <Lock size={14} className="text-gray-900" /> : <Unlock size={14} className="text-gray-400" />}
@@ -164,11 +238,36 @@ export default function StickerEditor({
 
         {/* Template Controls */}
         <div className="w-full lg:w-72 bg-white rounded-2xl border p-5 space-y-4" style={{ borderColor: "#f0f0f0" }}>
-          <h3 className="font-bold text-gray-900 text-sm">Save as Template</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-gray-900 text-sm">{editingId !== null ? "Edit Template" : "Save as Template"}</h3>
+            {editingId !== null && (
+              <button
+                onClick={() => { setEditingId(null); setTplName(""); }}
+                className="flex items-center gap-1 text-[10px] font-bold text-gray-500 hover:text-gray-900 transition-all cursor-pointer"
+              >
+                <X size={12} /> Cancel
+              </button>
+            )}
+          </div>
 
           <div>
             <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Template Name</label>
             <input value={tplName} onChange={(e) => setTplName(e.target.value)} placeholder="e.g. Midnight Classic" className="w-full px-3.5 py-2.5 text-sm rounded-xl border bg-gray-50 outline-none focus:bg-white focus:border-gray-400 transition-all font-semibold text-gray-900" style={{ borderColor: "#e2e8f0" }} />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1.5">Theme Presets</label>
+            <div className="grid grid-cols-8 gap-1.5">
+              {PRESETS.map((p) => (
+                <button
+                  key={p.name}
+                  title={p.name}
+                  onClick={() => { setTplFg(p.fg); setTplBg(p.bg); }}
+                  className="w-6 h-6 rounded-lg border transition-transform hover:scale-110 cursor-pointer"
+                  style={{ background: `#${p.fg}`, borderColor: p.fg === "FFFFFF" ? "#e2e8f0" : "#e2e8f0", boxShadow: tplFg === p.fg && tplBg === p.bg ? "0 0 0 2px #111111" : "none" }}
+                />
+              ))}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -202,9 +301,9 @@ export default function StickerEditor({
             onClick={handleSave}
             disabled={saveState !== "idle"}
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-60 cursor-pointer shadow-sm"
-            style={{ background: "var(--accent)" }}
+            style={{ background: "#111111" }}
           >
-            {saveState === "saving" ? "Saving..." : saveState === "saved" ? "Saved!" : <><Save size={14} /> Save Template</>}
+            {saveState === "saving" ? "Saving..." : saveState === "saved" ? "Saved!" : <><Save size={14} /> {editingId !== null ? "Update Template" : "Save Template"}</>}
           </button>
         </div>
       </div>
@@ -213,12 +312,26 @@ export default function StickerEditor({
       {templates.length > 0 && (
         <div className="bg-white rounded-2xl border p-5" style={{ borderColor: "#f0f0f0" }}>
           <h3 className="font-bold text-gray-900 text-sm mb-4">Saved Templates ({templates.length})</h3>
-          <div className="flex flex-wrap gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {templates.map((t) => (
-              <div key={t.id} className="flex items-center gap-3 px-3 py-2 rounded-xl border" style={{ borderColor: "#e2e8f0" }}>
-                <div className="w-6 h-6 rounded" style={{ background: `#${t.fg}` }} />
-                <span className="text-xs font-bold text-gray-800">{t.name}</span>
-                {t.isPublicDefault && <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md">Default</span>}
+              <div key={t.id} className="p-3.5 rounded-xl border flex flex-col gap-3" style={{ borderColor: "#e2e8f0", background: t.isPublicDefault ? "#F8FAFC" : "#fff" }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `#${t.fg}` }}>
+                    <div className="w-3.5 h-3.5 rounded-sm" style={{ background: `#${t.bg}` }} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-gray-900 truncate">{t.name}</p>
+                    <p className="text-[10px] font-mono text-gray-500">#{t.fg} / #{t.bg}</p>
+                  </div>
+                  {t.isPublicDefault && <span className="ml-auto text-[9px] font-bold text-gray-800 bg-gray-200 px-1.5 py-0.5 rounded-md">Default</span>}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => handleEdit(t)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition-all cursor-pointer" title="Edit"><Pencil size={11} /> Edit</button>
+                  <button onClick={() => handleLoad(t)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition-all cursor-pointer" title="Load colors & position"><Play size={11} /> Load</button>
+                  <button onClick={() => handleDuplicate(t)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition-all cursor-pointer" title="Duplicate"><Copy size={11} /> Copy</button>
+                  <button onClick={() => handleSetDefault(t)} className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${t.isPublicDefault ? "text-black bg-gray-200" : "text-gray-700 hover:bg-gray-100"}`} title="Set as default"><Star size={11} /> Default</button>
+                  <button onClick={() => handleDelete(t)} className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-all cursor-pointer" title="Delete"><Trash2 size={13} /></button>
+                </div>
               </div>
             ))}
           </div>

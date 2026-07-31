@@ -1,3 +1,4 @@
+import type React from "react";
 import { useState } from "react";
 import { RefreshCw, X } from "lucide-react";
 import { QrRecord } from "./types";
@@ -33,7 +34,7 @@ export default function RestoreStickerModal({
     const rec: QrRecord = {
       id: cleanId,
       qrUrl: qrFullUrl(cleanId),
-      clientId: cleanId.startsWith("CL-") ? cleanId : `CL-${cleanId.replace(/^QR-/, "")}`,
+      clientId: cleanId.startsWith("CL") ? cleanId : `CL${cleanId.replace(/^QR/, "")}`,
       vehicleName: vehicleName.trim() || `Restored Sticker (${cleanId})`,
       vehicleNumber: vehicleNumber.trim() || `RE-${cleanId.slice(-4)}`,
       createdAt: new Date().toISOString(),
@@ -71,7 +72,7 @@ export default function RestoreStickerModal({
         <form onSubmit={handleRestore} className="space-y-3">
           <div>
             <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1.5">Sticker ID or QR Code *</label>
-            <input type="text" required placeholder="e.g. QR-8A3F or CL-CXTF2" value={targetId} onChange={(e) => setTargetId(e.target.value)} className="w-full px-4 py-2.5 text-sm font-semibold text-gray-900 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-gray-400 uppercase font-mono transition-all" />
+            <input type="text" required placeholder="e.g. QR8A3F or CLCXTF2" value={targetId} onChange={(e) => setTargetId(e.target.value)} className="w-full px-4 py-2.5 text-sm font-semibold text-gray-900 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-gray-400 uppercase font-mono transition-all" />
           </div>
           <div>
             <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1.5">Vehicle / Item Name (optional)</label>

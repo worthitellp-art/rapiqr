@@ -24,89 +24,55 @@ import {
   RefreshCw,
   Search,
   Settings,
-  ChevronRight
+  ChevronRight,
+  Trash2,
+  Store
 } from 'lucide-react';
 
 interface ClientDashboardProps {
   onBack: () => void;
   switchToAdminFleet?: () => void;
+  switchToDistributor?: () => void;
 }
 
-export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDashboardProps) {
+export default function ClientDashboard({ onBack, switchToAdminFleet, switchToDistributor }: ClientDashboardProps) {
   const { profile, signOut } = useAuth();
-  const [activeTab, setActiveTab] = useState<'stickers' | 'alerts' | 'register' | 'sos'>('stickers');
+  const [activeTab, setActiveTab] = useState<'stickers' | 'alerts' | 'family' | 'register' | 'sos'>('stickers');
+
+  // Helper to sanitize code: uppercase, strip special characters (letters and numbers only)
+  const sanitizeCode = (val: string) => val.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 
   // Client's items state (persisted in localStorage / Supabase)
   const [myStickers, setMyStickers] = useState<any[]>(() => {
     const saved = localStorage.getItem('namoqr-client-stickers');
     if (saved) return JSON.parse(saved);
-    return [
-      {
-        id: 'CL-CXTF2',
-        name: "Mihir's Car",
-        category: 'car',
-        vehicleNumber: 'GJ01AB1234',
-        ownerPhone: '+91 98162 31234',
-        secondaryPhone: '+91 98765 43210',
-        roadsidePhone: '1800-102-1234',
-        status: 'active',
-        scansCount: 3,
-        createdAt: new Date().toISOString(),
-        template: 'Default',
-        fg: 'EAB308',
-        bg: 'FFFFFF',
-        details: { make: 'Tesla', model: 'Model 3', year: 2024 }
-      },
-      {
-        id: 'QR-8A3F',
-        name: 'Home Gate Tag',
-        category: 'home',
-        vehicleNumber: 'Apartment 4B',
-        ownerPhone: '+91 98765 43210',
-        status: 'active',
-        scansCount: 1,
-        createdAt: new Date().toISOString(),
-        template: 'Default',
-        fg: 'EAB308',
-        bg: 'FFFFFF',
-        details: { houseProfile: 'Green Glen Society, Gate 2' }
-      }
-    ];
+    return [];
   });
+
+  // Client Family Phone Numbers State
+  const [familyNumbers, setFamilyNumbers] = useState<any[]>(() => {
+    const saved = localStorage.getItem('namoqr-client-family-numbers');
+    if (saved) return JSON.parse(saved);
+    return [];
+  });
+
+  const [newFamName, setNewFamName] = useState('');
+  const [newFamPhone, setNewFamPhone] = useState('');
+  const [newFamRelation, setNewFamRelation] = useState('Spouse');
+  const [newFamWhatsapp, setNewFamWhatsapp] = useState(true);
 
   // Client's emergency alerts state
   const [alerts, setAlerts] = useState<any[]>(() => {
     const saved = localStorage.getItem('namoqr-client-alerts');
     if (saved) return JSON.parse(saved);
-    return [
-      {
-        id: 'ALT-101',
-        qrCodeId: 'CL-CXTF2',
-        productLabel: "Mihir's Car (GJ01AB1234)",
-        type: 'wrong_parking',
-        message: 'Vehicle is blocking driveway entrance. Please move.',
-        reporterPhone: '+91 98765 43210',
-        location: { lat: 23.0225, lng: 72.5714 },
-        status: 'unread',
-        createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString()
-      }
-    ];
+    return [];
   });
 
   // Pending Admin Activations state
   const [pendingActivations, setPendingActivations] = useState<any[]>(() => {
     const saved = localStorage.getItem('namoqr-pending-activations');
     if (saved) return JSON.parse(saved);
-    return [
-      {
-        id: 'QR-0Z2A',
-        activationCode: 'ACT-0Z2A',
-        vehicleName: 'NamoQR Pro Sticker Tag',
-        vehicleNumber: 'PENDING',
-        status: 'pending_activation',
-        createdAt: new Date().toISOString()
-      }
-    ];
+    return [];
   });
 
   // New Sticker Registration Form & Protection Layer
@@ -116,6 +82,9 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
   const [newName, setNewName] = useState('');
   const [newRegNumber, setNewRegNumber] = useState('');
   const [newCategory, setNewCategory] = useState('car');
+  const [newOwnerPhone, setNewOwnerPhone] = useState('');
+  const [newSecondaryPhone, setNewSecondaryPhone] = useState('');
+  const [newRoadsidePhone, setNewRoadsidePhone] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -127,6 +96,10 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
   useEffect(() => {
     localStorage.setItem('namoqr-client-stickers', JSON.stringify(myStickers));
   }, [myStickers]);
+
+  useEffect(() => {
+    localStorage.setItem('namoqr-client-family-numbers', JSON.stringify(familyNumbers));
+  }, [familyNumbers]);
 
   useEffect(() => {
     localStorage.setItem('namoqr-client-alerts', JSON.stringify(alerts));
@@ -150,6 +123,43 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
     setTimeout(() => setToast(null), 2500);
   };
 
+  const handleAddFamilyNumber = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFamName.trim() || !newFamPhone.trim()) return;
+
+    const newContact = {
+      id: 'FAM-' + Date.now().toString().slice(-4),
+      name: newFamName.trim(),
+      phone: newFamPhone.trim(),
+      relation: newFamRelation,
+      isPrimary: familyNumbers.length === 0,
+      isWhatsappAlerts: newFamWhatsapp,
+    };
+
+    const updated = [newContact, ...familyNumbers];
+    setFamilyNumbers(updated);
+    setNewFamName('');
+    setNewFamPhone('');
+    setNewFamRelation('Spouse');
+    setNewFamWhatsapp(true);
+    showToast(`Added ${newContact.name} (${newContact.phone}) to Family Numbers`);
+  };
+
+  const handleDeleteFamilyNumber = (id: string) => {
+    const updated = familyNumbers.filter(f => f.id !== id);
+    setFamilyNumbers(updated);
+    showToast('Family phone number removed');
+  };
+
+  const handleSetPrimaryNumber = (id: string) => {
+    const updated = familyNumbers.map(f => ({
+      ...f,
+      isPrimary: f.id === id,
+    }));
+    setFamilyNumbers(updated);
+    showToast('Primary emergency contact updated');
+  };
+
   const handleCopyLink = (qrId: string) => {
     const url = `${window.location.origin}/${qrId}`;
     navigator.clipboard.writeText(url);
@@ -162,7 +172,7 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
     e.preventDefault();
     setActivationError(null);
 
-    const cleanId = newQrId.trim().toUpperCase() || 'QR-0Z2A';
+    const cleanId = newQrId.trim().toUpperCase() || 'QR0Z2A';
     const cleanCode = newActivationCode.trim().toUpperCase();
 
     // Protection Verification: Find expected activation code for this QR ID
@@ -170,10 +180,10 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
     const globalQrList = JSON.parse(localStorage.getItem('namoqr-qrlist') || '[]');
     const adminQrItem = globalQrList.find((q: any) => q.id.toUpperCase() === cleanId);
 
-    const expectedCode = pendingItem?.activationCode || adminQrItem?.activationCode || `ACT-${cleanId.replace(/^QR-/, '')}`;
+    const expectedCode = pendingItem?.activationCode || adminQrItem?.activationCode || `ACT${cleanId.replace(/^QR/, '')}`;
 
     // Protection Gate Check
-    if (cleanCode && expectedCode && cleanCode !== expectedCode.toUpperCase() && !cleanCode.startsWith('ACT-')) {
+    if (cleanCode && expectedCode && cleanCode !== expectedCode.toUpperCase() && !cleanCode.startsWith('ACT')) {
       setActivationError(`Invalid Activation Code "${cleanCode}". Please enter the correct Security Activation Code provided by Admin or on your sticker package (Expected e.g. ${expectedCode}).`);
       return;
     }
@@ -255,11 +265,12 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
   const unreadAlertsCount = alerts.filter(a => a.status === 'unread').length;
 
   return (
-    <div className="min-h-screen bg-[#F8F9FC] text-gray-900 flex flex-col font-sans">
-      {/* Top Header */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-xs">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-18 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-[#F8F9FC] text-gray-900 flex flex-col md:flex-row font-sans">
+      {/* Left Sidebar Menu */}
+      <aside className="w-full md:w-64 bg-white border-r border-gray-100 p-5 flex flex-col justify-between shadow-2xs flex-shrink-0">
+        <div>
+          {/* Brand Logo Header */}
+          <div className="pb-5 border-b border-gray-100 flex items-center justify-between">
             <div>
               <span className="font-black text-gray-900 text-2xl tracking-tight block" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 Rapi<span className="text-orange-500">QR</span>
@@ -268,38 +279,114 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {switchToAdminFleet && (
+          {/* Sidebar Navigation: 3 Main Options */}
+          <div className="mt-6">
+            <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block mb-3 px-2">
+              Main Menu
+            </span>
+            <nav className="space-y-1.5">
+              {/* Option 1: Your Sticker Info */}
               <button
-                onClick={switchToAdminFleet}
-                className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3.5 py-2 rounded-full transition-colors"
+                onClick={() => setActiveTab('stickers')}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'stickers' || activeTab === 'register'
+                    ? 'bg-orange-50 text-orange-600 border border-orange-200/80 shadow-2xs'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
               >
-                <Settings size={14} /> Fleet Manager View
+                <div className="flex items-center gap-3">
+                  <QrCode size={18} />
+                  <span>Your Sticker Info</span>
+                </div>
+                <span className="bg-orange-100 text-orange-800 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
+                  {myStickers.length}
+                </span>
               </button>
-            )}
-            <div className="h-6 w-px bg-gray-200 hidden sm:block" />
-            <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-100 rounded-full py-1.5 pl-3 pr-2">
-              <div className="w-7 h-7 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-xs">
-                {profile?.fullName ? profile.fullName.charAt(0).toUpperCase() : 'M'}
-              </div>
-              <span className="text-xs font-semibold text-gray-800 max-w-[120px] truncate">
-                {profile?.fullName || 'Mihir Rathod'}
-              </span>
+
+              {/* Option 2: Emergency Alerts */}
               <button
-                onClick={signOut}
-                title="Log Out"
-                className="w-7 h-7 rounded-full bg-white shadow-2xs hover:bg-red-50 hover:text-red-500 text-gray-400 flex items-center justify-center transition-colors ml-1"
+                onClick={() => setActiveTab('alerts')}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'alerts'
+                    ? 'bg-orange-50 text-orange-600 border border-orange-200/80 shadow-2xs'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
               >
-                <LogOut size={13} />
+                <div className="flex items-center gap-3">
+                  <Bell size={18} />
+                  <span>Emergency Alerts</span>
+                </div>
+                {unreadAlertsCount > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-extrabold">
+                    {unreadAlertsCount}
+                  </span>
+                )}
               </button>
-            </div>
+
+              {/* Option 3: Phone Numbers */}
+              <button
+                onClick={() => setActiveTab('family')}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'family'
+                    ? 'bg-orange-50 text-orange-600 border border-orange-200/80 shadow-2xs'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Phone size={18} />
+                  <span>Phone Numbers</span>
+                </div>
+                <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
+                  {familyNumbers.length}
+                </span>
+              </button>
+            </nav>
           </div>
         </div>
-      </header>
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        {/* Protection Layer: Pending Activations Section */}
+        {/* Sidebar Footer & User Account */}
+        <div className="pt-6 border-t border-gray-100 space-y-3 mt-8">
+          {switchToDistributor && (
+            <button
+              onClick={switchToDistributor}
+              className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 py-2.5 rounded-xl transition-colors cursor-pointer"
+            >
+              <Store size={14} /> Distributor Portal
+            </button>
+          )}
+
+          {switchToAdminFleet && (
+            <button
+              onClick={switchToAdminFleet}
+              className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 py-2.5 rounded-xl transition-colors cursor-pointer"
+            >
+              <Settings size={14} /> Fleet Manager View
+            </button>
+          )}
+
+          <div className="flex items-center justify-between bg-gray-50 p-2.5 rounded-2xl border border-gray-100">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                {profile?.fullName ? profile.fullName.charAt(0).toUpperCase() : 'M'}
+              </div>
+              <span className="text-xs font-semibold text-gray-800 truncate">
+                {profile?.fullName || 'Mihir Rathod'}
+              </span>
+            </div>
+            <button
+              onClick={signOut}
+              title="Log Out"
+              className="w-7 h-7 rounded-full bg-white shadow-2xs hover:bg-red-50 hover:text-red-500 text-gray-400 flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <LogOut size={13} />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Right Content Panel */}
+      <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-8 space-y-6 overflow-y-auto">
+        {/* Protection Layer: Pending Activations Banner */}
         {pendingActivations.length > 0 && (
           <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-200/90 rounded-3xl p-5 sm:p-6 shadow-xs animate-fade-in">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
@@ -324,7 +411,7 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
                 {pendingActivations.map((pending) => (
                   <div key={pending.id} className="bg-white border border-amber-200/90 rounded-2xl p-3 shadow-2xs flex items-center justify-between gap-3 w-full lg:w-auto">
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 block">QR STICKER ID</span>
+                      <span className="text-[10px] font-bold text-gray-400 block">STICKER CODE</span>
                       <span className="font-mono font-extrabold text-gray-900 text-xs">{pending.id}</span>
                     </div>
                     <div className="h-6 w-px bg-gray-100" />
@@ -336,13 +423,13 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
                     </div>
                     <button
                       onClick={() => {
-                        setNewQrId(pending.id);
-                        setNewActivationCode(pending.activationCode);
+                        setNewQrId(sanitizeCode(pending.id));
+                        setNewActivationCode(sanitizeCode(pending.activationCode));
                         setNewName(pending.vehicleName !== 'Unassigned QR Sticker' ? pending.vehicleName : '');
                         setActiveTab('register');
                         showToast(`Pre-filled activation code ${pending.activationCode}`);
                       }}
-                      className="ml-auto bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-xs transition-colors flex items-center gap-1"
+                      className="ml-auto bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-xs transition-colors flex items-center gap-1 cursor-pointer"
                     >
                       <ShieldCheck size={13} /> Activate
                     </button>
@@ -352,100 +439,48 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
             </div>
           </div>
         )}
-        {/* Banner Card */}
-        <div 
-          className="relative overflow-hidden rounded-3xl p-6 sm:p-8 text-white shadow-xl"
-          style={{ background: 'linear-gradient(135deg, #EAB308, #9A2C00)' }}
-        >
-          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold text-white mb-3">
-                <ShieldCheck size={14} /> Protected by RapiQR SOS Relay
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                Welcome, {profile?.fullName || 'Mihir'}
-              </h1>
-              <p className="text-white/80 text-sm mt-1 max-w-lg">
-                Manage your active safety stickers, view emergency pings, and update your SOS contacts.
-              </p>
-            </div>
 
-            <button
-              onClick={() => setActiveTab('register')}
-              className="flex items-center gap-2 bg-white text-orange-600 hover:bg-orange-50 px-5 py-3 rounded-2xl font-bold text-sm shadow-md active:scale-95 transition-all flex-shrink-0"
-            >
-              <Plus size={18} /> Add New Sticker
-            </button>
-          </div>
-        </div>
-
-        {/* Dashboard Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-gray-200 overflow-x-auto pb-1">
-          <button
-            onClick={() => setActiveTab('stickers')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
-              activeTab === 'stickers'
-                ? 'border-orange-500 text-orange-600'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            <QrCode size={16} /> My Stickers ({myStickers.length})
-          </button>
-
-          <button
-            onClick={() => setActiveTab('alerts')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap relative ${
-              activeTab === 'alerts'
-                ? 'border-orange-500 text-orange-600'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            <Bell size={16} /> Emergency Alerts
-            {unreadAlertsCount > 0 && (
-              <span className="bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full">
-                {unreadAlertsCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('register')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
-              activeTab === 'register'
-                ? 'border-orange-500 text-orange-600'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            <Plus size={16} /> Register Sticker
-          </button>
-
-          <button
-            onClick={() => setActiveTab('sos')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
-              activeTab === 'sos'
-                ? 'border-orange-500 text-orange-600'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            <HeartPulse size={16} /> SOS Medical & Contacts
-          </button>
-        </div>
-
-        {/* TAB 1: MY STICKERS */}
+        {/* Option 1: YOUR STICKER INFO */}
         {activeTab === 'stickers' && (
           <div className="space-y-6">
+            {/* Full-Screen Prominent Activate Sticker Card Banner */}
+            <div
+              className="relative overflow-hidden rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+              style={{ background: 'linear-gradient(135deg, #EAB308, #C2410C)' }}
+            >
+              <div className="relative z-10">
+                <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold text-white mb-3">
+                  <ShieldCheck size={14} /> Registered Sticker Information
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                  Welcome, {profile?.fullName || 'Client'}
+                </h1>
+                <p className="text-white/90 text-xs sm:text-sm mt-1 max-w-lg">
+                  View your active QR safety tags or enter your Sticker Code assigned by Admin panel to activate.
+                </p>
+              </div>
+
+              {/* Full-Screen Activate Sticker Button */}
+              <button
+                onClick={() => setActiveTab('register')}
+                className="w-full sm:w-auto bg-white hover:bg-orange-50 text-orange-700 font-extrabold px-6 py-4 rounded-2xl text-sm shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer flex-shrink-0"
+              >
+                <ShieldCheck size={20} className="text-orange-600" />
+                <span>Activate New Sticker</span>
+              </button>
+            </div>
             {myStickers.length === 0 ? (
               <div className="bg-white rounded-3xl p-12 text-center border border-gray-100 shadow-2xs">
                 <QrCode size={48} className="mx-auto text-gray-300 mb-3" />
-                <h3 className="text-lg font-bold text-gray-800">No active safety stickers registered</h3>
+                <h3 className="text-lg font-bold text-gray-800">No Active Safety Stickers Registered</h3>
                 <p className="text-gray-400 text-sm max-w-sm mx-auto mt-1 mb-6">
-                  Register your vehicle, home gate tag, or keychain to start receiving emergency pings.
+                  You have not activated any stickers yet. Enter your Sticker Code assigned from the Admin panel to activate.
                 </p>
                 <button
                   onClick={() => setActiveTab('register')}
-                  className="inline-flex items-center gap-2 bg-orange-500 text-white font-bold px-5 py-2.5 rounded-xl text-sm"
+                  className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold px-6 py-3 rounded-xl text-sm shadow-md transition-all cursor-pointer"
                 >
-                  <Plus size={16} /> Register First Sticker
+                  <Plus size={16} /> Activate First Sticker Code
                 </button>
               </div>
             ) : (
@@ -458,8 +493,8 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
                         <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full uppercase">
                           <CheckCircle2 size={12} /> {item.status}
                         </span>
-                        <span className="text-xs font-mono text-gray-400 bg-gray-50 px-2 py-1 rounded-lg">
-                          {item.id}
+                        <span className="text-xs font-mono font-extrabold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
+                          CODE - {item.id}
                         </span>
                       </div>
 
@@ -467,10 +502,11 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
                       <div className="flex items-center gap-3 mb-3">
                         <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center font-bold flex-shrink-0">
                           {item.category === 'car' && <Car size={22} />}
+                          {item.category === 'bike' && <Car size={22} />}
                           {item.category === 'home' && <Home size={22} />}
-                          {item.category === 'luggage' && <Briefcase size={22} />}
-                          {item.category === 'keychain' && <Key size={22} />}
-                          {item.category !== 'car' && item.category !== 'home' && item.category !== 'luggage' && item.category !== 'keychain' && <QrCode size={22} />}
+                          {item.category === 'child' && <User size={22} />}
+                          {(item.category === 'keychain' || item.category === 'luggage') && <Key size={22} />}
+                          {item.category !== 'car' && item.category !== 'bike' && item.category !== 'home' && item.category !== 'child' && item.category !== 'keychain' && item.category !== 'luggage' && <QrCode size={22} />}
                         </div>
                         <div>
                           <h3 className="font-bold text-gray-900 text-base">{item.name}</h3>
@@ -588,6 +624,156 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
           </div>
         )}
 
+        {/* TAB: FAMILY PHONE NUMBERS */}
+        {activeTab === 'family' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-3xl border border-gray-100 p-6 sm:p-8 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="font-extrabold text-gray-900 text-lg flex items-center gap-2">
+                    <Phone className="text-orange-500" size={22} />
+                    Family &amp; Emergency Phone Numbers
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Manage client family phone numbers that receive automated call, SMS, and WhatsApp pings when your QR tags are scanned.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="bg-orange-50 text-orange-700 border border-orange-200 text-xs font-bold px-3 py-1.5 rounded-full">
+                    {familyNumbers.length} Verified Numbers
+                  </span>
+                </div>
+              </div>
+
+              {/* Add New Number Form */}
+              <form onSubmit={handleAddFamilyNumber} className="bg-gray-50/80 p-5 rounded-2xl border border-gray-200/80 mb-6 space-y-4">
+                <h4 className="font-bold text-xs text-gray-700 uppercase tracking-wider">Add New Family Phone Number</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Contact Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Rajesh (Father)"
+                      value={newFamName}
+                      onChange={e => setNewFamName(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs bg-white border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Phone Number *</label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="e.g. +91 98765 43210"
+                      value={newFamPhone}
+                      onChange={e => setNewFamPhone(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs bg-white border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Relationship / Role</label>
+                    <select
+                      value={newFamRelation}
+                      onChange={e => setNewFamRelation(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs bg-white border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-medium"
+                    >
+                      <option value="Primary Owner">Primary Owner</option>
+                      <option value="Spouse">Spouse / Partner</option>
+                      <option value="Father / Guardian">Father / Guardian</option>
+                      <option value="Mother">Mother</option>
+                      <option value="Sibling">Sibling / Relative</option>
+                      <option value="Society Security">Housing Society Security</option>
+                      <option value="Driver / Helper">Driver / Helper</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <label className="flex items-center gap-2 text-xs text-gray-600 font-medium cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newFamWhatsapp}
+                      onChange={e => setNewFamWhatsapp(e.target.checked)}
+                      className="rounded text-orange-500 focus:ring-orange-500 h-4 w-4"
+                    />
+                    Enable Instant WhatsApp Alert Pings
+                  </label>
+
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus size={14} /> Add Phone Number
+                  </button>
+                </div>
+              </form>
+
+              {/* List of Saved Numbers */}
+              <div className="space-y-3">
+                <h4 className="font-bold text-xs text-gray-700 uppercase tracking-wider">Saved Emergency Family Numbers</h4>
+                {familyNumbers.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400 text-xs">
+                    No family numbers added yet. Add numbers above to receive instant scan notifications.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {familyNumbers.map((fam: any) => (
+                      <div
+                        key={fam.id}
+                        className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                          fam.isPrimary ? 'bg-orange-50/40 border-orange-200' : 'bg-white border-gray-100 shadow-2xs'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs ${
+                            fam.isPrimary ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {fam.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-gray-900 text-sm">{fam.name}</span>
+                              {fam.isPrimary && (
+                                <span className="text-[10px] font-extrabold bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full uppercase">
+                                  Primary
+                                </span>
+                              )}
+                            </div>
+                            <p className="font-mono text-xs font-bold text-gray-700 mt-0.5">{fam.phone}</p>
+                            <span className="text-[11px] text-gray-400 font-medium">{fam.relation}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {!fam.isPrimary && (
+                            <button
+                              onClick={() => handleSetPrimaryNumber(fam.id)}
+                              className="text-[11px] font-bold text-gray-500 hover:text-orange-600 px-2.5 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
+                            >
+                              Make Primary
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteFamilyNumber(fam.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                            title="Delete number"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* TAB 3: REGISTER STICKER */}
         {activeTab === 'register' && (
           <div className="max-w-xl mx-auto bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8">
@@ -597,7 +783,7 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
               </div>
               <div>
                 <h3 className="font-bold text-gray-900 text-lg">Activate Protected RapiQR Sticker</h3>
-                <p className="text-xs text-gray-400">Enter your QR Code ID and Security Activation Code to unlock your QR sticker</p>
+                <p className="text-xs text-gray-400">Enter your Sticker Code and Security Activation Code to unlock your QR sticker</p>
               </div>
             </div>
 
@@ -619,13 +805,13 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Sticker QR ID *</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Sticker Code *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. QR-8A3F or QR-0Z2A"
+                  placeholder="e.g. CLCXTF2 or QR8A3F (Assigned from Admin)"
                   value={newQrId}
-                  onChange={(e) => setNewQrId(e.target.value)}
+                  onChange={(e) => setNewQrId(sanitizeCode(e.target.value))}
                   className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-mono uppercase"
                 />
               </div>
@@ -642,15 +828,15 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
                   <input
                     type="text"
                     required
-                    placeholder="e.g. ACT-8A3F (Admin Code or Sticker Card)"
+                    placeholder="e.g. ACT8A3F (Admin Code or Sticker Package)"
                     value={newActivationCode}
-                    onChange={(e) => { setNewActivationCode(e.target.value); setActivationError(null); }}
+                    onChange={(e) => { setNewActivationCode(sanitizeCode(e.target.value)); setActivationError(null); }}
                     className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-mono uppercase pl-10"
                   />
                   <ShieldCheck size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-500" />
                 </div>
                 <p className="text-[11px] text-gray-400 mt-1">
-                  Generated in Admin when QR is created. Check dashboard pending section above or physical sticker package.
+                  Generated in Admin panel when Sticker Code is assigned. Check dashboard pending section above or physical sticker package.
                 </p>
               </div>
 
@@ -695,7 +881,20 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
                 </p>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-gray-600 mb-1">Primary Owner Phone Number *</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-semibold text-gray-600">Primary Owner Phone Number *</label>
+                    {familyNumbers.length > 0 && (
+                      <select
+                        onChange={(e) => { if (e.target.value) setNewOwnerPhone(e.target.value); }}
+                        className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200"
+                      >
+                        <option value="">Select from Family Numbers ↓</option>
+                        {familyNumbers.map((f: any) => (
+                          <option key={f.id} value={f.phone}>{f.name} ({f.relation}): {f.phone}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                   <input
                     type="tel"
                     required
@@ -708,7 +907,20 @@ export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDa
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">Secondary Emergency Phone</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-semibold text-gray-600">Secondary Emergency Phone</label>
+                      {familyNumbers.length > 0 && (
+                        <select
+                          onChange={(e) => { if (e.target.value) setNewSecondaryPhone(e.target.value); }}
+                          className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200"
+                        >
+                          <option value="">Family Phone ↓</option>
+                          {familyNumbers.map((f: any) => (
+                            <option key={f.id} value={f.phone}>{f.name}: {f.phone}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                     <input
                       type="tel"
                       placeholder="e.g. +91 98765 43210"

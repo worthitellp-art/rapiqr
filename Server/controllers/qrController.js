@@ -1,4 +1,5 @@
 const QrModel = require('../models/qrModel');
+const { logger } = require('../middleware/loggerMiddleware');
 
 class QrController {
   /**
@@ -7,10 +8,11 @@ class QrController {
   static async getQrCodes(req, res) {
     try {
       const limit = parseInt(req.query.limit) || 100;
+      logger.info('QR_LIST', `Fetching QR code fleet records (limit: ${limit})`);
       const data = await QrModel.getAll(limit);
       return res.json({ success: true, data });
     } catch (err) {
-      console.error('QrController.getQrCodes Error:', err);
+      logger.error('QR_LIST', 'Failed to fetch QR records', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }
@@ -21,13 +23,15 @@ class QrController {
   static async getQrCodeById(req, res) {
     try {
       const { id } = req.params;
+      logger.info('QR_FETCH', `Fetching details for QR ID: ${id}`);
       const data = await QrModel.getById(id);
       if (!data) {
+        logger.warn('QR_FETCH', `QR Code not found: ${id}`);
         return res.status(404).json({ success: false, error: 'QR Code not found' });
       }
       return res.json({ success: true, data });
     } catch (err) {
-      console.error('QrController.getQrCodeById Error:', err);
+      logger.error('QR_FETCH', `Error fetching QR ID: ${req.params.id}`, err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }
@@ -38,10 +42,12 @@ class QrController {
   static async saveQrCode(req, res) {
     try {
       const qrData = req.body;
+      logger.event('QR_SAVE', '💾', `Saving QR Code record: ${qrData.id || 'new'}`);
       const saved = await QrModel.save(qrData);
+      logger.success('QR_SAVE', `QR Code record saved: ${saved.id}`);
       return res.json({ success: true, data: saved });
     } catch (err) {
-      console.error('QrController.saveQrCode Error:', err);
+      logger.error('QR_SAVE', 'Error saving QR Code record', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }
@@ -53,10 +59,12 @@ class QrController {
     try {
       const { id } = req.params;
       const activationData = req.body;
+      logger.event('QR_ACTIVATE', '⚡', `Activating QR Code: ${id}`);
       const activated = await QrModel.activate(id, activationData);
+      logger.success('QR_ACTIVATE', `QR Code activated: ${id}`);
       return res.json({ success: true, data: activated });
     } catch (err) {
-      console.error('QrController.activateQrCode Error:', err);
+      logger.error('QR_ACTIVATE', `Failed to activate QR Code: ${req.params.id}`, err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }
@@ -67,10 +75,11 @@ class QrController {
   static async recordScan(req, res) {
     try {
       const { id } = req.params;
+      logger.event('QR_SCAN', '📱', `Scan event recorded for QR Code: ${id}`);
       const updated = await QrModel.recordScan(id);
       return res.json({ success: true, data: updated });
     } catch (err) {
-      console.error('QrController.recordScan Error:', err);
+      logger.error('QR_SCAN', `Failed to record scan for QR Code: ${req.params.id}`, err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

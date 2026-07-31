@@ -1,3 +1,4 @@
+import type React from "react";
 import StickerEditor from "./StickerEditor";
 import { Template, StickerPos } from "./types";
 

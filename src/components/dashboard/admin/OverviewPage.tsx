@@ -43,7 +43,7 @@ function DonutRing({ percentage, size = 150 }: { percentage: number; size?: numb
       <circle cx={cx} cy={cy} r={r} fill="none" stroke="#F1F5F9" strokeWidth="14" />
       <circle
         cx={cx} cy={cy} r={r} fill="none"
-        stroke="#EAB308" strokeWidth="14" strokeLinecap="round"
+        stroke="#8B5CF6" strokeWidth="14" strokeLinecap="round"
         strokeDasharray={`${filled} ${empty}`}
         strokeDashoffset={circ * 0.25}
         style={{ transition: "stroke-dasharray 1.2s cubic-bezier(0.34,1.56,0.64,1)" }}
@@ -149,7 +149,7 @@ export default function OverviewPage({
   ];
 
   return (
-    <div className="px-8 pt-6 pb-12 space-y-5" style={{ fontFamily: "'Plus Jakarta Sans', ui-sans-serif, system-ui" }}>
+    <div className="px-8 pt-6 pb-12 space-y-5" style={{ fontFamily: "'Inter', ui-sans-serif, system-ui" }}>
 
       {/* ════════ Header ════════ */}
       <div className="flex items-center justify-between">
@@ -170,8 +170,8 @@ export default function OverviewPage({
             <ChevronDown size={13} />
           </button>
           <button
-            className="flex items-center gap-2 px-4 py-[8px] rounded-xl text-[12px] font-bold text-[#1A1D26] transition-all hover:opacity-90 cursor-pointer"
-            style={{ background: "#EAB308", boxShadow: "0 2px 8px rgba(234,179,8,0.25)" }}
+            className="flex items-center gap-2 px-4 py-[8px] rounded-xl text-[12px] font-bold text-white transition-all hover:opacity-90 cursor-pointer"
+            style={{ background: "#111111", boxShadow: "0 2px 8px rgba(17,17,17,0.25)" }}
           >
             <Download size={13} />
             Export
@@ -230,8 +230,8 @@ export default function OverviewPage({
             <button
               onClick={() => setPage("qr")}
               className="flex items-center gap-1 text-[11px] font-bold transition-all hover:gap-2 cursor-pointer px-2.5 py-1 rounded-lg"
-              style={{ color: "#EAB308" }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#FEF9C3"; }}
+              style={{ color: "#6366F1" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#EEF2FF"; }}
               onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
             >
               View all <ChevronRight size={11} />
@@ -254,8 +254,8 @@ export default function OverviewPage({
             <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
               <defs>
                 <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#EAB308" stopOpacity={0.15} />
-                  <stop offset="100%" stopColor="#EAB308" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#6366F1" stopOpacity={0.15} />
+                  <stop offset="100%" stopColor="#6366F1" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#94A3B8", fontWeight: 600 }} axisLine={false} tickLine={false} />
@@ -265,10 +265,10 @@ export default function OverviewPage({
                   background: "#1A1D26", border: "none", borderRadius: 12, color: "#fff",
                   fontSize: 11, padding: "8px 14px", boxShadow: "0 12px 32px rgba(0,0,0,0.2)", fontWeight: 700,
                 }}
-                cursor={{ stroke: "rgba(234,179,8,0.15)", strokeWidth: 1 }}
+                cursor={{ stroke: "rgba(99,102,241,0.15)", strokeWidth: 1 }}
               />
-              <Area type="monotone" dataKey="v" stroke="#EAB308" strokeWidth={2.5} fill="url(#areaGrad)" dot={false}
-                activeDot={{ r: 5, fill: "#EAB308", stroke: "#fff", strokeWidth: 2.5 }} />
+              <Area type="monotone" dataKey="v" stroke="#6366F1" strokeWidth={2.5} fill="url(#areaGrad)" dot={false}
+                activeDot={{ r: 5, fill: "#6366F1", stroke: "#fff", strokeWidth: 2.5 }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -299,7 +299,7 @@ export default function OverviewPage({
               />
               <Bar dataKey="v" radius={[6, 6, 6, 6]}>
                 {weekdayData.map((entry, i) => (
-                  <Cell key={i} fill={entry.isToday ? "#EAB308" : "#E8ECF4"} />
+                  <Cell key={i} fill={entry.isToday ? "#0EA5E9" : "#E8ECF4"} />
                 ))}
               </Bar>
             </BarChart>
@@ -310,7 +310,7 @@ export default function OverviewPage({
               <div key={i} className="flex flex-col items-center">
                 <div
                   className="w-[18px] h-[3px] rounded-full"
-                  style={{ background: d.isToday ? "#EAB308" : "transparent" }}
+                  style={{ background: d.isToday ? "#0EA5E9" : "transparent" }}
                 />
               </div>
             ))}
@@ -366,7 +366,7 @@ export default function OverviewPage({
           <DonutRing percentage={activeRate} />
           <button
             className="mt-3 text-[11px] font-bold transition-all cursor-pointer"
-            style={{ color: "#EAB308" }}
+            style={{ color: "#6366F1" }}
             onClick={() => setPage("qr")}
           >
             Show details
@@ -386,7 +386,7 @@ export default function OverviewPage({
             <button
               onClick={() => setPage("qr")}
               className="flex items-center gap-1 text-[11px] font-bold cursor-pointer"
-              style={{ color: "#EAB308" }}
+              style={{ color: "#6366F1" }}
             >
               See all <ChevronRight size={11} />
             </button>
@@ -399,8 +399,7 @@ export default function OverviewPage({
                   style={{ borderColor: "#F1F5F9", color: "#94A3B8" }}
                 >
                   <th className="px-6 py-2.5">QR</th>
-                  <th className="px-3 py-2.5">Client</th>
-                  <th className="px-3 py-2.5">Vehicle</th>
+                  <th className="px-3 py-2.5">Code</th>
                   <th className="px-3 py-2.5">Scans</th>
                   <th className="px-3 py-2.5">Status</th>
                   <th className="px-6 py-2.5 text-right">Actions</th>
@@ -420,11 +419,7 @@ export default function OverviewPage({
                         <StickerThumb qr={q} templates={templates} size={36} />
                       </button>
                     </td>
-                    <td className="px-3 py-3 font-mono text-[10px] font-bold" style={{ color: "#64748B" }}>{q.clientId}</td>
-                    <td className="px-3 py-3">
-                      <p className="text-[11px] font-bold text-[#1A1D26]">{q.vehicleName}</p>
-                      <p className="text-[9px] font-mono font-medium" style={{ color: "#94A3B8" }}>{q.vehicleNumber}</p>
-                    </td>
+                    <td className="px-3 py-3 font-mono text-[11px] font-bold" style={{ color: "#111111" }}>{q.id}</td>
                     <td className="px-3 py-3 text-[11px] font-bold text-[#1A1D26]">{(q.scans || 0).toLocaleString()}</td>
                     <td className="px-3 py-3"><StatusPill status={q.status} /></td>
                     <td className="px-6 py-3 text-right">
@@ -457,7 +452,7 @@ export default function OverviewPage({
             <div className="flex flex-col items-center py-16 text-center">
               <div
                 className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-                style={{ background: "#FEF9C3", color: "#EAB308" }}
+                style={{ background: "#EEF2FF", color: "#6366F1" }}
               >
                 <QrCode size={24} />
               </div>
@@ -465,8 +460,8 @@ export default function OverviewPage({
               <p className="text-[11px] mt-1 max-w-xs font-medium" style={{ color: "#94A3B8" }}>Generate your first QR sticker to start tracking your fleet.</p>
               <button
                 onClick={() => setPage("qr")}
-                className="mt-5 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[#1A1D26] text-[12px] font-bold transition-all hover:opacity-90 cursor-pointer"
-                style={{ background: "#EAB308", boxShadow: "0 2px 8px rgba(234,179,8,0.25)" }}
+                className="mt-5 flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-[12px] font-bold transition-all hover:opacity-90 cursor-pointer"
+                style={{ background: "#111111", boxShadow: "0 2px 8px rgba(17,17,17,0.25)" }}
               >
                 <Plus size={13} /> Generate First QR
               </button>
@@ -482,8 +477,8 @@ export default function OverviewPage({
           <h3 className="text-[14px] font-extrabold text-[#1A1D26] mb-1">Quick Actions</h3>
           <button
             onClick={() => setPage("qr")}
-            className="w-full flex items-center gap-3 p-3 rounded-xl text-[#1A1D26] text-[12px] font-bold cursor-pointer transition-all duration-300 hover:opacity-90"
-            style={{ background: "linear-gradient(135deg, #EAB308 0%, #CA8A04 100%)", boxShadow: "0 4px 12px rgba(234,179,8,0.3)" }}
+            className="w-full flex items-center gap-3 p-3 rounded-xl text-white text-[12px] font-bold cursor-pointer transition-all duration-300 hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, #111111 0%, #374151 100%)", boxShadow: "0 4px 12px rgba(17,17,17,0.3)" }}
           >
             <span className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
               <QrCode size={15} />

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import type React from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AlertTriangle, Bell, CheckCircle2, ShieldAlert, Clock, MessageSquare, Phone, MapPin, Info, Eye, ChevronRight } from "lucide-react";
 import StatusPill from "./StatusPill";
 import { QrRecord, Template, SystemAlertItem } from "./types";
@@ -15,8 +16,8 @@ export default function AlertsPage({
   const [reports, setReports] = useState<any[]>([]);
   const [expandedAlert, setExpandedAlert] = useState<string | null>(null);
 
-  // Fetch reports from Supabase & LocalStorage
-  useEffect(() => {
+  // Fetch reports from Supabase & LocalStorage (real reports only — no mocks)
+  const loadReports = useCallback(() => {
     getReportsFromDb().then((dbReports) => {
       let combined: any[] = dbReports || [];
       try {
@@ -27,48 +28,20 @@ export default function AlertsPage({
           combined = [...uniqueLocal, ...combined];
         }
       } catch { /* ignore */ }
-
-      // Default mock emergency alerts if no emergency reports exist yet
-      if (combined.length === 0) {
-        combined = [
-          {
-            id: "rep-101",
-            qr_code_id: "QR-8A3F",
-            product_label: "Toyota Innova (GJ01AB1234)",
-            type: "wrong_parking",
-            message: "Vehicle is parked blocking gate #2 entrance. Please move immediately.",
-            reporter_phone: "+91 98765 12345",
-            location: "Sector 4, Main Gate",
-            status: "unread",
-            created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-          },
-          {
-            id: "rep-102",
-            qr_code_id: "CL-CXTF2",
-            product_label: "Honda City (MH02CD5678)",
-            type: "headlights_on",
-            message: "Headlights left switched ON in basement parking level B2.",
-            reporter_phone: "+91 98190 88776",
-            location: "Basement B2, Slot 44",
-            status: "unread",
-            created_at: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
-          },
-          {
-            id: "rep-103",
-            qr_code_id: "QR-5590",
-            product_label: "Gate Security QR Tag",
-            type: "emergency_contact",
-            message: "Accident reported near vehicle. Emergency contact requested.",
-            reporter_phone: "+91 99001 22334",
-            location: "Express Highway Exit 3",
-            status: "resolved",
-            created_at: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
-          },
-        ];
-      }
       setReports(combined);
     });
   }, []);
+
+  useEffect(() => {
+    loadReports();
+    const onReportsUpdated = () => loadReports();
+    window.addEventListener("namoqr-reports-updated", onReportsUpdated);
+    const interval = setInterval(loadReports, 15000);
+    return () => {
+      window.removeEventListener("namoqr-reports-updated", onReportsUpdated);
+      clearInterval(interval);
+    };
+  }, [loadReports]);
 
   // Construct unified alerts list
   const unifiedAlerts: SystemAlertItem[] = [];
@@ -100,7 +73,7 @@ export default function AlertsPage({
         id: `activation-${q.id}`,
         category: "activation",
         title: `QR Activation Pending: ${q.vehicleName || q.id}`,
-        subtitle: `Code: ${q.activationCode || "ACT-????"} · ${q.vehicleNumber || "N/A"}`,
+        subtitle: `Code: ${q.activationCode || "ACT????"} · ${q.vehicleNumber || "N/A"}`,
         timestamp: q.createdAt,
         status: "active",
         qrId: q.id,

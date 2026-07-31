@@ -92,11 +92,10 @@ export default function QuickLookModal({
             <StickerThumb qr={qr} templates={templates} size={190} />
           </div>
 
-          <p className="font-extrabold text-gray-900 text-lg mt-4">{qr.vehicleName}</p>
-          <p className="font-mono text-xs font-bold text-gray-500">{qr.vehicleNumber}</p>
+          <p className="font-mono font-black text-gray-900 text-lg mt-4 tracking-tight">{qr.id}</p>
+          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.15em] mt-0.5">QR Sticker Code</p>
 
           <div className="flex flex-wrap gap-1.5 justify-center mt-3">
-            <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-gray-100 text-gray-700">{qr.clientId}</span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-gray-100 text-gray-700">{qr.template}</span>
             <StatusPill status={qr.status} />
           </div>
@@ -108,13 +107,13 @@ export default function QuickLookModal({
               </div>
               <div>
                 <p className="text-[9px] font-extrabold text-amber-800 uppercase tracking-wider">Activation Code</p>
-                <p className="font-mono font-black text-amber-950 text-sm">{qr.activationCode || "ACT-?????"}</p>
+                <p className="font-mono font-black text-amber-950 text-sm">{qr.activationCode || "ACT?????"}</p>
               </div>
             </div>
             <button
               onClick={() => dispatchActivationToUserDashboard(qr)}
               className="px-3 py-1.5 rounded-xl text-white text-[10px] font-bold shadow-sm transition-all hover:opacity-90 cursor-pointer"
-              style={{ background: "#b45309" }}
+              style={{ background: "#111111" }}
             >
               Send to User
             </button>

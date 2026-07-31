@@ -1,3 +1,4 @@
+import type React from "react";
 import { useState } from "react";
 import { Plus, Trash2, Phone, Wrench, Battery, Truck, Settings, Users, Ambulance, ShieldAlert, Car, Lightbulb, AlertTriangle } from "lucide-react";
 import { useLocalStorage } from "./useLocalStorage";
@@ -89,7 +90,7 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
             <button
               type="submit"
               disabled={!label.trim() || !phone.trim()}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#111111] hover:bg-gray-800 text-white text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm"
             >
               <Plus size={14} /> Add
             </button>

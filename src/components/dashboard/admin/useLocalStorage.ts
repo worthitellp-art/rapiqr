@@ -1,3 +1,4 @@
+import type React from "react";
 import { useState, useEffect } from "react";
 
 export function useLocalStorage<T>(key: string, initial: T): [T, React.Dispatch<React.SetStateAction<T>>] {

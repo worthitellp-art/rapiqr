@@ -1,6 +1,7 @@
- import { useState, useEffect } from "react";
+import type React from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../../../context/AuthContext";
-import { getTemplatesFromDb, saveStickerPosToDb } from "../../../lib/supabaseService";
+import { getTemplatesFromDb, saveStickerPosToDb, getReportsFromDb } from "../../../lib/supabaseService";
 import { useLocalStorage } from "./useLocalStorage";
 import { QrRecord, Template, TeamMember, StickerPos } from "./types";
 import Sidebar from "./Sidebar";
@@ -14,12 +15,13 @@ import AlertsPage from "./AlertsPage";
 import CommunicationPage from "./CommunicationPage";
 import UsersPage from "./UsersPage";
 import CustomizePage from "./CustomizePage";
+import DistributorsPage from "./DistributorsPage";
 
-export default function AdminDashboard({ onBack }: { onBack: () => void }) {
+export default function AdminDashboard({ onBack, switchToClientPortal }: { onBack: () => void; switchToClientPortal?: () => void }) {
   const { profile, signOut, isAdmin } = useAuth();
   const [page, setPage] = useState(() => (isAdmin ? "overview" : "qr"));
-  const accent = "EAB308";
-  const fontCss = "'Plus Jakarta Sans', ui-sans-serif, system-ui";
+  const accent = "111111";
+  const fontCss = "'Inter', ui-sans-serif, system-ui";
   const [templates, setTemplates] = useLocalStorage<Template[]>("namoqr-templates", []);
   const [qrList, setQrList] = useLocalStorage<QrRecord[]>("namoqr-qrlist", []);
   const [users, setUsers] = useLocalStorage<TeamMember[]>("namoqr-users", []);
@@ -28,6 +30,30 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [unreadAlerts, setUnreadAlerts] = useState(0);
+
+  // Live unread alert count for the sidebar badge (real reports only)
+  useEffect(() => {
+    const update = () => {
+      getReportsFromDb().then((dbReports) => {
+        let combined: any[] = dbReports || [];
+        try {
+          const local = JSON.parse(localStorage.getItem("namoqr-reports") || "[]");
+          const existingIds = new Set(combined.map((r) => r.id));
+          combined = [...local.filter((r: any) => !existingIds.has(r.id)), ...combined];
+        } catch { /* ignore */ }
+        setUnreadAlerts(combined.filter((r: any) => r.status !== "resolved").length);
+      });
+    };
+    update();
+    const onUpdated = () => update();
+    window.addEventListener("namoqr-reports-updated", onUpdated);
+    const interval = setInterval(update, 15000);
+    return () => {
+      window.removeEventListener("namoqr-reports-updated", onUpdated);
+      clearInterval(interval);
+    };
+  }, []);
 
   const admin = {
     name: profile?.fullName || (isAdmin ? "System Admin" : "Client User"),
@@ -37,7 +63,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
 
   // Reset search on page change & guard admin-only pages for client users
   useEffect(() => {
-    if (!isAdmin && (page === "overview" || page === "users" || page === "communication" || page === "customize")) {
+    if (!isAdmin && (page === "overview" || page === "distributors" || page === "users" || page === "communication" || page === "customize")) {
       setPage("qr");
     }
     setSearchQuery("");
@@ -72,10 +98,10 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
       className="h-screen w-full flex overflow-hidden text-gray-900"
       style={{ "--accent": `#${accent}`, fontFamily: fontCss, background: "#F5F6FA" } as React.CSSProperties}
     >
-      <Sidebar page={page} setPage={setPage} admin={admin} onBack={onBack} onSignOut={signOut} />
+      <Sidebar page={page} setPage={setPage} admin={admin} onBack={onBack} onSignOut={signOut} unreadAlerts={unreadAlerts} />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: "#F5F6FA" }}>
-        <TopBar admin={admin} searchQuery={searchQuery} setSearchQuery={setSearchQuery} page={page} />
+        <TopBar admin={admin} searchQuery={searchQuery} setSearchQuery={setSearchQuery} page={page} switchToClientPortal={switchToClientPortal} />
 
         <div className="flex-1 overflow-y-auto">
           {page === "overview" && (
@@ -85,6 +111,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
               openRestore={() => setRestoreModalOpen(true)} setToast={setToast}
             />
           )}
+          {page === "distributors" && <DistributorsPage setToast={setToast} />}
           {page === "qr" && (
             <QrCodesPage
               qrList={qrList} setQrList={setQrList} templates={templates}
@@ -99,7 +126,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
               setToast={setToast} searchQuery={searchQuery}
             />
           )}
-          {page === "users" && <UsersPage users={users} setUsers={setUsers} setToast={setToast} />}
+          {page === "users" && <UsersPage users={users} setUsers={setUsers} qrList={qrList} setQrList={setQrList} setToast={setToast} />}
           {page === "customize" && (
             <CustomizePage
               templates={templates} setTemplates={setTemplates}

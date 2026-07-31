@@ -46,7 +46,7 @@ export async function getQrCodeByIdFromDb(qrId: string) {
  */
 export async function saveQrCodeToDb(qr: {
   id: string;
-  clientId: string;
+  clientId?: string;
   status: string;
   scansCount?: number;
   templateName?: string;
@@ -60,7 +60,7 @@ export async function saveQrCodeToDb(qr: {
       .from('qr_codes')
       .upsert({
         id: qr.id,
-        client_id: qr.clientId,
+        client_id: qr.clientId || qr.id,
         status: qr.status || 'inactive',
         scans_count: qr.scansCount || 0,
         template_name: qr.templateName || 'Default',
@@ -86,7 +86,7 @@ export async function bulkSaveQrCodesToDb(qrList: any[]) {
   try {
     const records = qrList.map((qr) => ({
       id: qr.id,
-      client_id: qr.clientId,
+      client_id: qr.clientId || qr.id,
       status: qr.status || 'inactive',
       scans_count: qr.scans || 0,
       template_name: qr.template || 'Default',
@@ -200,6 +200,57 @@ export async function saveStickerPosToDb(pos: { x: number; y: number; w: number;
     return data;
   } catch (err) {
     console.warn('Supabase save sticker position error:', err);
+    return null;
+  }
+}
+
+/**
+ * Activate a QR code and save the user's registration profile to DB
+ * Updates qr_codes status and creates/updates a products record
+ */
+export async function activateQrInDb(data: {
+  qrId: string;
+  ownerName: string;
+  ownerPhone: string;
+  emergencyPhone?: string;
+  bloodGroup?: string;
+  allergies?: string;
+  address?: string;
+  userId?: string;
+}) {
+  if (!isSupabaseConfigured) return null;
+  try {
+    // 1. Update QR code status to active
+    const { error: qrError } = await supabase
+      .from('qr_codes')
+      .update({ status: 'active' })
+      .eq('id', data.qrId);
+
+    if (qrError) throw qrError;
+
+    // 2. Upsert a product record with the registration details
+    const { error: productError } = await supabase
+      .from('products')
+      .upsert({
+        qr_code_id: data.qrId,
+        user_id: data.userId || null,
+        name: data.ownerName,
+        status: 'active',
+        assigned_to: data.ownerName,
+        details: {
+          ownerPhone: data.ownerPhone,
+          emergencyPhone: data.emergencyPhone || '',
+          bloodGroup: data.bloodGroup || '',
+          allergies: data.allergies || '',
+          address: data.address || '',
+          activatedAt: new Date().toISOString(),
+        },
+      }, { onConflict: 'qr_code_id' });
+
+    if (productError) throw productError;
+    return { success: true };
+  } catch (err) {
+    console.warn('Supabase activate QR error:', err);
     return null;
   }
 }

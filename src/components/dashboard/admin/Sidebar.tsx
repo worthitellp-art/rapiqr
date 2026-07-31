@@ -1,13 +1,14 @@
-import { Settings, LogOut, HelpCircle } from "lucide-react";
+import { LogOut, HelpCircle } from "lucide-react";
 import { NAV_ITEMS } from "./constants";
 import { avatarUrl } from "./helpers";
 import groupLogo1 from "../../../assets/Group 1000005716-1.png";
 
 export default function Sidebar({
-  page, setPage, admin, onBack, onSignOut,
+  page, setPage, admin, onBack, onSignOut, unreadAlerts,
 }: {
   page: string; setPage: (p: string) => void;
   admin: { name: string; email?: string; role?: string }; onBack: () => void; onSignOut: () => void;
+  unreadAlerts?: number;
 }) {
   const isClientUser = admin.role === "Client Account";
 
@@ -16,7 +17,7 @@ export default function Sidebar({
         { id: "qr", label: "Your Code", icon: NAV_ITEMS[1].icon },
         { id: "alerts", label: "Alerts", icon: NAV_ITEMS[3].icon },
       ]
-    : NAV_ITEMS.filter(n => n.id !== "customize");
+    : NAV_ITEMS;
 
   return (
     <aside className="w-[256px] flex-shrink-0 flex flex-col h-full bg-white border-r" style={{ borderColor: "#E8ECF4" }}>
@@ -29,7 +30,7 @@ export default function Sidebar({
         >
           <div
             className="w-[34px] h-[34px] rounded-[10px] flex items-center justify-center"
-            style={{ background: "#EAB308" }}
+            style={{ background: "#111111" }}
           >
             <img src={groupLogo1} alt="" className="h-[18px] w-auto object-contain" />
           </div>
@@ -49,24 +50,24 @@ export default function Sidebar({
                 onClick={() => setPage(item.id)}
                 className="w-full flex items-center gap-3 px-3 py-[10px] rounded-xl text-[13px] font-semibold transition-all duration-200 cursor-pointer"
                 style={{
-                  background: isActive ? "#EAB308" : "transparent",
-                  color: isActive ? "#1A1D26" : "#64748B",
-                  boxShadow: isActive ? "0 2px 8px rgba(234,179,8,0.25)" : "none",
+                  background: isActive ? "#111111" : "transparent",
+                  color: isActive ? "#fff" : "#64748B",
+                  boxShadow: isActive ? "0 2px 8px rgba(17,17,17,0.25)" : "none",
                 }}
                 onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = "#F1F5F9"; e.currentTarget.style.color = "#1E293B"; } }}
                 onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#64748B"; } }}
               >
                 <Icon size={18} strokeWidth={isActive ? 2.2 : 1.7} />
                 <span>{item.label}</span>
-                {item.id === "alerts" && (
+                {item.id === "alerts" && (unreadAlerts ?? 0) > 0 && (
                   <span
                     className="ml-auto text-[10px] font-bold px-[7px] py-[2px] rounded-full"
                     style={{
-                      background: isActive ? "rgba(0,0,0,0.1)" : "#FEE2E2",
-                      color: isActive ? "#1A1D26" : "#DC2626",
+                      background: isActive ? "rgba(255,255,255,0.18)" : "#FEE2E2",
+                      color: isActive ? "#fff" : "#DC2626",
                     }}
                   >
-                    3
+                    {unreadAlerts}
                   </span>
                 )}
               </button>
@@ -78,20 +79,6 @@ export default function Sidebar({
 
         {/* ── Settings Section ────────────── */}
         <nav className="space-y-[2px]">
-          <button
-            onClick={() => setPage("customize")}
-            className="w-full flex items-center gap-3 px-3 py-[10px] rounded-xl text-[13px] font-semibold transition-all duration-200 cursor-pointer"
-            style={{
-              background: page === "customize" ? "#EAB308" : "transparent",
-              color: page === "customize" ? "#1A1D26" : "#64748B",
-              boxShadow: page === "customize" ? "0 2px 8px rgba(234,179,8,0.25)" : "none",
-            }}
-            onMouseEnter={e => { if (page !== "customize") { e.currentTarget.style.background = "#F1F5F9"; e.currentTarget.style.color = "#1E293B"; } }}
-            onMouseLeave={e => { if (page !== "customize") { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#64748B"; } }}
-          >
-            <Settings size={18} strokeWidth={page === "customize" ? 2.2 : 1.7} />
-            <span>Settings</span>
-          </button>
           <button
             className="w-full flex items-center gap-3 px-3 py-[10px] rounded-xl text-[13px] font-semibold text-[#64748B] hover:bg-[#F1F5F9] hover:text-[#1E293B] transition-all cursor-pointer"
           >

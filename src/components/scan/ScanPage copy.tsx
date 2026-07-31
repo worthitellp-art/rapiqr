@@ -90,7 +90,7 @@ function getQrIdFromUrl(): string | null {
 
   if (directMatch && directMatch[1] !== "") {
     const id = directMatch[1];
-    if (id.toUpperCase().startsWith("QR-") || id.toUpperCase().startsWith("CL-")) {
+    if (id.toUpperCase().startsWith("QR") || id.toUpperCase().startsWith("CL")) {
       return decodeURIComponent(id);
     }
   }
@@ -400,10 +400,10 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
           }
 
           // Universal fallback: If valid QR format (QR- or CL-), auto-initialize as activatable sticker
-          if (!found && (cleanQrId.startsWith("QR-") || cleanQrId.startsWith("CL-"))) {
+          if (!found && (cleanQrId.startsWith("QR") || cleanQrId.startsWith("CL"))) {
             found = {
               id: cleanQrId,
-              clientId: cleanQrId.startsWith("CL-") ? cleanQrId : `CL-${cleanQrId.replace(/^QR-/, "")}`,
+              clientId: cleanQrId.startsWith("CL") ? cleanQrId : `CL${cleanQrId.replace(/^QR/, "")}`,
               vehicleName: `RapiQR Safety Tag (${cleanQrId})`,
               vehicleNumber: `REG-${cleanQrId.slice(-4)}`,
               status: "inactive",

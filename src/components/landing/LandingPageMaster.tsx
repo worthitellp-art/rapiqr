@@ -6,9 +6,14 @@ import {
   Smartphone, HeartPulse, Bell, ChevronDown, Check,
   MapPin, Phone, MessageSquare, AlertTriangle, Lock,
   Key, Star, RotateCcw, Eye, Navigation, Zap, Users,
-  Menu, Signal, Package, LogOut, LayoutDashboard
+  Menu, Signal, Package, LogOut, LayoutDashboard, Store
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { 
+  saveDistributorApplication, 
+  getUserDistributorApplication, 
+  DistributorApplication 
+} from '../../lib/distributorService';
 import groupLogo from '../../../assets/Group 1000005716.png';
 import groupLogo1 from '../../../assets/Group 1000005716-1.png';
 import groupLogo2 from '../../../assets/Group 1000005716-2.png';
@@ -371,9 +376,11 @@ const DEMO_STEPS = [
 export default function LandingPageMaster({
   onStart,
   onLogin,
+  onOpenDistributorDashboard,
 }: {
   onStart: () => void;
   onLogin: () => void;
+  onOpenDistributorDashboard?: () => void;
 }) {
   const { isLoggedIn, isAdmin, profile, signOut } = useAuth();
   const [activeCategory, setActiveCategory] = useState<'All' | 'Vehicle' | 'Home' | 'Family' | 'Travel'>('All');
@@ -392,6 +399,79 @@ export default function LandingPageMaster({
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [partnerForm, setPartnerForm] = useState({ name: '', phone: '', city: '', business: 'Auto Accessories Shop', tier: 'Retail Kit (50 Units)' });
   const [partnerSubmitted, setPartnerSubmitted] = useState(false);
+  const [userAppStatus, setUserAppStatus] = useState<DistributorApplication | null>(null);
+
+  // Sync user's distributor application status
+  useEffect(() => {
+    if (isLoggedIn && (profile?.email || profile?.phone)) {
+      const app = getUserDistributorApplication(profile?.email || profile?.phone || '');
+      setUserAppStatus(app);
+    } else {
+      setUserAppStatus(null);
+    }
+  }, [isLoggedIn, profile, isPartnerModalOpen]);
+
+  // Handle auto-opening distributor modal after user logs in
+  useEffect(() => {
+    if (isLoggedIn) {
+      const pendingIntent = localStorage.getItem('namoqr-pending-distributor-intent');
+      if (pendingIntent) {
+        try {
+          const parsed = JSON.parse(pendingIntent);
+          if (parsed?.tier) {
+            setPartnerForm(prev => ({ ...prev, tier: parsed.tier }));
+          }
+        } catch {}
+        localStorage.removeItem('namoqr-pending-distributor-intent');
+        setIsPartnerModalOpen(true);
+      }
+    }
+  }, [isLoggedIn]);
+
+  // Handler for Partner Program button clicks
+  const handleOpenPartnerModal = (tier?: string) => {
+    if (tier) {
+      setPartnerForm(prev => ({ ...prev, tier }));
+    }
+
+    if (!isLoggedIn) {
+      // User must log in first before applying
+      localStorage.setItem('namoqr-pending-distributor-intent', JSON.stringify({ tier: tier || partnerForm.tier }));
+      onLogin();
+      return;
+    }
+
+    if (profile) {
+      setPartnerForm(prev => ({
+        ...prev,
+        name: prev.name || profile.fullName || '',
+      }));
+    }
+    setIsPartnerModalOpen(true);
+  };
+
+  // Submit handler for partner application
+  const handlePartnerSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isLoggedIn) {
+      localStorage.setItem('namoqr-pending-distributor-intent', JSON.stringify({ tier: partnerForm.tier }));
+      onLogin();
+      return;
+    }
+
+    const app = saveDistributorApplication({
+      userId: profile?.id,
+      userName: partnerForm.name,
+      userEmail: profile?.email || partnerForm.phone,
+      phone: partnerForm.phone,
+      city: partnerForm.city,
+      business: partnerForm.business,
+      tier: partnerForm.tier,
+    });
+
+    setUserAppStatus(app);
+    setPartnerSubmitted(true);
+  };
 
   const filteredProducts = activeCategory === 'All'
     ? PRODUCTS
@@ -468,7 +548,7 @@ export default function LandingPageMaster({
             <a href="#how-it-works" className="nav-link">How It Works</a>
             <a href="#categories" className="nav-link">Use Cases</a>
             <a href="#pricing" className="nav-link">Pricing</a>
-            {isAdmin && <a href="#distributorship" className="nav-link">Partner Program</a>}
+            <a href="#distributorship" className="nav-link">Partner Program</a>
             <a href="#faq" className="nav-link">FAQ</a>
           </div>
 
@@ -543,6 +623,7 @@ export default function LandingPageMaster({
             <a href="#how-it-works" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>How It Works</a>
             <a href="#categories" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>Use Cases</a>
             <a href="#pricing" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
+            <a href="#distributorship" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>Partner Program</a>
             <a href="#faq" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>FAQ</a>
             {isLoggedIn ? (
               <>
@@ -1284,8 +1365,7 @@ export default function LandingPageMaster({
         </div>
       </section>
 
-      {/* ── DISTRIBUTORSHIP & PARTNER PROGRAM (Admin only) ──────────── */}
-      {isAdmin && (
+      {/* ── DISTRIBUTORSHIP & PARTNER PROGRAM ──────────── */}
       <section id="distributorship" className="distributor-section py-20 relative overflow-hidden" style={{ background: 'var(--brand)', color: 'white' }}>
         {/* QR dot background motif */}
         <div className="qr-dot-bg-light absolute inset-0 pointer-events-none opacity-20" aria-hidden="true" />
@@ -1353,7 +1433,7 @@ export default function LandingPageMaster({
                 </ul>
               </div>
 
-              <button onClick={() => setIsPartnerModalOpen(true)} className="w-full py-3.5 rounded-xl font-bold bg-gray-900 text-white hover:bg-gray-800 transition-all text-xs flex items-center justify-center gap-2">
+              <button onClick={() => handleOpenPartnerModal('Retail Kit (50 Units)')} className="w-full py-3.5 rounded-xl font-bold bg-gray-900 text-white hover:bg-gray-800 transition-all text-xs flex items-center justify-center gap-2 cursor-pointer">
                 Apply for Retail Kit →
               </button>
             </div>
@@ -1387,7 +1467,7 @@ export default function LandingPageMaster({
                 </ul>
               </div>
 
-              <button onClick={() => setIsPartnerModalOpen(true)} className="w-full py-3.5 rounded-xl font-black bg-gray-950 text-white hover:bg-gray-900 transition-all text-xs flex items-center justify-center gap-2 shadow-lg">
+              <button onClick={() => handleOpenPartnerModal('City Franchise (300 Units)')} className="w-full py-3.5 rounded-xl font-black bg-gray-950 text-white hover:bg-gray-900 transition-all text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer">
                 Apply for City Distributorship →
               </button>
             </div>
@@ -1398,7 +1478,6 @@ export default function LandingPageMaster({
           </div>
         </div>
       </section>
-      )}
 
       {/* ── SOCIAL PROOF ────────────────────────────────────────────── */}
       <section className="proof-section" aria-labelledby="proof-heading">
@@ -1422,7 +1501,7 @@ export default function LandingPageMaster({
                 <p style={{ fontSize: 14, color: 'var(--ink-soft)', lineHeight: 1.7, fontStyle: 'italic', flex: 1 }}>
                   "{t.quote}"
                 </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', items: 'center', gap: 12, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
                   <div style={{
                     width: 38, height: 38, borderRadius: '50%', background: 'var(--brand-light)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1524,7 +1603,7 @@ export default function LandingPageMaster({
                 title: 'Product', links: ['How It Works', 'Vehicle Tags', 'Home Gate Tags', 'Family Tags', 'Luggage Tags'],
               },
               {
-                title: 'Company', links: ['About', 'Privacy Policy', 'Terms of Service', 'Refund Policy', 'Contact'],
+                title: 'Company', links: ['About', 'Partner Program', 'Privacy Policy', 'Terms of Service', 'Refund Policy', 'Contact'],
               },
               {
                 title: 'Support', links: ['Help Centre', 'FAQ', 'Track Your Order', 'Replace a Sticker', 'Enterprise / Fleet'],
@@ -1537,7 +1616,7 @@ export default function LandingPageMaster({
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {col.links.map(link => (
                     <li key={link}>
-                      <a href="#" style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.55)', textDecoration: 'none', transition: 'color 0.2s' }}
+                      <a href={link === 'Partner Program' ? '#distributorship' : '#'} style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.55)', textDecoration: 'none', transition: 'color 0.2s' }}
                         onMouseEnter={e => (e.currentTarget.style.color = 'white')}
                         onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.55)')}>
                         {link}
@@ -1651,8 +1730,8 @@ export default function LandingPageMaster({
         </div>
       </div>
 
-      {/* ── DISTRIBUTORSHIP APPLICATION MODAL (Admin only) ── */}
-      {isAdmin && isPartnerModalOpen && (
+      {/* ── DISTRIBUTORSHIP APPLICATION MODAL ── */}
+      {isPartnerModalOpen && (
         <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden relative border border-gray-100 p-8 text-left">
             <button
@@ -1662,7 +1741,55 @@ export default function LandingPageMaster({
               <X size={18} />
             </button>
 
-            {!partnerSubmitted ? (
+            {userAppStatus?.status === 'approved' ? (
+              <div className="py-6 text-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-2xl font-bold">
+                  ✓
+                </div>
+                <h3 className="text-2xl font-black text-gray-900">Distributor Verified &amp; Approved!</h3>
+                <p className="text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
+                  Congratulations <span className="font-bold text-gray-900">{profile?.fullName || userAppStatus.userName}</span>. Your franchise application has been verified by the admin owner. Your Distributor Dashboard is unlocked.
+                </p>
+                <div className="pt-2">
+                  <button
+                    onClick={() => {
+                      setIsPartnerModalOpen(false);
+                      if (onOpenDistributorDashboard) onOpenDistributorDashboard();
+                    }}
+                    className="w-full py-3.5 rounded-xl font-black bg-amber-500 text-gray-950 hover:bg-amber-400 transition-all text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer"
+                  >
+                    Open Distributor Dashboard <ArrowRight size={16} />
+                  </button>
+                </div>
+              </div>
+            ) : (userAppStatus?.status === 'pending' || partnerSubmitted) ? (
+              <div className="py-6 text-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto text-2xl font-bold animate-pulse">
+                  ⏳
+                </div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-100 text-amber-900 uppercase tracking-wider">
+                  Request Sent to Owner
+                </div>
+                <h3 className="text-2xl font-black text-gray-900">Pending Admin Verification</h3>
+                <p className="text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
+                  Thank you <span className="font-bold text-gray-900">{partnerForm.name || userAppStatus?.userName || 'Partner'}</span>. Your distributor application request has been sent to the system owner.
+                </p>
+                <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-600 font-medium text-left space-y-1.5">
+                  <div className="flex justify-between"><span>City / Territory:</span> <span className="font-bold text-gray-900">{partnerForm.city || userAppStatus?.city || 'Pune'}</span></div>
+                  <div className="flex justify-between"><span>Package Tier:</span> <span className="font-bold text-amber-600">{partnerForm.tier || userAppStatus?.tier}</span></div>
+                  <div className="flex justify-between"><span>Verification Status:</span> <span className="font-bold text-amber-600">Pending Review ⏳</span></div>
+                </div>
+                <p className="text-[11px] text-gray-400 italic">
+                  Once the admin owner verifies your request, your Distributor Dashboard will be unlocked automatically.
+                </p>
+                <button
+                  onClick={() => { setIsPartnerModalOpen(false); setPartnerSubmitted(false); }}
+                  className="px-6 py-2.5 rounded-xl font-bold bg-gray-900 text-white text-xs inline-block cursor-pointer"
+                >
+                  Close Window
+                </button>
+              </div>
+            ) : (
               <>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
@@ -1670,11 +1797,11 @@ export default function LandingPageMaster({
                   </div>
                   <div>
                     <h3 className="text-xl font-black text-gray-900">Become a Partner</h3>
-                    <p className="text-xs text-gray-500">Apply for RapiQR Distributorship & Franchise</p>
+                    <p className="text-xs text-gray-500">Apply for RapiQR Distributorship &amp; Franchise</p>
                   </div>
                 </div>
 
-                <form onSubmit={(e) => { e.preventDefault(); setPartnerSubmitted(true); }} className="space-y-4 pt-2">
+                <form onSubmit={handlePartnerSubmit} className="space-y-4 pt-2">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Full Name / Company Name</label>
                     <input
@@ -1700,7 +1827,7 @@ export default function LandingPageMaster({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">City & State</label>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">City &amp; State</label>
                       <input
                         type="text"
                         required
@@ -1741,28 +1868,12 @@ export default function LandingPageMaster({
 
                   <button
                     type="submit"
-                    className="w-full py-3.5 rounded-xl font-bold bg-amber-500 text-gray-950 text-xs flex items-center justify-center gap-2 hover:bg-amber-600 transition-all shadow-md mt-4"
+                    className="w-full py-3.5 rounded-xl font-bold bg-amber-500 text-gray-950 text-xs flex items-center justify-center gap-2 hover:bg-amber-600 transition-all shadow-md mt-4 cursor-pointer"
                   >
                     Submit Partner Application <ArrowRight size={14} />
                   </button>
                 </form>
               </>
-            ) : (
-              <div className="py-8 text-center space-y-4">
-                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-2xl font-bold">
-                  ✓
-                </div>
-                <h3 className="text-2xl font-black text-gray-900">Application Received!</h3>
-                <p className="text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
-                  Thank you <span className="font-bold text-gray-900">{partnerForm.name}</span>. Our B2B Partner Manager will call you at <span className="font-bold text-gray-900">{partnerForm.phone}</span> within 2 business hours with your wholesale pricing kit.
-                </p>
-                <button
-                  onClick={() => { setIsPartnerModalOpen(false); setPartnerSubmitted(false); }}
-                  className="px-6 py-2.5 rounded-xl font-bold bg-gray-900 text-white text-xs inline-block"
-                >
-                  Close Window
-                </button>
-              </div>
             )}
           </div>
         </div>

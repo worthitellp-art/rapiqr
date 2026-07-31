@@ -81,7 +81,7 @@ export interface NamoProduct {
 export type Vehicle = NamoProduct;
 
 export interface QRCodeData {
-  id: string; // Unique code (e.g., "QR-8A3F")
+  id: string; // Unique code (e.g., "QR8A3F")
   vehicleId: string | null; // Null means unlinked/unassigned (keeps vehicleId name for backward compat)
   status: 'active' | 'unlinked' | 'inactive';
   scansCount: number;

@@ -1,9 +1,9 @@
 export interface QrRecord {
   id: string;
   qrUrl: string;
-  clientId: string;
-  vehicleName: string;
-  vehicleNumber: string;
+  clientId?: string;
+  vehicleName?: string;
+  vehicleNumber?: string;
   createdAt: string;
   scans: number;
   status: string;
@@ -11,6 +11,8 @@ export interface QrRecord {
   template: string;
   fg: string;
   bg: string;
+  assignedTo?: string;     // user name this sticker is assigned to
+  assignedUserId?: number; // user ID this sticker is assigned to
 }
 
 export interface Template {

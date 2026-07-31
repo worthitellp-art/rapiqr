@@ -4,7 +4,9 @@ import AuthModal from './components/auth/AuthModal';
 
 const LandingPageMaster = lazy(() => import('./components/landing/LandingPageMaster'));
 const QRFleetDashboard = lazy(() => import('./components/dashboard/admin'));
+const ClientDashboard = lazy(() => import('./components/ClientDashboard'));
 const ScanPage = lazy(() => import('./components/scan/ScanPage'));
+const DistributorDashboard = lazy(() => import('./components/dashboard/DistributorDashboard'));
 
 function PageLoader() {
   return (
@@ -19,7 +21,8 @@ function PageLoader() {
 
 /**
  * Universal QR Scan URL Detector:
- * Matches /QR-8A3F, /CL-CXTF2, /qr/8A3F, ?qr=8A3F, #/qr/8A3F on any mobile or desktop browser
+ * Matches /QR-8A3F, /CL-CXTF2, /QR482KLM, /CL482KLM, /qr/8A3F, ?qr=8A3F, #/qr/8A3F on any mobile or desktop browser.
+ * QR/CL IDs are generated without hyphens (e.g. QR482KLM) as well as legacy hyphenated IDs (QR-8A3F).
  */
 function isScanUrl(): boolean {
   if (typeof window === 'undefined') return false;
@@ -27,7 +30,8 @@ function isScanUrl(): boolean {
   const hash = window.location.hash;
   const search = window.location.search;
 
-  const directQrMatch = path.match(/\/(QR-|CL-|qr-|cl-)[A-Z0-9_-]+/i);
+  // Matches /QR... or /CL... with at least one following char (handles both QR482KLM and QR-8A3F)
+  const directQrMatch = path.match(/\/(QR|CL)[A-Z0-9_-]+/i);
   const legacyPathMatch = /\/qr\//i.test(path);
   const hashMatch = /#\/qr\//i.test(hash);
   const queryMatch = /\?qr=/i.test(search);
@@ -39,19 +43,21 @@ function MainAppContent() {
   const { isLoggedIn, isAdmin, loading } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login');
+  const [dashboardMode, setDashboardMode] = useState<'admin' | 'client' | null>(null);
 
   // Restore page from localStorage, but only non-scan pages
-  const [page, setPage] = useState<'landing' | 'dashboard' | 'scan'>(() => {
+  const [page, setPage] = useState<'landing' | 'dashboard' | 'scan' | 'distributor'>(() => {
     if (isScanUrl()) return 'scan';
     try {
       const saved = localStorage.getItem('namoqr-current-page');
       if (saved === 'dashboard') return 'dashboard';
+      if (saved === 'distributor') return 'distributor';
     } catch { /* ignore */ }
     return 'landing';
   });
 
   // Persist page to localStorage whenever it changes
-  const navigateTo = (next: 'landing' | 'dashboard' | 'scan') => {
+  const navigateTo = (next: 'landing' | 'dashboard' | 'scan' | 'distributor') => {
     try {
       if (next === 'landing') localStorage.removeItem('namoqr-current-page');
       else localStorage.setItem('namoqr-current-page', next);
@@ -60,10 +66,9 @@ function MainAppContent() {
   };
 
   // After auth loads: if we think we're on dashboard but not logged in → send to landing
-  // If logged in (admin) and on landing → restore to dashboard
   useEffect(() => {
     if (loading) return; // wait for Supabase session to resolve
-    if (page === 'dashboard' && !isLoggedIn) {
+    if ((page === 'dashboard' || page === 'distributor') && !isLoggedIn) {
       navigateTo('landing');
     }
   }, [loading, isLoggedIn]);
@@ -86,7 +91,7 @@ function MainAppContent() {
   };
 
   // While Supabase is resolving the session, show loader — prevents flash of landing page
-  if (loading && page === 'dashboard') {
+  if (loading && (page === 'dashboard' || page === 'distributor')) {
     return <PageLoader />;
   }
 
@@ -99,9 +104,28 @@ function MainAppContent() {
   }
 
   if (page === 'dashboard') {
+    const showAdmin = (dashboardMode === 'admin') || (dashboardMode !== 'client' && isAdmin);
     return (
       <Suspense fallback={<PageLoader />}>
-        <QRFleetDashboard onBack={() => navigateTo('landing')} />
+        {showAdmin ? (
+          <QRFleetDashboard
+            onBack={() => navigateTo('landing')}
+            switchToClientPortal={() => setDashboardMode('client')}
+          />
+        ) : (
+          <ClientDashboard
+            onBack={() => navigateTo('landing')}
+            switchToAdminFleet={isAdmin ? () => setDashboardMode('admin') : undefined}
+          />
+        )}
+      </Suspense>
+    );
+  }
+
+  if (page === 'distributor') {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <DistributorDashboard onBack={() => navigateTo('landing')} />
       </Suspense>
     );
   }
@@ -112,11 +136,21 @@ function MainAppContent() {
         <LandingPageMaster
           onStart={() => handleOpenAuth('signup')}
           onLogin={() => handleOpenAuth('login')}
+          onOpenDistributorDashboard={() => navigateTo('distributor')}
         />
         <AuthModal
           isOpen={authModalOpen}
           onClose={() => setAuthModalOpen(false)}
-          onSuccess={() => navigateTo('dashboard')}
+          onSuccess={() => {
+            // Check if there was a pending distributor application attempt before login
+            const pendingIntent = localStorage.getItem('namoqr-pending-distributor-intent');
+            if (pendingIntent) {
+              // Stay on landing page, LandingPageMaster will auto-open the distributor modal
+              setAuthModalOpen(false);
+            } else {
+              navigateTo('dashboard');
+            }
+          }}
           initialMode={authModalMode}
         />
       </div>

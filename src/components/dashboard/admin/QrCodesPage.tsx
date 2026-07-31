@@ -1,3 +1,4 @@
+import type React from "react";
 import { useState, useEffect } from "react";
 import { Plus, Sparkles, Download, Trash2, RefreshCw, Eye, UserPlus } from "lucide-react";
 import StatusPill from "./StatusPill";
@@ -15,8 +16,6 @@ export default function QrCodesPage({
   templates: Template[]; setToast: (msg: string | null) => void;
   openQuickLook: (q: QrRecord) => void; openRestore: () => void; searchQuery: string;
 }) {
-  const [vehicleName, setVehicleName] = useState("");
-  const [vehicleNumber, setVehicleNumber] = useState("");
   const [templateId, setTemplateId] = useState(
     templates.find((t) => t.isPublicDefault)?.id?.toString() || templates[0]?.id?.toString() || ""
   );
@@ -36,64 +35,40 @@ export default function QrCodesPage({
   const filtered = qrList.filter((q) => {
     if (!searchQuery) return true;
     const q_ = searchQuery.toLowerCase();
-    return q.vehicleName.toLowerCase().includes(q_) ||
-      q.vehicleNumber.toLowerCase().includes(q_) ||
-      q.clientId.toLowerCase().includes(q_) ||
-      q.id.toLowerCase().includes(q_);
+    return q.id.toLowerCase().includes(q_) ||
+      (q.activationCode || "").toLowerCase().includes(q_);
   });
 
-  function handleGenerateSingle() {
-    if (!vehicleName || !vehicleNumber) {
-      setToast("Fill in vehicle name and vehicle number");
-      setTimeout(() => setToast(null), 2500);
-      return;
-    }
-    const qrId = uid();
-    const actCode = generateActivationCode();
-    const rec: QrRecord = {
-      id: qrId,
-      qrUrl: qrFullUrl(qrId),
-      clientId: uid("CL"),
-      vehicleName,
-      vehicleNumber,
+  function makeRecord(): QrRecord {
+    return {
+      id: uid(),
+      qrUrl: "",
       createdAt: new Date().toISOString(),
       scans: 0,
       status: "inactive",
-      activationCode: actCode,
+      activationCode: generateActivationCode(),
       template: activeTemplate?.name || "Default",
       fg: activeTemplate?.fg || "EAB308",
       bg: activeTemplate?.bg || "FFFFFF",
     };
+  }
+
+  function handleGenerateSingle() {
+    const rec = { ...makeRecord(), qrUrl: qrFullUrl(uid()) };
     setQrList((prev) => [rec, ...prev]);
-    saveQrCodeToDb({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, fgColor: rec.fg, bgColor: rec.bg, activationCode: actCode });
+    saveQrCodeToDb({ id: rec.id, status: rec.status, templateName: rec.template, fgColor: rec.fg, bgColor: rec.bg, activationCode: rec.activationCode });
     dispatchActivationToUserDashboard(rec);
     openQuickLook(rec);
-    setVehicleName("");
-    setVehicleNumber("");
-    setToast(`QR Generated! Code: ${actCode}`);
+    setToast(`QR Generated! Code: ${rec.id}`);
     setTimeout(() => setToast(null), 3000);
   }
 
   async function handleGenerateBulk() {
     const count = Math.max(1, Math.min(1000, Number(bulkCount) || 0));
     setBulkProgress(0);
-    const batch: QrRecord[] = Array.from({ length: count }).map((_, i) => {
-      const bulkId = uid();
-      const actCode = generateActivationCode();
-      return {
-        id: bulkId,
-        qrUrl: qrFullUrl(bulkId),
-        clientId: uid("CL"),
-        vehicleName: `Item ${i + 1}`,
-        vehicleNumber: `XX00XX${(1000 + i).toString().slice(-4)}`,
-        createdAt: new Date().toISOString(),
-        scans: 0,
-        status: "inactive",
-        activationCode: actCode,
-        template: activeTemplate?.name || "Default",
-        fg: activeTemplate?.fg || "EAB308",
-        bg: activeTemplate?.bg || "FFFFFF",
-      };
+    const batch: QrRecord[] = Array.from({ length: count }).map(() => {
+      const rec = makeRecord();
+      return { ...rec, qrUrl: qrFullUrl(rec.id) };
     });
 
     setQrList((prev) => [...batch, ...prev]);
@@ -106,14 +81,14 @@ export default function QrCodesPage({
 
     batch.forEach((item) => dispatchActivationToUserDashboard(item));
     setBulkProgress(null);
-    setToast(`${count} QR codes generated & sent to User Dashboard`);
+    setToast(`${count} QR stickers generated & sent to User Dashboard`);
     setTimeout(() => setToast(null), 3000);
   }
 
   function downloadCsv() {
     const rows = [
-      ["QR ID", "Client ID", "Activation Code", "Vehicle Name", "Vehicle Number", "Status", "Template", "Created"],
-      ...qrList.map((q) => [q.id, q.clientId, q.activationCode || "ACT-PENDING", q.vehicleName, q.vehicleNumber, q.status, q.template, fmtDate(q.createdAt)]),
+      ["QR Code", "Activation Code", "Status", "Template", "Created"],
+      ...qrList.map((q) => [q.id, q.activationCode || "ACTPENDING", q.status, q.template, fmtDate(q.createdAt)]),
     ];
     const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -147,15 +122,7 @@ export default function QrCodesPage({
         </div>
 
         {tab === "single" ? (
-          <div className="p-6 grid grid-cols-4 gap-3">
-            <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Vehicle Name</label>
-              <input value={vehicleName} onChange={(e) => setVehicleName(e.target.value)} placeholder="Toyota Innova" className={inputCls} style={{ borderColor: "#e2e8f0" }} />
-            </div>
-            <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Vehicle Number</label>
-              <input value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="GJ01AB1234" className={inputCls} style={{ borderColor: "#e2e8f0" }} />
-            </div>
+          <div className="p-6 grid grid-cols-3 gap-3">
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Template</label>
               <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className={inputCls} style={{ borderColor: "#e2e8f0" }}>
@@ -171,6 +138,9 @@ export default function QrCodesPage({
               >
                 <Plus size={14} /> Generate
               </button>
+            </div>
+            <div className="flex items-end">
+              <p className="text-[11px] text-gray-500 font-medium leading-relaxed">Generates a new QR sticker with its own activation code instantly.</p>
             </div>
           </div>
         ) : (
@@ -204,7 +174,7 @@ export default function QrCodesPage({
                 )}
               </button>
             </div>
-            <p className="col-span-4 text-[11px] text-gray-500 font-medium">Vehicle names &amp; numbers are auto-assigned. Export CSV for the full batch.</p>
+            <p className="col-span-4 text-[11px] text-gray-500 font-medium">Each sticker gets a unique code. Export CSV for the full batch.</p>
           </div>
         )}
       </div>
@@ -239,8 +209,7 @@ export default function QrCodesPage({
               <thead>
                 <tr className="text-left text-[11px] text-gray-500 font-bold uppercase tracking-wider border-b" style={{ borderColor: "#f7f7f7" }}>
                   <th className="px-6 py-3">QR</th>
-                  <th className="px-2 py-3">ID / Client</th>
-                  <th className="px-2 py-3">Vehicle</th>
+                  <th className="px-2 py-3">Code</th>
                   <th className="px-2 py-3">Activation Code</th>
                   <th className="px-2 py-3">Created</th>
                   <th className="px-2 py-3">Status</th>
@@ -249,7 +218,7 @@ export default function QrCodesPage({
               </thead>
               <tbody>
                 {filtered.slice(0, 60).map((q) => {
-                  const actCode = q.activationCode || "ACT-????";
+                  const actCode = q.activationCode || "ACT????";
                   return (
                     <tr key={q.id} className="border-b last:border-0 hover:bg-gray-50/60 transition-colors" style={{ borderColor: "#f7f7f7" }}>
                       <td className="px-6 py-3">
@@ -258,12 +227,7 @@ export default function QrCodesPage({
                         </button>
                       </td>
                       <td className="px-2 py-3">
-                        <p className="font-mono text-[11px] font-bold text-gray-900">{q.id}</p>
-                        <p className="font-mono text-[10px] text-gray-500 font-semibold">{q.clientId}</p>
-                      </td>
-                      <td className="px-2 py-3">
-                        <p className="text-xs font-bold text-gray-900">{q.vehicleName}</p>
-                        <p className="font-mono text-[10px] text-gray-500 font-medium">{q.vehicleNumber}</p>
+                        <button onClick={() => openQuickLook(q)} className="font-mono text-[11px] font-bold text-gray-900 hover:text-amber-600 transition-colors cursor-pointer">{q.id}</button>
                       </td>
                       <td className="px-2 py-3"><ActCode code={actCode} /></td>
                       <td className="px-2 py-3 text-[11px] text-gray-600 font-semibold">{fmtDate(q.createdAt)}</td>

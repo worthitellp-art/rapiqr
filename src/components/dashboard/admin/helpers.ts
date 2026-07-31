@@ -25,14 +25,23 @@ export function fmtDateTime(d: string) {
 }
 
 export function uid(prefix = "QR") {
-  return `${prefix}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+  const digits = "0123456789";
+  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  let numPart = "";
+  for (let i = 0; i < 3; i++) numPart += digits.charAt(Math.floor(Math.random() * digits.length));
+  let letterPart = "";
+  for (let i = 0; i < 3; i++) letterPart += letters.charAt(Math.floor(Math.random() * letters.length));
+  return `${prefix}${numPart}${letterPart}`;
 }
 
 export function generateActivationCode(): string {
-  const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
-  let code = "ACT-";
-  for (let i = 0; i < 4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
-  return code;
+  const digits = "0123456789";
+  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  let numPart = "";
+  for (let i = 0; i < 4; i++) numPart += digits.charAt(Math.floor(Math.random() * digits.length));
+  let letterPart = "";
+  for (let i = 0; i < 3; i++) letterPart += letters.charAt(Math.floor(Math.random() * letters.length));
+  return `ACT${numPart}${letterPart}`;
 }
 
 export function dispatchActivationToUserDashboard(qrItem: QrRecord) {

@@ -2,12 +2,13 @@ import { Search, Bell, Sun } from "lucide-react";
 import { avatarUrl } from "./helpers";
 
 export default function TopBar({
-  admin, searchQuery, setSearchQuery, page,
+  admin, searchQuery, setSearchQuery, page, switchToClientPortal,
 }: {
   admin: { name: string; email?: string; role?: string };
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   page: string;
+  switchToClientPortal?: () => void;
 }) {
   return (
     <div
@@ -34,8 +35,8 @@ export default function TopBar({
           onFocus={e => {
             e.currentTarget.style.width = "320px";
             e.currentTarget.style.background = "#fff";
-            e.currentTarget.style.borderColor = "rgba(234,179,8,0.35)";
-            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(234,179,8,0.08)";
+            e.currentTarget.style.borderColor = "rgba(17,17,17,0.35)";
+            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(17,17,17,0.08)";
           }}
           onBlur={e => {
             e.currentTarget.style.width = "280px";
@@ -54,6 +55,15 @@ export default function TopBar({
 
       {/* ── Right Actions ────────────────── */}
       <div className="flex items-center gap-3">
+        {switchToClientPortal && (
+          <button
+            onClick={switchToClientPortal}
+            className="text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-xl transition-colors cursor-pointer mr-1"
+          >
+            Client Portal ↗
+          </button>
+        )}
+
         {/* Theme Toggle */}
         <button
           className="w-[36px] h-[36px] rounded-xl border flex items-center justify-center transition-all cursor-pointer"
