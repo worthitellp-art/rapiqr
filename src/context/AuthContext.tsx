@@ -1,7 +1,24 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { getUserProfile, UserProfileData, ADMIN_EMAIL } from '../lib/authService';
+import { apiClient, isApiBackendConfigured } from '../lib/apiClient';
 import type { Session, User } from '@supabase/supabase-js';
+
+/**
+ * Map a backend (Express/Render) user profile into the app's UserProfileData shape.
+ * Backend returns { id, email, full_name, avatar_url, role, subscription_plan, is_subscribed }.
+ */
+function backendUserToProfile(u: any): UserProfileData {
+  return {
+    id: u?.id,
+    email: u?.email,
+    fullName: u?.full_name || u?.fullName || u?.email?.split('@')[0] || 'User',
+    avatarUrl: u?.avatar_url || u?.avatarUrl,
+    role: (u?.role as 'user' | 'admin') || 'user',
+    subscriptionPlan: u?.subscription_plan || u?.subscriptionPlan || 'free',
+    isSubscribed: u?.is_subscribed ?? u?.isSubscribed ?? false,
+  };
+}
 
 interface AuthContextType {
   user: User | null;
@@ -34,6 +51,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    // Backend session restore first (when a backend token exists)
+    if (isApiBackendConfigured) {
+      const token = localStorage.getItem('namoqr-token');
+      if (token) {
+        apiClient.auth.getMe()
+          .then((res) => {
+            if (res?.user) {
+              const p = backendUserToProfile(res.user);
+              const saved = localStorage.getItem('namoqr-auth-user');
+              const savedRole = saved ? JSON.parse(saved).role : null;
+              if (savedRole === 'admin' || res.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+                p.role = 'admin';
+              }
+              setProfile(p);
+              localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+            }
+          })
+          .catch(() => {
+            // Token invalid/expired — clear it; Supabase flow below will take over.
+            localStorage.removeItem('namoqr-token');
+          });
+      }
+    }
+
     if (!isSupabaseConfigured) {
       setLoading(false);
       return;
@@ -93,6 +134,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Standard user signup: ALWAYS assigns role = 'user'
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
+      // Backend-first signup when the Render API is configured
+      if (isApiBackendConfigured) {
+        const res = await apiClient.auth.signUp(email, password, fullName);
+        if (res?.token) localStorage.setItem('namoqr-token', res.token);
+        if (res?.user) {
+          const p = backendUserToProfile(res.user);
+          p.role = 'user';
+          setProfile(p);
+          localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+        }
+        return { success: true };
+      }
+
       if (!isSupabaseConfigured) {
         const newUser: UserProfileData = { 
           id: 'demo-' + Date.now(), 
@@ -138,6 +192,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Admin access is only available through adminSignIn() in the AdminAuthModal.
   const signIn = async (email: string, password: string) => {
     try {
+      // Backend-first signin when the Render API is configured
+      if (isApiBackendConfigured) {
+        const res = await apiClient.auth.signIn(email, password);
+        if (res?.token) localStorage.setItem('namoqr-token', res.token);
+        if (res?.user) {
+          const p = backendUserToProfile(res.user);
+          p.role = 'user'; // regular login never unlocks admin
+          setProfile(p);
+          localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+        }
+        return { success: true };
+      }
+
       if (!isSupabaseConfigured) {
         const demoUser: UserProfileData = { 
           id: 'demo-user', 
@@ -182,6 +249,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: 'Invalid admin email address.' };
       }
 
+      // Backend-first admin signin when the Render API is configured
+      if (isApiBackendConfigured) {
+        const res = await apiClient.auth.signIn(email, password);
+        // Validate the profile exists and is admin BEFORE persisting any token
+        if (!res?.user) {
+          return { success: false, error: 'Admin authentication failed.' };
+        }
+        const p = backendUserToProfile(res.user);
+        if (p.role !== 'admin' && email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+          return { success: false, error: 'Access Denied: This account does not have Admin Fleet privileges.' };
+        }
+        if (res?.token) localStorage.setItem('namoqr-token', res.token);
+        setProfile(p);
+        localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+        return { success: true };
+      }
+
       if (!isSupabaseConfigured) {
         if (password.length < 4) {
           return { success: false, error: 'Invalid admin password.' };
@@ -224,6 +308,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
     }
+    localStorage.removeItem('namoqr-token');
     setSession(null);
     setUser(null);
     setProfile(null);
