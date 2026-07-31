@@ -8,6 +8,7 @@ import { XAxis, YAxis, ResponsiveContainer, Tooltip, AreaChart, Area, BarChart, 
 import StatusPill from "./StatusPill";
 import StickerThumb from "./StickerThumb";
 import { QrRecord, Template } from "./types";
+import ConfirmModal from "./ConfirmModal";
 
 /* ─── Animated Counter ──────────────────────────────────────────────── */
 function AnimatedNumber({ value, duration = 800 }: { value: number; duration?: number }) {
@@ -80,6 +81,7 @@ export default function OverviewPage({
   const active = qrList.filter(q => q.status === "active").length;
   const inactive = qrList.length - active;
   const activeRate = qrList.length > 0 ? Math.round((active / qrList.length) * 100) : 0;
+  const [deleteTarget, setDeleteTarget] = useState<QrRecord | null>(null);
 
   // ── Period comparison (this week vs last week) ──
   const nowMs = Date.now();
@@ -434,11 +436,12 @@ export default function OverviewPage({
                           <Eye size={12} />
                         </button>
                         <button
-                          onClick={() => { setQrList(prev => prev.filter(x => x.id !== q.id)); setToast("QR removed"); setTimeout(() => setToast(null), 1500); }}
+                          onClick={() => setDeleteTarget(q)}
                           className="w-[26px] h-[26px] rounded-lg flex items-center justify-center transition-all cursor-pointer"
                           style={{ color: "#94A3B8" }}
                           onMouseEnter={e => { e.currentTarget.style.background = "#FEF2F2"; e.currentTarget.style.color = "#EF4444"; }}
                           onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#94A3B8"; }}
+                          title="Delete QR"
                         >
                           <Trash2 size={12} />
                         </button>
@@ -538,6 +541,26 @@ export default function OverviewPage({
           </div>
         </div>
       </div>
+
+      {/* Delete confirmation */}
+      <ConfirmModal
+        isOpen={deleteTarget !== null}
+        title="Delete QR Sticker?"
+        message={
+          <>
+            Are you sure you want to delete <span className="font-bold text-gray-900">{deleteTarget?.id}</span>?
+            This cannot be undone.
+          </>
+        }
+        onConfirm={() => {
+          if (deleteTarget) {
+            setQrList(prev => prev.filter(x => x.id !== deleteTarget.id));
+            setToast("QR removed");
+            setTimeout(() => setToast(null), 1500);
+          }
+        }}
+        onClose={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

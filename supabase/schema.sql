@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS public.qr_codes (
     template_name TEXT DEFAULT 'Default',
     fg_color TEXT DEFAULT 'D9581F',
     bg_color TEXT DEFAULT 'FFFFFF',
+    sticker_image TEXT, -- Public URL of the generated sticker image (Stickers bucket)
     created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -235,3 +236,29 @@ CREATE POLICY "Product owners can update report status" ON public.reports FOR UP
 -- Templates Policies
 DROP POLICY IF EXISTS "Everyone can view templates" ON public.templates;
 CREATE POLICY "Everyone can view templates" ON public.templates FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Anyone can insert templates" ON public.templates;
+CREATE POLICY "Anyone can insert templates" ON public.templates FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Anyone can update templates" ON public.templates;
+CREATE POLICY "Anyone can update templates" ON public.templates FOR UPDATE USING (true) WITH CHECK (true);
+
+-- ============================================================================
+-- STORAGE: STICKERS BUCKET (Generated sticker images)
+-- Public read so sticker URLs work anywhere; uploads allowed for any client.
+-- ============================================================================
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('Stickers', 'Stickers', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Stickers public read" ON storage.objects;
+CREATE POLICY "Stickers public read" ON storage.objects
+  FOR SELECT USING (bucket_id = 'Stickers');
+
+DROP POLICY IF EXISTS "Stickers authenticated insert" ON storage.objects;
+CREATE POLICY "Stickers authenticated insert" ON storage.objects
+  FOR INSERT WITH CHECK (bucket_id = 'Stickers');
+
+DROP POLICY IF EXISTS "Stickers authenticated update" ON storage.objects;
+CREATE POLICY "Stickers authenticated update" ON storage.objects
+  FOR UPDATE USING (bucket_id = 'Stickers') WITH CHECK (bucket_id = 'Stickers');

@@ -1,6 +1,6 @@
 /**
  * Live Console Logger Middleware for NamoQR Server
- * Provides formatted, real-time logging of HTTP requests, status codes, response times, and server events.
+ * Provides clean, one-line-per-request logging plus operation-level event helpers.
  */
 
 function formatTimestamp() {
@@ -17,35 +17,18 @@ function getStatusBadge(status) {
 }
 
 /**
- * Express middleware to log incoming HTTP requests and response performance live in console
+ * Express middleware: ONE concise log line per finished request.
+ * No body/query dumps — those create log spam. Operation context is logged
+ * by the controllers via the logger helper instead.
  */
 function requestLogger(req, res, next) {
   const startTime = Date.now();
-  const timestamp = formatTimestamp();
-  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
-  const origin = req.headers.origin || 'NO-ORIGIN';
+  const origin = req.headers.origin || '-';
 
-  // Log incoming request
-  console.log(`\n[${timestamp}] 📥 INCOMING ${req.method} ${req.originalUrl || req.url} - IP: ${clientIp}`);
-  console.log(`   🌐 Origin: ${origin}`);
-  
-  if (Object.keys(req.query || {}).length > 0) {
-    console.log(`   🔎 Query: ${JSON.stringify(req.query)}`);
-  }
-  
-  if (req.body && Object.keys(req.body).length > 0) {
-    const sanitizedBody = { ...req.body };
-    if (sanitizedBody.password) sanitizedBody.password = '***REDACTED***';
-    if (sanitizedBody.credential) sanitizedBody.credential = '***REDACTED***';
-    if (sanitizedBody.idToken) sanitizedBody.idToken = '***REDACTED***';
-    console.log(`   📦 Body Payload: ${JSON.stringify(sanitizedBody)}`);
-  }
-
-  // Hook into response finish event to calculate duration and log response
   res.on('finish', () => {
     const duration = Date.now() - startTime;
     const badge = getStatusBadge(res.statusCode);
-    console.log(`[${formatTimestamp()}] ${badge} ${req.method} ${req.originalUrl || req.url} finished in ${duration}ms`);
+    console.log(`[${formatTimestamp()}] ${badge} ${req.method} ${req.originalUrl || req.url} · ${duration}ms · ${origin}`);
   });
 
   next();

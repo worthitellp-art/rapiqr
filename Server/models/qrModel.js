@@ -8,7 +8,7 @@ class QrModel {
     try {
       const { data, error } = await supabaseAdmin
         .from('qr_codes')
-        .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, created_at, activation_code')
+        .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, created_at, activation_code')
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -66,6 +66,26 @@ class QrModel {
       return data;
     } catch (err) {
       console.error('QrModel.save Error:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Save the generated sticker image URL for a QR code
+   */
+  static async saveStickerImage(qrId, stickerImage) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('qr_codes')
+        .update({ sticker_image: stickerImage })
+        .eq('id', qrId)
+        .select('id, sticker_image')
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.error(`QrModel.saveStickerImage (${qrId}) Error:`, err);
       return null;
     }
   }

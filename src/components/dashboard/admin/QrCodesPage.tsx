@@ -8,6 +8,7 @@ import StickerThumb from "./StickerThumb";
 import { QrRecord, Template } from "./types";
 import { uid, generateActivationCode, qrFullUrl, fmtDate, dispatchActivationToUserDashboard } from "./helpers";
 import { saveQrCodeToDb, bulkSaveQrCodesToDb } from "../../../lib/supabaseService";
+import ConfirmModal from "./ConfirmModal";
 
 export default function QrCodesPage({
   qrList, setQrList, templates, setToast, openQuickLook, openRestore, searchQuery,
@@ -22,6 +23,8 @@ export default function QrCodesPage({
   const [tab, setTab] = useState("single");
   const [bulkCount, setBulkCount] = useState(25);
   const [bulkProgress, setBulkProgress] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<QrRecord | null>(null);
+  const [clearAllOpen, setClearAllOpen] = useState(false);
 
   useEffect(() => {
     if (templates.length > 0 && !templates.find((t) => t.id.toString() === templateId)) {
@@ -192,7 +195,7 @@ export default function QrCodesPage({
             <button onClick={downloadCsv} disabled={qrList.length === 0} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all disabled:opacity-40 cursor-pointer">
               <Download size={12} /> Export CSV
             </button>
-            <button onClick={() => { setQrList([]); setToast("All QR codes cleared"); setTimeout(() => setToast(null), 1500); }} disabled={qrList.length === 0} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 transition-all disabled:opacity-40 cursor-pointer">
+            <button onClick={() => setClearAllOpen(true)} disabled={qrList.length === 0} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 transition-all disabled:opacity-40 cursor-pointer">
               <Trash2 size={12} /> Clear all
             </button>
           </div>
@@ -245,7 +248,7 @@ export default function QrCodesPage({
                           <button onClick={() => openQuickLook(q)} className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 transition-all cursor-pointer" title="Quick look">
                             <Eye size={13} />
                           </button>
-                          <button onClick={() => { setQrList((prev) => prev.filter((x) => x.id !== q.id)); setToast("QR deleted"); setTimeout(() => setToast(null), 1500); }} className="w-7 h-7 rounded-lg hover:bg-red-50 hover:text-red-500 flex items-center justify-center text-gray-400 transition-all cursor-pointer">
+                          <button onClick={() => setDeleteTarget(q)} className="w-7 h-7 rounded-lg hover:bg-red-50 hover:text-red-500 flex items-center justify-center text-gray-400 transition-all cursor-pointer" title="Delete QR">
                             <Trash2 size={13} />
                           </button>
                         </div>
@@ -263,6 +266,43 @@ export default function QrCodesPage({
           </>
         )}
       </div>
+
+      {/* Delete confirmations */}
+      <ConfirmModal
+        isOpen={deleteTarget !== null}
+        title="Delete QR Sticker?"
+        message={
+          <>
+            Are you sure you want to delete <span className="font-bold text-gray-900">{deleteTarget?.id}</span>?
+            This cannot be undone.
+          </>
+        }
+        onConfirm={() => {
+          if (deleteTarget) {
+            setQrList((prev) => prev.filter((x) => x.id !== deleteTarget.id));
+            setToast("QR deleted");
+            setTimeout(() => setToast(null), 1500);
+          }
+        }}
+        onClose={() => setDeleteTarget(null)}
+      />
+      <ConfirmModal
+        isOpen={clearAllOpen}
+        title="Clear all QR stickers?"
+        message={
+          <>
+            Are you sure you want to delete all <span className="font-bold text-gray-900">{qrList.length}</span> QR codes?
+            This cannot be undone.
+          </>
+        }
+        confirmLabel="Clear All"
+        onConfirm={() => {
+          setQrList([]);
+          setToast("All QR codes cleared");
+          setTimeout(() => setToast(null), 1500);
+        }}
+        onClose={() => setClearAllOpen(false)}
+      />
     </div>
   );
 }

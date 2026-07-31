@@ -4,6 +4,7 @@ import CopyLinkButton from "./CopyLinkButton";
 import StickerThumb from "./StickerThumb";
 import { QrRecord, Template, StickerPos } from "./types";
 import { qrImageUrl, qrFullUrl, fmtDate, dispatchActivationToUserDashboard } from "./helpers";
+import { saveStickerImageToDb } from "../../../lib/supabaseService";
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
 
 const STICKER_SRC = stickerTemplateImg;
@@ -62,6 +63,7 @@ export default function QuickLookModal({
     });
     const blob = await compositeQrOnSticker(qrDataUrl, dlPos);
     if (blob) {
+      saveStickerImageToDb(qr.id, blob);
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = `${qr.id}-sticker.avif`;

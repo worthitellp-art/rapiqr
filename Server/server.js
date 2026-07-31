@@ -26,14 +26,18 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(requestLogger);
 
 // API Health Check Endpoint — also acts as the frontend connection detector
+const connectedOrigins = new Set();
 app.get('/api/health', (req, res) => {
   const origin = req.headers.origin || 'NO-ORIGIN';
   const isFrontend = origin.includes('worthitellp.workers.dev') || origin.includes(FRONTEND_ORIGIN);
-  logger.success('HEALTH', `Health check ping received from: ${origin}`);
-  if (isFrontend) {
-    logger.event('FRONTEND_CONNECTED', '🎉', `Frontend successfully connected to backend! Origin: ${origin}`);
-  } else {
-    logger.info('HEALTH', `Non-frontend ping (${origin}) — verifying external connectivity`);
+  // Log the connection only ONCE per origin to avoid ping spam
+  if (!connectedOrigins.has(origin)) {
+    connectedOrigins.add(origin);
+    if (isFrontend) {
+      logger.event('FRONTEND_CONNECTED', '🎉', `Frontend successfully connected to backend! Origin: ${origin}`);
+    } else {
+      logger.info('HEALTH', `Non-frontend ping (${origin}) — verifying external connectivity`);
+    }
   }
   res.json({
     status: 'online',

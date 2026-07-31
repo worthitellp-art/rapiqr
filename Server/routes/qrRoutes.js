@@ -5,6 +5,7 @@ const QrController = require('../controllers/qrController');
 router.get('/', QrController.getQrCodes);
 router.get('/:id', QrController.getQrCodeById);
 router.post('/', QrController.saveQrCode);
+router.post('/:id/sticker', QrController.saveStickerImage);
 router.post('/:id/activate', QrController.activateQrCode);
 router.post('/:id/scan', QrController.recordScan);
 

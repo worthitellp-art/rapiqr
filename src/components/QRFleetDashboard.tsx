@@ -5,6 +5,7 @@ import {
   getTemplatesFromDb,
   saveTemplateToDb,
   saveStickerPosToDb,
+  saveStickerImageToDb,
   bulkSaveQrCodesToDb,
   getReportsFromDb,
 } from "../lib/supabaseService";
@@ -405,6 +406,30 @@ async function compositeQrOnSticker(qrDataUrl: string, pos: StickerPos): Promise
     sticker.onerror = () => resolve(null);
     sticker.src = STICKER_SRC;
   });
+}
+
+async function saveGeneratedSticker(rec: { id: string; fg?: string; bg?: string }, pos: StickerPos) {
+  try {
+    const qrDataUrl = await new Promise<string | null>((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth; c.height = img.naturalHeight;
+        c.getContext("2d")!.drawImage(img, 0, 0);
+        resolve(c.toDataURL("image/png"));
+      };
+      img.onerror = () => resolve(null);
+      img.src = qrImageUrl(qrFullUrl(rec.id), rec.fg || "EAB308", rec.bg || "FFFFFF", 512);
+    });
+    if (!qrDataUrl) return null;
+    const blob = await compositeQrOnSticker(qrDataUrl, pos);
+    if (!blob) return null;
+    return await saveStickerImageToDb(rec.id, blob);
+  } catch (err) {
+    console.warn("Failed to save generated sticker image:", err);
+    return null;
+  }
 }
 
 /* ─── Sidebar ────────────────────────────────────────────────────────────── */
@@ -831,6 +856,7 @@ function QrCodesPage({
     };
     setQrList((prev) => [rec, ...prev]);
     saveQrCodeToDb({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, fgColor: rec.fg, bgColor: rec.bg, activationCode: actCode });
+    saveGeneratedSticker(rec, activeTemplate?.stickerPos || { x: 110, y: 40, w: 100, h: 100 });
     dispatchActivationToUserDashboard(rec);
     openQuickLook(rec);
     setVehicleName("");
@@ -1095,6 +1121,7 @@ function QuickLookModal({
     });
     const blob = await compositeQrOnSticker(qrDataUrl, dlPos);
     if (blob) {
+      saveStickerImageToDb(qr.id, blob);
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = `${qr.id}-sticker.avif`;

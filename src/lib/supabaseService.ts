@@ -19,7 +19,7 @@ export async function getQrCodesFromDb(limitCount = 100) {
   try {
     const { data, error } = await supabase
       .from('qr_codes')
-      .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, created_at, activation_code')
+      .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, created_at, activation_code')
       .order('created_at', { ascending: false })
       .limit(limitCount);
 
@@ -47,7 +47,7 @@ export async function getQrCodeByIdFromDb(qrId: string) {
   try {
     const { data, error } = await supabase
       .from('qr_codes')
-      .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, created_at, activation_code')
+      .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, created_at, activation_code')
       .eq('id', qrId)
       .maybeSingle();
 
@@ -239,6 +239,55 @@ export async function saveStickerPosToDb(pos: { x: number; y: number; w: number;
     return data;
   } catch (err) {
     console.warn('Supabase save sticker position error:', err);
+    return null;
+  }
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Save a generated sticker image to the "Stickers" storage bucket
+ * and persist its public URL on the qr_codes record.
+ * Prefers the Render/Express API (service role); falls back to direct Supabase.
+ */
+export async function saveStickerImageToDb(qrId: string, image: Blob | string) {
+  if (isApiBackendConfigured) {
+    try {
+      const dataUrl = typeof image === 'string' ? image : await blobToDataUrl(image);
+      const res = await apiClient.qr.saveStickerImage(qrId, dataUrl);
+      return res?.stickerImage || res?.data?.sticker_image || res?.data || null;
+    } catch (err) {
+      console.warn('Backend save sticker image error (falling back to Supabase):', err);
+    }
+  }
+  if (!isSupabaseConfigured) return null;
+  try {
+    const fileName = `stickers/${qrId}.png`;
+    const { error: uploadError } = await supabase.storage
+      .from('Stickers')
+      .upload(fileName, image, { upsert: true, contentType: 'image/png' });
+
+    if (uploadError) throw uploadError;
+
+    const { data: pub } = supabase.storage.from('Stickers').getPublicUrl(fileName);
+    const publicUrl = pub.publicUrl;
+
+    const { error: dbError } = await supabase
+      .from('qr_codes')
+      .update({ sticker_image: publicUrl })
+      .eq('id', qrId);
+
+    if (dbError) throw dbError;
+    return publicUrl;
+  } catch (err) {
+    console.warn('Supabase save sticker image error:', err);
     return null;
   }
 }

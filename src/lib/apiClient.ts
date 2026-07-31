@@ -99,6 +99,13 @@ export const apiClient = {
       });
     },
 
+    async saveStickerImage(qrId: string, image: string) {
+      return request<{ success: boolean; data: any; stickerImage?: string }>(`/qr/${qrId}/sticker`, {
+        method: 'POST',
+        body: JSON.stringify({ image }),
+      });
+    },
+
     async activateQrCode(qrId: string, activationData: any) {
       return request<{ success: boolean; data: any }>(`/qr/${qrId}/activate`, {
         method: 'POST',
