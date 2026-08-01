@@ -1,4 +1,6 @@
-Code	Category	Activation Code there is only 1 code named cpde onul that code use for everyhing no 2 code needed , and fix  ,
+from Product Catalog & Pre-orders
+ page into not adding in cart  when pre-order btn clicked 
 
+ and  rename btn with redeisgn Products catelog page  with goog style of ux , cards 
 
-chnage  icon fo the qr codes in sidebar set qr into + icon  , 
+ by defualt no activation card no simulation 

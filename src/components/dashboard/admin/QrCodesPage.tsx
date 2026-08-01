@@ -49,14 +49,15 @@ export default function QrCodesPage({
   });
 
   function buildQrRecord(targetCategory: string): QrRecord {
+    const codeId = uid();
     return {
-      id: uid(),
+      id: codeId,
       clientId: uid("CL"),
       qrUrl: "",
       createdAt: new Date().toISOString(),
       scans: 0,
       status: "inactive",
-      activationCode: generateActivationCode(),
+      activationCode: codeId,
       template: activeTemplate?.name || "Default",
       category: targetCategory,
       fg: activeTemplate?.fg || "EAB308",
@@ -287,9 +288,8 @@ export default function QrCodesPage({
               <thead>
                 <tr className="text-left text-[11px] text-gray-500 font-bold uppercase tracking-wider border-b" style={{ borderColor: "#f7f7f7" }}>
                   <th className="px-6 py-3">QR</th>
-                  <th className="px-2 py-3">Code</th>
-                  <th className="px-2 py-3">Category</th>
                   <th className="px-2 py-3">Activation Code</th>
+                  <th className="px-2 py-3">Category</th>
                   <th className="px-2 py-3">Created</th>
                   <th className="px-2 py-3">Status</th>
                   <th className="px-6 py-3 text-right">Actions</th>
@@ -297,7 +297,7 @@ export default function QrCodesPage({
               </thead>
               <tbody>
                 {filtered.slice(0, 60).map((q) => {
-                  const actCode = q.activationCode || "ACT????";
+                  const actCode = q.activationCode || q.id;
                   const catKey = (q.category || "car") as any;
                   const icon = getCategoryIcon(catKey);
                   const label = getCategoryLabel(catKey);
@@ -309,16 +309,13 @@ export default function QrCodesPage({
                           <StickerThumb qr={q} templates={templates} size={36} />
                         </button>
                       </td>
-                      <td className="px-2 py-3">
-                        <button onClick={() => openQuickLook(q)} className="font-mono text-[11px] font-bold text-gray-900 hover:text-amber-600 transition-colors cursor-pointer">{q.id}</button>
-                      </td>
+                      <td className="px-2 py-3"><ActCode code={actCode} /></td>
                       <td className="px-2 py-3">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-800 border border-gray-200">
                           <span>{icon}</span>
                           <span>{label}</span>
                         </span>
                       </td>
-                      <td className="px-2 py-3"><ActCode code={actCode} /></td>
                       <td className="px-2 py-3 text-[11px] text-gray-600 font-semibold">{fmtDate(q.createdAt)}</td>
                       <td className="px-2 py-3"><StatusPill status={q.status} /></td>
                       <td className="px-6 py-3">

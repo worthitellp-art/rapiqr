@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checkout — NamoQR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --cream:#F6F1E7; --cream-deep:#EEE4CF; --paper:#FFFEFB;
+  --ink:#201C15; --ink-soft:#6E6759; --ink-faint:#A79E8B;
+  --orange:#E25822; --orange-deep:#C4471A;
+  --green:#2F6B4F; --green-soft:#E4EFE8;
+  --line:rgba(32,28,21,0.11);
+  --shadow-sm:0 8px 20px -14px rgba(32,28,21,0.35);
+  --shadow-lg:0 30px 60px -30px rgba(32,28,21,0.4);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Inter',sans-serif;background:var(--cream);color:var(--ink);-webkit-font-smoothing:antialiased;}
+.serif{font-family:'Fraunces',serif;}
+a{color:inherit;text-decoration:none;}
+button{font-family:inherit;cursor:pointer;border:none;background:none;}
+:focus-visible{outline:2px solid var(--orange);outline-offset:3px;}
+
+/* ---------- HEADER ---------- */
+.co-header{background:var(--paper);border-bottom:1px solid var(--line);padding:18px 0;}
+.co-header-row{max-width:1180px;margin:0 auto;padding:0 28px;display:flex;align-items:center;justify-content:space-between;}
+.co-logo{display:flex;align-items:center;gap:9px;font-family:'Fraunces',serif;font-weight:700;font-size:19px;}
+.co-logo svg{width:24px;height:24px;}
+.co-logo span{color:var(--orange);}
+.co-secure{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--green);}
+.co-secure svg{width:15px;height:15px;}
+.co-steps{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--ink-faint);}
+.co-steps .on{color:var(--orange);}
+.co-steps svg{width:10px;height:10px;}
+@media(max-width:700px){.co-steps{display:none;}}
+
+/* ---------- LAYOUT ---------- */
+.co-wrap{max-width:1180px;margin:0 auto;padding:44px 28px 100px;display:grid;grid-template-columns:1.3fr 1fr;gap:44px;align-items:flex-start;}
+@media(max-width:960px){.co-wrap{grid-template-columns:1fr;padding:0 0 40px;}}
+
+/* ---------- FORM SECTIONS ---------- */
+.co-form{display:flex;flex-direction:column;gap:22px;}
+@media(max-width:960px){.co-form{padding:0 20px;order:2;margin-top:8px;}}
+.co-card{background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:26px 26px 28px;}
+.co-card-head{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+.co-num{width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--cream);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.co-card-head h3{font-family:'Fraunces',serif;font-size:17.5px;font-weight:600;}
+.co-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.co-field{margin-bottom:14px;}
+.co-field:last-child{margin-bottom:0;}
+.co-field label{display:block;font-size:11.5px;font-weight:700;color:var(--ink-soft);margin-bottom:7px;letter-spacing:0.01em;}
+.co-field input,.co-field select{width:100%;padding:13px 15px;border-radius:11px;border:1px solid var(--line);background:var(--cream);font-family:inherit;font-size:13.5px;color:var(--ink);transition:border-color .18s ease, background .18s ease;}
+.co-field input:focus,.co-field select:focus{outline:none;border-color:var(--orange);background:var(--paper);}
+.co-field input::placeholder{color:var(--ink-faint);}
+
+/* Delivery method */
+.deliv-opt{display:flex;align-items:center;gap:14px;border:1.5px solid var(--line);border-radius:14px;padding:15px 16px;cursor:pointer;margin-bottom:10px;transition:border-color .18s ease, background .18s ease;}
+.deliv-opt:last-child{margin-bottom:0;}
+.deliv-opt.checked{border-color:var(--orange);background:rgba(226,88,34,0.04);}
+.deliv-opt input{accent-color:var(--orange);width:17px;height:17px;flex-shrink:0;}
+.deliv-info{flex:1;}
+.deliv-info b{font-size:13.5px;display:block;}
+.deliv-info span{font-size:11.5px;color:var(--ink-soft);}
+.deliv-price{font-size:13.5px;font-weight:700;}
+
+/* Payment method */
+.pay-opt{border:1.5px solid var(--line);border-radius:14px;margin-bottom:10px;overflow:hidden;transition:border-color .18s ease;}
+.pay-opt.checked{border-color:var(--orange);}
+.pay-opt:last-child{margin-bottom:0;}
+.pay-head{display:flex;align-items:center;gap:13px;padding:15px 16px;cursor:pointer;}
+.pay-head input{accent-color:var(--orange);width:17px;height:17px;flex-shrink:0;}
+.pay-icon{width:34px;height:34px;border-radius:9px;background:var(--cream);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px;}
+.pay-info{flex:1;}
+.pay-info b{font-size:13.5px;display:flex;align-items:center;gap:8px;}
+.pay-info span{font-size:11.5px;color:var(--ink-soft);}
+.pay-tag{font-size:9.5px;font-weight:800;letter-spacing:0.02em;background:var(--green-soft);color:var(--green);padding:3px 8px;border-radius:100px;}
+.pay-body{max-height:0;overflow:hidden;transition:max-height .3s ease;background:var(--cream);}
+.pay-opt.checked .pay-body{max-height:140px;}
+.pay-body-inner{padding:16px;border-top:1px solid var(--line);}
+.upi-apps{display:flex;gap:10px;}
+.upi-apps span{flex:1;text-align:center;padding:10px;border-radius:10px;background:var(--paper);border:1px solid var(--line);font-size:11.5px;font-weight:700;}
+
+.co-submit{width:100%;background:var(--orange);color:#fff;font-weight:800;font-size:15px;padding:17px;border-radius:14px;box-shadow:0 16px 30px -12px rgba(226,88,34,0.55);transition:transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s ease;display:flex;align-items:center;justify-content:center;gap:9px;}
+.co-submit:hover{transform:translateY(-2px);box-shadow:0 20px 36px -12px rgba(226,88,34,0.65);}
+.co-submit:active{transform:translateY(0) scale(0.98);}
+.co-submit svg{width:16px;height:16px;}
+.co-guarantee{display:flex;justify-content:center;gap:22px;margin-top:16px;flex-wrap:wrap;}
+.co-guarantee div{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-soft);font-weight:600;}
+.co-guarantee svg{width:13px;height:13px;color:var(--green);}
+
+/* ---------- ORDER SUMMARY ---------- */
+.co-summary{position:sticky;top:24px;background:var(--paper);border:1px solid var(--line);border-radius:22px;padding:26px;box-shadow:var(--shadow-sm);}
+@media(max-width:960px){.co-summary{position:static;border-radius:0;border-left:none;border-right:none;order:1;}}
+.co-summary h3{font-family:'Fraunces',serif;font-size:18px;font-weight:600;margin-bottom:18px;}
+.cart-line{display:flex;gap:13px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);}
+.cart-line img{width:56px;height:56px;border-radius:12px;object-fit:cover;flex-shrink:0;background:var(--cream-deep);}
+.cart-line-info{flex:1;min-width:0;}
+.cart-line-info b{font-size:13px;display:block;line-height:1.3;}
+.cart-line-info span{font-size:11px;color:var(--ink-soft);}
+.cart-line-price{font-size:13px;font-weight:700;white-space:nowrap;}
+.cart-qty-ctrl{display:flex;align-items:center;gap:9px;margin-top:6px;}
+.cart-qty-ctrl button{width:22px;height:22px;border-radius:50%;border:1px solid var(--line);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.cart-qty-ctrl span{font-size:12px;font-weight:700;min-width:14px;text-align:center;}
+.cart-remove{font-size:10.5px;color:var(--ink-faint);text-decoration:underline;margin-left:6px;}
+
+.promo-row{display:flex;gap:8px;margin:18px 0;}
+.promo-row input{flex:1;padding:11px 13px;border-radius:10px;border:1px solid var(--line);background:var(--cream);font-family:inherit;font-size:12.5px;}
+.promo-row input:focus{outline:none;border-color:var(--orange);}
+.promo-row button{padding:11px 16px;border-radius:10px;background:var(--ink);color:var(--cream);font-size:12px;font-weight:700;white-space:nowrap;}
+.promo-applied{font-size:11.5px;color:var(--green);font-weight:700;margin:-10px 0 16px;display:none;}
+.promo-applied.show{display:block;}
+
+.sum-row{display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);margin-bottom:10px;}
+.sum-row.total{color:var(--ink);font-weight:800;font-size:16px;padding-top:14px;border-top:1px solid var(--line);margin-top:6px;}
+.sum-row .gst-note{font-size:10px;color:var(--ink-faint);display:block;margin-top:2px;font-weight:500;}
+
+.trust-strip{display:flex;justify-content:space-between;margin-top:22px;padding-top:18px;border-top:1px solid var(--line);}
+.trust-strip div{text-align:center;flex:1;}
+.trust-strip svg{width:19px;height:19px;color:var(--green);margin-bottom:6px;}
+.trust-strip span{display:block;font-size:9.5px;font-weight:700;color:var(--ink-soft);line-height:1.3;}
+
+/* ---------- MOBILE SUMMARY TOGGLE ---------- */
+.mob-summary-toggle{display:none;}
+@media(max-width:960px){
+  .mob-summary-toggle{display:flex;justify-content:space-between;align-items:center;background:var(--cream-deep);padding:16px 20px;font-size:13px;font-weight:700;cursor:pointer;}
+  .mob-summary-toggle svg{width:14px;height:14px;transition:transform .25s ease;}
+  .mob-summary-toggle.open svg{transform:rotate(180deg);}
+  .co-summary{display:none;}
+  .co-summary.mob-open{display:block;}
+}
+
+/* ---------- CONFIRMATION ---------- */
+.co-confirm{position:fixed;inset:0;background:var(--cream);z-index:500;display:none;align-items:center;justify-content:center;padding:24px;}
+.co-confirm.show{display:flex;}
+.confirm-box{max-width:440px;width:100%;text-align:center;}
+.confirm-icon{width:76px;height:76px;border-radius:50%;background:var(--green-soft);color:var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 24px;animation:pop-in .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes pop-in{from{transform:scale(0.5);opacity:0;}to{transform:scale(1);opacity:1;}}
+.confirm-icon svg{width:34px;height:34px;}
+.confirm-box h2{font-family:'Fraunces',serif;font-size:28px;font-weight:600;margin-bottom:10px;}
+.confirm-box p{font-size:14px;color:var(--ink-soft);line-height:1.6;margin-bottom:26px;}
+.confirm-order-id{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:26px;}
+.confirm-order-id span{display:block;font-size:11px;color:var(--ink-soft);font-weight:600;}
+.confirm-order-id b{font-family:'Fraunces',serif;font-size:19px;font-weight:600;}
+@media(prefers-reduced-motion:reduce){.confirm-icon{animation:none;}}
+</style>
+</head>
+<body>
+
+<header class="co-header">
+  <div class="co-header-row">
+    <a href="#" class="co-logo">
+      <svg viewBox="0 0 32 32" fill="none"><rect x="2" y="2" width="11" height="11" rx="3" stroke="#E25822" stroke-width="3"/><rect x="19" y="2" width="11" height="11" rx="3" stroke="#E25822" stroke-width="3"/><rect x="2" y="19" width="11" height="11" rx="3" stroke="#E25822" stroke-width="3"/><rect x="19" y="19" width="5" height="5" rx="1" fill="#E25822"/><rect x="26" y="26" width="4" height="4" rx="1" fill="#E25822"/><rect x="19" y="26" width="4" height="4" rx="1" fill="#E25822"/><rect x="26" y="19" width="4" height="4" rx="1" fill="#E25822"/></svg>
+      Namo<span>QR</span>
+    </a>
+    <div class="co-steps">
+      <span>Cart</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      <span class="on">Checkout</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      <span>Confirmation</span>
+    </div>
+    <div class="co-secure">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      Secure Checkout
+    </div>
+  </div>
+</header>
+
+<div class="mob-summary-toggle" id="mob-toggle">
+  <span id="mob-toggle-text">Show order summary · ₹1,248</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+</div>
+
+<div class="co-wrap">
+
+  <!-- ============ FORM COLUMN ============ -->
+  <form class="co-form" id="checkout-form">
+
+    <div class="co-card">
+      <div class="co-card-head"><div class="co-num">1</div><h3 class="serif">Contact Information</h3></div>
+      <div class="co-grid-2">
+        <div class="co-field"><label>Full Name</label><input type="text" placeholder="Rahul Sharma" required></div>
+        <div class="co-field"><label>Phone Number</label><input type="tel" placeholder="+91 98XXX XXXXX" required></div>
+      </div>
+      <div class="co-field"><label>Email Address</label><input type="email" placeholder="you@example.com" required></div>
+    </div>
+
+    <div class="co-card">
+      <div class="co-card-head"><div class="co-num">2</div><h3 class="serif">Shipping Address</h3></div>
+      <div class="co-field"><label>Flat / House No., Building, Street</label><input type="text" placeholder="Flat 402, Green Heights Apt" required></div>
+      <div class="co-grid-2">
+        <div class="co-field"><label>City</label><input type="text" placeholder="Rajkot" required></div>
+        <div class="co-field"><label>State</label><input type="text" placeholder="Gujarat" required></div>
+      </div>
+      <div class="co-grid-2">
+        <div class="co-field"><label>Pincode</label><input type="text" placeholder="360001" required></div>
+        <div class="co-field"><label>Landmark (Optional)</label><input type="text" placeholder="Near City Mall"></div>
+      </div>
+    </div>
+
+    <div class="co-card">
+      <div class="co-card-head"><div class="co-num">3</div><h3 class="serif">Delivery Method</h3></div>
+      <label class="deliv-opt checked" data-name="standard">
+        <input type="radio" name="delivery" checked>
+        <div class="deliv-info"><b>Standard Delivery</b><span>Arrives in 4–6 business days</span></div>
+        <div class="deliv-price" style="color:var(--green);">FREE</div>
+      </label>
+      <label class="deliv-opt" data-name="express">
+        <input type="radio" name="delivery">
+        <div class="deliv-info"><b>Express Delivery</b><span>Arrives in 24–48 hours</span></div>
+        <div class="deliv-price">₹99</div>
+      </label>
+    </div>
+
+    <div class="co-card">
+      <div class="co-card-head"><div class="co-num">4</div><h3 class="serif">Payment Method</h3></div>
+
+      <label class="pay-opt checked" data-pay="upi">
+        <div class="pay-head">
+          <input type="radio" name="payment" checked>
+          <div class="pay-icon">📱</div>
+          <div class="pay-info"><b>UPI <span class="pay-tag">RECOMMENDED</span></b><span>Pay via Google Pay, PhonePe, Paytm & more</span></div>
+        </div>
+        <div class="pay-body"><div class="pay-body-inner">
+          <div class="upi-apps"><span>GPay</span><span>PhonePe</span><span>Paytm</span><span>BHIM</span></div>
+        </div></div>
+      </label>
+
+      <label class="pay-opt" data-pay="card">
+        <div class="pay-head">
+          <input type="radio" name="payment">
+          <div class="pay-icon">💳</div>
+          <div class="pay-info"><b>Credit / Debit Card</b><span>Visa, Mastercard, RuPay accepted</span></div>
+        </div>
+        <div class="pay-body"><div class="pay-body-inner">
+          <div class="co-field" style="margin-bottom:10px;"><input type="text" placeholder="Card Number"></div>
+          <div class="co-grid-2"><input type="text" placeholder="MM/YY" style="padding:11px 13px;border-radius:10px;border:1px solid var(--line);background:var(--paper);font-size:13px;"><input type="text" placeholder="CVV" style="padding:11px 13px;border-radius:10px;border:1px solid var(--line);background:var(--paper);font-size:13px;"></div>
+        </div></div>
+      </label>
+
+      <label class="pay-opt" data-pay="cod">
+        <div class="pay-head">
+          <input type="radio" name="payment">
+          <div class="pay-icon">💵</div>
+          <div class="pay-info"><b>Cash on Delivery</b><span>Pay when your order arrives</span></div>
+        </div>
+        <div class="pay-body"><div class="pay-body-inner" style="font-size:12px;color:var(--ink-soft);">₹20 COD handling fee applies to this order.</div></div>
+      </label>
+    </div>
+
+    <button type="submit" class="co-submit">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      Pay ₹<span id="submit-total">1,248</span> Securely
+    </button>
+    <div class="co-guarantee">
+      <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2 4 6v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6l-8-4Z"></path></svg>256-bit SSL Encrypted</div>
+      <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path><polyline points="9 11 12 14 22 4"></polyline></svg>7-Day Replacement</div>
+      <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line></svg>GST Invoice Included</div>
+    </div>
+  </form>
+
+  <!-- ============ SUMMARY COLUMN ============ -->
+  <aside class="co-summary" id="co-summary">
+    <h3>Order Summary</h3>
+    <div id="cart-lines"></div>
+
+    <div class="promo-row">
+      <input type="text" id="promo-input" placeholder="Promo code">
+      <button type="button" onclick="applyPromo()">Apply</button>
+    </div>
+    <div class="promo-applied" id="promo-applied">✓ NAMO10 applied — 10% off</div>
+
+    <div class="sum-row"><span>Subtotal</span><span id="sum-subtotal">₹1,248</span></div>
+    <div class="sum-row" id="sum-discount-row" style="display:none;"><span>Discount</span><span id="sum-discount" style="color:var(--green);">−₹0</span></div>
+    <div class="sum-row"><span>Delivery</span><span id="sum-delivery">FREE</span></div>
+    <div class="sum-row total"><span>Total<span class="gst-note">Inclusive of 18% GST</span></span><span id="sum-total">₹1,248</span></div>
+
+    <div class="trust-strip">
+      <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6l-8-4Z"></path></svg><span>Secure<br>Payments</span></div>
+      <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg><span>Fast<br>Shipping</span></div>
+      <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v13H3z"></path><path d="M3 3l9 7 9-7"></path></svg><span>GST<br>Invoice</span></div>
+    </div>
+  </aside>
+</div>
+
+<!-- ============ CONFIRMATION SCREEN ============ -->
+<div class="co-confirm" id="co-confirm">
+  <div class="confirm-box">
+    <div class="confirm-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+    <h2 class="serif">Order Confirmed!</h2>
+    <p>Thank you — your NamoQR stickers are being packed. You'll get a WhatsApp update the moment they ship.</p>
+    <div class="confirm-order-id">
+      <span>Order Number</span>
+      <b id="confirm-order-num">#NQ-84213</b>
+    </div>
+    <a href="index.html" class="co-submit" style="text-decoration:none;">Continue Shopping</a>
+  </div>
+</div>
+
+<script>
+// ---------- Cart State (demo data — connects to real cart/session in production) ----------
+let cart = [
+  { name:"Car Safety Sticker", price:349, qty:1, img:"https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=200" },
+  { name:"Family Starter Pack", price:899, qty:1, img:"https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&q=80&w=200" },
+];
+let discountPct = 0;
+
+function renderCart(){
+  const linesEl = document.getElementById('cart-lines');
+  linesEl.innerHTML = cart.map((item, i) => `
+    <div class="cart-line">
+      <img src="${item.img}" alt="${item.name}">
+      <div class="cart-line-info">
+        <b>${item.name}</b>
+        <span>₹${item.price} each</span>
+        <div class="cart-qty-ctrl">
+          <button type="button" onclick="changeQty(${i}, -1)">−</button>
+          <span>${item.qty}</span>
+          <button type="button" onclick="changeQty(${i}, 1)">+</button>
+          <span class="cart-remove" onclick="removeItem(${i})">Remove</span>
+        </div>
+      </div>
+      <div class="cart-line-price">₹${item.price * item.qty}</div>
+    </div>
+  `).join('') || '<p style="font-size:13px;color:var(--ink-soft);padding:20px 0;text-align:center;">Your cart is empty.</p>';
+  updateTotals();
+}
+
+function changeQty(i, delta){
+  cart[i].qty = Math.max(1, cart[i].qty + delta);
+  renderCart();
+}
+function removeItem(i){
+  cart.splice(i, 1);
+  renderCart();
+}
+
+let deliveryFee = 0;
+function updateTotals(){
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const discount = Math.round(subtotal * discountPct / 100);
+  const total = subtotal - discount + deliveryFee;
+
+  document.getElementById('sum-subtotal').textContent = `₹${subtotal.toLocaleString('en-IN')}`;
+  document.getElementById('sum-delivery').textContent = deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`;
+  document.getElementById('sum-total').textContent = `₹${total.toLocaleString('en-IN')}`;
+  document.getElementById('submit-total').textContent = total.toLocaleString('en-IN');
+  document.getElementById('mob-toggle-text').textContent = `Show order summary · ₹${total.toLocaleString('en-IN')}`;
+
+  const discRow = document.getElementById('sum-discount-row');
+  if(discount > 0){
+    discRow.style.display = 'flex';
+    document.getElementById('sum-discount').textContent = `−₹${discount.toLocaleString('en-IN')}`;
+  } else {
+    discRow.style.display = 'none';
+  }
+}
+
+function applyPromo(){
+  const val = document.getElementById('promo-input').value.trim().toUpperCase();
+  if(val === 'NAMO10'){
+    discountPct = 10;
+    document.getElementById('promo-applied').classList.add('show');
+    updateTotals();
+  } else if(val){
+    alert('Invalid promo code. Try NAMO10 for 10% off.');
+  }
+}
+
+renderCart();
+
+// ---------- Delivery method toggle ----------
+document.querySelectorAll('.deliv-opt').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.deliv-opt').forEach(o => o.classList.remove('checked'));
+    opt.classList.add('checked');
+    opt.querySelector('input').checked = true;
+    deliveryFee = opt.getAttribute('data-name') === 'express' ? 99 : 0;
+    updateTotals();
+  });
+});
+
+// ---------- Payment method toggle ----------
+document.querySelectorAll('.pay-opt').forEach(opt => {
+  opt.querySelector('.pay-head').addEventListener('click', () => {
+    document.querySelectorAll('.pay-opt').forEach(o => o.classList.remove('checked'));
+    opt.classList.add('checked');
+    opt.querySelector('input').checked = true;
+  });
+});
+
+// ---------- Mobile summary toggle ----------
+const mobToggle = document.getElementById('mob-toggle');
+const summaryEl = document.getElementById('co-summary');
+mobToggle.addEventListener('click', () => {
+  mobToggle.classList.toggle('open');
+  summaryEl.classList.toggle('mob-open');
+});
+
+// ---------- Submit / Confirmation ----------
+document.getElementById('checkout-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const orderNum = '#NQ-' + Math.floor(10000 + Math.random() * 89999);
+  document.getElementById('confirm-order-num').textContent = orderNum;
+  document.getElementById('co-confirm').classList.add('show');
+});
+</script>
+
+</body>
+</html>

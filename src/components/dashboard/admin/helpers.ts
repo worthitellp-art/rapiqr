@@ -57,7 +57,7 @@ export function dispatchActivationToUserDashboard(qrItem: QrRecord) {
     const updated = [
       {
         id: qrItem.id,
-        activationCode: qrItem.activationCode || generateActivationCode(),
+        activationCode: qrItem.id,
         vehicleName: qrItem.vehicleName || "Unassigned QR Sticker",
         vehicleNumber: qrItem.vehicleNumber || "PENDING",
         status: "pending_activation",

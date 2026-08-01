@@ -1,4 +1,4 @@
-import { LayoutGrid, QrCode, PhoneCall, Bell, Users, Palette, Store } from "lucide-react";
+import { LayoutGrid, Plus, PhoneCall, Bell, Users, Palette, Store } from "lucide-react";
 
 export const FONT_OPTIONS = [
   { id: "Plus Jakarta Sans", label: "Jakarta Sans", css: "'Plus Jakarta Sans', ui-sans-serif, system-ui" },
@@ -9,7 +9,7 @@ export const FONT_OPTIONS = [
 export const NAV_ITEMS = [
   { id: "overview", label: "Dashboard", icon: LayoutGrid },
   { id: "distributors", label: "Distributors", icon: Store },
-  { id: "qr", label: "QR Codes", icon: QrCode },
+  { id: "qr", label: "QR Codes", icon: Plus },
   { id: "communication", label: "Communication", icon: PhoneCall },
   { id: "alerts", label: "Alerts", icon: Bell },
   { id: "users", label: "Users", icon: Users },

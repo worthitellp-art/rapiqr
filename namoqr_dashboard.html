@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — NamoQR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --cream:#F6F1E7; --cream-deep:#EEE4CF; --paper:#FFFEFB;
+  --ink:#201C15; --ink-soft:#6E6759; --ink-faint:#A79E8B;
+  --orange:#E25822; --orange-deep:#C4471A; --orange-soft:#FBEBE1;
+  --green:#2F6B4F; --green-soft:#E4EFE8;
+  --red:#C1442E; --red-soft:#F8E7E3;
+  --amber:#A9711F; --amber-soft:#F5EBD9;
+  --blue:#2E5C8A; --blue-soft:#E4EDF5;
+  --line:rgba(32,28,21,0.10);
+  --shadow-sm:0 8px 20px -14px rgba(32,28,21,0.3);
+  --shadow-lg:0 30px 60px -28px rgba(32,28,21,0.38);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Inter',sans-serif;background:var(--cream);color:var(--ink);-webkit-font-smoothing:antialiased;height:100vh;overflow:hidden;}
+.serif{font-family:'Fraunces',serif;}
+a{color:inherit;text-decoration:none;}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+img{max-width:100%;display:block;}
+:focus-visible{outline:2px solid var(--orange);outline-offset:2px;border-radius:4px;}
+::-webkit-scrollbar{width:7px;height:7px;}
+::-webkit-scrollbar-thumb{background:rgba(32,28,21,0.15);border-radius:10px;}
+::-webkit-scrollbar-thumb:hover{background:var(--orange);}
+
+/* ---------- APP SHELL ---------- */
+.shell{display:flex;flex-direction:column;height:100vh;}
+
+/* ---------- HEADER ---------- */
+.app-header{height:72px;flex-shrink:0;background:var(--paper);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px;}
+.hd-logo{display:flex;align-items:center;gap:9px;font-family:'Fraunces',serif;font-weight:700;font-size:19px;cursor:pointer;}
+.hd-logo svg{width:25px;height:25px;}
+.hd-logo span{color:var(--orange);}
+.hd-actions{display:flex;align-items:center;gap:16px;}
+.hd-stat-pill{display:flex;align-items:center;gap:8px;background:var(--green-soft);color:var(--green);padding:7px 14px;border-radius:100px;font-size:12.5px;font-weight:700;}
+.hd-dot{width:7px;height:7px;border-radius:50%;background:var(--green);position:relative;}
+.hd-dot::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1.5px solid var(--green);animation:ring 2s ease-out infinite;}
+@keyframes ring{0%{transform:scale(0.7);opacity:.7;}100%{transform:scale(2.1);opacity:0;}}
+.icon-btn{position:relative;width:40px;height:40px;border-radius:12px;background:var(--cream);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;transition:background .18s ease, border-color .18s ease;}
+.icon-btn:hover{background:var(--orange-soft);border-color:rgba(226,88,34,0.25);}
+.icon-btn svg{width:18px;height:18px;}
+.icon-badge{position:absolute;top:-4px;right:-4px;background:var(--orange);color:#fff;font-size:10px;font-weight:800;width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+.hd-profile{display:flex;align-items:center;gap:10px;padding-left:14px;border-left:1px solid var(--line);}
+.hd-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid var(--orange);}
+.hd-profile-info{display:flex;flex-direction:column;}
+.hd-profile-info b{font-size:13px;}
+.hd-profile-info span{font-size:11px;color:var(--ink-soft);}
+@media(max-width:700px){.hd-profile-info,.hd-stat-pill{display:none;}}
+
+/* ---------- BODY LAYOUT ---------- */
+.app-body{flex:1;display:flex;overflow:hidden;}
+
+/* ---------- SIDEBAR ---------- */
+.sidebar{width:236px;flex-shrink:0;background:var(--paper);border-right:1px solid var(--line);display:flex;flex-direction:column;justify-content:space-between;padding:20px 14px;}
+.sb-nav{display:flex;flex-direction:column;gap:4px;}
+.sb-btn{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:12px;font-size:14px;font-weight:600;color:var(--ink-soft);transition:background .18s ease, color .18s ease;width:100%;text-align:left;}
+.sb-btn svg{width:17px;height:17px;flex-shrink:0;}
+.sb-btn:hover{background:var(--cream);color:var(--ink);}
+.sb-btn.active{background:var(--orange-soft);color:var(--orange-deep);}
+.sb-add-btn{margin-top:14px;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--ink);color:var(--cream);padding:12px;border-radius:12px;font-weight:700;font-size:13px;transition:transform .2s cubic-bezier(.34,1.56,.64,1);}
+.sb-add-btn:hover{transform:translateY(-2px);}
+.sb-add-btn svg{width:15px;height:15px;}
+.sb-footer{background:var(--green-soft);border-radius:14px;padding:16px;}
+.sb-footer-title{font-size:10.5px;font-weight:800;letter-spacing:0.06em;color:var(--green);margin-bottom:5px;}
+.sb-footer p{font-size:11px;color:#3B6E56;line-height:1.5;}
+@media(max-width:860px){.sidebar{position:fixed;left:-260px;top:72px;bottom:0;z-index:150;transition:left .3s cubic-bezier(.16,1,.3,1);box-shadow:var(--shadow-lg);}.sidebar.open{left:0;}}
+
+/* ---------- MAIN CONTENT ---------- */
+.main{flex:1;overflow-y:auto;padding:30px 34px 60px;}
+.view{display:none;}
+.view.active{display:block;animation:fadeUp .4s cubic-bezier(.16,1,.3,1);}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.view-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:26px;flex-wrap:wrap;gap:14px;}
+.view-title{font-family:'Fraunces',serif;font-size:26px;font-weight:600;}
+.view-sub{font-size:13.5px;color:var(--ink-soft);margin-top:4px;}
+
+/* ---------- STAT CARDS ---------- */
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:30px;}
+.stat-card{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:10px;transition:transform .2s ease, box-shadow .2s ease;}
+.stat-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-sm);}
+.stat-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;}
+.stat-icon svg{width:17px;height:17px;}
+.stat-num{font-family:'Fraunces',serif;font-size:26px;font-weight:600;}
+.stat-label{font-size:11.5px;color:var(--ink-soft);font-weight:600;}
+.stat-trend{font-size:10.5px;font-weight:700;display:flex;align-items:center;gap:3px;}
+@media(max-width:900px){.stat-row{grid-template-columns:repeat(2,1fr);}}
+
+/* ---------- PRODUCT GRID ---------- */
+.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:18px;}
+.p-card{background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:22px;position:relative;overflow:hidden;transition:transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, border-color .25s ease;}
+.p-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--orange),#FF9E5C);opacity:0;transition:opacity .2s ease;}
+.p-card:hover{transform:translateY(-5px);box-shadow:var(--shadow-lg);border-color:rgba(226,88,34,0.2);}
+.p-card:hover::before{opacity:1;}
+.p-peel{position:absolute;top:0;right:0;width:26px;height:26px;background:var(--cream);border-bottom-left-radius:14px;}
+.p-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+.p-icon-title{display:flex;align-items:center;gap:12px;}
+.p-icon{width:42px;height:42px;border-radius:12px;background:var(--cream-deep);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.p-name{font-family:'Fraunces',serif;font-size:16.5px;font-weight:600;line-height:1.25;}
+.p-sub{font-size:11px;color:var(--ink-faint);font-weight:600;}
+.p-status{font-size:10px;font-weight:800;letter-spacing:0.02em;padding:4px 10px;border-radius:100px;text-transform:uppercase;}
+.p-status.active{background:var(--green-soft);color:var(--green);}
+.p-status.suspended{background:var(--amber-soft);color:var(--amber);}
+.p-status.lost{background:var(--red-soft);color:var(--red);}
+.p-status.replaced{background:var(--blue-soft);color:var(--blue);}
+.p-meta{display:flex;flex-direction:column;gap:7px;margin:14px 0;font-size:12.5px;}
+.p-meta-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed var(--line);}
+.p-meta-row:last-child{border-bottom:none;}
+.p-meta-label{color:var(--ink-faint);}
+.p-meta-val{font-weight:600;}
+.p-actions{display:flex;gap:9px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line);}
+.p-btn{flex:1;padding:9px;border-radius:10px;font-size:12px;font-weight:700;text-align:center;transition:background .18s ease, color .18s ease;}
+.p-btn-manage{background:var(--cream);color:var(--ink);}
+.p-btn-manage:hover{background:var(--cream-deep);}
+.p-btn-scan{background:var(--ink);color:var(--cream);}
+.p-btn-scan:hover{background:var(--orange);}
+
+/* ---------- EMPTY STATE ---------- */
+.empty-state{text-align:center;padding:70px 20px;}
+.empty-icon{width:60px;height:60px;border-radius:50%;background:var(--cream-deep);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:26px;}
+.empty-state h3{font-family:'Fraunces',serif;font-size:19px;font-weight:600;margin-bottom:6px;}
+.empty-state p{font-size:13px;color:var(--ink-soft);max-width:320px;margin:0 auto;}
+
+/* ---------- CATALOG ---------- */
+.catalog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
+.cat-card{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:20px;display:flex;flex-direction:column;}
+.cat-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
+.cat-icon{width:38px;height:38px;border-radius:10px;background:var(--cream-deep);display:flex;align-items:center;justify-content:center;font-size:18px;}
+.cat-tag{font-size:9.5px;font-weight:800;letter-spacing:0.03em;background:var(--orange-soft);color:var(--orange-deep);padding:4px 9px;border-radius:100px;text-transform:uppercase;}
+.cat-card h4{font-family:'Fraunces',serif;font-size:15px;font-weight:600;margin-bottom:6px;}
+.cat-card p{font-size:11.5px;color:var(--ink-soft);line-height:1.5;flex:1;margin-bottom:14px;}
+.cat-btn{background:transparent;border:1.5px solid var(--ink);color:var(--ink);padding:9px;border-radius:10px;font-size:12px;font-weight:700;transition:background .18s ease, color .18s ease;}
+.cat-btn:hover{background:var(--ink);color:var(--cream);}
+
+/* ---------- TIMELINE ---------- */
+.timeline-wrap{background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:26px;max-width:760px;}
+.tl-item{display:flex;gap:14px;position:relative;padding-bottom:22px;}
+.tl-item::after{content:'';position:absolute;left:17px;top:36px;bottom:0;width:1.5px;background:var(--line);}
+.tl-item:last-child::after{display:none;}
+.tl-item:last-child{padding-bottom:0;}
+.tl-badge{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;z-index:1;}
+.tl-badge.alert{background:var(--red-soft);}
+.tl-badge.info{background:var(--blue-soft);}
+.tl-badge.success{background:var(--green-soft);}
+.tl-body{flex:1;background:var(--cream);border-radius:12px;padding:11px 14px;}
+.tl-row{display:flex;justify-content:space-between;margin-bottom:3px;gap:10px;}
+.tl-title{font-size:13px;font-weight:700;}
+.tl-time{font-size:10.5px;color:var(--ink-faint);white-space:nowrap;}
+.tl-desc{font-size:12px;color:var(--ink-soft);line-height:1.5;}
+.tl-code{font-size:10px;color:var(--ink-faint);margin-left:5px;}
+
+/* ---------- WIZARD (Activate) ---------- */
+.wiz-shell{display:flex;background:var(--paper);border:1px solid var(--line);border-radius:22px;min-height:520px;overflow:hidden;box-shadow:var(--shadow-sm);}
+.wiz-side{width:240px;background:var(--cream);border-right:1px solid var(--line);padding:30px 22px;flex-shrink:0;}
+.wiz-steps{display:flex;flex-direction:column;gap:22px;}
+.wiz-step{display:flex;align-items:center;gap:12px;opacity:0.4;transition:opacity .2s ease;}
+.wiz-step.active{opacity:1;}
+.wiz-num{width:30px;height:30px;border-radius:50%;background:var(--paper);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;}
+.wiz-step.active .wiz-num{background:var(--orange);border-color:var(--orange);color:#fff;}
+.wiz-step.done .wiz-num{background:var(--green);border-color:var(--green);color:#fff;}
+.wiz-step-title{font-size:13.5px;font-weight:700;}
+.wiz-step-desc{font-size:10.5px;color:var(--ink-faint);}
+.wiz-main{flex:1;display:flex;flex-direction:column;padding:34px 40px;}
+.wiz-head h2{font-family:'Fraunces',serif;font-size:20px;font-weight:600;}
+.wiz-head p{font-size:13px;color:var(--ink-soft);margin-top:3px;}
+.wiz-body{flex:1;display:flex;flex-direction:column;justify-content:center;padding:20px 0;}
+.wiz-pane{display:none;animation:fadeUp .3s ease;}
+.wiz-pane.active{display:block;}
+.scan-box{width:170px;height:170px;border:2px dashed var(--orange);border-radius:20px;margin:0 auto 18px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:var(--orange-soft);}
+.scan-laser{position:absolute;left:0;right:0;height:2.5px;background:var(--orange);top:0;animation:laser 2s linear infinite;box-shadow:0 0 8px var(--orange);}
+@keyframes laser{0%{top:0;}50%{top:100%;}100%{top:0;}}
+.scan-box svg{width:80px;height:80px;color:var(--ink);opacity:0.75;}
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:11.5px;font-weight:700;color:var(--ink-soft);margin-bottom:7px;}
+.field input,.field select,.field textarea{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line);background:var(--cream);font-family:inherit;font-size:13.5px;color:var(--ink);}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--orange);background:var(--paper);}
+.inline-scan{display:flex;gap:10px;max-width:420px;margin:16px auto 0;}
+.cat-pick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px;}
+.cat-pick{cursor:pointer;position:relative;}
+.cat-pick input{position:absolute;opacity:0;}
+.cat-pick-inner{border:1.5px solid var(--line);border-radius:14px;padding:16px 10px;text-align:center;transition:all .18s ease;}
+.cat-pick input:checked + .cat-pick-inner{border-color:var(--orange);background:var(--orange-soft);}
+.cat-pick-icon{font-size:26px;margin-bottom:6px;}
+.cat-pick-name{font-size:12.5px;font-weight:700;}
+.wiz-foot{display:flex;justify-content:space-between;padding-top:22px;border-top:1px solid var(--line);}
+.chk-row{display:flex;align-items:center;gap:9px;font-size:13px;margin-bottom:9px;}
+.chk-row input{width:16px;height:16px;accent-color:var(--orange);}
+.success-wrap{text-align:center;}
+.success-badge{width:56px;height:56px;border-radius:50%;background:var(--green-soft);color:var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;}
+.success-badge svg{width:26px;height:26px;}
+
+/* ---------- BUTTONS ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:13.5px;padding:12px 22px;border-radius:100px;transition:transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s ease, background .2s ease;}
+.btn-primary{background:var(--orange);color:#fff;box-shadow:0 12px 22px -10px rgba(226,88,34,0.5);}
+.btn-primary:hover{background:var(--orange-deep);transform:translateY(-2px);}
+.btn-primary:disabled{opacity:0.4;pointer-events:none;}
+.btn-ghost{background:var(--cream);color:var(--ink);}
+.btn-ghost:hover{background:var(--cream-deep);}
+
+/* ---------- SLIDE-OVER DRAWER ---------- */
+.drawer-overlay{position:fixed;inset:0;background:rgba(32,28,21,0.42);z-index:300;opacity:0;pointer-events:none;transition:opacity .25s ease;}
+.drawer-overlay.show{opacity:1;pointer-events:auto;}
+.drawer{position:fixed;top:0;right:-460px;bottom:0;width:440px;max-width:92vw;background:var(--cream);z-index:301;box-shadow:-20px 0 50px rgba(32,28,21,0.25);transition:right .35s cubic-bezier(.16,1,.3,1);display:flex;flex-direction:column;}
+.drawer.show{right:0;}
+.drawer-head{display:flex;justify-content:space-between;align-items:center;padding:22px 24px;border-bottom:1px solid var(--line);background:var(--paper);}
+.drawer-head h3{font-family:'Fraunces',serif;font-size:18px;font-weight:600;}
+.drawer-close{width:34px;height:34px;border-radius:50%;background:var(--cream);display:flex;align-items:center;justify-content:center;}
+.drawer-close svg{width:14px;height:14px;}
+.drawer-body{flex:1;overflow-y:auto;padding:24px;}
+.dr-card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:16px;}
+.dr-card h4{font-family:'Fraunces',serif;font-size:14.5px;font-weight:600;margin-bottom:12px;}
+.dr-qr-box{width:120px;height:120px;background:#fff;border-radius:14px;padding:10px;margin:0 auto 14px;box-shadow:0 0 0 1px var(--line);}
+.dr-qr-actions{display:flex;gap:9px;}
+.dr-qr-actions button{flex:1;font-size:11.5px;padding:9px;border-radius:9px;font-weight:700;}
+.dr-doc-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px dashed var(--line);}
+.dr-doc-row:last-child{border-bottom:none;}
+.dr-doc-name{font-size:12.5px;font-weight:600;}
+.dr-doc-pill{font-size:9.5px;font-weight:800;padding:3px 9px;border-radius:100px;letter-spacing:0.02em;}
+.dr-doc-pill.valid{background:var(--green-soft);color:var(--green);}
+.dr-doc-pill.soon{background:var(--amber-soft);color:var(--amber);}
+.dr-doc-pill.expired{background:var(--red-soft);color:var(--red);}
+.dr-contact{display:flex;justify-content:space-between;align-items:center;padding:8px 0;}
+.dr-contact-name{font-size:12.5px;font-weight:600;}
+.dr-contact-phone{font-size:11px;color:var(--ink-soft);}
+.dr-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.dr-stat{text-align:center;background:var(--cream);border-radius:10px;padding:10px;}
+.dr-stat b{font-family:'Fraunces',serif;font-size:18px;display:block;}
+.dr-stat span{font-size:10px;color:var(--ink-soft);}
+
+/* ---------- TOAST ---------- */
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--cream);padding:13px 20px;border-radius:100px;font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:9px;box-shadow:var(--shadow-lg);z-index:500;opacity:0;pointer-events:none;transition:opacity .3s ease, transform .3s ease;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast svg{width:14px;height:14px;color:var(--orange);}
+.hamburger-mob{display:none;}
+@media(max-width:860px){
+  .hamburger-mob{display:flex;width:38px;height:38px;border-radius:10px;background:var(--cream);align-items:center;justify-content:center;}
+  .main{padding:22px 18px 60px;}
+  .stat-row{grid-template-columns:1fr 1fr;}
+}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important;}}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <header class="app-header">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <button class="hamburger-mob" id="hamburger-mob"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+      <div class="hd-logo">
+        <svg viewBox="0 0 32 32" fill="none"><rect x="2" y="2" width="11" height="11" rx="3" stroke="#E25822" stroke-width="3"/><rect x="19" y="2" width="11" height="11" rx="3" stroke="#E25822" stroke-width="3"/><rect x="2" y="19" width="11" height="11" rx="3" stroke="#E25822" stroke-width="3"/><rect x="19" y="19" width="5" height="5" rx="1" fill="#E25822"/><rect x="26" y="26" width="4" height="4" rx="1" fill="#E25822"/><rect x="19" y="26" width="4" height="4" rx="1" fill="#E25822"/><rect x="26" y="19" width="4" height="4" rx="1" fill="#E25822"/></svg>
+        Namo<span>QR</span>
+      </div>
+    </div>
+    <div class="hd-actions">
+      <a href="index.html" class="icon-btn" aria-label="Back to Store" title="Back to Store" style="width:auto;padding:0 14px;gap:7px;font-size:12.5px;font-weight:700;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+        Store
+      </a>
+      <div class="hd-stat-pill"><span class="hd-dot"></span><span id="hd-active-count">6</span> Active Tags</div>
+      <button class="icon-btn" id="notif-btn" aria-label="Notifications">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        <span class="icon-badge" id="notif-badge">2</span>
+      </button>
+      <div class="hd-profile">
+        <img class="hd-avatar" src="https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&q=80&w=100" alt="Rahul Sharma">
+        <div class="hd-profile-info"><b>Rahul Sharma</b><span>Pro Account</span></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-body">
+    <aside class="sidebar" id="sidebar">
+      <div>
+        <nav class="sb-nav">
+          <button class="sb-btn active" data-view="overview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+            My Products
+          </button>
+          <button class="sb-btn" data-view="activate">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Activate QR Tag
+          </button>
+          <button class="sb-btn" data-view="catalog">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+            Product Catalog
+          </button>
+          <button class="sb-btn" data-view="history">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            Emergency History
+          </button>
+        </nav>
+        <button class="sb-add-btn" onclick="switchView('activate')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Add New Sticker
+        </button>
+      </div>
+      <div class="sb-footer">
+        <div class="sb-footer-title">SYSTEM SECURE</div>
+        <p>All NamoQR communications are masked and encrypted.</p>
+      </div>
+    </aside>
+
+    <main class="main">
+
+      <!-- ===== OVERVIEW ===== -->
+      <section class="view active" id="view-overview">
+        <div class="view-head">
+          <div>
+            <h1 class="view-title serif">Welcome back, Rahul.</h1>
+            <p class="view-sub">Here's what's happening across your family's safety network.</p>
+          </div>
+          <button class="btn btn-primary" onclick="switchView('activate')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Register Sticker
+          </button>
+        </div>
+
+        <div class="stat-row">
+          <div class="stat-card">
+            <div class="stat-icon" style="background:var(--orange-soft);color:var(--orange-deep);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 2l2.9 6.6L22 9.3l-5 4.9 1.2 7.1L12 17.8l-6.2 3.5L7 14.2l-5-4.9 7.1-.7z"/></svg></div>
+            <div class="stat-num serif" id="stat-active">6</div>
+            <div class="stat-label">Active Tags</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:var(--blue-soft);color:var(--blue);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"></path><circle cx="12" cy="12" r="3"></circle></svg></div>
+            <div class="stat-num serif" id="stat-scans">82</div>
+            <div class="stat-label">Total Scans Received</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:var(--red-soft);color:var(--red);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div>
+            <div class="stat-num serif" id="stat-alerts">3</div>
+            <div class="stat-label">Alerts This Month</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:var(--green-soft);color:var(--green);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div>
+            <div class="stat-num serif">4</div>
+            <div class="stat-label">Family Members Linked</div>
+          </div>
+        </div>
+
+        <div class="prod-grid" id="product-grid"></div>
+      </section>
+
+      <!-- ===== ACTIVATE WIZARD ===== -->
+      <section class="view" id="view-activate">
+        <div class="view-head">
+          <div>
+            <h1 class="view-title serif">Activate a New Sticker</h1>
+            <p class="view-sub">Register your physical NamoQR product in under a minute.</p>
+          </div>
+        </div>
+        <div class="wiz-shell">
+          <div class="wiz-side">
+            <div class="wiz-steps" id="wiz-steps">
+              <div class="wiz-step active" data-step="1"><div class="wiz-num">1</div><div><div class="wiz-step-title">Scan Code</div><div class="wiz-step-desc">Enter or scan sticker</div></div></div>
+              <div class="wiz-step" data-step="2"><div class="wiz-num">2</div><div><div class="wiz-step-title">Category</div><div class="wiz-step-desc">Pick product type</div></div></div>
+              <div class="wiz-step" data-step="3"><div class="wiz-num">3</div><div><div class="wiz-step-title">Contacts</div><div class="wiz-step-desc">Emergency triggers</div></div></div>
+              <div class="wiz-step" data-step="4"><div class="wiz-num">4</div><div><div class="wiz-step-title">Done</div><div class="wiz-step-desc">Tag is now active</div></div></div>
+            </div>
+          </div>
+          <div class="wiz-main">
+            <div class="wiz-head"><h2 class="serif">Product Activation</h2><p>Step <span id="wiz-step-num">1</span> of 4</p></div>
+            <div class="wiz-body">
+              <div class="wiz-pane active" id="wiz-pane-1">
+                <div class="scan-box">
+                  <div class="scan-laser"></div>
+                  <svg viewBox="0 0 100 100"><rect x="10" y="10" width="20" height="20" fill="currentColor"/><rect x="70" y="10" width="20" height="20" fill="currentColor"/><rect x="10" y="70" width="20" height="20" fill="currentColor"/><rect x="35" y="35" width="30" height="30" fill="currentColor"/><rect x="15" y="15" width="10" height="10" fill="#F6F1E7"/><rect x="75" y="15" width="10" height="10" fill="#F6F1E7"/><rect x="15" y="75" width="10" height="10" fill="#F6F1E7"/></svg>
+                </div>
+                <p style="text-align:center;font-size:13px;color:var(--ink-soft);">Scan the sticker's QR, or enter its code manually.</p>
+                <div class="inline-scan">
+                  <input type="text" id="wiz-code" class="field" style="padding:12px 14px;border-radius:11px;border:1px solid var(--line);background:var(--cream);font-size:13.5px;flex:1;" placeholder="e.g. NQ-CAR-9081" value="NQ-AUTO-8812">
+                  <button class="btn btn-ghost" onclick="autoScan()">Auto-Scan</button>
+                </div>
+              </div>
+              <div class="wiz-pane" id="wiz-pane-2">
+                <h3 class="serif" style="font-size:16px;margin-bottom:6px;">Select physical product type</h3>
+                <div class="cat-pick-grid" id="cat-pick-grid"></div>
+              </div>
+              <div class="wiz-pane" id="wiz-pane-3">
+                <h3 class="serif" style="font-size:16px;margin-bottom:14px;">Configure SOS & alert settings</h3>
+                <div class="field"><label>Primary Emergency Contact Name</label><input type="text" id="wiz-contact-name" value="Karan Sharma"></div>
+                <div class="field"><label>Phone Number</label><input type="text" id="wiz-contact-phone" value="+91 98765 43210"></div>
+                <div class="chk-row"><input type="checkbox" checked> Notify via WhatsApp</div>
+                <div class="chk-row"><input type="checkbox" checked> Masked emergency call (IVR)</div>
+                <div class="chk-row"><input type="checkbox" checked> SMS alert with GPS coordinates</div>
+              </div>
+              <div class="wiz-pane" id="wiz-pane-4">
+                <div class="success-wrap">
+                  <div class="success-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+                  <h2 class="serif" style="font-size:21px;margin-bottom:8px;">Tag Successfully Activated!</h2>
+                  <p style="font-size:13px;color:var(--ink-soft);max-width:400px;margin:0 auto;">Your sticker is now live on your dashboard. Test it anytime with "Simulate Scan."</p>
+                </div>
+              </div>
+            </div>
+            <div class="wiz-foot">
+              <button class="btn btn-ghost" id="wiz-prev" disabled>Back</button>
+              <button class="btn btn-primary" id="wiz-next">Next Step</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== CATALOG ===== -->
+      <section class="view" id="view-catalog">
+        <div class="view-head">
+          <div><h1 class="view-title serif">Product Catalog & Pre-orders</h1><p class="view-sub">Expand your family's safety network with upcoming products.</p></div>
+        </div>
+        <div class="catalog-grid" id="catalog-grid"></div>
+      </section>
+
+      <!-- ===== HISTORY ===== -->
+      <section class="view" id="view-history">
+        <div class="view-head">
+          <div><h1 class="view-title serif">Emergency & Activity History</h1><p class="view-sub">Every scan and alert, across all your tags.</p></div>
+          <button class="btn btn-ghost" onclick="clearHistory()">Clear All Logs</button>
+        </div>
+        <div class="timeline-wrap" id="history-timeline"></div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ===== PRODUCT DRAWER ===== -->
+<div class="drawer-overlay" id="drawer-overlay"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <h3 id="dr-title">Product</h3>
+    <button class="drawer-close" onclick="closeDrawer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+  </div>
+  <div class="drawer-body" id="dr-body"></div>
+</aside>
+
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+  <span id="toast-text">Done</span>
+</div>
+
+<script>
+// ==================== STATE ====================
+let products = [
+  { id:'p1', code:'NQ-CAR-9081', category:'car', nickname:'Mahindra Thar', assigned:'Self (Rahul)', status:'Active', scans:14, lastScan:'Today, 10:45 AM',
+    meta:[['License Plate','DL 3C AM 4492'],['Model','Thar LX Diesel']],
+    docs:[['RC Certificate','valid'],['Insurance','valid'],['PUC Certificate','soon'],['Driving Licence','valid']],
+    contacts:[['Karan Sharma','+91 98765 43210'],['Asha Sharma','+91 99988 77766']],
+    timeline:[['alert','Wrong Parking Scan','Today, 10:45 AM','Bystander scanned sticker at Block E, CP.'],['success','AI Crash Assist Armed','28 Jun 2026','Sensors calibrated and active.']] },
+  { id:'p2', code:'NQ-BIKE-3302', category:'bike', nickname:'Daily Activa', assigned:'Wife (Asha)', status:'Active', scans:8, lastScan:'Yesterday, 3:20 PM',
+    meta:[['Plate','DL 9S BA 7781'],['Model','Honda Activa 6G']],
+    docs:[['Insurance','valid'],['PUC Certificate','expired']],
+    contacts:[['Rahul Sharma','+91 98112 33445']],
+    timeline:[['info','Sticker Scanned','Yesterday, 3:20 PM','Scanned at Nehru Place Parking Lot.']] },
+  { id:'p3', code:'NQ-GATE-1004', category:'gate', nickname:'Main Gate · Flat 402', assigned:'Self (Rahul)', status:'Active', scans:23, lastScan:'2 days ago',
+    meta:[['Location','Green Heights Apt'],['Availability','Away — notify security']],
+    docs:[],
+    contacts:[['Rahul Sharma','+91 98112 33445'],['Asha Sharma','+91 99988 77766']],
+    timeline:[['info','Courier Scanned QR','29 Jun 2026','Delivery reported Courier Waiting alert.'],['alert','Security Alert Triggered','27 Jun 2026','Visitor triggered urgent status check.']] },
+  { id:'p4', code:'NQ-LUGG-7741', category:'luggage', nickname:'Samsonite Cabin Bag', assigned:'Self (Rahul)', status:'Active', scans:2, lastScan:'3 days ago',
+    meta:[['Travel Mode','In Transit'],['Flight','AI-161 (DEL–LHR)']],
+    docs:[],
+    contacts:[['Rahul Sharma','+91 98112 33445']],
+    timeline:[['success','Luggage Scanned','28 Jun 2026','Registered at Heathrow T5 tracking.']] },
+  { id:'p5', code:'NQ-KEY-5592', category:'keychain', nickname:"Father's Keychain", assigned:'Father (Karan)', status:'Active', scans:0, lastScan:'Never scanned',
+    meta:[['Blood Group','O+'],['Medical Note','Hypertension, daily medication']],
+    docs:[],
+    contacts:[['Rahul Sharma','+91 98112 33445']],
+    timeline:[['success','Keychain Registered','15 Jun 2026','Linked to emergency medical profile.']] },
+  { id:'p6', code:'NQ-BAG-2009', category:'school_bag', nickname:"Aryan's School Bag", assigned:'Son (Aryan)', status:'Active', scans:35, lastScan:'4 hours ago',
+    meta:[['School','Ryan International, Sector C'],['Bus Route','#12-B · Mr. Amit']],
+    docs:[],
+    contacts:[['Rahul Sharma','+91 98112 33445'],['Asha Sharma','+91 99988 77766']],
+    timeline:[['success','Bus Pick-up Scanned','Today, 4:20 PM','Aryan safely boarded bus 12-B.'],['success','Arrival at School Scanned','Today, 8:15 AM','Sticker verified at school gate.']] },
+];
+const catIcons = { car:'🚗', bike:'🏍️', gate:'🏡', luggage:'🧳', keychain:'🔑', school_bag:'🎒' };
+const catLabels = { car:'Vehicle Sticker', bike:'Two-Wheeler Sticker', gate:'Home Gate Sticker', luggage:'Luggage Sticker', keychain:'Emergency Keychain', school_bag:'School Bag Tag' };
+let activeProductId = null;
+let wizStep = 1;
+let wizCategory = 'car';
+
+// ==================== NAV / VIEW SWITCH ====================
+document.querySelectorAll('.sb-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchView(btn.getAttribute('data-view')));
+});
+function switchView(name){
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.querySelectorAll('.sb-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-view') === name));
+  if(name === 'history') renderHistory();
+  document.getElementById('sidebar').classList.remove('open');
+}
+document.getElementById('hamburger-mob').addEventListener('click', () => document.getElementById('sidebar').classList.toggle('open'));
+
+// ==================== PRODUCT GRID ====================
+function renderProducts(){
+  const grid = document.getElementById('product-grid');
+  grid.innerHTML = products.map(p => `
+    <div class="p-card">
+      <div class="p-peel"></div>
+      <div class="p-top">
+        <div class="p-icon-title">
+          <div class="p-icon">${catIcons[p.category]}</div>
+          <div><div class="p-name serif">${p.nickname}</div><div class="p-sub">${catLabels[p.category]}</div></div>
+        </div>
+        <span class="p-status ${p.status.toLowerCase()}">${p.status}</span>
+      </div>
+      <div class="p-meta">
+        ${p.meta.map(m => `<div class="p-meta-row"><span class="p-meta-label">${m[0]}</span><span class="p-meta-val">${m[1]}</span></div>`).join('')}
+        <div class="p-meta-row"><span class="p-meta-label">Total Scans</span><span class="p-meta-val">${p.scans}</span></div>
+        <div class="p-meta-row"><span class="p-meta-label">Last Scan</span><span class="p-meta-val">${p.lastScan}</span></div>
+      </div>
+      <div class="p-actions">
+        <button class="p-btn p-btn-manage" onclick="openDrawer('${p.id}')">Manage</button>
+        <button class="p-btn p-btn-scan" onclick="simulateScan('${p.id}')">Simulate Scan</button>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('stat-active').textContent = products.filter(p => p.status === 'Active').length;
+  document.getElementById('hd-active-count').textContent = products.filter(p => p.status === 'Active').length;
+  document.getElementById('stat-scans').textContent = products.reduce((s,p) => s + p.scans, 0);
+}
+renderProducts();
+
+// ==================== DRAWER ====================
+function openDrawer(id){
+  const p = products.find(x => x.id === id);
+  if(!p) return;
+  activeProductId = id;
+  document.getElementById('dr-title').textContent = p.nickname;
+  const docsHTML = p.docs.length ? `
+    <div class="dr-card">
+      <h4>Documents</h4>
+      ${p.docs.map(d => `<div class="dr-doc-row"><span class="dr-doc-name">${d[0]}</span><span class="dr-doc-pill ${d[1]}">${d[1]==='valid'?'Valid':d[1]==='soon'?'Expiring Soon':'Expired'}</span></div>`).join('')}
+    </div>` : '';
+  document.getElementById('dr-body').innerHTML = `
+    <div class="dr-card" style="text-align:center;">
+      <div class="dr-qr-box">
+        <svg viewBox="0 0 120 120" style="width:100%;height:100%;">
+          <rect x="5" y="5" width="26" height="26" rx="4" fill="none" stroke="#201C15" stroke-width="6"/><rect x="11" y="11" width="14" height="14" rx="2" fill="#201C15"/>
+          <rect x="89" y="5" width="26" height="26" rx="4" fill="none" stroke="#201C15" stroke-width="6"/><rect x="95" y="11" width="14" height="14" rx="2" fill="#201C15"/>
+          <rect x="5" y="89" width="26" height="26" rx="4" fill="none" stroke="#201C15" stroke-width="6"/><rect x="11" y="95" width="14" height="14" rx="2" fill="#201C15"/>
+          <rect x="42" y="10" width="8" height="8" fill="#201C15"/><rect x="62" y="15" width="12" height="6" fill="#201C15"/><rect x="42" y="28" width="6" height="12" fill="#201C15"/>
+          <rect x="10" y="42" width="12" height="8" fill="#201C15"/><rect x="28" y="48" width="8" height="12" fill="#201C15"/><rect x="74" y="54" width="6" height="18" fill="#201C15"/>
+          <rect x="92" y="44" width="16" height="8" fill="#201C15"/><rect x="42" y="86" width="12" height="8" fill="#201C15"/><rect x="64" y="92" width="8" height="16" fill="#201C15"/>
+          <rect x="36" y="44" width="48" height="32" rx="6" fill="#E25822"/><text x="60" y="64" fill="#fff" font-family="Inter" font-size="9" font-weight="800" text-anchor="middle">NamoQR</text>
+        </svg>
+      </div>
+      <div class="dr-qr-actions">
+        <button class="btn-ghost" style="background:var(--cream);" onclick="simulateScan('${p.id}')">🚀 Simulate Scan</button>
+        <button class="btn-ghost" style="background:var(--cream);" onclick="shareProfile('${p.id}')">📤 Share Profile</button>
+      </div>
+    </div>
+    <div class="dr-stat-grid" style="margin-bottom:16px;">
+      <div class="dr-stat"><b>${p.scans}</b><span>Total Scans</span></div>
+      <div class="dr-stat"><b>${p.status === 'Active' ? '95%' : '0%'}</b><span>Readiness</span></div>
+    </div>
+    ${docsHTML}
+    <div class="dr-card">
+      <h4>Emergency Contacts</h4>
+      ${p.contacts.map(c => `<div class="dr-contact"><span class="dr-contact-name">${c[0]}</span><span class="dr-contact-phone">${c[1]}</span></div>`).join('')}
+    </div>
+    <div class="dr-card">
+      <h4>Status Control</h4>
+      <select class="field" style="padding:11px 13px;border-radius:10px;border:1px solid var(--line);background:var(--cream);font-size:13px;width:100%;" onchange="changeStatus('${p.id}', this.value)">
+        <option ${p.status==='Active'?'selected':''}>Active</option>
+        <option ${p.status==='Suspended'?'selected':''}>Suspended</option>
+        <option ${p.status==='Lost'?'selected':''}>Lost</option>
+        <option ${p.status==='Replaced'?'selected':''}>Replaced</option>
+      </select>
+    </div>
+    <div class="dr-card">
+      <h4>Activity Timeline</h4>
+      ${p.timeline.map(t => `<div class="tl-item"><div class="tl-badge ${t[0]}">${t[0]==='alert'?'⚠️':t[0]==='success'?'🛡️':'🔍'}</div><div class="tl-body"><div class="tl-row"><span class="tl-title">${t[1]}</span><span class="tl-time">${t[2]}</span></div><div class="tl-desc">${t[3]}</div></div></div>`).join('') || '<p style="font-size:12px;color:var(--ink-soft);">No activity yet.</p>'}
+    </div>
+  `;
+  document.getElementById('drawer').classList.add('show');
+  document.getElementById('drawer-overlay').classList.add('show');
+}
+function closeDrawer(){
+  document.getElementById('drawer').classList.remove('show');
+  document.getElementById('drawer-overlay').classList.remove('show');
+}
+document.getElementById('drawer-overlay').addEventListener('click', closeDrawer);
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeDrawer(); });
+
+function changeStatus(id, status){
+  const p = products.find(x => x.id === id);
+  p.status = status;
+  renderProducts();
+  showToast(`Status updated to ${status}`);
+}
+function shareProfile(id){
+  const p = products.find(x => x.id === id);
+  showToast(`Safety link copied: namoqr.com/verify/${p.code}`);
+}
+
+// ==================== SIMULATE SCAN ====================
+function simulateScan(id){
+  const p = products.find(x => x.id === id);
+  if(!p) return;
+  p.scans += 1;
+  p.lastScan = 'Just now';
+  p.timeline.unshift(['alert', 'Simulated Scan Triggered', 'Just now', 'A test scan was triggered from the dashboard.']);
+  renderProducts();
+  if(document.getElementById('drawer').classList.contains('show') && activeProductId === id) openDrawer(id);
+  showToast(`Scan simulated on ${p.nickname}`);
+}
+
+// ==================== CATALOG ====================
+const catalogItems = [
+  { icon:'🐶', name:'NamoQR Pet Tag', desc:'Vet details & instant finder calling for pets.' },
+  { icon:'💳', name:'NamoQR Wallet Card', desc:'Credit-card sized emergency profile tag.' },
+  { icon:'🪪', name:'Employee ID Badge', desc:'Security & medical access badge for staff.' },
+  { icon:'👵', name:'Senior Citizen Wristband', desc:'Medical notes & GPS tracing, hypoallergenic.' },
+  { icon:'🪖', name:'Smart Helmet Tag', desc:'Crash-assisted tag for motorsport helmets.' },
+  { icon:'🏢', name:'Office Door Sticker', desc:'Alert managers when reception is unstaffed.' },
+];
+document.getElementById('catalog-grid').innerHTML = catalogItems.map(c => `
+  <div class="cat-card">
+    <div class="cat-top"><div class="cat-icon">${c.icon}</div><span class="cat-tag">Pre-order</span></div>
+    <h4 class="serif">${c.name}</h4>
+    <p>${c.desc}</p>
+    <button class="cat-btn" onclick="showToast('${c.name} pre-order registered!')">Pre-order · ₹299</button>
+  </div>
+`).join('');
+
+// ==================== HISTORY ====================
+function renderHistory(){
+  const holder = document.getElementById('history-timeline');
+  let logs = [];
+  products.forEach(p => p.timeline.forEach(t => logs.push({...t, nickname:p.nickname, code:p.code})));
+  if(!logs.length){
+    holder.innerHTML = `<div class="empty-state"><div class="empty-icon">🛡️</div><h3 class="serif">All clear</h3><p>No security logs recorded yet. Your family's network is quiet.</p></div>`;
+    return;
+  }
+  holder.innerHTML = logs.map(l => `
+    <div class="tl-item">
+      <div class="tl-badge ${l[0]}">${l[0]==='alert'?'⚠️':l[0]==='success'?'🛡️':'🔍'}</div>
+      <div class="tl-body">
+        <div class="tl-row"><span class="tl-title">${l.nickname} — ${l[1]}</span><span class="tl-time">${l[2]}</span></div>
+        <div class="tl-desc">${l[3]}<span class="tl-code">[${l.code}]</span></div>
+      </div>
+    </div>
+  `).join('');
+}
+function clearHistory(){
+  products.forEach(p => p.timeline = []);
+  renderHistory();
+  showToast('All security logs cleared');
+}
+
+// ==================== NOTIFICATIONS ====================
+document.getElementById('notif-btn').addEventListener('click', () => {
+  document.getElementById('notif-badge').style.display = 'none';
+  showToast('2 new alerts — Wrong Parking, Courier Arrived');
+});
+
+// ==================== TOAST ====================
+function showToast(msg){
+  const t = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window._tt);
+  window._tt = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ==================== ACTIVATION WIZARD ====================
+const catOptions = [
+  {v:'car', icon:'🚗', name:'Car Sticker'}, {v:'bike', icon:'🏍️', name:'Bike Sticker'}, {v:'gate', icon:'🏡', name:'Home Gate'},
+  {v:'luggage', icon:'🧳', name:'Luggage Tag'}, {v:'keychain', icon:'🔑', name:'SOS Keychain'}, {v:'school_bag', icon:'🎒', name:'School Bag'},
+];
+document.getElementById('cat-pick-grid').innerHTML = catOptions.map((c,i) => `
+  <label class="cat-pick">
+    <input type="radio" name="wiz-cat" value="${c.v}" ${i===0?'checked':''} onchange="wizCategory='${c.v}'">
+    <div class="cat-pick-inner"><div class="cat-pick-icon">${c.icon}</div><div class="cat-pick-name">${c.name}</div></div>
+  </label>
+`).join('');
+
+function autoScan(){
+  const codes = ['NQ-AUTO-8812','NQ-GATE-9051','NQ-KIDS-3392','NQ-LUGG-1188','NQ-BIKE-2900'];
+  document.getElementById('wiz-code').value = codes[Math.floor(Math.random()*codes.length)];
+  showToast('Sticker QR authenticated!');
+}
+
+document.getElementById('wiz-next').addEventListener('click', () => {
+  if(wizStep === 1 && document.getElementById('wiz-code').value.trim().length < 5){
+    showToast('Please enter a valid product code');
+    return;
+  }
+  if(wizStep < 4){
+    goToStep(wizStep + 1);
+  } else {
+    // finish: add product
+    const newP = {
+      id:'p'+Date.now(), code:document.getElementById('wiz-code').value.trim(), category:wizCategory,
+      nickname: catOptions.find(c=>c.v===wizCategory).name, assigned:'Self (Rahul)', status:'Active', scans:0, lastScan:'Never scanned',
+      meta:[['Registered','Just now']], docs:[], contacts:[[document.getElementById('wiz-contact-name').value, document.getElementById('wiz-contact-phone').value]],
+      timeline:[['success','Activation Success','Just now','Sticker activated and linked.']]
+    };
+    products.unshift(newP);
+    renderProducts();
+    showToast(`${newP.nickname} activated successfully!`);
+    goToStep(1);
+    document.getElementById('wiz-code').value = 'NQ-AUTO-' + Math.floor(1000+Math.random()*9000);
+    switchView('overview');
+  }
+});
+document.getElementById('wiz-prev').addEventListener('click', () => { if(wizStep > 1) goToStep(wizStep - 1); });
+
+function goToStep(n){
+  wizStep = n;
+  document.querySelectorAll('.wiz-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('wiz-pane-' + n).classList.add('active');
+  document.querySelectorAll('.wiz-step').forEach((s,i) => {
+    s.classList.remove('active','done');
+    if(i+1 === n) s.classList.add('active'); else if(i+1 < n) s.classList.add('done');
+  });
+  document.getElementById('wiz-step-num').textContent = n;
+  document.getElementById('wiz-prev').disabled = (n === 1);
+  document.getElementById('wiz-next').textContent = n === 4 ? 'Go to Dashboard' : (n === 3 ? 'Activate Tag' : 'Next Step');
+}
+</script>
+
+</body>
+</html>

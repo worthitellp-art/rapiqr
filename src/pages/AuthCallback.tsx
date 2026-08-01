@@ -12,45 +12,46 @@ export default function AuthCallback({ onSuccess }: { onSuccess?: () => void }) 
 
     const handleCallback = async () => {
       try {
-      // 1) Attempt to get the session — with detectSessionInUrl:true,
-      //    the Supabase client auto-detects the PKCE code / access_token
-      //    from the URL during initialization on page load.
-      const { data, error: sessionError } = await supabase.auth.getSession();
-
-        if (sessionError) throw sessionError;
-
-        if (data?.session) {
+        // 1) Check existing session first
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session) {
           finish();
           return;
         }
 
-        // 2) No session yet — try explicit PKCE code exchange.
-        //    Supabase v2+ attaches the code in the URL after the OAuth flow.
-        const currentUrl = window.location.href;
-        const hasCode = currentUrl.includes('code=') || currentUrl.includes('access_token=');
+        // 2) Listen for auth state change
+        const { data: authListener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+          if (newSession) {
+            authListener.subscription.unsubscribe();
+            finish();
+          }
+        });
 
-        if (hasCode) {
-          const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(currentUrl);
-          if (exchangeErr) throw exchangeErr;
+        // 3) Try explicit PKCE code exchange if ?code= parameter is in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
 
-          // Re-check session after exchange
-          const retry = await supabase.auth.getSession();
-          if (retry.data?.session) {
+        if (code) {
+          const { data: exchangeData, error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
+          if (!exchangeErr && exchangeData?.session) {
+            authListener.subscription.unsubscribe();
             finish();
             return;
           }
         }
 
-        // 3) Still nothing — the callback URL may have been consumed already
-        //    or the OAuth flow didn't complete. Redirect to home; the main
-        //    AuthProvider will pick up any persisted session.
-        if (!cancelled) {
+        // 4) Check again after short delay
+        setTimeout(async () => {
+          if (cancelled) return;
+          const retry = await supabase.auth.getSession();
+          authListener.subscription.unsubscribe();
           finish();
-        }
+        }, 1200);
+
       } catch (err: any) {
         if (!cancelled) {
-          setStatus('error');
-          setError(err.message || 'Authentication failed. Please try again.');
+          console.warn('OAuth Callback Error:', err);
+          finish();
         }
       }
     };
@@ -58,10 +59,13 @@ export default function AuthCallback({ onSuccess }: { onSuccess?: () => void }) 
     function finish() {
       if (cancelled) return;
       setStatus('success');
-      // Remove OAuth params from the URL so the main app doesn't re-parse them
-      window.history.replaceState({}, document.title, window.location.pathname);
-      if (onSuccess) onSuccess();
-      else window.location.href = window.location.origin;
+      // Clean up URL pathname away from /auth/callback to root '/' so App router advances
+      window.history.replaceState({}, document.title, '/');
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        window.location.href = window.location.origin;
+      }
     }
 
     handleCallback();

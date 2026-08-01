@@ -417,12 +417,6 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
       return;
     }
 
-    const storedCode = qrData.activationCode;
-    if (!storedCode) {
-      setActivationError("No activation code set for this sticker. Contact the admin.");
-      return;
-    }
-
     const entered = activationCodeInput.trim().toUpperCase();
     if (!entered) {
       setActivationError("Please enter your activation code.");
@@ -929,67 +923,121 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                   </div>
                 </div>
 
-                {/* Single Activation Form: Name + Phone Number */}
+                {/* Single Activation Form: Name + Phone Number + OTP Verification */}
                 <div className="mt-6 space-y-4">
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Full Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={regName}
-                      onChange={(e) => { setRegName(e.target.value); setActivationError(null); }}
-                      placeholder="Enter your full name"
-                      className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-semibold"
-                    />
-                  </div>
+                  {!otpStep ? (
+                    <>
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Full Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={regName}
+                          onChange={(e) => { setRegName(e.target.value); setActivationError(null); }}
+                          placeholder="Enter your full name"
+                          className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-semibold"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Phone Number *
-                    </label>
-                    <div className="flex gap-2">
-                      <select
-                        value={regCountry}
-                        onChange={(e) => { setRegCountry(e.target.value); setActivationError(null); }}
-                        title="Country dial code"
-                        className="h-12 w-24 flex-shrink-0 rounded-xl border border-slate-200 px-2 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-bold bg-white"
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Phone Number *
+                        </label>
+                        <div className="flex gap-2">
+                          <select
+                            value={regCountry}
+                            onChange={(e) => { setRegCountry(e.target.value); setActivationError(null); }}
+                            title="Country dial code"
+                            className="h-12 w-24 flex-shrink-0 rounded-xl border border-slate-200 px-2 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-bold bg-white"
+                          >
+                            {ACTIVATION_COUNTRIES.map((c) => (
+                              <option key={`${c.code}-${c.name}`} value={c.code}>{c.code}</option>
+                            ))}
+                          </select>
+                          <input
+                            type="tel"
+                            value={regPhone}
+                            onChange={(e) => { setRegPhone(e.target.value); setActivationError(null); }}
+                            placeholder="98765 43210"
+                            className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-mono font-semibold"
+                          />
+                        </div>
+                      </div>
+
+                      {activationError && (
+                        <p className="flex items-center gap-1 text-[11px] font-semibold text-red-500">
+                          <AlertTriangle size={12} />
+                          {activationError}
+                        </p>
+                      )}
+
+                      <button
+                        onClick={handleActivateNow}
+                        className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 text-white font-bold shadow-md transition-all hover:scale-[1.02] active:scale-100 cursor-pointer text-xs"
                       >
-                        {ACTIVATION_COUNTRIES.map((c) => (
-                          <option key={`${c.code}-${c.name}`} value={c.code}>{c.code}</option>
-                        ))}
-                      </select>
-                      <input
-                        type="tel"
-                        value={regPhone}
-                        onChange={(e) => { setRegPhone(e.target.value); setActivationError(null); }}
-                        placeholder="98765 43210"
-                        className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-mono font-semibold"
-                      />
+                        <Send size={15} /> Send OTP &amp; Verify Activation Code
+                      </button>
+                    </>
+                  ) : (
+                    /* OTP VERIFICATION STEP */
+                    <div className="space-y-4 bg-slate-50 border border-slate-200 rounded-2xl p-4 animate-fade-in text-left">
+                      <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
+                        <CheckCircle2 size={16} />
+                        <span>OTP &amp; Activation Code Check</span>
+                      </div>
+                      <p className="text-xs text-slate-600">
+                        Enter the 6-digit OTP sent to <strong className="font-mono text-slate-900">{regCountry} {regPhone}</strong> to verify your phone number and activate QR code <strong className="font-mono text-amber-600">{qrData.activationCode || qrData.id}</strong>.
+                      </p>
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-[11px] text-amber-800 font-semibold flex items-center justify-between">
+                        <span>Test OTP Code:</span>
+                        <span className="font-mono font-extrabold text-xs tracking-widest bg-amber-200/80 px-2 py-0.5 rounded">123456</span>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-slate-700">Enter 6-Digit OTP *</label>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={otpInput}
+                          onChange={(e) => { setOtpInput(e.target.value); setActivationError(null); }}
+                          placeholder="123456"
+                          className="h-12 w-full rounded-xl border border-slate-300 px-4 text-center font-mono text-lg font-bold tracking-widest outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 bg-white"
+                        />
+                      </div>
+
+                      {activationError && (
+                        <p className="flex items-center gap-1 text-[11px] font-semibold text-red-500">
+                          <AlertTriangle size={12} />
+                          {activationError}
+                        </p>
+                      )}
+
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setOtpStep(false)}
+                          className="px-4 h-11 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 cursor-pointer"
+                        >
+                          Back
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleVerifyOtpAndActivate}
+                          disabled={activatingQr}
+                          className="flex-1 h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {activatingQr ? (
+                            <>
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                              <span>Activating…</span>
+                            </>
+                          ) : (
+                            <><ShieldCheck size={16} /> Verify OTP &amp; Activate Sticker</>
+                          )}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-
-                  {activationError && (
-                    <p className="flex items-center gap-1 text-[11px] font-semibold text-red-500">
-                      <AlertTriangle size={12} />
-                      {activationError}
-                    </p>
                   )}
-
-                  <button
-                    onClick={handleRegisterSubmit}
-                    disabled={activatingQr}
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 text-white font-bold shadow-md transition-all hover:scale-[1.02] active:scale-100 cursor-pointer disabled:opacity-50 disabled:hover:scale-100 text-xs"
-                  >
-                    {activatingQr ? (
-                      <>
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        <span>Activating…</span>
-                      </>
-                    ) : (
-                      <><ShieldCheck size={16} /> Activate Sticker</>
-                    )}
-                  </button>
                 </div>
 
 

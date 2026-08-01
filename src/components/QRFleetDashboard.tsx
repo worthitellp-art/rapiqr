@@ -209,7 +209,7 @@ const FONT_OPTIONS = [
 
 const NAV_ITEMS = [
   { id: "overview", label: "Dashboard", icon: LayoutGrid },
-  { id: "qr", label: "QR Codes", icon: QrCode },
+  { id: "qr", label: "QR Codes", icon: Plus },
   { id: "communication", label: "Communication", icon: PhoneCall },
   { id: "alerts", label: "Alerts", icon: Bell },
   { id: "users", label: "Team", icon: Users },

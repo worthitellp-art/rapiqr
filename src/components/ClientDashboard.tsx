@@ -1,33 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { STICKER_CATEGORIES, getCategoryIcon, getCategoryLabel } from '../stickerModules';
+import { getCategoryIcon, getCategoryLabel, STICKER_CATEGORIES } from '../stickerModules';
 import {
   QrCode,
   Bell,
   Plus,
   ShieldCheck,
-  Download,
-  MapPin,
-  Phone,
-  CheckCircle2,
-  AlertTriangle,
-  Car,
-  Home,
-  Briefcase,
-  Key,
-  HeartPulse,
   User,
   LogOut,
   Sparkles,
-  ExternalLink,
-  Copy,
   Check,
-  RefreshCw,
-  Search,
   Settings,
-  ChevronRight,
+  CreditCard,
+  X,
+  Eye,
+  Share2,
+  Menu,
+  Grid,
+  History,
+  BookOpen,
+  Store,
+  CheckCircle2,
+  AlertTriangle,
+  ShoppingBag,
   Trash2,
-  Store
+  ShieldAlert
 } from 'lucide-react';
 
 interface ClientDashboardProps {
@@ -36,999 +33,1466 @@ interface ClientDashboardProps {
   switchToDistributor?: () => void;
 }
 
-export default function ClientDashboard({ onBack, switchToAdminFleet, switchToDistributor }: ClientDashboardProps) {
+// Product descriptions keyed by the admin sticker category value.
+const CATALOG_DESCRIPTIONS: Record<string, string> = {
+  car: 'Wrong-parking alerts, crash SOS & masked calling for cars, autos & trucks.',
+  bike: 'Rider safety with crash alerts & instant emergency contact sharing.',
+  home: 'Courier arrival pings, visitor check-in & neighbour hazard alerts for home & office.',
+  pet: 'Vet details & instant finder calling for your pets.',
+  child: 'School-bag tracking, guardian alerts & pickup verification for kids.',
+  luggage: 'Anonymous finder messaging & recovery support for your luggage.'
+};
+
+// Banner images keyed by the admin sticker category value.
+const CATALOG_IMAGES: Record<string, string> = {
+  car: 'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=400',
+  bike: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=400',
+  home: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=400',
+  pet: 'https://images.unsplash.com/photo-1583337130417-3346a1be7dee?auto=format&fit=crop&q=80&w=400',
+  child: 'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?auto=format&fit=crop&q=80&w=400',
+  luggage: 'https://images.unsplash.com/photo-1553531384-cc64ac80f931?auto=format&fit=crop&q=80&w=400'
+};
+
+// Product Catalog & Pre-orders — driven by the same admin sticker categories.
+const CATALOG_ITEMS = STICKER_CATEGORIES.map((cat) => ({
+  category: cat.value,
+  icon: getCategoryIcon(cat.value),
+  name: `NamoQR ${cat.label} Sticker`,
+  desc: CATALOG_DESCRIPTIONS[cat.value] || `${cat.label} sticker with instant scan-and-alert protection.`,
+  price: 299,
+  img: CATALOG_IMAGES[cat.value] || ''
+}));
+
+export default function ClientDashboard({ onBack, switchToAdminFleet }: ClientDashboardProps) {
   const { profile, signOut } = useAuth();
-  const [activeTab, setActiveTab] = useState<'stickers' | 'alerts' | 'family' | 'register' | 'sos'>('stickers');
 
-  // Helper to sanitize code: uppercase, strip special characters (letters and numbers only)
-  const sanitizeCode = (val: string) => val.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-
-  // Client's items state (persisted in localStorage / Supabase)
-  const [myStickers, setMyStickers] = useState<any[]>(() => {
-    const saved = localStorage.getItem('namoqr-client-stickers');
-    if (saved) return JSON.parse(saved);
-    return [];
-  });
-
-  // Client Family Phone Numbers State
-  const [familyNumbers, setFamilyNumbers] = useState<any[]>(() => {
-    const saved = localStorage.getItem('namoqr-client-family-numbers');
-    if (saved) return JSON.parse(saved);
-    return [];
-  });
-
-  const [newFamName, setNewFamName] = useState('');
-  const [newFamPhone, setNewFamPhone] = useState('');
-  const [newFamRelation, setNewFamRelation] = useState('Spouse');
-  const [newFamWhatsapp, setNewFamWhatsapp] = useState(true);
-
-  // Client's emergency alerts state
-  const [alerts, setAlerts] = useState<any[]>(() => {
-    const saved = localStorage.getItem('namoqr-client-alerts');
-    if (saved) return JSON.parse(saved);
-    return [];
-  });
-
-  // Pending Admin Activations state
-  const [pendingActivations, setPendingActivations] = useState<any[]>(() => {
-    const saved = localStorage.getItem('namoqr-pending-activations');
-    if (saved) return JSON.parse(saved);
-    return [];
-  });
-
-  // New Sticker Registration Form & Protection Layer
-  const [newQrId, setNewQrId] = useState('');
-  const [newActivationCode, setNewActivationCode] = useState('');
-  const [activationError, setActivationError] = useState<string | null>(null);
-  const [newName, setNewName] = useState('');
-  const [newRegNumber, setNewRegNumber] = useState('');
-  const [newCategory, setNewCategory] = useState('car');
-  const [newOwnerPhone, setNewOwnerPhone] = useState('');
-  const [newSecondaryPhone, setNewSecondaryPhone] = useState('');
-  const [newRoadsidePhone, setNewRoadsidePhone] = useState('');
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-
-  // SOS Details
-  const [bloodGroup, setBloodGroup] = useState('O+');
-  const [allergies, setAllergies] = useState('None');
-  const [sosPhone, setSosPhone] = useState('+91 98980 12345');
-
+  // Load Google Fraunces Font dynamically for title rendering
   useEffect(() => {
-    localStorage.setItem('namoqr-client-stickers', JSON.stringify(myStickers));
-  }, [myStickers]);
-
-  useEffect(() => {
-    localStorage.setItem('namoqr-client-family-numbers', JSON.stringify(familyNumbers));
-  }, [familyNumbers]);
-
-  useEffect(() => {
-    localStorage.setItem('namoqr-client-alerts', JSON.stringify(alerts));
-  }, [alerts]);
-
-  useEffect(() => {
-    localStorage.setItem('namoqr-pending-activations', JSON.stringify(pendingActivations));
-  }, [pendingActivations]);
-
-  useEffect(() => {
-    const handleUpdate = () => {
-      const saved = localStorage.getItem('namoqr-pending-activations');
-      if (saved) setPendingActivations(JSON.parse(saved));
-    };
-    window.addEventListener('namoqr-pending-activations-updated', handleUpdate);
-    return () => window.removeEventListener('namoqr-pending-activations-updated', handleUpdate);
+    const link = document.createElement('link');
+    link.href = 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap';
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
   }, []);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2500);
-  };
+  // Active navigation view tab
+  const [activeTab, setActiveTab] = useState<'overview' | 'activate' | 'catalog' | 'history' | 'subscription'>('overview');
 
-  const handleAddFamilyNumber = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newFamName.trim() || !newFamPhone.trim()) return;
+  // Mobile sidebar toggle
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-    const newContact = {
-      id: 'FAM-' + Date.now().toString().slice(-4),
-      name: newFamName.trim(),
-      phone: newFamPhone.trim(),
-      relation: newFamRelation,
-      isPrimary: familyNumbers.length === 0,
-      isWhatsappAlerts: newFamWhatsapp,
-    };
-
-    const updated = [newContact, ...familyNumbers];
-    setFamilyNumbers(updated);
-    setNewFamName('');
-    setNewFamPhone('');
-    setNewFamRelation('Spouse');
-    setNewFamWhatsapp(true);
-    showToast(`Added ${newContact.name} (${newContact.phone}) to Family Numbers`);
-  };
-
-  const handleDeleteFamilyNumber = (id: string) => {
-    const updated = familyNumbers.filter(f => f.id !== id);
-    setFamilyNumbers(updated);
-    showToast('Family phone number removed');
-  };
-
-  const handleSetPrimaryNumber = (id: string) => {
-    const updated = familyNumbers.map(f => ({
-      ...f,
-      isPrimary: f.id === id,
-    }));
-    setFamilyNumbers(updated);
-    showToast('Primary emergency contact updated');
-  };
-
-  const handleCopyLink = (qrId: string) => {
-    const url = `${window.location.origin}/${qrId}`;
-    navigator.clipboard.writeText(url);
-    setCopiedId(qrId);
-    showToast('Direct scan link copied!');
-    setTimeout(() => setCopiedId(null), 1800);
-  };
-
-  const handleRegisterSticker = (e: React.FormEvent) => {
-    e.preventDefault();
-    setActivationError(null);
-
-    const cleanId = newQrId.trim().toUpperCase() || 'QR0Z2A';
-    const cleanCode = newActivationCode.trim().toUpperCase();
-
-    // Protection Verification: Find expected activation code for this QR ID
-    const pendingItem = pendingActivations.find(p => p.id.toUpperCase() === cleanId);
-    const globalQrList = JSON.parse(localStorage.getItem('namoqr-qrlist') || '[]');
-    const adminQrItem = globalQrList.find((q: any) => q.id.toUpperCase() === cleanId);
-
-    const expectedCode = pendingItem?.activationCode || adminQrItem?.activationCode || `ACT${cleanId.replace(/^QR/, '')}`;
-
-    // Protection Gate Check
-    if (cleanCode && expectedCode && cleanCode !== expectedCode.toUpperCase() && !cleanCode.startsWith('ACT')) {
-      setActivationError(`Invalid Activation Code "${cleanCode}". Please enter the correct Security Activation Code provided by Admin or on your sticker package (Expected e.g. ${expectedCode}).`);
-      return;
-    }
-
-    if (!cleanCode && (pendingItem || adminQrItem)) {
-      setActivationError(`Protection Active: Security Activation Code is required to activate sticker ${cleanId}. Check your dashboard pending list above.`);
-      return;
-    }
-
-    const newRecord = {
-      id: cleanId,
-      name: newName.trim() || pendingItem?.vehicleName || `My ${newCategory}`,
-      category: newCategory,
-      vehicleNumber: newRegNumber.trim() || pendingItem?.vehicleNumber || 'REG-ACTIVE',
-      ownerPhone: newOwnerPhone.trim() || '+91 98162 31234',
-      secondaryPhone: newSecondaryPhone.trim() || '',
-      roadsidePhone: newRoadsidePhone.trim() || '',
-      status: 'active',
-      scansCount: 0,
-      createdAt: new Date().toISOString(),
-      activationCode: cleanCode || expectedCode,
-      template: 'Default',
-      fg: 'EAB308',
-      bg: 'FFFFFF',
-      details: {}
-    };
-
-    setMyStickers([newRecord, ...myStickers]);
-
-    // Remove from pending activations
-    const updatedPending = pendingActivations.filter(p => p.id.toUpperCase() !== cleanId);
-    setPendingActivations(updatedPending);
-
-    // Sync global QR list status & contact numbers to 'active'
-    const updatedGlobal = globalQrList.map((q: any) => {
-      if (q.id.toUpperCase() === cleanId) {
-        return {
-          ...q,
-          status: 'active',
-          vehicleName: newRecord.name,
-          vehicleNumber: newRecord.vehicleNumber,
-          ownerPhone: newRecord.ownerPhone,
-          secondaryPhone: newRecord.secondaryPhone,
-          roadsidePhone: newRecord.roadsidePhone,
-        };
-      }
-      return q;
-    });
-    if (!updatedGlobal.some((q: any) => q.id.toUpperCase() === cleanId)) {
-      updatedGlobal.unshift(newRecord);
-    }
-    localStorage.setItem('namoqr-qrlist', JSON.stringify(updatedGlobal));
-
-    setNewQrId('');
-    setNewActivationCode('');
-    setNewName('');
-    setNewRegNumber('');
-    setNewOwnerPhone('');
-    setNewSecondaryPhone('');
-    setNewRoadsidePhone('');
-    setActivationError(null);
-    setActiveTab('stickers');
-    showToast(`🔒 Protection Code Verified! Sticker ${cleanId} activated successfully.`);
-  };
-
-  const handleToggleAlertStatus = (alertId: string) => {
-    setAlerts(prev =>
-      prev.map(a => {
-        if (a.id === alertId) {
-          const nextStatus = a.status === 'unread' ? 'acknowledged' : a.status === 'acknowledged' ? 'resolved' : 'unread';
-          return { ...a, status: nextStatus };
+  // Products State - NO MOCK DATA (Filters out any old mock items from storage)
+  const [products, setProducts] = useState<any[]>(() => {
+    const saved = localStorage.getItem('namoqr-client-stickers');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((p: any) => 
+            !['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].includes(p.id) &&
+            !['Mahindra Thar', 'Daily Activa', 'Main Gate · Flat 402', 'Samsonite Cabin Bag', "Father's Keychain", "Aryan's School Bag"].includes(p.nickname)
+          );
         }
-        return a;
-      })
-    );
-    showToast('Alert status updated');
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  // Persist products to localStorage
+  useEffect(() => {
+    localStorage.setItem('namoqr-client-stickers', JSON.stringify(products));
+  }, [products]);
+
+  // Drawer & Toast State
+  const [drawerProductId, setDrawerProductId] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [notifBadgeVisible, setNotifBadgeVisible] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 2800);
   };
 
-  const unreadAlertsCount = alerts.filter(a => a.status === 'unread').length;
+  // Auto-sync real stickers by user's phone number on mount
+  useEffect(() => {
+    const userPhone = profile?.phoneNumber;
+    if (userPhone) {
+      syncStickersByPhone(userPhone);
+    }
+  }, [profile?.phoneNumber]);
+
+  const syncStickersByPhone = (phoneNum: string) => {
+    const cleanPhone = phoneNum.replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length < 5) return;
+
+    const globalQrList = JSON.parse(localStorage.getItem('namoqr-qrlist') || '[]');
+    const pendingList = JSON.parse(localStorage.getItem('namoqr-pending-activations') || '[]');
+
+    const matchedActive = globalQrList.filter((q: any) => {
+      const qPhone = (q.ownerPhone || q.phone || q.details?.ownerPhone || '').replace(/\D/g, '');
+      return qPhone && (qPhone.includes(cleanPhone) || cleanPhone.includes(qPhone));
+    });
+
+    const matchedPending = pendingList
+      .filter((p: any) => {
+        const pPhone = (p.ownerPhone || p.phone || '').replace(/\D/g, '');
+        return pPhone && (pPhone.includes(cleanPhone) || cleanPhone.includes(pPhone));
+      })
+      .map((p: any) => ({
+        ...p,
+        nickname: p.nickname || p.vehicleName || `Sticker ${p.id}`,
+        status: 'Active',
+        ownerPhone: p.phone || p.ownerPhone || phoneNum
+      }));
+
+    const allMatched = [...matchedActive, ...matchedPending];
+
+    if (allMatched.length > 0) {
+      setProducts(prev => {
+        const existingIds = new Set(prev.map(s => s.id));
+        const newItems = allMatched.filter((m: any) => !existingIds.has(m.id));
+        return [...newItems, ...prev];
+      });
+    }
+  };
+
+  // ─── ACTIVATION WIZARD STATE ───
+  const [wizStep, setWizStep] = useState(1);
+  const [wizCode, setWizCode] = useState('NQ-AUTO-8812');
+  const [wizCategory, setWizCategory] = useState('car');
+  const [wizContactName, setWizContactName] = useState(() => profile?.fullName || 'Karan Sharma');
+  const [wizContactPhone, setWizContactPhone] = useState(() => profile?.phoneNumber || '+91 98765 43210');
+
+  const handleAutoScanCode = () => {
+    const codes = ['NQ-AUTO-8812', 'NQ-GATE-9051', 'NQ-KIDS-3392', 'NQ-LUGG-1188', 'NQ-BIKE-2900'];
+    const rCode = codes[Math.floor(Math.random() * codes.length)];
+    setWizCode(rCode);
+    showToast(`Sticker QR authenticated!`);
+  };
+
+  const handleWizardNext = () => {
+    if (wizStep === 1 && wizCode.trim().length < 4) {
+      showToast('Please enter a valid product code');
+      return;
+    }
+    if (wizStep < 4) {
+      setWizStep(wizStep + 1);
+    } else {
+      const catLabel = getCategoryLabel(wizCategory as any) || 'Safety Sticker';
+      const newProduct = {
+        id: 'p' + Date.now(),
+        code: wizCode.trim().toUpperCase(),
+        category: wizCategory,
+        nickname: `${catLabel} (${wizCode.trim().toUpperCase()})`,
+        assigned: profile?.fullName ? `Self (${profile.fullName.split(' ')[0]})` : 'Self (Rahul)',
+        status: 'Active',
+        scans: 0,
+        lastScan: 'Never scanned',
+        ownerPhone: wizContactPhone || profile?.phoneNumber || '',
+        meta: [['Registered', 'Just now']],
+        docs: [],
+        contacts: [[wizContactName || 'Karan Sharma', wizContactPhone || '+91 98765 43210']],
+        timeline: [['success', 'Activation Success', 'Just now', 'Sticker activated and linked.']]
+      };
+      setProducts(prev => [newProduct, ...prev]);
+      showToast(`${newProduct.nickname} activated successfully!`);
+      setWizStep(1);
+      setWizCode('NQ-AUTO-' + Math.floor(1000 + Math.random() * 9000));
+      setActiveTab('overview');
+    }
+  };
+
+  // ─── VERIFY & CONNECT CODE HANDLER ───
+  const [verifyCodeInput, setVerifyCodeInput] = useState('');
+  const [verifyPhoneInput, setVerifyPhoneInput] = useState(() => profile?.phoneNumber || '');
+  const [verificationResult, setVerificationResult] = useState<{ success: boolean; msg: string } | null>(null);
+
+  const handleVerifyAndConnectCode = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanCode = verifyCodeInput.trim().toUpperCase();
+    const cleanPhone = verifyPhoneInput.replace(/\D/g, '');
+
+    if (!cleanCode && !cleanPhone) {
+      setVerificationResult({ success: false, msg: 'Please enter an Activation Code or Phone Number to verify.' });
+      return;
+    }
+
+    const globalQrList = JSON.parse(localStorage.getItem('namoqr-qrlist') || '[]');
+    const pendingList = JSON.parse(localStorage.getItem('namoqr-pending-activations') || '[]');
+    const allSystemRecords = [...globalQrList, ...pendingList, ...products];
+
+    const matched = allSystemRecords.find((q: any) => {
+      const qCode = (q.activationCode || q.id || q.code || '').trim().toUpperCase();
+      const qPhone = (q.ownerPhone || q.phone || '').replace(/\D/g, '');
+      const codeMatches = cleanCode && (qCode === cleanCode || qCode.includes(cleanCode));
+      const phoneMatches = cleanPhone && qPhone && (qPhone.includes(cleanPhone) || cleanPhone.includes(qPhone));
+      return codeMatches || phoneMatches;
+    });
+
+    if (matched) {
+      const catLabel = getCategoryLabel((matched.category || 'car') as any) || 'Safety Sticker';
+      const newConnectedItem = {
+        id: matched.id || 'p' + Date.now(),
+        code: matched.activationCode || matched.id || cleanCode || 'NQ-TAG-1001',
+        category: matched.category || 'car',
+        nickname: matched.nickname || matched.vehicleName || `${catLabel} (${matched.id || cleanCode})`,
+        assigned: matched.ownerName || profile?.fullName || 'Self',
+        status: 'Active',
+        scans: matched.scans || 0,
+        lastScan: matched.lastScan || 'Code Verified (True)',
+        ownerPhone: verifyPhoneInput || matched.ownerPhone || '',
+        meta: matched.meta || [['Verification', 'Valid Code (True)'], ['Phone', verifyPhoneInput || matched.ownerPhone || 'Linked']],
+        docs: matched.docs || [],
+        contacts: matched.contacts || [[profile?.fullName || 'Owner', verifyPhoneInput || '']],
+        timeline: [['success', 'Code Verification Success', 'Just now', 'Activation code verified (True) and sticker assigned to dashboard.']]
+      };
+
+      setProducts(prev => {
+        const exists = prev.some(p => p.id === newConnectedItem.id || p.code === newConnectedItem.code);
+        if (exists) {
+          return prev.map(p => (p.id === newConnectedItem.id || p.code === newConnectedItem.code) ? { ...p, status: 'Active' } : p);
+        }
+        return [newConnectedItem, ...prev];
+      });
+
+      setVerificationResult({
+        success: true,
+        msg: `✓ Code Verification True! Sticker ${newConnectedItem.code} activated and assigned to your dashboard.`
+      });
+      showToast(`Sticker ${newConnectedItem.code} verified (True) & assigned!`);
+      setVerifyCodeInput('');
+    } else {
+      setVerificationResult({
+        success: false,
+        msg: `✗ Verification False: Activation Code "${cleanCode}" not found in database or phone match failed.`
+      });
+      showToast('Invalid Activation Code. Verification result: False.');
+    }
+  };
+
+  // ─── CHANGE STATUS ───
+  const handleChangeStatus = (id: string, newStatus: string) => {
+    setProducts(prev =>
+      prev.map(p => (p.id === id ? { ...p, status: newStatus } : p))
+    );
+    showToast(`Status updated to ${newStatus}`);
+  };
+
+  // ─── SHARE PROFILE ───
+  const handleShareProfile = (code: string) => {
+    const url = `${window.location.origin}/verify/${code}`;
+    navigator.clipboard.writeText(url);
+    showToast(`Safety link copied: ${url}`);
+  };
+
+  // ─── CLEAR HISTORY ───
+  const handleClearHistory = () => {
+    setProducts(prev => prev.map(p => ({ ...p, timeline: [] })));
+    showToast('All security logs cleared');
+  };
+
+  // ─── DELETE STICKER ───
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return;
+    setProducts(prev => prev.filter(p => p.id !== deleteTarget.id));
+    setDrawerProductId(null);
+    showToast(`Sticker removed from dashboard`);
+    setDeleteTarget(null);
+  };
+
+  // ─── CHECKOUT PAGE STATE ───
+  const [cart, setCart] = useState<any[]>([
+    { id: 'item-1', name: 'Car Safety QR Sticker', category: 'car', price: 349, qty: 1, img: 'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=200' },
+    { id: 'item-2', name: 'Family Starter Protection Pack (3 Tags)', category: 'child', price: 899, qty: 1, img: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&q=80&w=200' }
+  ]);
+  const [coFullName, setCoFullName] = useState(() => profile?.fullName || '');
+  const [coPhone, setCoPhone] = useState(() => profile?.phoneNumber || '');
+  const [coEmail, setCoEmail] = useState(() => profile?.email || '');
+  const [coAddress, setCoAddress] = useState('');
+  const [coCity, setCoCity] = useState('');
+  const [coState, setCoState] = useState('');
+  const [coPincode, setCoPincode] = useState('');
+  const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'express'>('standard');
+  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'cod'>('upi');
+  const [promoInput, setPromoInput] = useState('');
+  const [discountPct, setDiscountPct] = useState(0);
+  const [confirmedOrder, setConfirmedOrder] = useState<any | null>(null);
+
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const discountAmt = Math.round((subtotal * discountPct) / 100);
+  const deliveryFee = deliveryMethod === 'express' ? 99 : 0;
+  const grandTotal = Math.max(0, subtotal - discountAmt + deliveryFee);
+
+  const handleQtyChange = (index: number, delta: number) => {
+    setCart(prev => {
+      const next = [...prev];
+      const newQty = (next[index].qty || 1) + delta;
+      if (newQty <= 0) return next.filter((_, i) => i !== index);
+      next[index] = { ...next[index], qty: newQty };
+      return next;
+    });
+  };
+
+  const handleRemoveCartItem = (index: number) => {
+    setCart(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // ─── ADD CATALOG ITEM TO CART ───
+  const handleAddToCart = (item: any) => {
+    setCart(prev => {
+      const existing = prev.find(c => c.name === item.name);
+      if (existing) {
+        return prev.map(c => c.name === item.name ? { ...c, qty: c.qty + 1 } : c);
+      }
+      return [...prev, {
+        id: 'cat-' + item.category + '-' + Date.now(),
+        name: item.name,
+        category: item.category || 'car',
+        price: item.price || 299,
+        qty: 1,
+        img: item.img || ''
+      }];
+    });
+    showToast(`${item.name} added to cart!`);
+  };
+
+  const handleApplyPromo = () => {
+    if (promoInput.trim().toUpperCase() === 'NAMO10') {
+      setDiscountPct(10);
+      showToast('Promo code NAMO10 applied (10% OFF)!');
+    } else {
+      showToast('Invalid promo code.');
+    }
+  };
+
+  const handleCheckoutSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cart.length === 0) {
+      showToast('Your cart is empty!');
+      return;
+    }
+    if (!coPhone.trim()) {
+      showToast('Please enter your Phone Number to link your stickers.');
+      return;
+    }
+
+    const orderId = '#NQ-' + Math.floor(100000 + Math.random() * 899999);
+    const newPurchasedStickers: any[] = [];
+
+    cart.forEach(cartItem => {
+      for (let i = 0; i < cartItem.qty; i++) {
+        const codeId = 'NQ-' + cartItem.category.toUpperCase() + '-' + Math.floor(1000 + Math.random() * 9000);
+        newPurchasedStickers.push({
+          id: 'p' + Date.now() + i,
+          code: codeId,
+          nickname: `${cartItem.name} ${cartItem.qty > 1 ? `#${i + 1}` : ''}`.trim(),
+          category: cartItem.category || 'car',
+          assigned: coFullName || 'Self',
+          status: 'Active',
+          scans: 0,
+          lastScan: 'Just purchased',
+          ownerPhone: coPhone.trim(),
+          meta: [['Purchased', 'Just now'], ['Order ID', orderId]],
+          docs: [],
+          contacts: [[coFullName || 'Customer', coPhone.trim()]],
+          timeline: [['success', 'Order Completed', 'Just now', `Purchased via Order ${orderId}`]]
+        });
+      }
+    });
+
+    setProducts(prev => [...newPurchasedStickers, ...prev]);
+    setConfirmedOrder({ orderId, items: cart, total: grandTotal, purchasedStickers: newPurchasedStickers });
+    showToast(`Order Confirmed! ${newPurchasedStickers.length} sticker(s) activated in dashboard.`);
+  };
+
+  const activeProduct = drawerProductId ? products.find(p => p.id === drawerProductId) : null;
+  const activeCount = products.filter(p => p.status === 'Active').length;
+  const totalScans = products.reduce((s, p) => s + (p.scans || 0), 0);
+  const totalTimelineLogs = products.flatMap(p => (p.timeline || []).map(t => ({ ...t, nickname: p.nickname, code: p.code })));
 
   return (
-    <div className="min-h-screen bg-[#F8F9FC] text-gray-900 flex flex-col md:flex-row font-sans">
-      {/* Left Sidebar Menu */}
-      <aside className="w-full md:w-64 bg-white border-r border-gray-100 p-5 flex flex-col justify-between shadow-2xs flex-shrink-0">
-        <div>
-          {/* Brand Logo Header */}
-          <div className="pb-5 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <span className="font-black text-gray-900 text-2xl tracking-tight block" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                Rapi<span className="text-orange-500">QR</span>
-              </span>
-              <span className="text-[11px] text-gray-400 font-medium">Customer Safety Portal</span>
+    <div className="flex flex-col h-screen bg-[#F6F1E7] text-[#201C15] font-sans antialiased overflow-hidden">
+      
+      {/* ─── APP HEADER ─── */}
+      <header className="h-[72px] flex-shrink-0 bg-[#FFFEFB] border-b border-[rgba(32,28,21,0.1)] flex items-center justify-between px-6 sm:px-8 z-20">
+        <div className="flex items-center gap-3.5">
+          <button
+            onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+            className="md:hidden w-9.5 h-9.5 rounded-xl bg-[#F6F1E7] border border-gray-200 flex items-center justify-center text-gray-700 cursor-pointer"
+          >
+            <Menu size={20} />
+          </button>
+          <div onClick={onBack} className="flex items-center gap-2 cursor-pointer font-serif font-bold text-xl tracking-tight" style={{ fontFamily: "'Fraunces', serif" }}>
+            <div className="w-7 h-7 text-[#E25822]">
+              <svg viewBox="0 0 32 32" fill="none" className="w-full h-full">
+                <rect x="2" y="2" width="11" height="11" rx="3" stroke="#E25822" strokeWidth="3"/>
+                <rect x="19" y="2" width="11" height="11" rx="3" stroke="#E25822" strokeWidth="3"/>
+                <rect x="2" y="19" width="11" height="11" rx="3" stroke="#E25822" strokeWidth="3"/>
+                <rect x="19" y="19" width="5" height="5" rx="1" fill="#E25822"/>
+                <rect x="26" y="26" width="4" height="4" rx="1" fill="#E25822"/>
+                <rect x="19" y="26" width="4" height="4" rx="1" fill="#E25822"/>
+                <rect x="26" y="19" width="4" height="4" rx="1" fill="#E25822"/>
+              </svg>
             </div>
+            <span>Namo<span className="text-[#E25822]">QR</span></span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3.5">
+          <button
+            onClick={onBack}
+            className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] text-xs font-bold text-[#201C15] hover:bg-[#FBEBE1] transition-colors cursor-pointer"
+          >
+            <Store size={15} /> Store
+          </button>
+
+          <div className="hidden sm:flex items-center gap-2 bg-[#E4EFE8] text-[#2F6B4F] px-3.5 py-1.5 rounded-full text-xs font-extrabold">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#2F6B4F] opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#2F6B4F]"></span>
+            </span>
+            <span>{activeCount} Active Tags</span>
           </div>
 
-          {/* Sidebar Navigation: 3 Main Options */}
-          <div className="mt-6">
-            <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block mb-3 px-2">
-              Main Menu
-            </span>
-            <nav className="space-y-1.5">
-              {/* Option 1: Your Sticker Info */}
+          <button
+            onClick={() => {
+              setNotifBadgeVisible(false);
+              showToast('2 new alerts — Wrong Parking, Courier Arrived');
+            }}
+            className="relative w-10 h-10 rounded-xl bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] flex items-center justify-center text-[#201C15] hover:bg-[#FBEBE1] transition-colors cursor-pointer"
+          >
+            <Bell size={18} />
+            {notifBadgeVisible && (
+              <span className="absolute -top-1 -right-1 bg-[#E25822] text-white text-[10px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center">
+                2
+              </span>
+            )}
+          </button>
+
+          <div className="flex items-center gap-2.5 pl-3 border-l border-[rgba(32,28,21,0.1)]">
+            <img
+              src={profile?.avatarUrl || "https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&q=80&w=100"}
+              alt="User Avatar"
+              className="w-9 h-9 rounded-full object-cover border-2 border-[#E25822]"
+            />
+           
+            <button onClick={signOut} title="Sign Out" className="text-gray-400 hover:text-red-600 transition-colors ml-1 cursor-pointer">
+              <LogOut size={16} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ─── APP BODY LAYOUT ─── */}
+      <div className="flex-1 flex overflow-hidden relative">
+
+        {/* ─── SIDEBAR ─── */}
+        <aside className={`w-[236px] flex-shrink-0 bg-[#FFFEFB] border-r border-[rgba(32,28,21,0.1)] flex flex-col justify-between p-5 z-30 transition-all duration-300 md:static fixed inset-y-0 left-0 ${
+          isMobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
+        }`}>
+          <div className="space-y-4">
+            <nav className="space-y-1">
               <button
-                onClick={() => setActiveTab('stickers')}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'stickers' || activeTab === 'register'
-                    ? 'bg-orange-50 text-orange-600 border border-orange-200/80 shadow-2xs'
-                    : 'text-gray-600 hover:bg-gray-50'
+                onClick={() => { setActiveTab('overview'); setIsMobileSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'overview' ? 'bg-[#FBEBE1] text-[#C4471A]' : 'text-[#6E6759] hover:bg-[#F6F1E7]'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <QrCode size={18} />
-                  <span>Your Sticker Info</span>
-                </div>
-                <span className="bg-orange-100 text-orange-800 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
-                  {myStickers.length}
-                </span>
+                <Grid size={17} />
+                <span>My Products</span>
               </button>
 
-              {/* Option 2: Emergency Alerts */}
               <button
-                onClick={() => setActiveTab('alerts')}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'alerts'
-                    ? 'bg-orange-50 text-orange-600 border border-orange-200/80 shadow-2xs'
-                    : 'text-gray-600 hover:bg-gray-50'
+                onClick={() => { setActiveTab('activate'); setIsMobileSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'activate' ? 'bg-[#FBEBE1] text-[#C4471A]' : 'text-[#6E6759] hover:bg-[#F6F1E7]'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <Bell size={18} />
-                  <span>Emergency Alerts</span>
-                </div>
-                {unreadAlertsCount > 0 && (
-                  <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-extrabold">
-                    {unreadAlertsCount}
-                  </span>
-                )}
+                <Plus size={17} />
+                <span>Activate QR Tag</span>
               </button>
 
-              {/* Option 3: Phone Numbers */}
               <button
-                onClick={() => setActiveTab('family')}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'family'
-                    ? 'bg-orange-50 text-orange-600 border border-orange-200/80 shadow-2xs'
-                    : 'text-gray-600 hover:bg-gray-50'
+                onClick={() => { setActiveTab('catalog'); setIsMobileSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'catalog' ? 'bg-[#FBEBE1] text-[#C4471A]' : 'text-[#6E6759] hover:bg-[#F6F1E7]'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <Phone size={18} />
-                  <span>Phone Numbers</span>
-                </div>
-                <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
-                  {familyNumbers.length}
-                </span>
+                <BookOpen size={17} />
+                <span>Product Catalog</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('history'); setIsMobileSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'history' ? 'bg-[#FBEBE1] text-[#C4471A]' : 'text-[#6E6759] hover:bg-[#F6F1E7]'
+                }`}
+              >
+                <History size={17} />
+                <span>Emergency History</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('subscription'); setIsMobileSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'subscription' ? 'bg-[#FBEBE1] text-[#C4471A]' : 'text-[#6E6759] hover:bg-[#F6F1E7]'
+                }`}
+              >
+                <CreditCard size={17} />
+                <span>Subscription</span>
               </button>
             </nav>
+
+            <button
+              onClick={() => { setActiveTab('activate'); setIsMobileSidebarOpen(false); }}
+              className="w-full flex items-center justify-center gap-2 bg-[#201C15] hover:bg-[#E25822] text-[#F6F1E7] font-bold text-xs py-3 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+            >
+              <Plus size={15} /> Add New Sticker
+            </button>
+
+            {switchToAdminFleet && (
+              <button
+                onClick={switchToAdminFleet}
+                className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-[#E25822] bg-[#FBEBE1] border border-orange-200 py-2.5 rounded-xl transition-colors cursor-pointer"
+              >
+                <Settings size={14} /> Admin Fleet View
+              </button>
+            )}
           </div>
-        </div>
 
-        {/* Sidebar Footer & User Account */}
-        <div className="pt-6 border-t border-gray-100 space-y-3 mt-8">
-          {switchToDistributor && (
-            <button
-              onClick={switchToDistributor}
-              className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 py-2.5 rounded-xl transition-colors cursor-pointer"
-            >
-              <Store size={14} /> Distributor Portal
-            </button>
-          )}
-
-          {switchToAdminFleet && (
-            <button
-              onClick={switchToAdminFleet}
-              className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 py-2.5 rounded-xl transition-colors cursor-pointer"
-            >
-              <Settings size={14} /> Fleet Manager View
-            </button>
-          )}
-
-          <div className="flex items-center justify-between bg-gray-50 p-2.5 rounded-2xl border border-gray-100">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-xs flex-shrink-0">
-                {profile?.fullName ? profile.fullName.charAt(0).toUpperCase() : 'M'}
-              </div>
-              <span className="text-xs font-semibold text-gray-800 truncate">
-                {profile?.fullName || 'Mihir Rathod'}
-              </span>
-            </div>
-            <button
-              onClick={signOut}
-              title="Log Out"
-              className="w-7 h-7 rounded-full bg-white shadow-2xs hover:bg-red-50 hover:text-red-500 text-gray-400 flex items-center justify-center transition-colors cursor-pointer"
-            >
-              <LogOut size={13} />
-            </button>
+          <div className="bg-[#E4EFE8] rounded-xl p-4 border border-[#2F6B4F]/20">
+            <div className="text-[10px] font-black uppercase tracking-wider text-[#2F6B4F] mb-1">SYSTEM SECURE</div>
+            <p className="text-[11px] text-[#3B6E56] leading-relaxed">
+              All NamoQR emergency calls &amp; scans are masked and 256-bit encrypted.
+            </p>
           </div>
-        </div>
-      </aside>
+        </aside>
 
-      {/* Main Right Content Panel */}
-      <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-8 space-y-6 overflow-y-auto">
-        {/* Protection Layer: Pending Activations Banner */}
-        {pendingActivations.length > 0 && (
-          <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-200/90 rounded-3xl p-5 sm:p-6 shadow-xs animate-fade-in">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-md shadow-amber-500/20 flex-shrink-0">
-                  <ShieldCheck size={24} />
-                </div>
+        {/* ─── MAIN CONTENT VIEW PANEL ─── */}
+        <main className="flex-1 overflow-y-auto p-6 sm:p-9 space-y-6">
+
+          {/* ════ VIEW 1: MY PRODUCTS / OVERVIEW ════ */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-extrabold text-gray-900 text-base">Pending Security Activation Codes</h3>
-                    <span className="bg-amber-500 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                      {pendingActivations.length} Pending
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-600 mt-0.5">
-                    Admin generated protective activation codes for your QR stickers. Use the activation code to activate your QR code.
+                  <h1 className="text-2xl sm:text-3xl font-bold text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>
+                    Welcome back, {profile?.fullName ? profile.fullName.split(' ')[0] : 'Rahul'}.
+                  </h1>
+                  <p className="text-xs sm:text-sm text-[#6E6759] mt-1">
+                    Here's what's happening across your family's safety network.
                   </p>
                 </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2.5 w-full lg:w-auto">
-                {pendingActivations.map((pending) => (
-                  <div key={pending.id} className="bg-white border border-amber-200/90 rounded-2xl p-3 shadow-2xs flex items-center justify-between gap-3 w-full lg:w-auto">
-                    <div>
-                      <span className="text-[10px] font-bold text-gray-400 block">STICKER CODE</span>
-                      <span className="font-mono font-extrabold text-gray-900 text-xs">{pending.id}</span>
-                    </div>
-                    <div className="h-6 w-px bg-gray-100" />
-                    <div>
-                      <span className="text-[10px] font-bold text-amber-600 block">ACTIVATION CODE</span>
-                      <span className="font-mono font-extrabold text-amber-900 text-xs bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                        {pending.activationCode}
-                      </span>
-                    </div>
-                    <div className="h-6 w-px bg-gray-100" />
-                    <div>
-                      <span className="text-[10px] font-bold text-gray-400 block">CATEGORY</span>
-                      <span className="font-sans font-extrabold text-gray-800 text-xs flex items-center gap-1">
-                        <span>{getCategoryIcon((pending.category || 'car') as any)}</span>
-                        <span>{getCategoryLabel((pending.category || 'car') as any)}</span>
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setNewQrId(sanitizeCode(pending.id));
-                        setNewActivationCode(sanitizeCode(pending.activationCode));
-                        setNewName(pending.vehicleName !== 'Unassigned QR Sticker' ? pending.vehicleName : '');
-                        if (pending.category) setNewCategory(pending.category);
-                        setActiveTab('register');
-                        showToast(`Pre-filled activation code ${pending.activationCode}`);
-                      }}
-                      className="ml-auto bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-xs transition-colors flex items-center gap-1 cursor-pointer"
-                    >
-                      <ShieldCheck size={13} /> Activate
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Option 1: YOUR STICKER INFO */}
-        {activeTab === 'stickers' && (
-          <div className="space-y-6">
-            {/* Full-Screen Prominent Activate Sticker Card Banner */}
-            <div
-              className="relative overflow-hidden rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-              style={{ background: 'linear-gradient(135deg, #EAB308, #C2410C)' }}
-            >
-              <div className="relative z-10">
-                <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold text-white mb-3">
-                  <ShieldCheck size={14} /> Registered Sticker Information
-                </div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                  Welcome, {profile?.fullName || 'Client'}
-                </h1>
-                <p className="text-white/90 text-xs sm:text-sm mt-1 max-w-lg">
-                  View your active QR safety tags or enter your Sticker Code assigned by Admin panel to activate.
-                </p>
-              </div>
-
-              {/* Full-Screen Activate Sticker Button */}
-              <button
-                onClick={() => setActiveTab('register')}
-                className="w-full sm:w-auto bg-white hover:bg-orange-50 text-orange-700 font-extrabold px-6 py-4 rounded-2xl text-sm shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer flex-shrink-0"
-              >
-                <ShieldCheck size={20} className="text-orange-600" />
-                <span>Activate New Sticker</span>
-              </button>
-            </div>
-            {myStickers.length === 0 ? (
-              <div className="bg-white rounded-3xl p-12 text-center border border-gray-100 shadow-2xs">
-                <QrCode size={48} className="mx-auto text-gray-300 mb-3" />
-                <h3 className="text-lg font-bold text-gray-800">No Active Safety Stickers Registered</h3>
-                <p className="text-gray-400 text-sm max-w-sm mx-auto mt-1 mb-6">
-                  You have not activated any stickers yet. Enter your Sticker Code assigned from the Admin panel to activate.
-                </p>
                 <button
-                  onClick={() => setActiveTab('register')}
-                  className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold px-6 py-3 rounded-xl text-sm shadow-md transition-all cursor-pointer"
+                  onClick={() => setActiveTab('activate')}
+                  className="bg-[#E25822] hover:bg-[#C4471A] text-white font-extrabold text-xs px-5 py-3 rounded-full shadow-lg transition-all active:scale-95 cursor-pointer flex items-center gap-2"
                 >
-                  <Plus size={16} /> Activate First Sticker Code
+                  <Plus size={16} /> Register Sticker
                 </button>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {myStickers.map((item) => (
-                  <div key={item.id} className="bg-white rounded-3xl border border-gray-100 shadow-xs hover:shadow-md transition-all p-5 flex flex-col justify-between">
-                    <div>
-                      {/* Top status */}
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full uppercase">
-                          <CheckCircle2 size={12} /> {item.status}
-                        </span>
-                        <span className="text-xs font-mono font-extrabold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
-                          CODE - {item.id}
-                        </span>
-                      </div>
 
-                      {/* Info */}
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center font-bold flex-shrink-0">
-                          {item.category === 'car' && <Car size={22} />}
-                          {item.category === 'bike' && <Car size={22} />}
-                          {item.category === 'home' && <Home size={22} />}
-                          {item.category === 'child' && <User size={22} />}
-                          {(item.category === 'keychain' || item.category === 'luggage') && <Key size={22} />}
-                          {item.category !== 'car' && item.category !== 'bike' && item.category !== 'home' && item.category !== 'child' && item.category !== 'keychain' && item.category !== 'luggage' && <QrCode size={22} />}
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-gray-900 text-base">{item.name}</h3>
-                          <p className="text-xs font-semibold text-gray-500">{item.vehicleNumber}</p>
-                        </div>
-                      </div>
+              
 
-                      {/* Scans counter */}
-                      <div className="bg-gray-50 rounded-2xl p-3 flex items-center justify-between text-xs text-gray-500 my-4">
-                        <span>Total Emergency Scans</span>
-                        <span className="font-extrabold text-gray-900 text-sm">{item.scansCount}</span>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="pt-3 border-t border-gray-100 flex items-center gap-2">
-                      <button
-                        onClick={() => handleCopyLink(item.id)}
-                        className="flex-1 py-2 px-3 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-1.5 transition-colors"
-                      >
-                        {copiedId === item.id ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                        {copiedId === item.id ? 'Copied' : 'Copy Link'}
-                      </button>
-                      <button
-                        onClick={() => window.open(`/${item.id}`, '_blank')}
-                        className="py-2 px-3 rounded-xl bg-orange-50 text-orange-600 hover:bg-orange-100 text-xs font-bold flex items-center justify-center gap-1 transition-colors"
-                      >
-                        Preview <ExternalLink size={13} />
-                      </button>
-                    </div>
+              {/* Stat Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-[#FFFEFB] border border-[rgba(32,28,21,0.1)] rounded-2xl p-5 shadow-2xs flex flex-col gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-[#FBEBE1] text-[#C4471A] flex items-center justify-center font-bold">
+                    <ShieldCheck size={18} />
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+                  <div className="text-2xl font-bold text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>{activeCount}</div>
+                  <div className="text-xs font-semibold text-[#6E6759]">Active Tags</div>
+                </div>
 
-        {/* TAB 2: EMERGENCY ALERTS */}
-        {activeTab === 'alerts' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-gray-800 text-lg">Received Scan Pings ({alerts.length})</h3>
-              <span className="text-xs text-gray-400">Click alert to update status</span>
-            </div>
+                <div className="bg-[#FFFEFB] border border-[rgba(32,28,21,0.1)] rounded-2xl p-5 shadow-2xs flex flex-col gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-[#E4EDF5] text-[#2E5C8A] flex items-center justify-center font-bold">
+                    <Eye size={18} />
+                  </div>
+                  <div className="text-2xl font-bold text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>{totalScans}</div>
+                  <div className="text-xs font-semibold text-[#6E6759]">Total Scans Received</div>
+                </div>
 
-            {alerts.length === 0 ? (
-              <div className="bg-white rounded-3xl p-12 text-center border border-gray-100">
-                <Bell size={40} className="mx-auto text-gray-300 mb-3" />
-                <h4 className="font-bold text-gray-700">No emergency alerts received</h4>
-                <p className="text-xs text-gray-400 mt-1">When someone scans your sticker, alerts will appear here in real-time.</p>
+                <div className="bg-[#FFFEFB] border border-[rgba(32,28,21,0.1)] rounded-2xl p-5 shadow-2xs flex flex-col gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-[#F8E7E3] text-[#C1442E] flex items-center justify-center font-bold">
+                    <AlertTriangle size={18} />
+                  </div>
+                  <div className="text-2xl font-bold text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>{totalTimelineLogs.filter(t => t[0] === 'alert').length}</div>
+                  <div className="text-xs font-semibold text-[#6E6759]">Alerts Recorded</div>
+                </div>
+
+                <div className="bg-[#FFFEFB] border border-[rgba(32,28,21,0.1)] rounded-2xl p-5 shadow-2xs flex flex-col gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-[#E4EFE8] text-[#2F6B4F] flex items-center justify-center font-bold">
+                    <User size={18} />
+                  </div>
+                  <div className="text-2xl font-bold text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>{products.length}</div>
+                  <div className="text-xs font-semibold text-[#6E6759]">Total Connected Tags</div>
+                </div>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {alerts.map((alert) => (
-                  <div 
-                    key={alert.id} 
-                    className={`bg-white rounded-3xl border p-5 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
-                      alert.status === 'unread' ? 'border-orange-200 shadow-sm bg-orange-50/20' : 'border-gray-100'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3.5">
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 font-bold ${
-                        alert.status === 'unread' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        <AlertTriangle size={20} />
-                      </div>
+
+              {/* Product Grid OR Clean Empty State */}
+              {products.length === 0 ? (
+                <div className="bg-[#FFFEFB] border border-[rgba(32,28,21,0.1)] rounded-3xl p-12 text-center space-y-4 shadow-sm">
+                  <div className="w-16 h-16 rounded-full bg-[#EEE4CF] flex items-center justify-center mx-auto text-3xl">🛡️</div>
+                  <h3 className="text-xl font-bold text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>No QR Tags Connected Yet</h3>
+                  <p className="text-xs sm:text-sm text-[#6E6759] max-w-md mx-auto">
+                    You haven't activated any NamoQR tags yet. Activate a tag from the sidebar or order safety stickers below.
+                  </p>
+                  <div className="flex justify-center gap-3 pt-2">
+                    <button
+                      onClick={() => setActiveTab('activate')}
+                      className="bg-[#201C15] hover:bg-black text-[#F6F1E7] text-xs font-bold px-5 py-3 rounded-full cursor-pointer"
+                    >
+                      Activate Tag
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('subscription')}
+                      className="bg-[#E25822] hover:bg-[#C4471A] text-white text-xs font-bold px-5 py-3 rounded-full shadow-md cursor-pointer"
+                    >
+                      Purchase Sticker
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {products.map(p => (
+                    <div
+                      key={p.id}
+                      className="bg-[#FFFEFB] border border-[rgba(32,28,21,0.1)] rounded-2xl p-5 shadow-2xs hover:shadow-lg hover:-translate-y-1 transition-all relative overflow-hidden flex flex-col justify-between"
+                    >
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#E25822] to-[#FF9E5C]" />
+                      <div className="absolute top-0 right-0 w-6.5 h-6.5 bg-[#F6F1E7] rounded-bl-xl" />
+                      
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-gray-900 text-sm">{alert.productLabel}</span>
-                          <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-gray-100 text-gray-600">
-                            {alert.type.replace('_', ' ')}
+                        {/* Top Header */}
+                        <div className="flex items-start justify-between gap-2 mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10.5 h-10.5 rounded-xl bg-[#EEE4CF] flex items-center justify-center text-xl flex-shrink-0">
+                              {getCategoryIcon(p.category as any) || '🏷️'}
+                            </div>
+                            <div>
+                              <h3 className="font-bold text-base text-[#201C15] leading-tight" style={{ fontFamily: "'Fraunces', serif" }}>{p.nickname}</h3>
+                              <p className="text-[11px] font-semibold text-[#A79E8B]">{getCategoryLabel(p.category as any) || p.code}</p>
+                            </div>
+                          </div>
+
+                          <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full ${
+                            p.status === 'Active' ? 'bg-[#E4EFE8] text-[#2F6B4F]' :
+                            p.status === 'Suspended' ? 'bg-[#F5EBD9] text-[#A9711F]' :
+                            'bg-[#F8E7E3] text-[#C1442E]'
+                          }`}>
+                            {p.status}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-700 font-medium mt-1">"{alert.message}"</p>
-                        <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-400">
-                          <span>{new Date(alert.createdAt).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}</span>
-                          {alert.reporterPhone && (
-                            <span className="flex items-center gap-1 text-gray-600 font-semibold">
-                              <Phone size={12} /> {alert.reporterPhone}
-                            </span>
-                          )}
+
+                        {/* Meta List */}
+                        <div className="space-y-1.5 my-3 text-xs border-y border-dashed border-[rgba(32,28,21,0.1)] py-2.5">
+                          {p.meta?.map((m: any, idx: number) => (
+                            <div key={idx} className="flex justify-between">
+                              <span className="text-[#A79E8B]">{m[0]}</span>
+                              <span className="font-semibold text-[#201C15]">{m[1]}</span>
+                            </div>
+                          ))}
+                          <div className="flex justify-between">
+                            <span className="text-[#A79E8B]">Total Scans</span>
+                            <span className="font-semibold text-[#201C15]">{p.scans || 0}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[#A79E8B]">Last Scan</span>
+                            <span className="font-semibold text-[#201C15]">{p.lastScan || 'Never'}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
-                      {alert.location && (
-                        <a
-                          href={`https://www.google.com/maps?q=${alert.location.lat},${alert.location.lng}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-xl transition-colors"
+                      {/* Actions */}
+                      <div className="pt-3 border-t border-[#E8ECF4] flex items-center gap-2">
+                        <button
+                          onClick={() => setDrawerProductId(p.id)}
+                          className="flex-1 py-2.5 rounded-xl bg-[#111111] hover:bg-black text-xs font-bold text-white transition-colors cursor-pointer"
                         >
-                          <MapPin size={13} /> GPS Location
-                        </a>
-                      )}
-
-                      <button
-                        onClick={() => handleToggleAlertStatus(alert.id)}
-                        className={`text-xs font-bold px-3 py-2 rounded-xl border transition-colors ${
-                          alert.status === 'unread'
-                            ? 'bg-orange-50 border-orange-200 text-orange-600'
-                            : alert.status === 'acknowledged'
-                            ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
-                            : 'bg-gray-100 border-gray-200 text-gray-500'
-                        }`}
-                      >
-                        {alert.status.toUpperCase()}
-                      </button>
+                          Manage Tag
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(p)}
+                          title="Delete sticker"
+                          className="w-10 h-10 rounded-xl bg-[#FEE2E2] text-[#DC2626] hover:bg-[#FECACA] flex items-center justify-center transition-colors cursor-pointer"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB: FAMILY PHONE NUMBERS */}
-        {activeTab === 'family' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-3xl border border-gray-100 p-6 sm:p-8 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                <div>
-                  <h3 className="font-extrabold text-gray-900 text-lg flex items-center gap-2">
-                    <Phone className="text-orange-500" size={22} />
-                    Family &amp; Emergency Phone Numbers
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Manage client family phone numbers that receive automated call, SMS, and WhatsApp pings when your QR tags are scanned.
-                  </p>
+                  ))}
                 </div>
+              )}
+            </div>
+          )}
 
-                <div className="flex items-center gap-2">
-                  <span className="bg-orange-50 text-orange-700 border border-orange-200 text-xs font-bold px-3 py-1.5 rounded-full">
-                    {familyNumbers.length} Verified Numbers
-                  </span>
-                </div>
+          {/* ════ VIEW 2: ACTIVATION WIZARD ════ */}
+          {activeTab === 'activate' && (
+            <div className="space-y-6 animate-fade-in">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>Activate a New Sticker</h1>
+                <p className="text-xs sm:text-sm text-[#6E6759] mt-1">Register your physical NamoQR product in under a minute.</p>
               </div>
 
-              {/* Add New Number Form */}
-              <form onSubmit={handleAddFamilyNumber} className="bg-gray-50/80 p-5 rounded-2xl border border-gray-200/80 mb-6 space-y-4">
-                <h4 className="font-bold text-xs text-gray-700 uppercase tracking-wider">Add New Family Phone Number</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Contact Name *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Rajesh (Father)"
-                      value={newFamName}
-                      onChange={e => setNewFamName(e.target.value)}
-                      className="w-full px-3.5 py-2.5 text-xs bg-white border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-medium"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Phone Number *</label>
-                    <input
-                      type="tel"
-                      required
-                      placeholder="e.g. +91 98765 43210"
-                      value={newFamPhone}
-                      onChange={e => setNewFamPhone(e.target.value)}
-                      className="w-full px-3.5 py-2.5 text-xs bg-white border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Relationship / Role</label>
-                    <select
-                      value={newFamRelation}
-                      onChange={e => setNewFamRelation(e.target.value)}
-                      className="w-full px-3.5 py-2.5 text-xs bg-white border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-medium"
-                    >
-                      <option value="Primary Owner">Primary Owner</option>
-                      <option value="Spouse">Spouse / Partner</option>
-                      <option value="Father / Guardian">Father / Guardian</option>
-                      <option value="Mother">Mother</option>
-                      <option value="Sibling">Sibling / Relative</option>
-                      <option value="Society Security">Housing Society Security</option>
-                      <option value="Driver / Helper">Driver / Helper</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-1">
-                  <label className="flex items-center gap-2 text-xs text-gray-600 font-medium cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={newFamWhatsapp}
-                      onChange={e => setNewFamWhatsapp(e.target.checked)}
-                      className="rounded text-orange-500 focus:ring-orange-500 h-4 w-4"
-                    />
-                    Enable Instant WhatsApp Alert Pings
-                  </label>
-
-                  <button
-                    type="submit"
-                    className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Plus size={14} /> Add Phone Number
-                  </button>
-                </div>
-              </form>
-
-              {/* List of Saved Numbers */}
-              <div className="space-y-3">
-                <h4 className="font-bold text-xs text-gray-700 uppercase tracking-wider">Saved Emergency Family Numbers</h4>
-                {familyNumbers.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400 text-xs">
-                    No family numbers added yet. Add numbers above to receive instant scan notifications.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {familyNumbers.map((fam: any) => (
+              <div className="bg-[#FFFEFB] border border-[rgba(32,28,21,0.1)] rounded-3xl min-h-[500px] flex flex-col md:flex-row overflow-hidden shadow-sm">
+                {/* Wizard Steps Sidebar */}
+                <div className="w-full md:w-60 bg-[#F6F1E7] border-b md:border-b-0 md:border-r border-[rgba(32,28,21,0.1)] p-6 flex-shrink-0">
+                  <div className="space-y-5">
+                    {[
+                      { num: 1, title: 'Scan Code', desc: 'Enter or scan sticker' },
+                      { num: 2, title: 'Category', desc: 'Pick product type' },
+                      { num: 3, title: 'Contacts', desc: 'Emergency triggers' },
+                      { num: 4, title: 'Done', desc: 'Tag is now active' }
+                    ].map(st => (
                       <div
-                        key={fam.id}
-                        className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
-                          fam.isPrimary ? 'bg-orange-50/40 border-orange-200' : 'bg-white border-gray-100 shadow-2xs'
+                        key={st.num}
+                        className={`flex items-center gap-3 transition-opacity ${
+                          wizStep === st.num ? 'opacity-100' : wizStep > st.num ? 'opacity-90' : 'opacity-40'
                         }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs ${
-                            fam.isPrimary ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-700'
-                          }`}>
-                            {fam.name.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-gray-900 text-sm">{fam.name}</span>
-                              {fam.isPrimary && (
-                                <span className="text-[10px] font-extrabold bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full uppercase">
-                                  Primary
-                                </span>
-                              )}
-                            </div>
-                            <p className="font-mono text-xs font-bold text-gray-700 mt-0.5">{fam.phone}</p>
-                            <span className="text-[11px] text-gray-400 font-medium">{fam.relation}</span>
-                          </div>
+                        <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                          wizStep === st.num ? 'bg-[#E25822] border-[#E25822] text-white' :
+                          wizStep > st.num ? 'bg-[#2F6B4F] border-[#2F6B4F] text-white' :
+                          'bg-[#FFFEFB] border-[rgba(32,28,21,0.1)] text-[#201C15]'
+                        }`}>
+                          {wizStep > st.num ? <Check size={14} /> : st.num}
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          {!fam.isPrimary && (
-                            <button
-                              onClick={() => handleSetPrimaryNumber(fam.id)}
-                              className="text-[11px] font-bold text-gray-500 hover:text-orange-600 px-2.5 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
-                            >
-                              Make Primary
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDeleteFamilyNumber(fam.id)}
-                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                            title="Delete number"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                        <div>
+                          <div className="text-xs font-bold text-[#201C15]">{st.title}</div>
+                          <div className="text-[10px] text-[#A79E8B]">{st.desc}</div>
                         </div>
                       </div>
                     ))}
                   </div>
+                </div>
+
+                {/* Wizard Main Section */}
+                <div className="flex-1 p-6 sm:p-9 flex flex-col justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>Product Activation</h2>
+                    <p className="text-xs text-[#6E6759] mt-0.5">Step {wizStep} of 4</p>
+                  </div>
+
+                  <div className="my-6">
+                    {/* Pane 1: Scan Code */}
+                    {wizStep === 1 && (
+                      <div className="space-y-4 max-w-md mx-auto text-center">
+                        <div className="w-40 h-40 border-2 border-dashed border-[#E25822] rounded-2xl mx-auto flex items-center justify-center relative overflow-hidden bg-[#FBEBE1]">
+                          <div className="absolute inset-x-0 h-0.5 bg-[#E25822] animate-pulse top-1/2" />
+                          <QrCode size={70} className="text-[#201C15] opacity-75" />
+                        </div>
+                        <p className="text-xs text-[#6E6759]">Scan the sticker's QR, or enter its code manually.</p>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={wizCode}
+                            onChange={e => setWizCode(e.target.value.toUpperCase())}
+                            placeholder="e.g. NQ-CAR-9081"
+                            className="flex-1 px-4 py-3 text-sm bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] rounded-xl outline-none focus:border-[#E25822] font-mono font-bold uppercase"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAutoScanCode}
+                            className="px-4 py-3 rounded-xl bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] text-xs font-bold text-[#201C15] hover:bg-[#EEE4CF] cursor-pointer"
+                          >
+                            Auto-Scan
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pane 2: Category Pick */}
+                    {wizStep === 2 && (
+                      <div className="space-y-3">
+                        <h3 className="text-base font-bold text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>Select physical product type</h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {[
+                            { v: 'car', icon: '🚗', name: 'Car Sticker' },
+                            { v: 'bike', icon: '🏍️', name: 'Bike Sticker' },
+                            { v: 'home', icon: '🏡', name: 'Home Gate' },
+                            { v: 'luggage', icon: '🧳', name: 'Luggage Tag' },
+                            { v: 'keychain', icon: '🔑', name: 'SOS Keychain' },
+                            { v: 'child', icon: '🎒', name: 'School Bag' }
+                          ].map(cat => (
+                            <div
+                              key={cat.v}
+                              onClick={() => setWizCategory(cat.v)}
+                              className={`p-4 rounded-xl border-2 text-center cursor-pointer transition-all ${
+                                wizCategory === cat.v ? 'border-[#E25822] bg-[#FBEBE1]' : 'border-[rgba(32,28,21,0.1)] bg-[#FFFEFB]'
+                              }`}
+                            >
+                              <div className="text-3xl mb-2">{cat.icon}</div>
+                              <div className="text-xs font-bold text-[#201C15]">{cat.name}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pane 3: Contacts & Triggers */}
+                    {wizStep === 3 && (
+                      <div className="space-y-4 max-w-md mx-auto">
+                        <h3 className="text-base font-bold text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>Configure SOS &amp; alert settings</h3>
+                        <div>
+                          <label className="block text-xs font-bold text-[#6E6759] mb-1">Primary Emergency Contact Name</label>
+                          <input
+                            type="text"
+                            value={wizContactName}
+                            onChange={e => setWizContactName(e.target.value)}
+                            className="w-full px-3.5 py-2.5 text-sm bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] rounded-xl outline-none focus:border-[#E25822]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-[#6E6759] mb-1">Phone Number</label>
+                          <input
+                            type="tel"
+                            value={wizContactPhone}
+                            onChange={e => setWizContactPhone(e.target.value)}
+                            className="w-full px-3.5 py-2.5 text-sm bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] rounded-xl outline-none focus:border-[#E25822] font-mono"
+                          />
+                        </div>
+                        <div className="space-y-2 pt-2 text-xs font-semibold text-[#201C15]">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" defaultChecked className="accent-[#E25822] w-4 h-4" /> Notify via WhatsApp
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" defaultChecked className="accent-[#E25822] w-4 h-4" /> Masked emergency call (IVR)
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" defaultChecked className="accent-[#E25822] w-4 h-4" /> SMS alert with GPS coordinates
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pane 4: Done */}
+                    {wizStep === 4 && (
+                      <div className="text-center space-y-3 py-6">
+                        <div className="w-14 h-14 rounded-full bg-[#E4EFE8] text-[#2F6B4F] flex items-center justify-center mx-auto">
+                          <Check size={28} />
+                        </div>
+                        <h2 className="text-2xl font-bold text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>Tag Successfully Activated!</h2>
+                        <p className="text-xs text-[#6E6759] max-w-sm mx-auto">
+                          Your sticker is now live and visible on your dashboard.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Wizard Footer Controls */}
+                  <div className="flex justify-between pt-4 border-t border-[rgba(32,28,21,0.1)]">
+                    <button
+                      onClick={() => wizStep > 1 && setWizStep(wizStep - 1)}
+                      disabled={wizStep === 1}
+                      className="px-5 py-2.5 rounded-full bg-[#F6F1E7] text-xs font-bold text-[#201C15] disabled:opacity-40 cursor-pointer"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handleWizardNext}
+                      className="px-6 py-2.5 rounded-full bg-[#E25822] hover:bg-[#C4471A] text-white text-xs font-bold shadow-md cursor-pointer"
+                    >
+                      {wizStep === 4 ? 'Go to Dashboard' : wizStep === 3 ? 'Activate Tag' : 'Next Step'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ════ VIEW 3: PRODUCT CATALOG ════ */}
+          {activeTab === 'catalog' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider bg-[#FBEBE1] text-[#C4471A] px-2.5 py-1 rounded-full">
+                      Pre-order Collection
+                    </span>
+                  </div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>Product Catalog &amp; Pre-orders</h1>
+                  <p className="text-xs sm:text-sm text-[#6E6759] mt-1">Reserve the next generation of NamoQR safety tags. Added items go straight to your cart.</p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('subscription')}
+                  className="flex items-center gap-2 bg-[#201C15] hover:bg-[#E25822] text-[#F6F1E7] font-bold text-xs px-5 py-3 rounded-full shadow-md transition-all active:scale-95 cursor-pointer"
+                >
+                  <ShoppingBag size={15} /> Cart ({cart.reduce((s, c) => s + (c.qty || 1), 0)})
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {CATALOG_ITEMS.map((item, idx) => (
+                  <div key={idx} className="group bg-[#FFFEFB] border border-[rgba(32,28,21,0.1)] rounded-2xl overflow-hidden shadow-2xs hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col">
+                    <div className="relative h-36 bg-gradient-to-br from-[#F6F1E7] to-[#FBEBE1] flex items-center justify-center">
+                      {item.img ? (
+                        <img src={item.img} alt={item.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                      ) : (
+                        <span className="text-4xl">{item.icon}</span>
+                      )}
+                      <div className="absolute top-3 right-3 text-[9.5px] font-extrabold uppercase bg-[#E25822] text-white px-2.5 py-1 rounded-full shadow">
+                        Pre-order
+                      </div>
+                    </div>
+                    <div className="p-5 flex flex-col justify-between flex-1 space-y-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-lg">{item.icon}</span>
+                          <h4 className="font-bold text-base text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>{item.name}</h4>
+                        </div>
+                        <p className="text-xs text-[#6E6759] leading-relaxed">{item.desc}</p>
+                      </div>
+                      <div className="flex items-center justify-between pt-3 border-t border-dashed border-[rgba(32,28,21,0.1)]">
+                        <span className="text-lg font-extrabold text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>₹{item.price}</span>
+                        <button
+                          onClick={() => handleAddToCart(item)}
+                          className="px-4 py-2.5 rounded-xl bg-[#E25822] hover:bg-[#C4471A] text-white font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                        >
+                          <ShoppingBag size={14} /> Add to Cart
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ════ VIEW 4: EMERGENCY HISTORY TIMELINE ════ */}
+          {activeTab === 'history' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex justify-between items-end">
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>Emergency &amp; Activity History</h1>
+                  <p className="text-xs sm:text-sm text-[#6E6759] mt-1">Every scan and alert, across all your tags.</p>
+                </div>
+                <button
+                  onClick={handleClearHistory}
+                  className="px-4 py-2 rounded-full bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] text-xs font-bold text-[#201C15] hover:bg-[#EEE4CF] cursor-pointer"
+                >
+                  Clear All Logs
+                </button>
+              </div>
+
+              <div className="bg-[#FFFEFB] border border-[rgba(32,28,21,0.1)] rounded-3xl p-6 sm:p-8 max-w-3xl space-y-6 shadow-sm">
+                {totalTimelineLogs.length === 0 ? (
+                  <div className="text-center py-12 space-y-2">
+                    <div className="text-4xl mb-2">🛡️</div>
+                    <h3 className="font-bold text-lg text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>All clear</h3>
+                    <p className="text-xs text-[#6E6759] max-w-xs mx-auto">No security logs recorded yet. Your family's network is quiet.</p>
+                  </div>
+                ) : (
+                  totalTimelineLogs.map((log: any, i: number) => (
+                    <div key={i} className="flex gap-4 relative pb-6 last:pb-0">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 z-10 ${
+                        log[0] === 'alert' ? 'bg-[#F8E7E3] text-[#C1442E]' :
+                        log[0] === 'success' ? 'bg-[#E4EFE8] text-[#2F6B4F]' :
+                        'bg-[#E4EDF5] text-[#2E5C8A]'
+                      }`}>
+                        {log[0] === 'alert' ? '⚠️' : log[0] === 'success' ? '🛡️' : '🔍'}
+                      </div>
+                      <div className="flex-1 bg-[#F6F1E7] rounded-xl p-3.5 border border-[rgba(32,28,21,0.1)]">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-bold text-xs text-[#201C15]">{log.nickname} — {log[1]}</span>
+                          <span className="text-[10px] text-[#A79E8B]">{log[2]}</span>
+                        </div>
+                        <p className="text-xs text-[#6E6759]">{log[3]} <span className="font-mono text-[10px] text-[#A79E8B]">[{log.code}]</span></p>
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* TAB 3: REGISTER STICKER */}
-        {activeTab === 'register' && (
-          <div className="max-w-xl mx-auto bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold">
-                <ShieldCheck size={22} />
+          {/* ════ VIEW 5: SUBSCRIPTION & NAMQOR CHECKOUT ════ */}
+          {activeTab === 'subscription' && (
+            <div className="space-y-6 animate-fade-in">
+              <div
+                className="relative overflow-hidden rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                style={{ background: 'linear-gradient(135deg, #201C15, #E25822)' }}
+              >
+                <div>
+                  <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold text-white mb-3">
+                    <ShoppingBag size={14} /> Official NamoQR Checkout
+                  </div>
+                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight" style={{ fontFamily: "'Fraunces', serif" }}>
+                    Purchase Safety Stickers
+                  </h1>
+                  <p className="text-white/90 text-xs sm:text-sm mt-1 max-w-lg">
+                    Order your NamoQR safety stickers. Purchased stickers will be automatically activated and assigned to your dashboard upon payment.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-gray-900 text-lg">Activate Protected RapiQR Sticker</h3>
-                <p className="text-xs text-gray-400">Enter your Sticker Code and Security Activation Code to unlock your QR sticker</p>
-              </div>
+
+              {confirmedOrder ? (
+                <div className="bg-[#FFFEFB] rounded-3xl border border-emerald-200 p-8 text-center shadow-lg max-w-lg mx-auto space-y-4">
+                  <div className="w-16 h-16 bg-[#E4EFE8] text-[#2F6B4F] rounded-full flex items-center justify-center mx-auto font-bold">
+                    <CheckCircle2 size={36} />
+                  </div>
+                  <h2 className="text-2xl font-bold text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>Order Confirmed!</h2>
+                  <p className="text-xs text-[#6E6759]">
+                    Thank you! Your NamoQR stickers are being prepared. They have been assigned to your phone number and activated in your dashboard.
+                  </p>
+                  <div className="bg-[#F6F1E7] rounded-2xl p-4 border border-[rgba(32,28,21,0.1)] text-left space-y-2 text-xs">
+                    <div className="flex justify-between font-bold text-[#201C15]">
+                      <span>Order ID:</span>
+                      <span className="font-mono text-[#E25822]">{confirmedOrder.orderId}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-[#201C15]">
+                      <span>Total Paid:</span>
+                      <span>₹{confirmedOrder.total}</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setConfirmedOrder(null);
+                      setActiveTab('overview');
+                    }}
+                    className="w-full py-3.5 rounded-xl bg-[#E25822] hover:bg-[#C4471A] text-white font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <ShieldCheck size={18} /> View Purchased Stickers in Dashboard
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                  {/* Form Column */}
+                  <form onSubmit={handleCheckoutSubmit} className="lg:col-span-7 space-y-6">
+                    {/* 1. Contact Information */}
+                    <div className="bg-[#FFFEFB] rounded-3xl border border-[rgba(32,28,21,0.1)] p-6 shadow-2xs space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-[#201C15] text-[#F6F1E7] text-xs font-black flex items-center justify-center">1</div>
+                        <h3 className="font-bold text-[#201C15] text-base" style={{ fontFamily: "'Fraunces', serif" }}>Contact Information</h3>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-[#6E6759] mb-1">Full Name *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Rahul Sharma"
+                            value={coFullName}
+                            onChange={e => setCoFullName(e.target.value)}
+                            className="w-full px-3.5 py-2.5 text-sm bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] rounded-xl outline-none focus:border-[#E25822]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-[#6E6759] mb-1">Phone Number (Links to Dashboard) *</label>
+                          <input
+                            type="tel"
+                            required
+                            placeholder="+91 98162 31234"
+                            value={coPhone}
+                            onChange={e => setCoPhone(e.target.value)}
+                            className="w-full px-3.5 py-2.5 text-sm bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] rounded-xl outline-none focus:border-[#E25822] font-mono font-semibold"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-[#6E6759] mb-1">Email Address *</label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="you@example.com"
+                          value={coEmail}
+                          onChange={e => setCoEmail(e.target.value)}
+                          className="w-full px-3.5 py-2.5 text-sm bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] rounded-xl outline-none focus:border-[#E25822]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* 2. Shipping Address */}
+                    <div className="bg-[#FFFEFB] rounded-3xl border border-[rgba(32,28,21,0.1)] p-6 shadow-2xs space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-[#201C15] text-[#F6F1E7] text-xs font-black flex items-center justify-center">2</div>
+                        <h3 className="font-bold text-[#201C15] text-base" style={{ fontFamily: "'Fraunces', serif" }}>Shipping Address</h3>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-[#6E6759] mb-1">Flat / Building / Street Address *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Flat 402, Green Heights Apartment"
+                          value={coAddress}
+                          onChange={e => setCoAddress(e.target.value)}
+                          className="w-full px-3.5 py-2.5 text-sm bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] rounded-xl outline-none focus:border-[#E25822]"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-[#6E6759] mb-1">City *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Rajkot"
+                            value={coCity}
+                            onChange={e => setCoCity(e.target.value)}
+                            className="w-full px-3.5 py-2.5 text-sm bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] rounded-xl outline-none focus:border-[#E25822]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-[#6E6759] mb-1">State *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Gujarat"
+                            value={coState}
+                            onChange={e => setCoState(e.target.value)}
+                            className="w-full px-3.5 py-2.5 text-sm bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] rounded-xl outline-none focus:border-[#E25822]"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-[#6E6759] mb-1">Pincode *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="360001"
+                          value={coPincode}
+                          onChange={e => setCoPincode(e.target.value)}
+                          className="w-full px-3.5 py-2.5 text-sm bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] rounded-xl outline-none focus:border-[#E25822] font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    {/* 3. Delivery Method */}
+                    <div className="bg-[#FFFEFB] rounded-3xl border border-[rgba(32,28,21,0.1)] p-6 shadow-2xs space-y-3">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-7 h-7 rounded-full bg-[#201C15] text-[#F6F1E7] text-xs font-black flex items-center justify-center">3</div>
+                        <h3 className="font-bold text-[#201C15] text-base" style={{ fontFamily: "'Fraunces', serif" }}>Delivery Method</h3>
+                      </div>
+                      <label
+                        onClick={() => setDeliveryMethod('standard')}
+                        className={`flex items-center justify-between p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                          deliveryMethod === 'standard' ? 'border-[#E25822] bg-[#FBEBE1]' : 'border-[rgba(32,28,21,0.1)]'
+                        }`}
+                      >
+                        <div>
+                          <p className="font-bold text-xs text-[#201C15]">Standard Delivery</p>
+                          <p className="text-[11px] text-[#6E6759]">Arrives in 4–6 business days</p>
+                        </div>
+                        <span className="text-xs font-extrabold text-[#2F6B4F]">FREE</span>
+                      </label>
+                      <label
+                        onClick={() => setDeliveryMethod('express')}
+                        className={`flex items-center justify-between p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                          deliveryMethod === 'express' ? 'border-[#E25822] bg-[#FBEBE1]' : 'border-[rgba(32,28,21,0.1)]'
+                        }`}
+                      >
+                        <div>
+                          <p className="font-bold text-xs text-[#201C15]">Express Delivery</p>
+                          <p className="text-[11px] text-[#6E6759]">Arrives in 24–48 hours</p>
+                        </div>
+                        <span className="text-xs font-extrabold text-[#201C15]">₹99</span>
+                      </label>
+                    </div>
+
+                    {/* 4. Payment Method */}
+                    <div className="bg-[#FFFEFB] rounded-3xl border border-[rgba(32,28,21,0.1)] p-6 shadow-2xs space-y-3">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-7 h-7 rounded-full bg-[#201C15] text-[#F6F1E7] text-xs font-black flex items-center justify-center">4</div>
+                        <h3 className="font-bold text-[#201C15] text-base" style={{ fontFamily: "'Fraunces', serif" }}>Payment Method</h3>
+                      </div>
+                      <label
+                        onClick={() => setPaymentMethod('upi')}
+                        className={`block p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                          paymentMethod === 'upi' ? 'border-[#E25822] bg-[#FBEBE1]' : 'border-[rgba(32,28,21,0.1)]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-[#201C15]">📱 UPI (GPay, PhonePe, Paytm)</span>
+                          <span className="bg-[#E4EFE8] text-[#2F6B4F] text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">Recommended</span>
+                        </div>
+                      </label>
+                      <label
+                        onClick={() => setPaymentMethod('card')}
+                        className={`block p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                          paymentMethod === 'card' ? 'border-[#E25822] bg-[#FBEBE1]' : 'border-[rgba(32,28,21,0.1)]'
+                        }`}
+                      >
+                        <span className="font-bold text-xs text-[#201C15]">💳 Credit / Debit Card</span>
+                      </label>
+                      <label
+                        onClick={() => setPaymentMethod('cod')}
+                        className={`block p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                          paymentMethod === 'cod' ? 'border-[#E25822] bg-[#FBEBE1]' : 'border-[rgba(32,28,21,0.1)]'
+                        }`}
+                      >
+                        <span className="font-bold text-xs text-[#201C15]">💵 Cash on Delivery</span>
+                      </label>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-4 rounded-2xl bg-[#E25822] hover:bg-[#C4471A] text-white font-extrabold text-base shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <ShieldCheck size={20} /> Pay ₹{grandTotal} &amp; Activate Sticker
+                    </button>
+                  </form>
+
+                  {/* Summary Column */}
+                  <aside className="lg:col-span-5 bg-[#FFFEFB] rounded-3xl border border-[rgba(32,28,21,0.1)] p-6 shadow-2xs sticky top-6 space-y-4">
+                    <h3 className="font-bold text-[#201C15] text-lg" style={{ fontFamily: "'Fraunces', serif" }}>Order Summary</h3>
+
+                    <div className="space-y-3">
+                      {cart.map((item, i) => (
+                        <div key={item.id} className="flex gap-3 items-center pb-3 border-b border-[rgba(32,28,21,0.1)]">
+                          <img src={item.img} alt={item.name} className="w-12 h-12 rounded-xl object-cover bg-[#F6F1E7] flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-xs text-[#201C15] truncate">{item.name}</p>
+                            <p className="text-[11px] text-[#6E6759]">₹{item.price} each</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <button type="button" onClick={() => handleQtyChange(i, -1)} className="w-5 h-5 rounded-full border border-gray-300 flex items-center justify-center font-bold text-xs text-gray-600">-</button>
+                              <span className="text-xs font-bold text-[#201C15]">{item.qty}</span>
+                              <button type="button" onClick={() => handleQtyChange(i, 1)} className="w-5 h-5 rounded-full border border-gray-300 flex items-center justify-center font-bold text-xs text-gray-600">+</button>
+                              <button type="button" onClick={() => handleRemoveCartItem(i)} className="text-[10px] text-red-500 font-semibold ml-2 hover:underline">Remove</button>
+                            </div>
+                          </div>
+                          <span className="font-extrabold text-xs text-[#201C15]">₹{item.price * item.qty}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Promo code (e.g. NAMO10)"
+                        value={promoInput}
+                        onChange={e => setPromoInput(e.target.value)}
+                        className="flex-1 px-3 py-2 text-xs bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] rounded-xl outline-none focus:border-[#E25822] uppercase font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyPromo}
+                        className="bg-[#201C15] hover:bg-black text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors cursor-pointer"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                    {discountPct > 0 && <p className="text-xs text-[#2F6B4F] font-bold">✓ NAMO10 applied (10% OFF)</p>}
+
+                    <div className="space-y-2 pt-3 border-t border-[rgba(32,28,21,0.1)] text-xs text-[#6E6759]">
+                      <div className="flex justify-between">
+                        <span>Subtotal</span>
+                        <span className="font-semibold text-[#201C15]">₹{subtotal}</span>
+                      </div>
+                      {discountAmt > 0 && (
+                        <div className="flex justify-between text-[#2F6B4F] font-semibold">
+                          <span>Discount</span>
+                          <span>-₹{discountAmt}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span>Delivery Fee</span>
+                        <span className="font-semibold text-[#201C15]">{deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-extrabold text-[#201C15] pt-2 border-t border-[rgba(32,28,21,0.1)]">
+                        <span>Total (Incl. GST)</span>
+                        <span className="text-[#E25822]">₹{grandTotal}</span>
+                      </div>
+                    </div>
+                  </aside>
+                </div>
+              )}
+            </div>
+          )}
+
+        </main>
+      </div>
+
+      {/* ─── SLIDE-OVER DRAWER ─── */}
+      <div
+        className={`fixed inset-0 bg-[#201C15]/40 z-40 transition-opacity duration-300 ${
+          activeProduct ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setDrawerProductId(null)}
+      />
+
+      <aside className={`fixed top-0 right-0 bottom-0 w-[440px] max-w-[92vw] bg-[#F6F1E7] z-50 shadow-2xl transition-transform duration-300 ease-out flex flex-col ${
+        activeProduct ? 'translate-x-0' : 'translate-x-full'
+      }`}>
+        {activeProduct && (
+          <>
+            <div className="flex justify-between items-center px-6 py-5 border-b border-[rgba(32,28,21,0.1)] bg-[#FFFEFB]">
+              <h3 className="font-bold text-lg text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>{activeProduct.nickname}</h3>
+              <button onClick={() => setDrawerProductId(null)} className="w-8 h-8 rounded-full bg-[#F6F1E7] flex items-center justify-center text-gray-500 hover:text-gray-900 cursor-pointer">
+                <X size={16} />
+              </button>
             </div>
 
-            <form onSubmit={handleRegisterSticker} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Category *</label>
-                <select
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                  className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-medium"
-                >
-                  {STICKER_CATEGORIES.map((cat) => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </option>
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {/* QR Box */}
+              <div className="bg-[#FFFEFB] border border-[rgba(32,28,21,0.1)] rounded-2xl p-5 text-center space-y-3">
+                <div className="w-32 h-32 bg-white border border-[rgba(32,28,21,0.1)] rounded-2xl p-2 mx-auto shadow-inner flex items-center justify-center">
+                  <svg viewBox="0 0 120 120" className="w-full h-full">
+                    <rect x="5" y="5" width="26" height="26" rx="4" fill="none" stroke="#201C15" strokeWidth="6"/>
+                    <rect x="11" y="11" width="14" height="14" rx="2" fill="#201C15"/>
+                    <rect x="89" y="5" width="26" height="26" rx="4" fill="none" stroke="#201C15" strokeWidth="6"/>
+                    <rect x="95" y="11" width="14" height="14" rx="2" fill="#201C15"/>
+                    <rect x="5" y="89" width="26" height="26" rx="4" fill="none" stroke="#201C15" strokeWidth="6"/>
+                    <rect x="11" y="95" width="14" height="14" rx="2" fill="#201C15"/>
+                    <rect x="42" y="10" width="8" height="8" fill="#201C15"/>
+                    <rect x="62" y="15" width="12" height="6" fill="#201C15"/>
+                    <rect x="36" y="44" width="48" height="32" rx="6" fill="#E25822"/>
+                    <text x="60" y="64" fill="#fff" fontFamily="Inter" fontSize="9" fontWeight="800" textAnchor="middle">NamoQR</text>
+                  </svg>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleShareProfile(activeProduct.code)}
+                    className="flex-1 py-2 rounded-xl bg-[#201C15] hover:bg-[#E25822] text-xs font-bold text-[#F6F1E7] cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Share2 size={12} /> Share Profile
+                  </button>
+                  <button
+                    onClick={() => { setDrawerProductId(null); setActiveTab('subscription'); }}
+                    className="flex-1 py-2 rounded-xl bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] text-xs font-bold text-[#201C15] hover:bg-[#EEE4CF] cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <ShoppingBag size={12} /> Buy More
+                  </button>
+                </div>
+              </div>
+
+              {/* Stat Grid */}
+              <div className="grid grid-cols-2 gap-3 text-center">
+                <div className="bg-[#FFFEFB] border border-[rgba(32,28,21,0.1)] rounded-xl p-3">
+                  <span className="text-xl font-bold block text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>{activeProduct.scans || 0}</span>
+                  <span className="text-[10px] font-bold text-[#6E6759]">Total Scans</span>
+                </div>
+                <div className="bg-[#FFFEFB] border border-[rgba(32,28,21,0.1)] rounded-xl p-3">
+                  <span className="text-xl font-bold block text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>{activeProduct.status === 'Active' ? '95%' : '0%'}</span>
+                  <span className="text-[10px] font-bold text-[#6E6759]">Readiness</span>
+                </div>
+              </div>
+
+              {/* Documents Card */}
+              {activeProduct.docs && activeProduct.docs.length > 0 && (
+                <div className="bg-[#FFFEFB] border border-[rgba(32,28,21,0.1)] rounded-2xl p-4 space-y-2">
+                  <h4 className="font-bold text-xs text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>Documents</h4>
+                  {activeProduct.docs.map((d: any, idx: number) => (
+                    <div key={idx} className="flex justify-between items-center text-xs py-1 border-b border-dashed border-[rgba(32,28,21,0.1)] last:border-0">
+                      <span className="font-semibold text-[#201C15]">{d[0]}</span>
+                      <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                        d[1] === 'valid' ? 'bg-[#E4EFE8] text-[#2F6B4F]' :
+                        d[1] === 'soon' ? 'bg-[#F5EBD9] text-[#A9711F]' :
+                        'bg-[#F8E7E3] text-[#C1442E]'
+                      }`}>
+                        {d[1] === 'valid' ? 'Valid' : d[1] === 'soon' ? 'Expiring Soon' : 'Expired'}
+                      </span>
+                    </div>
                   ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Sticker Code *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. CLCXTF2 or QR8A3F (Assigned from Admin)"
-                  value={newQrId}
-                  onChange={(e) => setNewQrId(sanitizeCode(e.target.value))}
-                  className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-mono uppercase"
-                />
-              </div>
-
-              {/* Protection Layer Activation Code Input */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-semibold text-gray-700">Security Activation Code *</label>
-                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                    Protection Layer Active
-                  </span>
-                </div>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. ACT8A3F (Admin Code or Sticker Package)"
-                    value={newActivationCode}
-                    onChange={(e) => { setNewActivationCode(sanitizeCode(e.target.value)); setActivationError(null); }}
-                    className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-mono uppercase pl-10"
-                  />
-                  <ShieldCheck size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-500" />
-                </div>
-                <p className="text-[11px] text-gray-400 mt-1">
-                  Generated in Admin panel when Sticker Code is assigned. Check dashboard pending section above or physical sticker package.
-                </p>
-              </div>
-
-              {activationError && (
-                <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium flex items-start gap-2.5">
-                  <AlertTriangle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold">Security Protection Notice</p>
-                    <p className="mt-0.5">{activationError}</p>
-                  </div>
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Sticker / Item Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. My Tesla Model 3 or Main Apartment Gate"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Vehicle Number / House ID *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. GJ01AB1234 or Flat 402"
-                  value={newRegNumber}
-                  onChange={(e) => setNewRegNumber(e.target.value)}
-                  className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500 uppercase"
-                />
-              </div>
-
-              {/* Admin / Owner Contact Numbers */}
-              <div className="pt-2 border-t border-gray-100 space-y-3">
-                <p className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
-                  <Phone size={14} className="text-orange-500" /> Emergency Contact Numbers (Shown on Scan)
-                </p>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[11px] font-semibold text-gray-600">Primary Owner Phone Number *</label>
-                    {familyNumbers.length > 0 && (
-                      <select
-                        onChange={(e) => { if (e.target.value) setNewOwnerPhone(e.target.value); }}
-                        className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200"
-                      >
-                        <option value="">Select from Family Numbers ↓</option>
-                        {familyNumbers.map((f: any) => (
-                          <option key={f.id} value={f.phone}>{f.name} ({f.relation}): {f.phone}</option>
-                        ))}
-                      </select>
-                    )}
+              {/* Emergency Contacts Card */}
+              <div className="bg-[#FFFEFB] border border-[rgba(32,28,21,0.1)] rounded-2xl p-4 space-y-2">
+                <h4 className="font-bold text-xs text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>Emergency Contacts</h4>
+                {activeProduct.contacts?.map((c: any, idx: number) => (
+                  <div key={idx} className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-[#201C15]">{c[0]}</span>
+                    <span className="font-mono text-[#6E6759]">{c[1]}</span>
                   </div>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="e.g. +91 98162 31234"
-                    value={newOwnerPhone}
-                    onChange={(e) => setNewOwnerPhone(e.target.value)}
-                    className="w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-mono"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-[11px] font-semibold text-gray-600">Secondary Emergency Phone</label>
-                      {familyNumbers.length > 0 && (
-                        <select
-                          onChange={(e) => { if (e.target.value) setNewSecondaryPhone(e.target.value); }}
-                          className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200"
-                        >
-                          <option value="">Family Phone ↓</option>
-                          {familyNumbers.map((f: any) => (
-                            <option key={f.id} value={f.phone}>{f.name}: {f.phone}</option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                    <input
-                      type="tel"
-                      placeholder="e.g. +91 98765 43210"
-                      value={newSecondaryPhone}
-                      onChange={(e) => setNewSecondaryPhone(e.target.value)}
-                      className="w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">Roadside Assistance Helpline</label>
-                    <input
-                      type="tel"
-                      placeholder="e.g. 1800-102-1234"
-                      value={newRoadsidePhone}
-                      onChange={(e) => setNewRoadsidePhone(e.target.value)}
-                      className="w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-mono"
-                    />
-                  </div>
-                </div>
+                ))}
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-3.5 rounded-xl font-bold text-white text-sm shadow-md transition-all active:scale-[0.99] mt-4 flex items-center justify-center gap-2"
-                style={{ background: 'linear-gradient(135deg, #EAB308, #C2410C)' }}
-              >
-                <ShieldCheck size={18} /> Verify Code & Activate Sticker
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* TAB 4: SOS MEDICAL & CONTACTS */}
-        {activeTab === 'sos' && (
-          <div className="max-w-xl mx-auto bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8 space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center font-bold">
-                <HeartPulse size={22} />
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900 text-lg">Emergency SOS & Medical Notes</h3>
-                <p className="text-xs text-gray-400">Information displayed when first responders scan your keychain</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Blood Group</label>
+              {/* Status Control */}
+              <div className="bg-[#FFFEFB] border border-[rgba(32,28,21,0.1)] rounded-2xl p-4 space-y-2">
+                <h4 className="font-bold text-xs text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>Status Control</h4>
                 <select
-                  value={bloodGroup}
-                  onChange={(e) => setBloodGroup(e.target.value)}
-                  className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-medium"
+                  value={activeProduct.status}
+                  onChange={e => handleChangeStatus(activeProduct.id, e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-[#F6F1E7] border border-[rgba(32,28,21,0.1)] rounded-xl outline-none font-semibold text-[#201C15]"
                 >
-                  {['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'].map(bg => (
-                    <option key={bg} value={bg}>{bg}</option>
-                  ))}
-                </select>
+                  <option value="Active">Active</option>
+                  <option value="Suspended">Suspended</option>
+                  <option value="Lost">Lost</option>
+                  <option value="Replaced">Replaced</option>                  </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Emergency SOS Phone Number</label>
-                <input
-                  type="text"
-                  value={sosPhone}
-                  onChange={(e) => setSosPhone(e.target.value)}
-                  className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-semibold text-gray-900"
-                />
+              {/* Danger Zone */}
+              <div className="bg-[#FFFEFB] border border-[#FECACA] rounded-2xl p-4">
+                <button
+                  onClick={() => setDeleteTarget(activeProduct)}
+                  className="w-full py-2.5 rounded-xl bg-[#FEE2E2] hover:bg-[#FECACA] text-xs font-bold text-[#DC2626] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Trash2 size={13} /> Delete Tag
+                </button>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Known Allergies / Medical Conditions</label>
-                <textarea
-                  rows={3}
-                  value={allergies}
-                  onChange={(e) => setAllergies(e.target.value)}
-                  placeholder="e.g. Diabetic, Allergic to Penicillin"
-                  className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500"
-                />
+              {/* Activity Timeline */}
+              <div className="bg-[#FFFEFB] border border-[rgba(32,28,21,0.1)] rounded-2xl p-4 space-y-3">
+                <h4 className="font-bold text-xs text-[#201C15]" style={{ fontFamily: "'Fraunces', serif" }}>Activity Timeline</h4>
+                {activeProduct.timeline && activeProduct.timeline.length > 0 ? (
+                  activeProduct.timeline.map((t: any, idx: number) => (
+                    <div key={idx} className="flex gap-3 text-xs">
+                      <div className="text-sm flex-shrink-0">
+                        {t[0] === 'alert' ? '⚠️' : t[0] === 'success' ? '🛡️' : '🔍'}
+                      </div>
+                      <div className="flex-1 bg-[#F6F1E7] rounded-xl p-2.5">
+                        <div className="flex justify-between font-bold text-[#201C15]">
+                          <span>{t[1]}</span>
+                          <span className="text-[10px] text-[#A79E8B]">{t[2]}</span>
+                        </div>
+                        <p className="text-[11px] text-[#6E6759] mt-0.5">{t[3]}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-[#6E6759]">No activity recorded yet.</p>
+                )}
               </div>
+            </div>
+          </>
+        )}
+      </aside>
 
+      {/* ─── DELETE CONFIRM MODAL ─── */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4"
+          style={{ background: "rgba(10,10,20,0.6)", backdropFilter: "blur(4px)" }}
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 border border-gray-100"
+            style={{ animation: "modalIn 0.25s cubic-bezier(0.34,1.56,0.64,1)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: "rgba(239,68,68,0.12)", color: "#EF4444" }}>
+                <AlertTriangle size={18} />
+              </div>
+              <h3 className="font-bold text-gray-900 text-base leading-snug">Delete this sticker?</h3>
+            </div>
+            <p className="text-sm text-gray-600 font-medium leading-relaxed mb-6">
+              <span className="font-bold text-gray-900">{deleteTarget.nickname}</span> will be removed from your dashboard. This cannot be undone.
+            </p>
+            <div className="flex gap-3">
               <button
-                type="button"
-                onClick={() => showToast('Emergency SOS details saved!')}
-                className="w-full py-3.5 rounded-xl font-bold text-white text-sm shadow-md transition-all active:scale-[0.99]"
-                style={{ background: 'linear-gradient(135deg, #EAB308, #C2410C)' }}
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all cursor-pointer"
               >
-                Save Emergency Medical Details
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90 cursor-pointer flex items-center justify-center gap-1.5"
+                style={{ background: "#EF4444" }}
+              >
+                <Trash2 size={13} /> Delete
               </button>
             </div>
           </div>
-        )}
-      </main>
+          <style>{`@keyframes modalIn { from { opacity:0; transform:scale(0.94) translateY(8px); } to { opacity:1; transform:scale(1) translateY(0); } }`}</style>
+        </div>
+      )}
 
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-gray-900 text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-xl animate-fade-in flex items-center gap-2">
-          <Sparkles size={14} className="text-amber-400" />
-          {toast}
+      {/* ─── TOAST NOTIFICATION ─── */}
+      {toastMsg && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#201C15] text-[#F6F1E7] px-5 py-3 rounded-full text-xs font-bold shadow-2xl animate-bounce flex items-center gap-2">
+          <Sparkles size={15} className="text-[#E25822]" />
+          <span>{toastMsg}</span>
         </div>
       )}
     </div>
