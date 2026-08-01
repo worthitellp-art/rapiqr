@@ -45,6 +45,10 @@ class QrController {
       const qrData = req.body;
       logger.event('QR_SAVE', '💾', `Saving QR Code record: ${qrData.id || 'new'}`);
       const saved = await QrModel.save(qrData);
+      if (!saved) {
+        logger.warn('QR_SAVE', `Failed to save QR Code record: ${qrData.id || 'unknown'}`);
+        return res.status(500).json({ success: false, error: 'Failed to save QR Code record' });
+      }
       logger.success('QR_SAVE', `QR Code record saved: ${saved.id}`);
       return res.json({ success: true, data: saved });
     } catch (err) {

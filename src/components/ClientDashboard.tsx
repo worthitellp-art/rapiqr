@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { STICKER_CATEGORIES, getCategoryIcon, getCategoryLabel } from '../stickerModules';
 import {
   QrCode,
   Bell,
@@ -421,11 +422,20 @@ export default function ClientDashboard({ onBack, switchToAdminFleet, switchToDi
                         {pending.activationCode}
                       </span>
                     </div>
+                    <div className="h-6 w-px bg-gray-100" />
+                    <div>
+                      <span className="text-[10px] font-bold text-gray-400 block">CATEGORY</span>
+                      <span className="font-sans font-extrabold text-gray-800 text-xs flex items-center gap-1">
+                        <span>{getCategoryIcon((pending.category || 'car') as any)}</span>
+                        <span>{getCategoryLabel((pending.category || 'car') as any)}</span>
+                      </span>
+                    </div>
                     <button
                       onClick={() => {
                         setNewQrId(sanitizeCode(pending.id));
                         setNewActivationCode(sanitizeCode(pending.activationCode));
                         setNewName(pending.vehicleName !== 'Unassigned QR Sticker' ? pending.vehicleName : '');
+                        if (pending.category) setNewCategory(pending.category);
                         setActiveTab('register');
                         showToast(`Pre-filled activation code ${pending.activationCode}`);
                       }}
@@ -795,12 +805,11 @@ export default function ClientDashboard({ onBack, switchToAdminFleet, switchToDi
                   onChange={(e) => setNewCategory(e.target.value)}
                   className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-medium"
                 >
-                  <option value="car">Car / Vehicle Sticker</option>
-                  <option value="bike">Bike / Motorcycle Tag</option>
-                  <option value="home">Home Main Gate Tag</option>
-                  <option value="luggage">Luggage / Travel Tag</option>
-                  <option value="keychain">Keychain Medical SOS</option>
-                  <option value="child">Child Bag Tag</option>
+                  {STICKER_CATEGORIES.map((cat) => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 

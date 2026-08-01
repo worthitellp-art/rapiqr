@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured, getAuthCallbackUrl } from '../../lib/supabase';
 import groupLogo1 from '../../../assets/Group 1000005716-1.png';
 
 const AUTH_IMAGES = [
@@ -104,7 +104,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
       await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin + '/auth/callback',
+          redirectTo: getAuthCallbackUrl(),
         },
       });
       // Modal stays open until redirect; AuthProvider picks up session on return

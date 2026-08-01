@@ -9,6 +9,7 @@ export interface QrRecord {
   status: string;
   activationCode?: string;
   template: string;
+  category?: string;
   fg: string;
   bg: string;
   assignedTo?: string;     // user name this sticker is assigned to

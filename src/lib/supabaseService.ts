@@ -19,7 +19,7 @@ export async function getQrCodesFromDb(limitCount = 100) {
   try {
     const { data, error } = await supabase
       .from('qr_codes')
-      .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, created_at, activation_code')
+      .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, category, created_at, activation_code')
       .order('created_at', { ascending: false })
       .limit(limitCount);
 
@@ -47,7 +47,7 @@ export async function getQrCodeByIdFromDb(qrId: string) {
   try {
     const { data, error } = await supabase
       .from('qr_codes')
-      .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, created_at, activation_code')
+      .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, category, created_at, activation_code')
       .eq('id', qrId)
       .maybeSingle();
 
@@ -68,6 +68,7 @@ export async function saveQrCodeToDb(qr: {
   status: string;
   scansCount?: number;
   templateName?: string;
+  category?: string;
   fgColor?: string;
   bgColor?: string;
   activationCode?: string;
@@ -90,11 +91,12 @@ export async function saveQrCodeToDb(qr: {
         status: qr.status || 'inactive',
         scans_count: qr.scansCount || 0,
         template_name: qr.templateName || 'Default',
+        category: qr.category || 'car',
         fg_color: qr.fgColor || 'EAB308',
         bg_color: qr.bgColor || 'FFFFFF',
         activation_code: qr.activationCode,
       })
-      .select('id, client_id, status, scans_count, created_at, activation_code');
+      .select('id, client_id, status, scans_count, category, created_at, activation_code');
 
     if (error) throw error;
     return data;
@@ -129,6 +131,7 @@ export async function bulkSaveQrCodesToDb(qrList: any[]) {
       status: qr.status || 'inactive',
       scans_count: qr.scans || 0,
       template_name: qr.template || 'Default',
+      category: qr.category || 'car',
       fg_color: qr.fg || 'EAB308',
       bg_color: qr.bg || 'FFFFFF',
       activation_code: qr.activationCode,
@@ -137,7 +140,7 @@ export async function bulkSaveQrCodesToDb(qrList: any[]) {
     const { data, error } = await supabase
       .from('qr_codes')
       .upsert(records)
-      .select('id, client_id, status, activation_code');
+      .select('id, client_id, status, category, activation_code');
       
     if (error) throw error;
     return data;
@@ -298,6 +301,7 @@ export async function saveStickerImageToDb(qrId: string, image: Blob | string) {
  */
 export async function activateQrInDb(data: {
   qrId: string;
+  category?: string;
   ownerName: string;
   ownerPhone: string;
   emergencyPhone?: string;
@@ -330,6 +334,7 @@ export async function activateQrInDb(data: {
       .upsert({
         qr_code_id: data.qrId,
         user_id: data.userId || null,
+        category: (data.category || 'car') as any,
         name: data.ownerName,
         status: 'active',
         assigned_to: data.ownerName,

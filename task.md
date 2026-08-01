@@ -1,8 +1,4 @@
-let me give you fronted and backend url you jut need to connect using env here is the fronted nad backend url :- 
+Code	Category	Activation Code there is only 1 code named cpde onul that code use for everyhing no 2 code needed , and fix  ,
 
 
-after google redirect to the server but also work in local host and the hosted backend server poits beacsse right know after google sign in after going localhost so fix it 
-
-
-
-
+chnage  icon fo the qr codes in sidebar set qr into + icon  , 

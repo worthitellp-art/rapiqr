@@ -140,6 +140,26 @@ export function getCategoryLabel(category: ProductCategory): string {
 }
 
 /**
+ * Sticker creation categories — shown in the admin "Generate QR" panel and
+ * used to personalise the scanner activation title.
+ */
+export const STICKER_CATEGORIES: { value: ProductCategory; label: string }[] = [
+  { value: 'car', label: 'Car & Auto & Truck' },
+  { value: 'bike', label: 'Bike' },
+  { value: 'home', label: 'Home & Office' },
+  { value: 'pet', label: 'Pet' },
+  { value: 'child', label: 'Kids' },
+  { value: 'luggage', label: 'Luggage' },
+];
+
+/**
+ * Human label for a sticker category value ('' when unknown).
+ */
+export function getStickerCategoryLabel(value?: string): string {
+  return STICKER_CATEGORIES.find((c) => c.value === value)?.label ?? '';
+}
+
+/**
  * All module ids as a readonly array.
  */
 export const MODULE_IDS: StickerModuleId[] = STICKER_MODULES.map((m) => m.id);

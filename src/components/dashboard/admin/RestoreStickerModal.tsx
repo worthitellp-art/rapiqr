@@ -41,12 +41,13 @@ export default function RestoreStickerModal({
       scans: 0,
       status: "inactive",
       template: defTpl.name || "Default",
+      category: "car",
       fg: defTpl.fg || "EAB308",
       bg: defTpl.bg || "FFFFFF",
     };
 
     setQrList((prev) => [rec, ...prev]);
-    saveQrCodeToDb({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, fgColor: rec.fg, bgColor: rec.bg });
+    saveQrCodeToDb({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, category: rec.category, fgColor: rec.fg, bgColor: rec.bg });
     setToast(`Sticker ${cleanId} restored!`);
     setTimeout(() => setToast(null), 3000);
     onClose(); openQuickLook(rec);

@@ -46,6 +46,7 @@ import {
   Info,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from "recharts";
+import { STICKER_CATEGORIES, getStickerCategoryLabel } from "../stickerModules";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
 
@@ -62,6 +63,7 @@ interface QrRecord {
   template: string;
   fg: string;
   bg: string;
+  category?: string;
 }
 
 interface Template {
@@ -156,6 +158,7 @@ function dispatchActivationToUserDashboard(qrItem: QrRecord) {
         status: "pending_activation",
         createdAt: new Date().toISOString(),
         template: qrItem.template || "Default",
+        category: qrItem.category || "car",
       },
       ...filtered,
     ];
@@ -813,6 +816,7 @@ function QrCodesPage({
   const [tab, setTab] = useState("single");
   const [bulkCount, setBulkCount] = useState(25);
   const [bulkProgress, setBulkProgress] = useState<number | null>(null);
+  const [category, setCategory] = useState("car");
 
   useEffect(() => {
     if (templates.length > 0 && !templates.find((t) => t.id.toString() === templateId)) {
@@ -853,9 +857,10 @@ function QrCodesPage({
       template: activeTemplate?.name || "Default",
       fg: activeTemplate?.fg || "EAB308",
       bg: activeTemplate?.bg || "FFFFFF",
+      category,
     };
     setQrList((prev) => [rec, ...prev]);
-    saveQrCodeToDb({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, fgColor: rec.fg, bgColor: rec.bg, activationCode: actCode });
+    saveQrCodeToDb({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, category: rec.category, fgColor: rec.fg, bgColor: rec.bg, activationCode: actCode });
     saveGeneratedSticker(rec, activeTemplate?.stickerPos || { x: 110, y: 40, w: 100, h: 100 });
     dispatchActivationToUserDashboard(rec);
     openQuickLook(rec);
@@ -884,6 +889,7 @@ function QrCodesPage({
         template: activeTemplate?.name || "Default",
         fg: activeTemplate?.fg || "EAB308",
         bg: activeTemplate?.bg || "FFFFFF",
+        category,
       };
     });
 
@@ -939,7 +945,7 @@ function QrCodesPage({
         </div>
 
         {tab === "single" ? (
-          <div className="p-6 grid grid-cols-4 gap-3">
+          <div className="p-6 grid grid-cols-5 gap-3">
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Vehicle Name</label>
               <input value={vehicleName} onChange={(e) => setVehicleName(e.target.value)} placeholder="Toyota Innova" className={inputCls} style={{ borderColor: "#e2e8f0" }} />
@@ -947,6 +953,12 @@ function QrCodesPage({
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Vehicle Number</label>
               <input value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="GJ01AB1234" className={inputCls} style={{ borderColor: "#e2e8f0" }} />
+            </div>
+            <div>
+              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Category</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls} style={{ borderColor: "#e2e8f0" }}>
+                {STICKER_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
             </div>
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Template</label>
@@ -966,7 +978,7 @@ function QrCodesPage({
             </div>
           </div>
         ) : (
-          <div className="p-6 grid grid-cols-4 gap-3">
+          <div className="p-6 grid grid-cols-5 gap-3">
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Quantity (max 1000)</label>
               <input
@@ -974,6 +986,12 @@ function QrCodesPage({
                 onChange={(e) => setBulkCount(Math.min(1000, Number(e.target.value)))}
                 className={inputCls} style={{ borderColor: "#e2e8f0" }}
               />
+            </div>
+            <div>
+              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Category</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls} style={{ borderColor: "#e2e8f0" }}>
+                {STICKER_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
             </div>
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Template</label>
@@ -996,7 +1014,7 @@ function QrCodesPage({
                 )}
               </button>
             </div>
-            <p className="col-span-4 text-[11px] text-gray-500 font-medium">Vehicle names &amp; numbers are auto-assigned. Export CSV for the full batch.</p>
+            <p className="col-span-5 text-[11px] text-gray-500 font-medium">Vehicle names &amp; numbers are auto-assigned. Export CSV for the full batch.</p>
           </div>
         )}
       </div>
@@ -1033,6 +1051,7 @@ function QrCodesPage({
                   <th className="px-6 py-3">QR</th>
                   <th className="px-2 py-3">ID / Client</th>
                   <th className="px-2 py-3">Vehicle</th>
+                  <th className="px-2 py-3">Category</th>
                   <th className="px-2 py-3">Activation Code</th>
                   <th className="px-2 py-3">Created</th>
                   <th className="px-2 py-3">Status</th>
@@ -1056,6 +1075,11 @@ function QrCodesPage({
                       <td className="px-2 py-3">
                         <p className="text-xs font-bold text-gray-900">{q.vehicleName}</p>
                         <p className="font-mono text-[10px] text-gray-500 font-medium">{q.vehicleNumber}</p>
+                      </td>
+                      <td className="px-2 py-3">
+                        <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-yellow-50 text-yellow-700 border border-yellow-100">
+                          {getStickerCategoryLabel(q.category) || "Sticker"}
+                        </span>
                       </td>
                       <td className="px-2 py-3"><ActCode code={actCode} /></td>
                       <td className="px-2 py-3 text-[11px] text-gray-600 font-semibold">{fmtDate(q.createdAt)}</td>
@@ -1939,12 +1963,13 @@ function RestoreStickerModal({
       scans: 0,
       status: "inactive",
       template: defTpl.name || "Default",
+      category: "car",
       fg: defTpl.fg || "EAB308",
       bg: defTpl.bg || "FFFFFF",
     };
 
     setQrList((prev) => [rec, ...prev]);
-    saveQrCodeToDb({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, fgColor: rec.fg, bgColor: rec.bg });
+    saveQrCodeToDb({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, category: rec.category, fgColor: rec.fg, bgColor: rec.bg });
     setToast(`Sticker ${cleanId} restored!`);
     setTimeout(() => setToast(null), 3000);
     onClose(); openQuickLook(rec);

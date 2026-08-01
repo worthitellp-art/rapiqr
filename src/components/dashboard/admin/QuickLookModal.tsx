@@ -3,41 +3,8 @@ import StatusPill from "./StatusPill";
 import CopyLinkButton from "./CopyLinkButton";
 import StickerThumb from "./StickerThumb";
 import { QrRecord, Template, StickerPos } from "./types";
-import { qrImageUrl, qrFullUrl, fmtDate, dispatchActivationToUserDashboard } from "./helpers";
+import { qrImageUrl, qrFullUrl, fmtDate, dispatchActivationToUserDashboard, compositeQrOnSticker } from "./helpers";
 import { saveStickerImageToDb } from "../../../lib/supabaseService";
-import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
-
-const STICKER_SRC = stickerTemplateImg;
-
-async function compositeQrOnSticker(qrDataUrl: string, pos: StickerPos): Promise<Blob | null> {
-  return new Promise((resolve) => {
-    const sticker = new Image();
-    sticker.crossOrigin = "anonymous";
-    sticker.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = sticker.naturalWidth;
-      canvas.height = sticker.naturalHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return resolve(null);
-      ctx.drawImage(sticker, 0, 0);
-      const scaleX = sticker.naturalWidth / 320;
-      const scaleY = sticker.naturalHeight / 200;
-      const qr = new Image();
-      qr.crossOrigin = "anonymous";
-      qr.onload = () => {
-        ctx.drawImage(qr, pos.x * scaleX, pos.y * scaleY, pos.w * scaleX, pos.h * scaleY);
-        canvas.toBlob((avifBlob) => {
-          if (avifBlob && avifBlob.type === "image/avif") resolve(avifBlob);
-          else canvas.toBlob((pngBlob) => resolve(pngBlob), "image/png");
-        }, "image/avif", 0.95);
-      };
-      qr.onerror = () => resolve(null);
-      qr.src = qrDataUrl;
-    };
-    sticker.onerror = () => resolve(null);
-    sticker.src = STICKER_SRC;
-  });
-}
 
 export default function QuickLookModal({
   qr, onClose, stickerPos, templates,

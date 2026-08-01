@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthModal from './components/auth/AuthModal';
+import AuthCallback from './pages/AuthCallback';
 
 const LandingPageMaster = lazy(() => import('./components/landing/LandingPageMaster'));
 const QRFleetDashboard = lazy(() => import('./components/dashboard/admin'));
@@ -93,6 +94,11 @@ function MainAppContent() {
   // While Supabase is resolving the session, show loader — prevents flash of landing page
   if (loading && (page === 'dashboard' || page === 'distributor')) {
     return <PageLoader />;
+  }
+
+  // OAuth / password-reset callback — exchange the code, then go to dashboard
+  if (window.location.pathname.startsWith('/auth/callback')) {
+    return <AuthCallback onSuccess={() => navigateTo('dashboard')} />;
   }
 
   if (page === 'scan') {

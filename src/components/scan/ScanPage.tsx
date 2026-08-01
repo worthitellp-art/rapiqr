@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { getQrCodeByIdFromDb, activateQrInDb } from "../../lib/supabaseService";
+import { getStickerCategoryLabel, getCategoryIcon, getCategoryLabel } from "../../stickerModules";
 import groupLogo from "../../../assets/Group 1000005716.png";
 import groupLogo1 from "../../../assets/Group 1000005716-1.png";
 import groupLogo2 from "../../../assets/Group 1000005716-2.png";
@@ -70,6 +71,7 @@ interface QrData {
   status: string;
   template: string;
   activationCode?: string;
+  category?: string;
 }
 
 interface GeoLocation {
@@ -446,7 +448,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
     setAiLoading(true);
 
     const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY || "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";
-    
+
     // Array of active free models on OpenRouter
     const freeModels = [
       "meta-llama/llama-3.3-70b-instruct:free",
@@ -667,6 +669,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
             vehicleNumber: `REG-${dbRecord.id.slice(-4)}`,
             template: dbRecord.template_name || "Default",
             activationCode: dbRecord.activation_code,
+            category: dbRecord.category,
           };
           resolveQr(dbFound);
         } else {
@@ -690,6 +693,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
         status: record.status || "inactive",
         template: record.template || "Default",
         activationCode: record.activationCode,
+        category: record.category,
       };
       setQrData(data);
 
@@ -738,6 +742,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
     // Save to Supabase
     activateQrInDb({
       qrId: qrData.id,
+      category: qrData.category || "car",
       ownerName: regName.trim(),
       ownerPhone: fullPhone,
       emergencyPhone: regEmergencyPhone.trim(),
@@ -782,6 +787,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
           vehicleNumber: qrData.vehicleNumber,
           status: "active",
           template: qrData.template,
+          category: qrData.category,
           ...registrationData,
         };
         localStorage.setItem("namoqr-qrlist", JSON.stringify([newRecord, ...list]));
@@ -887,7 +893,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
       </header>
 
       {/* Main Light Visitor Container */}
-      <main className="flex-1 w-full max-w-md mx-auto px-4 py-2 pb-10 z-10 flex flex-col justify-center items-center">
+      <main className="flex-1 w-full max-w-md mx-auto px-4 py-2 pb-5 z-10 flex flex-col justify-center items-center">
         {/* ============ ACTIVATION — Enter Activation Code ============ */}
         {phase === "activation" && qrData && (
           <div className="w-full max-w-sm mx-auto animate-fade-in">
@@ -895,14 +901,11 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
 
               {/* ——— Yellow Gradient Header ——— */}
               <div className="relative bg-gradient-to-br from-yellow-300 via-amber-300 to-orange-300 px-8 pt-10 pb-16">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-lg">
-                  🔒
-                </div>
                 <h1 className="mt-5 text-center text-3xl font-bold text-slate-900">
-                  Activate Your Sticker
+                  Activate Your {getStickerCategoryLabel(qrData.category) || "Sticker"}
                 </h1>
                 <p className="mt-2 text-center text-sm text-slate-700">
-                  Enter the activation code to unlock this QR tag
+                  Enter your details below to activate this QR tag
                 </p>
                 {/* Decorative circles */}
                 <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/15" />
@@ -910,33 +913,23 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
               </div>
 
               {/* ——— Overlapping White Body ——— */}
-              <div className="-mt-8 rounded-t-3xl bg-white px-6 pb-8 pt-6">
+              <div className="rounded-t-3xl bg-white px-6 pb-4 pt-2">
 
                 {/* Tag Card */}
-                <div className="flex items-center justify-between rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div className="flex items-center justify-between rounded-2xl border border-slate-200 p-3 shadow-sm">
                   <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-yellow-100 text-xl">
-                      🏷️
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-yellow-100 text-xl">
+                      {getCategoryIcon((qrData.category || "car") as any)}
                     </div>
                     <div>
-                      <h3 className="font-semibold text-slate-900">
-                        {qrData.vehicleName && !qrData.vehicleName.includes('Item ') && !qrData.vehicleName.includes('Vehicle (')
-                          ? qrData.vehicleName
-                          : `RapiQR Safety Tag (${qrData.id})`}
-                      </h3>
-                      <p className="text-sm text-slate-500 font-mono">
-                        {qrData.vehicleNumber && !qrData.vehicleNumber.startsWith('XX00XX') && !qrData.vehicleNumber.startsWith('REG-')
-                          ? qrData.vehicleNumber
-                          : `Code: ${qrData.id}`}
-                      </p>
+                      <h2 className="text-sm font-bold text-slate-900">
+                        {getCategoryLabel((qrData.category || "car") as any)}
+                      </h2>
                     </div>
                   </div>
-                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                    Pending
-                  </span>
                 </div>
 
-                {/* Single Activation Form: Name + Country + Phone + Activation Code */}
+                {/* Single Activation Form: Name + Phone Number */}
                 <div className="mt-6 space-y-4">
                   <div>
                     <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -953,49 +946,27 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
 
                   <div>
                     <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Country *
-                    </label>
-                    <select
-                      value={regCountry}
-                      onChange={(e) => { setRegCountry(e.target.value); setActivationError(null); }}
-                      className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-semibold bg-white"
-                    >
-                      {ACTIVATION_COUNTRIES.map((c) => (
-                        <option key={`${c.code}-${c.name}`} value={c.code}>{c.name} ({c.code})</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Phone Number *
                     </label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-mono font-bold text-slate-600 border-r border-slate-200 pr-3">
-                        {regCountry}
-                      </span>
+                    <div className="flex gap-2">
+                      <select
+                        value={regCountry}
+                        onChange={(e) => { setRegCountry(e.target.value); setActivationError(null); }}
+                        title="Country dial code"
+                        className="h-12 w-24 flex-shrink-0 rounded-xl border border-slate-200 px-2 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-bold bg-white"
+                      >
+                        {ACTIVATION_COUNTRIES.map((c) => (
+                          <option key={`${c.code}-${c.name}`} value={c.code}>{c.code}</option>
+                        ))}
+                      </select>
                       <input
                         type="tel"
                         value={regPhone}
                         onChange={(e) => { setRegPhone(e.target.value); setActivationError(null); }}
                         placeholder="98765 43210"
-                        className="h-12 w-full rounded-xl border border-slate-200 pl-16 pr-4 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-mono font-semibold"
+                        className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-mono font-semibold"
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Security Activation Code *
-                    </label>
-                    <input
-                      type="text"
-                      value={activationCodeInput}
-                      onChange={(e) => { setActivationCodeInput(e.target.value.toUpperCase()); setActivationError(null); }}
-                      placeholder="e.g. ACT8A3F"
-                      className="h-12 w-full rounded-xl border border-slate-200 px-4 outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-mono font-bold tracking-wider"
-                      autoCapitalize="characters"
-                    />
                   </div>
 
                   {activationError && (
@@ -1006,7 +977,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                   )}
 
                   <button
-                    onClick={handleActivateNow}
+                    onClick={handleRegisterSubmit}
                     disabled={activatingQr}
                     className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 text-white font-bold shadow-md transition-all hover:scale-[1.02] active:scale-100 cursor-pointer disabled:opacity-50 disabled:hover:scale-100 text-xs"
                   >
@@ -1021,13 +992,6 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                   </button>
                 </div>
 
-                {/* Footer */}
-                <div className="mt-5 rounded-xl bg-yellow-50 p-4">
-                  <p className="text-center text-sm text-slate-600">
-                    Your activation code was provided by the admin.
-                    Check your dashboard for the code.
-                  </p>
-                </div>
 
               </div>
 
@@ -1036,22 +1000,6 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
         )}
 
 
-        {phase === "success" && (
-          <div className="w-full max-w-sm mx-auto animate-fade-in text-center">
-            <div className="rounded-3xl bg-white shadow-2xl p-8">
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 shadow-lg">
-                <CheckCircle2 size={48} className="text-emerald-500" />
-              </div>
-              <h1 className="mt-6 text-2xl font-bold text-slate-900">Activation Successful!</h1>
-              <p className="mt-2 text-sm text-slate-500">
-                Your sticker has been activated. You'll be redirected to the emergency profile.
-              </p>
-              <div className="mt-6 h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full w-full animate-progress rounded-full bg-gradient-to-r from-emerald-400 to-teal-500" />
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* ============ LOCATION REQUEST (Light Mode) ============ */}
         {phase === "location-request" && (
@@ -1198,7 +1146,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                       Get Help  </span>
                   </button>
 
-            
+
                 </div>
 
                 {/* 3. QUICK ACTIONS SECTION */}
@@ -1358,24 +1306,24 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                     </button>
                   </div>
 
-   {/* 6. AI SAFETY ASSISTANT & SUPPORT BAR */}
-                <button
-                  onClick={() => setAiChatOpen(true)}
-                  className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-orange-500/20 active:scale-[0.98] transition-all cursor-pointer"
-                >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold text-xl flex-shrink-0">
-                      <Bot size={22} />
+                  {/* 6. AI SAFETY ASSISTANT & SUPPORT BAR */}
+                  <button
+                    onClick={() => setAiChatOpen(true)}
+                    className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-orange-500/20 active:scale-[0.98] transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold text-xl flex-shrink-0">
+                        <Bot size={22} />
+                      </div>
+                      <div className="text-left min-w-0">
+                        <p className="text-sm font-black text-white tracking-tight">RapiQR AI Assistant</p>
+                        <p className="text-[11px] font-medium text-white/90">Ask AI for emergency advice &amp; owner assistance</p>
+                      </div>
                     </div>
-                    <div className="text-left min-w-0">
-                      <p className="text-sm font-black text-white tracking-tight">RapiQR AI Assistant</p>
-                      <p className="text-[11px] font-medium text-white/90">Ask AI for emergency advice &amp; owner assistance</p>
+                    <div className="bg-white text-orange-700 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
+                      <Sparkles size={13} /> CHAT
                     </div>
-                  </div>
-                  <div className="bg-white text-orange-700 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
-                    <Sparkles size={13} /> CHAT
-                  </div>
-                </button>                </div>
+                  </button>                </div>
 
                 {/* 5. MESSAGE VEHICLE OWNER CARD */}
                 <div className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm flex items-center justify-between gap-3">
@@ -1406,7 +1354,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                   </button>
                 </div>
 
-             
+
 
                 <div className="bg-white rounded-2xl p-2.5 border border-gray-100 shadow-sm flex items-center justify-between divide-x divide-gray-100">
                   {/* Left Half: You're Protected */}
@@ -2015,16 +1963,14 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                     key={idx}
                     className={`flex items-start gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
                   >
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs flex-shrink-0 ${
-                      msg.role === 'user' ? 'bg-orange-500 text-white' : 'bg-gray-900 text-amber-400'
-                    }`}>
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs flex-shrink-0 ${msg.role === 'user' ? 'bg-orange-500 text-white' : 'bg-gray-900 text-amber-400'
+                      }`}>
                       {msg.role === 'user' ? 'U' : <Bot size={16} />}
                     </div>
-                    <div className={`max-w-[80%] rounded-2xl p-3.5 text-xs font-medium leading-relaxed shadow-2xs ${
-                      msg.role === 'user'
-                        ? 'bg-orange-500 text-white rounded-tr-xs'
-                        : 'bg-white text-gray-800 border border-gray-200/80 rounded-tl-xs'
-                    }`}>
+                    <div className={`max-w-[80%] rounded-2xl p-3.5 text-xs font-medium leading-relaxed shadow-2xs ${msg.role === 'user'
+                      ? 'bg-orange-500 text-white rounded-tr-xs'
+                      : 'bg-white text-gray-800 border border-gray-200/80 rounded-tl-xs'
+                      }`}>
                       {msg.content}
                     </div>
                   </div>

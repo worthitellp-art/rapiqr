@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 
 type CallbackStatus = 'processing' | 'success' | 'error';
 
-export default function AuthCallback() {
+export default function AuthCallback({ onSuccess }: { onSuccess?: () => void }) {
   const [status, setStatus] = useState<CallbackStatus>('processing');
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +20,7 @@ export default function AuthCallback() {
         if (sessionError) throw sessionError;
 
         if (data?.session) {
-          onSuccess();
+          finish();
           return;
         }
 
@@ -36,7 +36,7 @@ export default function AuthCallback() {
           // Re-check session after exchange
           const retry = await supabase.auth.getSession();
           if (retry.data?.session) {
-            onSuccess();
+            finish();
             return;
           }
         }
@@ -45,8 +45,7 @@ export default function AuthCallback() {
         //    or the OAuth flow didn't complete. Redirect to home; the main
         //    AuthProvider will pick up any persisted session.
         if (!cancelled) {
-          setStatus('success');
-          cleanUrlAndRedirect();
+          finish();
         }
       } catch (err: any) {
         if (!cancelled) {
@@ -56,20 +55,13 @@ export default function AuthCallback() {
       }
     };
 
-    function onSuccess() {
+    function finish() {
       if (cancelled) return;
       setStatus('success');
-      cleanUrlAndRedirect();
-    }
-
-    function cleanUrlAndRedirect() {
       // Remove OAuth params from the URL so the main app doesn't re-parse them
-      window.history.replaceState({}, document.title, window.location.origin);
-
-      // Navigate to root — AuthProvider will pick up the session from
-      // localStorage (persisted by the code exchange) and App.tsx will
-      // auto-redirect to the dashboard.
-      window.location.href = window.location.origin;
+      window.history.replaceState({}, document.title, window.location.pathname);
+      if (onSuccess) onSuccess();
+      else window.location.href = window.location.origin;
     }
 
     handleCallback();

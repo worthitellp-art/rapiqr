@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, getAuthCallbackUrl } from '../lib/supabase';
 import { getUserProfile, UserProfileData, ADMIN_EMAIL } from '../lib/authService';
 import { apiClient, isApiBackendConfigured } from '../lib/apiClient';
 import type { Session, User } from '@supabase/supabase-js';
@@ -322,7 +322,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + '/reset-password',
+        redirectTo: getAuthCallbackUrl('/reset-password'),
       });
 
       if (error) return { success: false, error: error.message };

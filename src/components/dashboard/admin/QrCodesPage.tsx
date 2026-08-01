@@ -1,13 +1,14 @@
 import type React from "react";
 import { useState, useEffect } from "react";
-import { Plus, Sparkles, Download, Trash2, RefreshCw, Eye, UserPlus } from "lucide-react";
+import { Plus, Sparkles, Download, Trash2, RefreshCw, Eye, UserPlus, Tag } from "lucide-react";
 import StatusPill from "./StatusPill";
 import ActCode from "./ActCode";
 import CopyLinkButton from "./CopyLinkButton";
 import StickerThumb from "./StickerThumb";
 import { QrRecord, Template } from "./types";
-import { uid, generateActivationCode, qrFullUrl, fmtDate, dispatchActivationToUserDashboard } from "./helpers";
+import { uid, generateActivationCode, qrFullUrl, fmtDate, dispatchActivationToUserDashboard, saveGeneratedSticker } from "./helpers";
 import { saveQrCodeToDb, bulkSaveQrCodesToDb } from "../../../lib/supabaseService";
+import { STICKER_CATEGORIES, getCategoryIcon, getCategoryLabel } from "../../../stickerModules";
 import ConfirmModal from "./ConfirmModal";
 
 export default function QrCodesPage({
@@ -20,6 +21,8 @@ export default function QrCodesPage({
   const [templateId, setTemplateId] = useState(
     templates.find((t) => t.isPublicDefault)?.id?.toString() || templates[0]?.id?.toString() || ""
   );
+  const [selectedCategory, setSelectedCategory] = useState<string>("car");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [tab, setTab] = useState("single");
   const [bulkCount, setBulkCount] = useState(25);
   const [bulkProgress, setBulkProgress] = useState<number | null>(null);
@@ -36,33 +39,53 @@ export default function QrCodesPage({
   const activeTemplate = templates.find((t) => t.id.toString() === templateId) || templates[0];
 
   const filtered = qrList.filter((q) => {
-    if (!searchQuery) return true;
-    const q_ = searchQuery.toLowerCase();
-    return q.id.toLowerCase().includes(q_) ||
-      (q.activationCode || "").toLowerCase().includes(q_);
+    const matchesSearch = !searchQuery || 
+      q.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (q.activationCode || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (q.category || "").toLowerCase().includes(searchQuery.toLowerCase());
+      
+    const matchesCategory = categoryFilter === "all" || (q.category || "car") === categoryFilter;
+    return matchesSearch && matchesCategory;
   });
 
-  function makeRecord(): QrRecord {
+  function buildQrRecord(targetCategory: string): QrRecord {
     return {
       id: uid(),
+      clientId: uid("CL"),
       qrUrl: "",
       createdAt: new Date().toISOString(),
       scans: 0,
       status: "inactive",
       activationCode: generateActivationCode(),
       template: activeTemplate?.name || "Default",
+      category: targetCategory,
       fg: activeTemplate?.fg || "EAB308",
       bg: activeTemplate?.bg || "FFFFFF",
     };
   }
 
-  function handleGenerateSingle() {
-    const rec = { ...makeRecord(), qrUrl: qrFullUrl(uid()) };
+  async function handleGenerateSingle() {
+    const rec = buildQrRecord(selectedCategory);
+    rec.qrUrl = qrFullUrl(rec.id);
     setQrList((prev) => [rec, ...prev]);
-    saveQrCodeToDb({ id: rec.id, status: rec.status, templateName: rec.template, fgColor: rec.fg, bgColor: rec.bg, activationCode: rec.activationCode });
+
+    await saveQrCodeToDb({ 
+      id: rec.id, 
+      clientId: rec.clientId, 
+      status: rec.status, 
+      templateName: rec.template, 
+      category: rec.category,
+      fgColor: rec.fg, 
+      bgColor: rec.bg, 
+      activationCode: rec.activationCode 
+    });
+
+    const stickerPos = activeTemplate?.stickerPos || { x: 110, y: 40, w: 100, h: 100 };
+    saveGeneratedSticker(rec, stickerPos);
+
     dispatchActivationToUserDashboard(rec);
     openQuickLook(rec);
-    setToast(`QR Generated! Code: ${rec.id}`);
+    setToast(`QR Generated (${selectedCategory.toUpperCase()})! Code: ${rec.id}`);
     setTimeout(() => setToast(null), 3000);
   }
 
@@ -70,7 +93,7 @@ export default function QrCodesPage({
     const count = Math.max(1, Math.min(1000, Number(bulkCount) || 0));
     setBulkProgress(0);
     const batch: QrRecord[] = Array.from({ length: count }).map(() => {
-      const rec = makeRecord();
+      const rec = buildQrRecord(selectedCategory);
       return { ...rec, qrUrl: qrFullUrl(rec.id) };
     });
 
@@ -84,14 +107,14 @@ export default function QrCodesPage({
 
     batch.forEach((item) => dispatchActivationToUserDashboard(item));
     setBulkProgress(null);
-    setToast(`${count} QR stickers generated & sent to User Dashboard`);
+    setToast(`${count} ${selectedCategory.toUpperCase()} QR stickers generated & sent to User Dashboard`);
     setTimeout(() => setToast(null), 3000);
   }
 
   function downloadCsv() {
     const rows = [
-      ["QR Code", "Activation Code", "Status", "Template", "Created"],
-      ...qrList.map((q) => [q.id, q.activationCode || "ACTPENDING", q.status, q.template, fmtDate(q.createdAt)]),
+      ["QR Code", "Activation Code", "Category", "Status", "Template", "Created"],
+      ...qrList.map((q) => [q.id, q.activationCode || "ACTPENDING", q.category || "car", q.status, q.template, fmtDate(q.createdAt)]),
     ];
     const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -125,9 +148,28 @@ export default function QrCodesPage({
         </div>
 
         {tab === "single" ? (
-          <div className="p-6 grid grid-cols-3 gap-3">
+          <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Template</label>
+              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">
+                Sticker Category
+              </label>
+              <select 
+                value={selectedCategory} 
+                onChange={(e) => setSelectedCategory(e.target.value)} 
+                className={inputCls} 
+                style={{ borderColor: "#e2e8f0" }}
+              >
+                {STICKER_CATEGORIES.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">
+                Template
+              </label>
               <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className={inputCls} style={{ borderColor: "#e2e8f0" }}>
                 {templates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.isPublicDefault ? " (default)" : ""}</option>)}
                 {templates.length === 0 && <option value="">No templates yet</option>}
@@ -139,15 +181,29 @@ export default function QrCodesPage({
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-all hover:opacity-90 active:scale-95 cursor-pointer shadow-sm"
                 style={{ background: "var(--accent)" }}
               >
-                <Plus size={14} /> Generate
+                <Plus size={14} /> Generate Sticker
               </button>
-            </div>
-            <div className="flex items-end">
-              <p className="text-[11px] text-gray-500 font-medium leading-relaxed">Generates a new QR sticker with its own activation code instantly.</p>
             </div>
           </div>
         ) : (
-          <div className="p-6 grid grid-cols-4 gap-3">
+          <div className="p-6 grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">
+                Sticker Category
+              </label>
+              <select 
+                value={selectedCategory} 
+                onChange={(e) => setSelectedCategory(e.target.value)} 
+                className={inputCls} 
+                style={{ borderColor: "#e2e8f0" }}
+              >
+                {STICKER_CATEGORIES.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Quantity (max 1000)</label>
               <input
@@ -163,11 +219,11 @@ export default function QrCodesPage({
                 {templates.length === 0 && <option value="">No templates</option>}
               </select>
             </div>
-            <div className="col-span-2 flex items-end gap-3">
+            <div className="flex items-end gap-3">
               <button
                 onClick={handleGenerateBulk}
                 disabled={bulkProgress !== null}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-60 cursor-pointer shadow-sm"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-60 cursor-pointer shadow-sm"
                 style={{ background: "var(--accent)" }}
               >
                 {bulkProgress !== null ? (
@@ -177,17 +233,36 @@ export default function QrCodesPage({
                 )}
               </button>
             </div>
-            <p className="col-span-4 text-[11px] text-gray-500 font-medium">Each sticker gets a unique code. Export CSV for the full batch.</p>
           </div>
         )}
       </div>
 
       {/* Table */}
       <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: "#f0f0f0" }}>
-        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: "#f7f7f7" }}>
-          <h3 className="font-bold text-gray-900 text-sm">
-            All QR Codes <span className="text-gray-500 font-normal">· {filtered.length}</span>
-          </h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 py-4 border-b gap-3" style={{ borderColor: "#f7f7f7" }}>
+          <div className="flex items-center gap-3">
+            <h3 className="font-bold text-gray-900 text-sm">
+              All QR Codes <span className="text-gray-500 font-normal">· {filtered.length}</span>
+            </h3>
+            
+            {/* Category Filter Pills */}
+            <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200">
+              <Tag size={12} className="text-gray-400 ml-1.5" />
+              <select 
+                value={categoryFilter} 
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer pr-1"
+              >
+                <option value="all">All Categories</option>
+                {STICKER_CATEGORIES.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div className="flex items-center gap-2">
             <button onClick={openRestore} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition-all hover:bg-yellow-50 cursor-pointer" style={{ color: "var(--accent)", borderColor: "rgba(234,179,8,0.3)" }}>
               <RefreshCw size={12} /> Restore
@@ -203,8 +278,8 @@ export default function QrCodesPage({
 
         {filtered.length === 0 ? (
           <div className="px-6 py-14 text-center">
-            <p className="text-sm font-semibold text-gray-700">{searchQuery ? "No results match your search." : "No QR codes yet — generate one above."}</p>
-            {searchQuery && <p className="text-xs text-gray-500 mt-1 font-medium">Try adjusting your search query.</p>}
+            <p className="text-sm font-semibold text-gray-700">{searchQuery || categoryFilter !== "all" ? "No results match your search or filter." : "No QR codes yet — generate one above."}</p>
+            {(searchQuery || categoryFilter !== "all") && <p className="text-xs text-gray-500 mt-1 font-medium">Try adjusting your category filter or search query.</p>}
           </div>
         ) : (
           <>
@@ -213,6 +288,7 @@ export default function QrCodesPage({
                 <tr className="text-left text-[11px] text-gray-500 font-bold uppercase tracking-wider border-b" style={{ borderColor: "#f7f7f7" }}>
                   <th className="px-6 py-3">QR</th>
                   <th className="px-2 py-3">Code</th>
+                  <th className="px-2 py-3">Category</th>
                   <th className="px-2 py-3">Activation Code</th>
                   <th className="px-2 py-3">Created</th>
                   <th className="px-2 py-3">Status</th>
@@ -222,6 +298,10 @@ export default function QrCodesPage({
               <tbody>
                 {filtered.slice(0, 60).map((q) => {
                   const actCode = q.activationCode || "ACT????";
+                  const catKey = (q.category || "car") as any;
+                  const icon = getCategoryIcon(catKey);
+                  const label = getCategoryLabel(catKey);
+
                   return (
                     <tr key={q.id} className="border-b last:border-0 hover:bg-gray-50/60 transition-colors" style={{ borderColor: "#f7f7f7" }}>
                       <td className="px-6 py-3">
@@ -231,6 +311,12 @@ export default function QrCodesPage({
                       </td>
                       <td className="px-2 py-3">
                         <button onClick={() => openQuickLook(q)} className="font-mono text-[11px] font-bold text-gray-900 hover:text-amber-600 transition-colors cursor-pointer">{q.id}</button>
+                      </td>
+                      <td className="px-2 py-3">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-800 border border-gray-200">
+                          <span>{icon}</span>
+                          <span>{label}</span>
+                        </span>
                       </td>
                       <td className="px-2 py-3"><ActCode code={actCode} /></td>
                       <td className="px-2 py-3 text-[11px] text-gray-600 font-semibold">{fmtDate(q.createdAt)}</td>

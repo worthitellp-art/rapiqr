@@ -8,7 +8,7 @@ class QrModel {
     try {
       const { data, error } = await supabaseAdmin
         .from('qr_codes')
-        .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, created_at, activation_code')
+        .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, category, created_at, activation_code')
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -46,10 +46,11 @@ class QrModel {
     try {
       const payload = {
         id: qrData.id,
-        client_id: qrData.clientId || qrData.client_id,
+        client_id: qrData.clientId || qrData.client_id || qrData.id || 'UNASSIGNED',
         status: qrData.status || 'unactivated',
         scans_count: qrData.scansCount || qrData.scans_count || 0,
         template_name: qrData.templateName || qrData.template_name || 'Standard Badge',
+        category: qrData.category || 'car',
         fg_color: qrData.fgColor || qrData.fg_color || '#000000',
         bg_color: qrData.bgColor || qrData.bg_color || '#FFFFFF',
         activation_code: qrData.activationCode || qrData.activation_code || null,
@@ -117,6 +118,7 @@ class QrModel {
         const productPayload = {
           qr_code_id: qrId,
           user_id: activationData.userId || activationData.user_id || null,
+          category: activationData.category || data?.category || 'car',
           name: activationData.ownerName || 'Vehicle Owner',
           status: 'active',
           assigned_to: activationData.ownerName || 'Vehicle Owner',
