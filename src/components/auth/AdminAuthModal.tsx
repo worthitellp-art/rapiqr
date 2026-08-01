@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { X, ShieldAlert, Lock, Mail, ArrowRight, Sparkles } from 'lucide-react';
+import { X, ShieldAlert, Lock, Mail, ArrowRight } from 'lucide-react';
 
 interface AdminAuthModalProps {
   isOpen: boolean;
@@ -9,8 +9,12 @@ interface AdminAuthModalProps {
 }
 
 export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuthModalProps) {
-  const { adminSignIn, adminDemoLogin } = useAuth();
-  const [email, setEmail] = useState('admin@namoqr.com');
+  const { adminSignIn } = useAuth();
+  // Prefill with the configured admin ID so the panel is accessible with the
+  // known credentials (falls back gracefully if the env var is unset).
+  const [email, setEmail] = useState<string>(() =>
+    (import.meta.env.VITE_ADMIN_EMAIL as string | undefined) || 'worthitellp@gmail.com'
+  );
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -33,12 +37,6 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleAdminDemo = () => {
-    adminDemoLogin();
-    onSuccess();
-    onClose();
   };
 
   return (
@@ -81,7 +79,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
               <input
                 type="email"
                 required
-                placeholder="admin@namoqr.com"
+                placeholder="worthitellp@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-200 transition-all text-gray-900"
@@ -118,17 +116,6 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
               </>
             )}
           </button>
-
-          <div className="pt-2 text-center">
-            <button
-              type="button"
-              onClick={handleAdminDemo}
-              className="w-full py-2.5 px-3 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors"
-            >
-              <Sparkles size={14} className="text-amber-500" />
-              Quick Admin Access (Demo Mode)
-            </button>
-          </div>
         </form>
       </div>
     </div>

@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const { supabaseAdmin } = require('../config/db');
 const UserModel = require('../models/userModel');
-const { JWT_SECRET, ADMIN_EMAIL } = require('../middleware/authMiddleware');
+const { JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD } = require('../middleware/authMiddleware');
 const { logger } = require('../middleware/loggerMiddleware');
 
 const googleClient = new OAuth2Client(
@@ -113,6 +113,62 @@ class AuthController {
     } catch (err) {
       logger.error('AUTH_SIGNIN', 'Sign in internal failure', err);
       return res.status(500).json({ success: false, error: err.message || 'Sign in failed' });
+    }
+  }
+
+  /**
+   * Admin Fleet Panel Sign In — the ONLY way to obtain an admin-role token.
+   * Validated purely against ADMIN_EMAIL / ADMIN_PASSWORD in Server/.env (never against
+   * a regular user's Supabase Auth password), so admin access can't be gained through
+   * the normal signup/signin flow no matter what a user's account role looks like.
+   */
+  static async adminSignIn(req, res) {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        logger.warn('AUTH_ADMIN_SIGNIN', 'Admin sign-in attempt missing credentials');
+        return res.status(400).json({ success: false, error: 'Email and password are required' });
+      }
+
+      if (!ADMIN_PASSWORD) {
+        logger.error('AUTH_ADMIN_SIGNIN', 'ADMIN_PASSWORD is not configured on the server');
+        return res.status(500).json({ success: false, error: 'Admin login is not configured.' });
+      }
+
+      if (email.toLowerCase() !== ADMIN_EMAIL.toLowerCase() || password !== ADMIN_PASSWORD) {
+        logger.warn('AUTH_ADMIN_SIGNIN', `Admin login failed for ${email}`);
+        return res.status(401).json({ success: false, error: 'Invalid admin credentials.' });
+      }
+
+      let profile = await UserModel.findByEmail(ADMIN_EMAIL);
+      if (!profile) {
+        profile = await UserModel.upsertProfile({
+          id: 'admin-' + Buffer.from(ADMIN_EMAIL).toString('hex').slice(0, 24),
+          email: ADMIN_EMAIL,
+          fullName: 'Fleet Admin',
+          role: 'admin',
+        });
+      } else if (profile.role !== 'admin') {
+        profile = await UserModel.upsertProfile({ ...profile, role: 'admin' });
+      }
+
+      const token = jwt.sign(
+        { id: profile.id, email: profile.email, role: 'admin' },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      logger.success('AUTH_ADMIN_SIGNIN', `Admin signed in: ${ADMIN_EMAIL}`);
+
+      return res.json({
+        success: true,
+        token,
+        user: { ...profile, role: 'admin' }
+      });
+    } catch (err) {
+      logger.error('AUTH_ADMIN_SIGNIN', 'Admin sign in internal failure', err);
+      return res.status(500).json({ success: false, error: err.message || 'Admin sign in failed' });
     }
   }
 

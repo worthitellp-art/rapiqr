@@ -1,9 +1,11 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthModal from './components/auth/AuthModal';
+import AdminAuthModal from './components/auth/AdminAuthModal';
 import AuthCallback from './pages/AuthCallback';
 
 const LandingPageMaster = lazy(() => import('./components/landing/LandingPageMaster'));
+const CheckoutPage = lazy(() => import('./components/landing/CheckoutPage'));
 const QRFleetDashboard = lazy(() => import('./components/dashboard/admin'));
 const ClientDashboard = lazy(() => import('./components/ClientDashboard'));
 const ScanPage = lazy(() => import('./components/scan/ScanPage'));
@@ -31,13 +33,23 @@ function isScanUrl(): boolean {
   const hash = window.location.hash;
   const search = window.location.search;
 
-  // Matches /QR... or /CL... with at least one following char (handles both QR482KLM and QR-8A3F)
-  const directQrMatch = path.match(/\/(QR|CL)[A-Z0-9_-]+/i);
-  const legacyPathMatch = /\/qr\//i.test(path);
-  const hashMatch = /#\/qr\//i.test(hash);
-  const queryMatch = /\?qr=/i.test(search);
+  // Matches /QR..., /CL..., /NQ... with at least one char (handles QR482KLM, QR-8A3F, NQ-CAR-9081)
+  const directQrMatch = path.match(/\/(QR|CL|NQ)[A-Z0-9_-]+/i);
+  const legacyPathMatch = /\/(qr|activate|verify)(\/|$)/i.test(path);
+  const hashMatch = /#\/(qr|activate|verify)/i.test(hash);
+  const queryMatch = /\?(qr|sticker|code)=/i.test(search);
 
   return !!directQrMatch || legacyPathMatch || hashMatch || queryMatch;
+}
+
+/**
+ * Secret Admin Fleet entry point: only reachable by visiting /admin (or #/admin) directly.
+ * There is no visible link/button to this route anywhere in the app — admin access is
+ * gated purely behind the dedicated AdminAuthModal (secret email + password).
+ */
+function isAdminUrl(): boolean {
+  if (typeof window === 'undefined') return false;
+  return /\/admin(\/|$)/i.test(window.location.pathname) || /#\/admin(\/|$)/i.test(window.location.hash);
 }
 
 function MainAppContent() {
@@ -45,20 +57,22 @@ function MainAppContent() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login');
   const [dashboardMode, setDashboardMode] = useState<'admin' | 'client' | null>(null);
+  const [adminModalOpen, setAdminModalOpen] = useState(() => isAdminUrl());
 
   // Restore page from localStorage, but only non-scan pages
-  const [page, setPage] = useState<'landing' | 'dashboard' | 'scan' | 'distributor'>(() => {
+  const [page, setPage] = useState<'landing' | 'dashboard' | 'scan' | 'distributor' | 'checkout'>(() => {
     if (isScanUrl()) return 'scan';
     try {
       const saved = localStorage.getItem('namoqr-current-page');
       if (saved === 'dashboard') return 'dashboard';
       if (saved === 'distributor') return 'distributor';
+      if (saved === 'checkout') return 'checkout';
     } catch { /* ignore */ }
     return 'landing';
   });
 
   // Persist page to localStorage whenever it changes
-  const navigateTo = (next: 'landing' | 'dashboard' | 'scan' | 'distributor') => {
+  const navigateTo = (next: 'landing' | 'dashboard' | 'scan' | 'distributor' | 'checkout') => {
     try {
       if (next === 'landing') localStorage.removeItem('namoqr-current-page');
       else localStorage.setItem('namoqr-current-page', next);
@@ -91,9 +105,39 @@ function MainAppContent() {
     }
   };
 
+  // Post-purchase one-click signup: open the signup modal pre-filled with the order email
+  const [authPrefillEmail, setAuthPrefillEmail] = useState('');
+  const handleOpenSignupWithEmail = (email: string) => {
+    setAuthPrefillEmail(email);
+    handleOpenAuth('signup');
+  };
+
   // While Supabase is resolving the session, show loader — prevents flash of landing page
   if (loading && (page === 'dashboard' || page === 'distributor')) {
     return <PageLoader />;
+  }
+
+  // Secret Admin Fleet entry (/admin) — requires the dedicated admin email + password.
+  // Normal sign in/sign up never lands here; this is the only path into the admin dashboard.
+  if (adminModalOpen) {
+    return (
+      <div className="min-h-screen bg-zinc-950">
+        <AdminAuthModal
+          isOpen={true}
+          onClose={() => {
+            setAdminModalOpen(false);
+            window.history.replaceState({}, '', '/');
+            navigateTo('landing');
+          }}
+          onSuccess={() => {
+            setDashboardMode('admin');
+            setAdminModalOpen(false);
+            window.history.replaceState({}, '', '/');
+            navigateTo('dashboard');
+          }}
+        />
+      </div>
+    );
   }
 
   // OAuth / password-reset callback — exchange the code, then go to dashboard
@@ -121,7 +165,6 @@ function MainAppContent() {
         ) : (
           <ClientDashboard
             onBack={() => navigateTo('landing')}
-            switchToAdminFleet={isAdmin ? () => setDashboardMode('admin') : undefined}
           />
         )}
       </Suspense>
@@ -136,6 +179,29 @@ function MainAppContent() {
     );
   }
 
+  if (page === 'checkout') {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <CheckoutPage
+          onBack={() => navigateTo('landing')}
+          onOpenSignup={handleOpenSignupWithEmail}
+          onOpenLogin={() => handleOpenAuth('login')}
+          onViewDashboard={() => navigateTo('dashboard')}
+          onOrderComplete={() => {
+            try { localStorage.removeItem('namoqr-cart'); } catch { /* ignore */ }
+          }}
+        />
+        <AuthModal
+          isOpen={authModalOpen}
+          onClose={() => { setAuthModalOpen(false); setAuthPrefillEmail(''); }}
+          onSuccess={() => navigateTo('dashboard')}
+          initialMode={authModalMode}
+          prefillEmail={authPrefillEmail}
+        />
+      </Suspense>
+    );
+  }
+
   return (
     <Suspense fallback={<PageLoader />}>
       <div className="min-h-screen bg-[#FAFAFC] text-[#0A0D14]">
@@ -143,10 +209,11 @@ function MainAppContent() {
           onStart={() => handleOpenAuth('signup')}
           onLogin={() => handleOpenAuth('login')}
           onOpenDistributorDashboard={() => navigateTo('distributor')}
+          onOpenCheckout={() => navigateTo('checkout')}
         />
         <AuthModal
           isOpen={authModalOpen}
-          onClose={() => setAuthModalOpen(false)}
+          onClose={() => { setAuthModalOpen(false); setAuthPrefillEmail(''); }}
           onSuccess={() => {
             // Check if there was a pending distributor application attempt before login
             const pendingIntent = localStorage.getItem('namoqr-pending-distributor-intent');
@@ -158,6 +225,7 @@ function MainAppContent() {
             }
           }}
           initialMode={authModalMode}
+          prefillEmail={authPrefillEmail}
         />
       </div>
     </Suspense>

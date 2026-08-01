@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured, getAuthCallbackUrl } from '../lib/supabase';
-import { getUserProfile, UserProfileData, ADMIN_EMAIL } from '../lib/authService';
+import { getUserProfile, updateProfilePhoneNumber, UserProfileData } from '../lib/authService';
 import { apiClient, isApiBackendConfigured } from '../lib/apiClient';
 import type { Session, User } from '@supabase/supabase-js';
 
@@ -27,13 +27,15 @@ interface AuthContextType {
   loading: boolean;
   isLoggedIn: boolean;
   isAdmin: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ success: boolean; error?: string }>;
+  signUp: (email: string, password: string, fullName: string, phoneNumber?: string) => Promise<{ success: boolean; error?: string }>;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   adminSignIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   demoLogin: () => void;
-  adminDemoLogin: () => void;
+  // Links a phone number to the logged-in account — used at signup and to auto-link
+  // the phone entered during sticker activation, so the dashboard can match by phone.
+  updatePhoneNumber: (phoneNumber: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,9 +61,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .then((res) => {
             if (res?.user) {
               const p = backendUserToProfile(res.user);
+              // Admin role only carries over from a previously-established admin session
+              // (set by adminSignIn) — never granted just by email match here.
               const saved = localStorage.getItem('namoqr-auth-user');
               const savedRole = saved ? JSON.parse(saved).role : null;
-              if (savedRole === 'admin' || res.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+              if (savedRole === 'admin') {
                 p.role = 'admin';
               }
               setProfile(p);
@@ -87,11 +91,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (initSession?.user) {
         getUserProfile(initSession.user.id, initSession.user.email || '').then((p) => {
           if (p) {
+            // Admin role only carries over from a previously-established admin session.
             const saved = localStorage.getItem('namoqr-auth-user');
             const savedRole = saved ? JSON.parse(saved).role : null;
-            if (savedRole === 'admin' || initSession.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
-              p.role = 'admin';
-            }
+            p.role = savedRole === 'admin' ? 'admin' : 'user';
             setProfile(p);
             localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
           }
@@ -109,11 +112,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (currentSession?.user) {
           const userProfile = await getUserProfile(currentSession.user.id, currentSession.user.email || '');
           if (userProfile) {
+            // Admin role only carries over from a previously-established admin session
+            // (set by adminSignIn) — a normal sign-in never unlocks admin,
+            // even if the email happens to match the designated admin address.
             const saved = localStorage.getItem('namoqr-auth-user');
             const savedRole = saved ? JSON.parse(saved).role : null;
-            if (savedRole === 'admin' || currentSession.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
-              userProfile.role = 'admin';
-            }
+            userProfile.role = savedRole === 'admin' ? 'admin' : 'user';
             setProfile(userProfile);
             localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
           }
@@ -132,7 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // Standard user signup: ALWAYS assigns role = 'user'
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, fullName: string, phoneNumber?: string) => {
     try {
       // Backend-first signup when the Render API is configured
       if (isApiBackendConfigured) {
@@ -141,6 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (res?.user) {
           const p = backendUserToProfile(res.user);
           p.role = 'user';
+          if (phoneNumber) p.phoneNumber = phoneNumber;
           setProfile(p);
           localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
         }
@@ -148,12 +153,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (!isSupabaseConfigured) {
-        const newUser: UserProfileData = { 
-          id: 'demo-' + Date.now(), 
-          email, 
-          fullName, 
-          role: 'user', 
-          subscriptionPlan: 'free' 
+        const newUser: UserProfileData = {
+          id: 'demo-' + Date.now(),
+          email,
+          fullName,
+          phoneNumber: phoneNumber || undefined,
+          role: 'user',
+          subscriptionPlan: 'free'
         };
         setProfile(newUser);
         localStorage.setItem('namoqr-auth-user', JSON.stringify(newUser));
@@ -164,7 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email,
         password,
         options: {
-          data: { 
+          data: {
             full_name: fullName,
             role: 'user' // Explicitly set default user role
           },
@@ -177,6 +183,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const p = await getUserProfile(data.user.id, data.user.email || email);
         if (p) {
           p.role = 'user';
+          if (phoneNumber) {
+            p.phoneNumber = phoneNumber;
+            await updateProfilePhoneNumber(data.user.id, phoneNumber);
+          }
           setProfile(p);
           localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
         }
@@ -241,7 +251,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Dedicated Admin Panel login: Requires admin credentials
+  // Dedicated Admin Panel login: validated purely against configured admin credentials
+  // (never against a regular user's account), so admin access can only ever be gained
+  // here — not through the normal signup/signin flow.
   const adminSignIn = async (email: string, password: string) => {
     try {
       // Validate email format
@@ -249,55 +261,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: 'Invalid admin email address.' };
       }
 
-      // Backend-first admin signin when the Render API is configured
+      // Backend-first: validated server-side against Server/.env ADMIN_EMAIL/ADMIN_PASSWORD.
       if (isApiBackendConfigured) {
-        const res = await apiClient.auth.signIn(email, password);
-        // Validate the profile exists and is admin BEFORE persisting any token
-        if (!res?.user) {
-          return { success: false, error: 'Admin authentication failed.' };
+        try {
+          const res = await apiClient.auth.adminSignIn(email, password);
+          if (!res?.user || !res?.token) {
+            return { success: false, error: 'Admin authentication failed.' };
+          }
+          const p = backendUserToProfile(res.user);
+          p.role = 'admin';
+          localStorage.setItem('namoqr-token', res.token);
+          setProfile(p);
+          localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+          return { success: true };
+        } catch (err: any) {
+          return { success: false, error: err.message || 'Invalid admin credentials.' };
         }
-        const p = backendUserToProfile(res.user);
-        if (p.role !== 'admin' && email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-          return { success: false, error: 'Access Denied: This account does not have Admin Fleet privileges.' };
-        }
-        if (res?.token) localStorage.setItem('namoqr-token', res.token);
-        setProfile(p);
-        localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
-        return { success: true };
       }
 
-      if (!isSupabaseConfigured) {
-        if (password.length < 4) {
-          return { success: false, error: 'Invalid admin password.' };
+      // No Express backend configured (e.g. local Vite-only dev): validate against
+      // VITE_ADMIN_EMAIL / VITE_ADMIN_PASSWORD instead. Note these are bundled into the
+      // client JS and are not secret in that build — the backend path above is authoritative.
+      const envAdminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
+      const envAdminPassword = import.meta.env.VITE_ADMIN_PASSWORD as string | undefined;
+
+      if (envAdminEmail && envAdminPassword) {
+        if (email.toLowerCase() !== envAdminEmail.toLowerCase() || password !== envAdminPassword) {
+          return { success: false, error: 'Invalid admin credentials.' };
         }
-        const adminUser: UserProfileData = {
-          id: 'admin-101',
-          email,
-          fullName: 'System Fleet Admin',
-          role: 'admin',
-          subscriptionPlan: 'enterprise',
-          isSubscribed: true,
-        };
-        setProfile(adminUser);
-        localStorage.setItem('namoqr-auth-user', JSON.stringify(adminUser));
-        return { success: true };
+      } else if (password.length < 4) {
+        // No admin credentials configured anywhere — lenient local-only fallback.
+        return { success: false, error: 'Invalid admin password.' };
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const adminUser: UserProfileData = {
+        id: 'admin-101',
         email,
-        password,
-      });
-
-      if (error) return { success: false, error: error.message };
-
-      if (data.user) {
-        const p = await getUserProfile(data.user.id, data.user.email || email);
-        if (p?.role !== 'admin' && email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-          return { success: false, error: 'Access Denied: This account does not have Admin Fleet privileges.' };
-        }
-        setProfile(p);
-      }
-
+        fullName: 'System Fleet Admin',
+        role: 'admin',
+        subscriptionPlan: 'enterprise',
+        isSubscribed: true,
+      };
+      setProfile(adminUser);
+      localStorage.setItem('namoqr-auth-user', JSON.stringify(adminUser));
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || 'Admin authentication failed.' };
@@ -332,34 +338,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Used only as the Google Sign-In fallback when Supabase isn't configured — ALWAYS a
+  // regular user. Admin access is only ever granted via adminSignIn() in the Admin Panel.
   const demoLogin = () => {
-    const demoAdmin: UserProfileData = {
-      id: 'admin-demo-' + Date.now(),
-      email: 'worthitellp@gmail.com',
-      fullName: 'Demo Admin',
-      role: 'admin',
-      subscriptionPlan: 'enterprise',
-      isSubscribed: true,
+    const demoUser: UserProfileData = {
+      id: 'demo-user-' + Date.now(),
+      email: 'demo@rapiqr.com',
+      fullName: 'Demo User',
+      role: 'user',
+      subscriptionPlan: 'free',
+      isSubscribed: false,
     };
-    setProfile(demoAdmin);
-    localStorage.setItem('namoqr-auth-user', JSON.stringify(demoAdmin));
+    setProfile(demoUser);
+    localStorage.setItem('namoqr-auth-user', JSON.stringify(demoUser));
   };
 
-  const adminDemoLogin = () => {
-    const adminUser: UserProfileData = {
-      id: 'admin-demo',
-      email: 'worthitellp@gmail.com',
-      fullName: 'WorthIT Fleet Admin',
-      role: 'admin',
-      subscriptionPlan: 'enterprise',
-      isSubscribed: true,
-    };
-    setProfile(adminUser);
-    localStorage.setItem('namoqr-auth-user', JSON.stringify(adminUser));
+  // Links a phone number to the currently logged-in account. Used at signup and to
+  // auto-link the phone entered during sticker activation (ScanPage) to the account,
+  // so the Client Dashboard can match previously-activated stickers by phone number.
+  const updatePhoneNumber = async (phoneNumber: string) => {
+    if (!profile) return { success: false, error: 'Not signed in.' };
+    try {
+      if (isSupabaseConfigured && !profile.id.startsWith('demo-') && profile.id !== 'demo-user') {
+        const ok = await updateProfilePhoneNumber(profile.id, phoneNumber);
+        if (!ok) return { success: false, error: 'Failed to save phone number.' };
+      }
+      const updated = { ...profile, phoneNumber };
+      setProfile(updated);
+      localStorage.setItem('namoqr-auth-user', JSON.stringify(updated));
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to save phone number.' };
+    }
   };
 
   const isLoggedIn = Boolean(user || profile);
-  // isAdmin is purely role-based — only adminSignIn() and adminDemoLogin() produce role='admin'
+  // isAdmin is purely role-based — only adminSignIn() produces role='admin'
   const isAdmin = profile?.role === 'admin';
 
   return (
@@ -374,10 +388,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signUp,
         signIn,
         adminSignIn,
+        updatePhoneNumber,
         signOut,
         resetPassword,
         demoLogin,
-        adminDemoLogin,
       }}
     >
       {children}

@@ -71,6 +71,7 @@ export async function saveQrCodeToDb(qr: {
   category?: string;
   fgColor?: string;
   bgColor?: string;
+  stickerImage?: string;
   activationCode?: string;
 }) {
   if (isApiBackendConfigured) {
@@ -92,11 +93,12 @@ export async function saveQrCodeToDb(qr: {
         scans_count: qr.scansCount || 0,
         template_name: qr.templateName || 'Default',
         category: qr.category || 'car',
-        fg_color: qr.fgColor || 'EAB308',
+        fg_color: qr.fgColor || 'D9581F',
         bg_color: qr.bgColor || 'FFFFFF',
+        sticker_image: qr.stickerImage || (qr as any).sticker_image || null,
         activation_code: qr.activationCode,
-      })
-      .select('id, client_id, status, scans_count, category, created_at, activation_code');
+      }, { onConflict: 'id' })
+      .select('id, client_id, status, scans_count, category, sticker_image, fg_color, bg_color, created_at, activation_code');
 
     if (error) throw error;
     return data;
@@ -129,18 +131,19 @@ export async function bulkSaveQrCodesToDb(qrList: any[]) {
       id: qr.id,
       client_id: qr.clientId || qr.id,
       status: qr.status || 'inactive',
-      scans_count: qr.scans || 0,
-      template_name: qr.template || 'Default',
+      scans_count: qr.scans || qr.scansCount || 0,
+      template_name: qr.template || qr.templateName || 'Default',
       category: qr.category || 'car',
-      fg_color: qr.fg || 'EAB308',
-      bg_color: qr.bg || 'FFFFFF',
+      fg_color: qr.fg || qr.fgColor || 'D9581F',
+      bg_color: qr.bg || qr.bgColor || 'FFFFFF',
+      sticker_image: qr.stickerImage || qr.sticker_image || null,
       activation_code: qr.activationCode,
     }));
 
     const { data, error } = await supabase
       .from('qr_codes')
-      .upsert(records)
-      .select('id, client_id, status, category, activation_code');
+      .upsert(records, { onConflict: 'id' })
+      .select('id, client_id, status, category, sticker_image, activation_code');
       
     if (error) throw error;
     return data;
@@ -182,16 +185,19 @@ export async function saveTemplateToDb(template: {
 }) {
   if (!isSupabaseConfigured) return null;
   try {
+    const payload: any = {
+      name: template.name,
+      fg_color: template.fgColor,
+      bg_color: template.bgColor,
+      sticker_pos: template.stickerPos || { x: 110, y: 40, w: 100, h: 100 },
+      is_default: template.isDefault || false,
+    };
+    if (template.id && typeof template.id === 'string' && template.id.includes('-')) {
+      payload.id = template.id;
+    }
     const { data, error } = await supabase
       .from('templates')
-      .upsert({
-        id: template.id,
-        name: template.name,
-        fg_color: template.fgColor,
-        bg_color: template.bgColor,
-        sticker_pos: template.stickerPos || { x: 110, y: 40, w: 100, h: 100 },
-        is_default: template.isDefault || false,
-      })
+      .upsert(payload, { onConflict: 'name' })
       .select('id, name, fg_color, bg_color, sticker_pos');
 
     if (error) throw error;
@@ -444,3 +450,140 @@ export async function getReportsFromDb(limitCount = 50) {
     return null;
   }
 }
+
+/**
+ * Fetch Live Server Logs from Supabase database
+ */
+export async function fetchServerLogsFromDb(limitCount = 100, levelFilter?: string, categoryFilter?: string) {
+  if (isApiBackendConfigured) {
+    try {
+      const res = await apiClient.logs.getLogs(limitCount, levelFilter, categoryFilter);
+      return (res.data || []) as any[];
+    } catch (err) {
+      console.warn('Backend fetch logs error (falling back to Supabase):', err);
+    }
+  }
+  if (!isSupabaseConfigured) return [];
+  try {
+    let query = supabase
+      .from('server_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limitCount);
+
+    if (levelFilter && levelFilter !== 'ALL') {
+      query = query.eq('level', levelFilter.toUpperCase());
+    }
+
+    if (categoryFilter && categoryFilter !== 'ALL') {
+      query = query.eq('category', categoryFilter.toUpperCase());
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.warn('Supabase fetch server logs error:', err);
+    return [];
+  }
+}
+
+/**
+ * Clear Live Server Logs in Supabase
+ */
+export async function clearServerLogsInDb() {
+  if (isApiBackendConfigured) {
+    try {
+      await apiClient.logs.clearLogs();
+      return true;
+    } catch (err) {
+      console.warn('Backend clear logs error (falling back to Supabase):', err);
+    }
+  }
+  if (!isSupabaseConfigured) return false;
+  try {
+    const { error } = await supabase
+      .from('server_logs')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (error) throw error;
+  } catch (err) {
+    console.warn('Supabase clear server logs error:', err);
+    return false;
+  }
+}
+
+/**
+ * Fetch helpline communication providers from Supabase
+ */
+export async function getCommunicationProvidersFromDb() {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { data, error } = await supabase
+      .from('communication')
+      .select('id, category, label, phone, active, created_at')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.warn('Supabase fetch communication providers error:', err);
+    return null;
+  }
+}
+
+/**
+ * Save helpline communication provider to Supabase
+ */
+export async function saveCommunicationProviderToDb(provider: {
+  id?: string;
+  category: string;
+  label: string;
+  phone: string;
+  active?: boolean;
+}) {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const payload: any = {
+      category: provider.category,
+      label: provider.label,
+      phone: provider.phone,
+      active: provider.active !== undefined ? provider.active : true,
+    };
+    if (provider.id && typeof provider.id === 'string' && provider.id.includes('-')) {
+      payload.id = provider.id;
+    }
+
+    const { data, error } = await supabase
+      .from('communication')
+      .upsert(payload)
+      .select('id, category, label, phone, active, created_at');
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.warn('Supabase save communication provider error:', err);
+    return null;
+  }
+}
+
+/**
+ * Delete helpline communication provider from Supabase
+ */
+export async function deleteCommunicationProviderFromDb(providerId: string) {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { error } = await supabase
+      .from('communication')
+      .delete()
+      .eq('id', providerId);
+
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.warn('Supabase delete communication provider error:', err);
+    return false;
+  }
+}
+

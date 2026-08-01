@@ -40,28 +40,29 @@ class QrModel {
   }
 
   /**
-   * Save or Update QR Code
+   * Save or Update QR Code record (including sticker image and colors)
    */
   static async save(qrData) {
     try {
       const payload = {
         id: qrData.id,
         client_id: qrData.clientId || qrData.client_id || qrData.id || 'UNASSIGNED',
-        status: qrData.status || 'unactivated',
+        status: qrData.status || 'inactive',
         scans_count: qrData.scansCount || qrData.scans_count || 0,
         template_name: qrData.templateName || qrData.template_name || 'Standard Badge',
         category: qrData.category || 'car',
-        fg_color: qrData.fgColor || qrData.fg_color || '#000000',
-        bg_color: qrData.bgColor || qrData.bg_color || '#FFFFFF',
+        fg_color: qrData.fgColor || qrData.fg_color || 'D9581F',
+        bg_color: qrData.bgColor || qrData.bg_color || 'FFFFFF',
+        sticker_image: qrData.stickerImage || qrData.sticker_image || null,
         activation_code: qrData.activationCode || qrData.activation_code || null,
         created_at: qrData.createdAt || qrData.created_at || new Date().toISOString()
       };
 
       const { data, error } = await supabaseAdmin
         .from('qr_codes')
-        .upsert(payload)
+        .upsert(payload, { onConflict: 'id' })
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data;
@@ -93,15 +94,12 @@ class QrModel {
 
   /**
    * Activate QR Code
-   * Also upserts a products record so the client dashboard shows the registered item
+   * Updates qr_codes status to active and upserts a products record
    */
   static async activate(qrId, activationData) {
     try {
       const payload = {
-        status: 'active',
-        activated_at: new Date().toISOString(),
-        owner_name: activationData.visitorName || activationData.ownerName || 'Vehicle Owner',
-        owner_message: activationData.visitorMessage || activationData.ownerMessage || ''
+        status: 'active'
       };
 
       const { data, error } = await supabaseAdmin
@@ -113,7 +111,7 @@ class QrModel {
 
       if (error) throw error;
 
-      // Mirror the frontend's activateQrInDb: create/update the product record
+      // Upsert product record for user dashboard
       if (activationData.ownerName || activationData.ownerPhone) {
         const productPayload = {
           qr_code_id: qrId,

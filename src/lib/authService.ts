@@ -4,6 +4,7 @@ export interface UserProfileData {
   id: string;
   email: string;
   fullName: string;
+  phoneNumber?: string;
   avatarUrl?: string;
   role: 'user' | 'admin';
   subscriptionPlan?: string;
@@ -35,7 +36,7 @@ export async function getUserProfile(userId: string, email: string): Promise<Use
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, full_name, avatar_url, role, subscription_plan, is_subscribed')
+      .select('id, email, full_name, phone_number, avatar_url, role, subscription_plan, is_subscribed')
       .eq('id', userId)
       .maybeSingle();
 
@@ -46,6 +47,7 @@ export async function getUserProfile(userId: string, email: string): Promise<Use
         id: data.id,
         email: data.email,
         fullName: data.full_name || email.split('@')[0],
+        phoneNumber: data.phone_number || undefined,
         avatarUrl: data.avatar_url,
         role: (data.role as 'user' | 'admin') || defaultRole,
         subscriptionPlan: data.subscription_plan,
@@ -83,5 +85,26 @@ export async function getUserProfile(userId: string, email: string): Promise<Use
       subscriptionPlan: 'free',
       isSubscribed: false,
     };
+  }
+}
+
+/**
+ * Persist a phone number onto a user's profile — used both at signup (if provided)
+ * and to auto-link the phone entered during sticker activation to the logged-in account,
+ * so the Client Dashboard can match stickers to the account by phone number.
+ */
+export async function updateProfilePhoneNumber(userId: string, phoneNumber: string): Promise<boolean> {
+  if (!isSupabaseConfigured) return true;
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ phone_number: phoneNumber })
+      .eq('id', userId);
+
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.warn(`updateProfilePhoneNumber (${userId}) Error:`, err);
+    return false;
   }
 }

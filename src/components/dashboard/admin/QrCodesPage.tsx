@@ -68,6 +68,13 @@ export default function QrCodesPage({
   async function handleGenerateSingle() {
     const rec = buildQrRecord(selectedCategory);
     rec.qrUrl = qrFullUrl(rec.id);
+
+    const stickerPos = activeTemplate?.stickerPos || { x: 110, y: 40, w: 100, h: 100 };
+    const stickerUrl = await saveGeneratedSticker(rec, stickerPos);
+    if (stickerUrl) {
+      rec.stickerImage = stickerUrl;
+    }
+
     setQrList((prev) => [rec, ...prev]);
 
     await saveQrCodeToDb({ 
@@ -78,11 +85,9 @@ export default function QrCodesPage({
       category: rec.category,
       fgColor: rec.fg, 
       bgColor: rec.bg, 
+      stickerImage: rec.stickerImage || stickerUrl || undefined,
       activationCode: rec.activationCode 
     });
-
-    const stickerPos = activeTemplate?.stickerPos || { x: 110, y: 40, w: 100, h: 100 };
-    saveGeneratedSticker(rec, stickerPos);
 
     dispatchActivationToUserDashboard(rec);
     openQuickLook(rec);

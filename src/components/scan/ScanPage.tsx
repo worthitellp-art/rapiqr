@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { getQrCodeByIdFromDb, activateQrInDb } from "../../lib/supabaseService";
+import { useAuth } from "../../context/AuthContext";
 import { getStickerCategoryLabel, getCategoryIcon, getCategoryLabel } from "../../stickerModules";
 import groupLogo from "../../../assets/Group 1000005716.png";
 import groupLogo1 from "../../../assets/Group 1000005716-1.png";
@@ -38,6 +39,10 @@ import {
   Upload,
   Check,
   Send,
+  Mail,
+  Clock,
+  RefreshCw,
+  Smartphone,
   Bot,
   Disc,
   Siren,
@@ -95,18 +100,24 @@ function getQrBaseUrl() {
 function getQrIdFromUrl(): string | null {
   const path = window.location.pathname;
   const hash = window.location.hash;
-  const directMatch = path.match(/^\/([^/]+)/);
-  const hashMatch = hash.match(/#\/qr\/([^/]+)/);
-  const legacyMatch = path.match(/\/qr\/([^/]+)/);
+  const search = window.location.search;
 
-  if (directMatch && directMatch[1] !== "") {
+  const urlParams = new URLSearchParams(search);
+  const paramId = urlParams.get('sticker') || urlParams.get('code') || urlParams.get('qr');
+  if (paramId) return decodeURIComponent(paramId);
+
+  const directMatch = path.match(/^\/([^/]+)/);
+  const hashMatch = hash.match(/#\/(qr|activate|verify)\/([^/]+)/);
+  const legacyMatch = path.match(/\/(qr|activate|verify)\/([^/]+)/);
+
+  if (directMatch && directMatch[1] !== "" && directMatch[1] !== "activate" && directMatch[1] !== "verify") {
     const id = directMatch[1];
-    if (id.toUpperCase().startsWith("QR") || id.toUpperCase().startsWith("CL")) {
+    if (id.toUpperCase().startsWith("QR") || id.toUpperCase().startsWith("CL") || id.toUpperCase().startsWith("NQ")) {
       return decodeURIComponent(id);
     }
   }
-  if (hashMatch) return decodeURIComponent(hashMatch[1]);
-  if (legacyMatch) return decodeURIComponent(legacyMatch[1]);
+  if (hashMatch) return decodeURIComponent(hashMatch[2]);
+  if (legacyMatch) return decodeURIComponent(legacyMatch[2]);
   return null;
 }
 
@@ -369,6 +380,7 @@ function IconTheftDetected() {
 /* ---------------------------------------------------------------------- */
 
 export default function ScanPage({ onBack }: { onBack: () => void }) {
+  const { profile, updatePhoneNumber } = useAuth();
   const [phase, setPhase] = useState<Phase>("validating");
   const [qrData, setQrData] = useState<QrData | null>(null);
   const [location, setLocation] = useState<GeoLocation | null>(null);
@@ -377,7 +389,6 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
   const [visitorName, setVisitorName] = useState("");
   const [visitorMessage, setVisitorMessage] = useState("");
   const [activatingQr, setActivatingQr] = useState(false);
-  const [activationCodeInput, setActivationCodeInput] = useState("");
   const [activationError, setActivationError] = useState<string | null>(null);
   const [activeSubMenu, setActiveSubMenu] = useState<"none" | "emergency-main" | "mechanical" | "medical" | "towing" | "family">("none");
   const [towingImage, setTowingImage] = useState<string | null>(null);
@@ -404,7 +415,77 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
-  const handleActivateNow = () => {
+  // ── Authentication choice (multi-method: Google / Phone+OTP / Email) ──
+  const [authChoice, setAuthChoice] = useState<"google" | "phone" | "email">("phone");
+  const [regEmail, setRegEmail] = useState("");
+  const [googleAuthed, setGoogleAuthed] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [buyerPhone, setBuyerPhone] = useState("");
+  const [phoneMatchesBuyer, setPhoneMatchesBuyer] = useState(false);
+
+  // OTP verification step state (two-step activation flow)
+  const [otpStep, setOtpStep] = useState(false);
+  const [otpInput, setOtpInput] = useState("");
+  // Testing purposes: OTP is fixed to "0000" until real SMS delivery is wired up.
+  const [generatedOtp, setGeneratedOtp] = useState("0000");
+
+  // OTP security: 5-min validity, 5 attempts, resend cooldown
+  const [otpSentTo, setOtpSentTo] = useState("");
+  const [otpTimeLeft, setOtpTimeLeft] = useState(300);
+  const [otpAttemptsLeft, setOtpAttemptsLeft] = useState(5);
+  const [otpResendIn, setOtpResendIn] = useState(0);
+
+  const maskPhone = (full: string) => {
+    const d = full.replace(/\D/g, "");
+    if (d.length < 7) return full;
+    return `${full.slice(0, 3)}-XXXXX-${d.slice(-4)}`;
+  };
+
+  // Prefill owner phone/name/email from the most recent purchase order (decision branch)
+  useEffect(() => {
+    try {
+      const orders = JSON.parse(localStorage.getItem("namoqr-orders") || "[]");
+      if (orders.length > 0) {
+        // Orders are persisted with unshift → index 0 is the newest purchase
+        const last = orders[0];
+        if (last?.phone) {
+          const digits = String(last.phone).replace(/\D/g, "");
+          setBuyerPhone(digits);
+          if (digits.length >= 10) {
+            const local = digits.slice(-10);
+            setRegPhone((prev) => prev || local);
+          }
+        }
+        if (last?.name) setRegName((prev) => prev || String(last.name));
+        if (last?.email) setRegEmail((prev) => prev || String(last.email));
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // Keep the buyer-match flag in sync with the entered phone
+  useEffect(() => {
+    const entered = regPhone.replace(/\D/g, "").replace(/^0+/, "");
+    setPhoneMatchesBuyer(
+      !!buyerPhone && entered.length >= 10 && buyerPhone.slice(-10) === entered.slice(-10)
+    );
+  }, [regPhone, buyerPhone]);
+
+  // OTP 5-minute validity countdown
+  useEffect(() => {
+    if (!otpStep) return;
+    const t = setInterval(() => setOtpTimeLeft((s) => (s > 0 ? s - 1 : 0)), 1000);
+    return () => clearInterval(t);
+  }, [otpStep]);
+
+  // Resend cooldown countdown
+  useEffect(() => {
+    if (otpResendIn <= 0) return;
+    const t = setInterval(() => setOtpResendIn((s) => (s > 0 ? s - 1 : 0)), 1000);
+    return () => clearInterval(t);
+  }, [otpResendIn]);
+
+  const handleSendOtp = () => {
     if (!qrData) return;
     setActivationError(null);
 
@@ -417,18 +498,100 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
       return;
     }
 
-    const entered = activationCodeInput.trim().toUpperCase();
-    if (!entered) {
-      setActivationError("Please enter your activation code.");
+    // Verify the sticker's stored activation code before sending OTP.
+    const storedCode = (qrData.activationCode || qrData.id || "").trim();
+    if (!storedCode) {
+      setActivationError("No activation code found for this QR tag.");
       return;
     }
 
-    if (entered !== storedCode.toUpperCase()) {
-      setActivationError("Invalid activation code. Please try again.");
+    // Decision branch: phone matches the purchase phone → skip OTP entirely
+    if (phoneMatchesBuyer) {
+      handleRegisterSubmit(true);
       return;
     }
 
-    handleRegisterSubmit();
+    // Demo OTP — a real integration would send this via SMS.
+    setGeneratedOtp("0000");
+    setOtpInput("");
+    setEmailSent(false); // fresh phone flow — never inherit the email variant
+    setOtpSentTo(maskPhone(`${regCountry} ${regPhone}`));
+    setOtpTimeLeft(300);
+    setOtpAttemptsLeft(5);
+    setOtpResendIn(30);
+    setActivationError(null);
+    setOtpStep(true);
+  };
+
+  const handleResendOtp = () => {
+    if (otpResendIn > 0) return;
+    setGeneratedOtp("0000");
+    setOtpInput("");
+    setActivationError(null);
+    setOtpTimeLeft(300);
+    setOtpAttemptsLeft(5);
+    setOtpResendIn(30);
+  };
+
+  const handleSendEmailCode = () => {
+    if (!qrData) return;
+    setActivationError(null);
+
+    if (!regName.trim()) {
+      setActivationError("Please enter your full name.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail.trim())) {
+      setActivationError("Please enter a valid email address.");
+      return;
+    }
+
+    // Simulated email — a real integration would send a magic link / code.
+    setGeneratedOtp("0000");
+    setOtpInput("");
+    setOtpTimeLeft(300);
+    setOtpAttemptsLeft(5);
+    setOtpResendIn(30);
+    setEmailSent(true);
+    setActivationError(null);
+    setOtpStep(true);
+  };
+
+  const handleContinueWithGoogle = () => {
+    if (!qrData) return;
+    setGoogleLoading(true);
+    setActivationError(null);
+    setTimeout(() => {
+      setGoogleLoading(false);
+      setGoogleAuthed(true);
+      if (!regName.trim()) setRegName("Karan Sharma"); // demo Google profile
+    }, 1200);
+  };
+
+  const handleVerifyOtpAndActivate = () => {
+    if (!qrData) return;
+    setActivationError(null);
+
+    if (otpTimeLeft <= 0) {
+      setActivationError("This code has expired. Please resend a new code.");
+      return;
+    }
+    if (otpAttemptsLeft <= 0) {
+      setActivationError("Too many failed attempts. Please resend a new code.");
+      return;
+    }
+    if (otpInput.trim() !== generatedOtp) {
+      const left = otpAttemptsLeft - 1;
+      setOtpAttemptsLeft(left);
+      setActivationError(left > 0 ? `Invalid code. ${left} attempt${left === 1 ? "" : "s"} left.` : "Too many failed attempts. Please resend a new code.");
+      return;
+    }
+
+    handleRegisterSubmit(true);
+  };
+
+  const handleContinueLimited = () => {
+    handleRegisterSubmit(false);
   };
 
   const handleSendAiMessage = async (customPrompt?: string) => {
@@ -720,9 +883,9 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
   }, [requestLocation]);
 
   /* ---- Registration Form Submit (after activation code validated) ---- */
-  const handleRegisterSubmit = () => {
+  const handleRegisterSubmit = (verified = true) => {
     if (!qrData) return;
-    if (!regName.trim() || !regPhone.trim()) {
+    if (!regName.trim() || (!regPhone.trim() && !regEmail.trim())) {
       setActivationError("Please enter your name and phone number.");
       return;
     }
@@ -731,7 +894,9 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
 
     const fullPhone = regPhone.trim().startsWith("+")
       ? regPhone.trim()
-      : `${regCountry}${regPhone.trim().replace(/\s+/g, "")}`;
+      : regPhone.trim()
+        ? `${regCountry}${regPhone.trim().replace(/\s+/g, "")}`
+        : regEmail.trim();
 
     // Save to Supabase
     activateQrInDb({
@@ -743,7 +908,14 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
       bloodGroup: regBloodGroup,
       allergies: regAllergies.trim(),
       address: regAddress.trim(),
+      userId: profile?.id,
     });
+
+    // Auto-link this phone number to the logged-in account (if any) so the sticker
+    // shows up on their Client Dashboard the next time they sign in.
+    if (profile && regPhone.trim() && profile.phoneNumber !== fullPhone) {
+      updatePhoneNumber(fullPhone).catch(() => { /* non-blocking */ });
+    }
 
     setTimeout(() => {
       // Also save to localStorage as fallback
@@ -754,6 +926,8 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
       const registrationData = {
         ownerName: regName.trim(),
         ownerPhone: fullPhone,
+        email: regEmail.trim(),
+        verification: verified ? "verified" : "pending",
         emergencyPhone: regEmergencyPhone.trim(),
         bloodGroup: regBloodGroup,
         allergies: regAllergies.trim(),
@@ -766,6 +940,8 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
         list[idx].activatedAt = registrationData.activatedAt;
         list[idx].ownerName = registrationData.ownerName;
         list[idx].ownerPhone = registrationData.ownerPhone;
+        list[idx].email = registrationData.email;
+        list[idx].verification = registrationData.verification;
         list[idx].secondaryPhone = registrationData.emergencyPhone;
         list[idx].bloodGroup = registrationData.bloodGroup;
         list[idx].allergies = registrationData.allergies;
@@ -923,10 +1099,49 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                   </div>
                 </div>
 
-                {/* Single Activation Form: Name + Phone Number + OTP Verification */}
+                {/* Single Activation Form: Auth Choice → Details → OTP Verification */}
                 <div className="mt-6 space-y-4">
                   {!otpStep ? (
                     <>
+                      {/* ── AUTH METHOD CHOICE ── */}
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Verify with
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { setAuthChoice("google"); setEmailSent(false); setActivationError(null); }}
+                            className={`flex h-11 items-center justify-center gap-1.5 rounded-xl border text-[11px] font-bold transition cursor-pointer ${authChoice === "google" ? "border-yellow-400 bg-yellow-50 text-slate-900 ring-2 ring-yellow-200" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                              <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47a5.57 5.57 0 0 1-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"/>
+                              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09A11.99 11.99 0 0 0 12 24z"/>
+                              <path fill="#FBBC05" d="M5.27 14.29a7.19 7.19 0 0 1 0-4.58V6.62H1.29a12.01 12.01 0 0 0 0 10.76l3.98-3.09z"/>
+                              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.32 2.69 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z"/>
+                            </svg>
+                            Google
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setAuthChoice("phone"); setEmailSent(false); setActivationError(null); }}
+                            className={`flex h-11 items-center justify-center gap-1.5 rounded-xl border text-[11px] font-bold transition cursor-pointer ${authChoice === "phone" ? "border-yellow-400 bg-yellow-50 text-slate-900 ring-2 ring-yellow-200" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`}
+                          >
+                            <Smartphone size={13} />
+                            Phone + OTP
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setAuthChoice("email"); setEmailSent(false); setActivationError(null); }}
+                            className={`flex h-11 items-center justify-center gap-1.5 rounded-xl border text-[11px] font-bold transition cursor-pointer ${authChoice === "email" ? "border-yellow-400 bg-yellow-50 text-slate-900 ring-2 ring-yellow-200" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`}
+                          >
+                            <Mail size={13} />
+                            Email
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* ── DETAILS ── */}
                       <div>
                         <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
                           Full Name *
@@ -940,30 +1155,52 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                         />
                       </div>
 
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Phone Number *
-                        </label>
-                        <div className="flex gap-2">
-                          <select
-                            value={regCountry}
-                            onChange={(e) => { setRegCountry(e.target.value); setActivationError(null); }}
-                            title="Country dial code"
-                            className="h-12 w-24 flex-shrink-0 rounded-xl border border-slate-200 px-2 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-bold bg-white"
-                          >
-                            {ACTIVATION_COUNTRIES.map((c) => (
-                              <option key={`${c.code}-${c.name}`} value={c.code}>{c.code}</option>
-                            ))}
-                          </select>
+                      {authChoice !== "email" ? (
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            {authChoice === "google" ? "Owner Phone Number *" : "Phone Number *"}
+                          </label>
+                          <div className="flex gap-2">
+                            <select
+                              value={regCountry}
+                              onChange={(e) => { setRegCountry(e.target.value); setActivationError(null); }}
+                              title="Country dial code"
+                              className="h-12 w-24 flex-shrink-0 rounded-xl border border-slate-200 px-2 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-bold bg-white"
+                            >
+                              {ACTIVATION_COUNTRIES.map((c) => (
+                                <option key={`${c.code}-${c.name}`} value={c.code}>{c.code}</option>
+                              ))}
+                            </select>
+                            <input
+                              type="tel"
+                              value={regPhone}
+                              onChange={(e) => { setRegPhone(e.target.value); setActivationError(null); }}
+                              placeholder="98765 43210"
+                              className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-mono font-semibold"
+                            />
+                          </div>
+                          {phoneMatchesBuyer && authChoice === "phone" && (
+                            <p className="mt-2 flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-[11px] font-bold text-emerald-700">
+                              <CheckCircle2 size={13} />
+                              Matches your purchase phone — you can activate instantly.
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Email Address *
+                          </label>
                           <input
-                            type="tel"
-                            value={regPhone}
-                            onChange={(e) => { setRegPhone(e.target.value); setActivationError(null); }}
-                            placeholder="98765 43210"
-                            className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-mono font-semibold"
+                            type="email"
+                            value={regEmail}
+                            onChange={(e) => { setRegEmail(e.target.value); setActivationError(null); }}
+                            placeholder="you@example.com"
+                            autoComplete="email"
+                            className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-semibold"
                           />
                         </div>
-                      </div>
+                      )}
 
                       {activationError && (
                         <p className="flex items-center gap-1 text-[11px] font-semibold text-red-500">
@@ -972,37 +1209,125 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                         </p>
                       )}
 
-                      <button
-                        onClick={handleActivateNow}
-                        className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 text-white font-bold shadow-md transition-all hover:scale-[1.02] active:scale-100 cursor-pointer text-xs"
-                      >
-                        <Send size={15} /> Send OTP &amp; Verify Activation Code
-                      </button>
+                      {/* ── PRIMARY ACTION ── */}
+                      {authChoice === "google" ? (
+                        <button
+                          onClick={googleAuthed ? () => handleRegisterSubmit(true) : handleContinueWithGoogle}
+                          disabled={googleLoading}
+                          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 text-white font-bold shadow-md transition-all hover:scale-[1.02] active:scale-100 cursor-pointer text-xs disabled:opacity-60"
+                        >
+                          {googleLoading ? (
+                            <>
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                              <span>Connecting to Google…</span>
+                            </>
+                          ) : googleAuthed ? (
+                            <><ShieldCheck size={15} /> Activate Sticker (Google Verified)</>
+                          ) : (
+                            <>Continue with Google</>
+                          )}
+                        </button>
+                      ) : phoneMatchesBuyer && authChoice === "phone" ? (
+                        <button
+                          onClick={() => handleRegisterSubmit(true)}
+                          disabled={activatingQr}
+                          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md transition-all hover:scale-[1.02] active:scale-100 cursor-pointer text-xs disabled:opacity-60"
+                        >
+                          {activatingQr ? (
+                            <>
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                              <span>Activating…</span>
+                            </>
+                          ) : (
+                            <><ShieldCheck size={15} /> Activate Instantly (Purchase Phone)</>
+                          )}
+                        </button>
+                      ) : authChoice === "email" ? (
+                        <button
+                          onClick={handleSendEmailCode}
+                          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 text-white font-bold shadow-md transition-all hover:scale-[1.02] active:scale-100 cursor-pointer text-xs"
+                        >
+                          <Send size={15} /> Send Verification Email
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleSendOtp}
+                          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 text-white font-bold shadow-md transition-all hover:scale-[1.02] active:scale-100 cursor-pointer text-xs"
+                        >
+                          <Send size={15} /> Send OTP &amp; Verify Activation Code
+                        </button>
+                      )}
                     </>
                   ) : (
-                    /* OTP VERIFICATION STEP */
+                    /* OTP / EMAIL VERIFICATION STEP */
                     <div className="space-y-4 bg-slate-50 border border-slate-200 rounded-2xl p-4 animate-fade-in text-left">
                       <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
                         <CheckCircle2 size={16} />
-                        <span>OTP &amp; Activation Code Check</span>
+                        <span>{emailSent ? "Email Verification" : "OTP &amp; Activation Code Check"}</span>
                       </div>
-                      <p className="text-xs text-slate-600">
-                        Enter the 6-digit OTP sent to <strong className="font-mono text-slate-900">{regCountry} {regPhone}</strong> to verify your phone number and activate QR code <strong className="font-mono text-amber-600">{qrData.activationCode || qrData.id}</strong>.
-                      </p>
+
+                      {emailSent ? (
+                        <p className="text-xs text-slate-600">
+                          <strong className="text-slate-900">Check your email.</strong> We've sent a 4-digit code to{" "}
+                          <strong className="font-mono text-slate-900">{regEmail}</strong> to verify your identity and activate QR code{" "}
+                          <strong className="font-mono text-amber-600">{qrData.activationCode || qrData.id}</strong>.
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-600">
+                          We've sent a 4-digit code to <strong className="font-mono text-slate-900">{otpSentTo || `${regCountry} ${regPhone}`}</strong> to verify your phone number and activate QR code{" "}
+                          <strong className="font-mono text-amber-600">{qrData.activationCode || qrData.id}</strong>.
+                        </p>
+                      )}
+
+                      {/* Security: expiry + attempts */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold ${otpTimeLeft > 0 ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-600"}`}>
+                          <Clock size={11} />
+                          {otpTimeLeft > 0 ? `Code expires in ${Math.floor(otpTimeLeft / 60)}:${String(otpTimeLeft % 60).padStart(2, "0")}` : "Code expired"}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-500">{otpAttemptsLeft} attempt{otpAttemptsLeft === 1 ? "" : "s"} left</span>
+                      </div>
+
                       <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-[11px] text-amber-800 font-semibold flex items-center justify-between">
-                        <span>Test OTP Code:</span>
-                        <span className="font-mono font-extrabold text-xs tracking-widest bg-amber-200/80 px-2 py-0.5 rounded">123456</span>
+                        <span>Test Code:</span>
+                        <span className="font-mono font-extrabold text-xs tracking-widest bg-amber-200/80 px-2 py-0.5 rounded">0000</span>
                       </div>
+
                       <div>
-                        <label className="mb-1 block text-xs font-semibold text-slate-700">Enter 6-Digit OTP *</label>
+                        <label className="mb-1 block text-xs font-semibold text-slate-700">Enter 4-Digit Code *</label>
                         <input
                           type="text"
-                          maxLength={6}
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          autoFocus
+                          maxLength={4}
                           value={otpInput}
-                          onChange={(e) => { setOtpInput(e.target.value); setActivationError(null); }}
-                          placeholder="123456"
+                          onChange={(e) => { setOtpInput(e.target.value.replace(/\D/g, "").slice(0, 4)); setActivationError(null); }}
+                          placeholder="••••"
                           className="h-12 w-full rounded-xl border border-slate-300 px-4 text-center font-mono text-lg font-bold tracking-widest outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 bg-white"
                         />
+                      </div>
+
+                      {/* Resend + switch method */}
+                      <div className="flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={handleResendOtp}
+                          disabled={otpResendIn > 0}
+                          className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer disabled:opacity-40"
+                        >
+                          <RefreshCw size={12} />
+                          {otpResendIn > 0 ? `Resend code in ${otpResendIn}s` : "Resend code"}
+                        </button>
+                        {!emailSent && (
+                          <button
+                            type="button"
+                            onClick={() => { setOtpStep(false); setAuthChoice("email"); setActivationError(null); }}
+                            className="text-[11px] font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
+                          >
+                            Forgot phone? Use email instead
+                          </button>
+                        )}
                       </div>
 
                       {activationError && (
@@ -1032,10 +1357,20 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                               <span>Activating…</span>
                             </>
                           ) : (
-                            <><ShieldCheck size={16} /> Verify OTP &amp; Activate Sticker</>
+                            <><ShieldCheck size={16} /> Verify &amp; Activate Sticker</>
                           )}
                         </button>
                       </div>
+
+                      {emailSent && (
+                        <button
+                          type="button"
+                          onClick={handleContinueLimited}
+                          className="w-full h-10 rounded-xl border border-dashed border-slate-300 text-[11px] font-bold text-slate-500 hover:bg-white hover:text-slate-700 cursor-pointer"
+                        >
+                          <Lock size={12} className="mr-1 inline" /> Check your email for a link — continue in limited mode
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

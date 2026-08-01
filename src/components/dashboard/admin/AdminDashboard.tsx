@@ -127,6 +127,7 @@ export default function AdminDashboard({ onBack, switchToClientPortal }: { onBac
             />
           )}
           {page === "users" && <UsersPage users={users} setUsers={setUsers} qrList={qrList} setQrList={setQrList} setToast={setToast} />}
+
           {page === "customize" && (
             <CustomizePage
               templates={templates} setTemplates={setTemplates}

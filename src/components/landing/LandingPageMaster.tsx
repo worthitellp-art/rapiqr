@@ -377,15 +377,33 @@ export default function LandingPageMaster({
   onStart,
   onLogin,
   onOpenDistributorDashboard,
+  onOpenCheckout,
 }: {
   onStart: () => void;
   onLogin: () => void;
   onOpenDistributorDashboard?: () => void;
+  onOpenCheckout?: () => void;
 }) {
   const { isLoggedIn, isAdmin, profile, signOut } = useAuth();
   const [activeCategory, setActiveCategory] = useState<'All' | 'Vehicle' | 'Home' | 'Family' | 'Travel'>('All');
-  const [cart, setCart] = useState<CartItem[]>([]);
+  // Cart persisted to localStorage so added products survive navigation & refresh
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('namoqr-cart');
+      return saved ? (JSON.parse(saved) as CartItem[]) : [];
+    } catch {
+      return [];
+    }
+  });
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [cartToast, setCartToast] = useState<{ product: Product; qty: number; ts: number; mode: 'added' | 'updated' } | null>(null);
+
+  // Save cart whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('namoqr-cart', JSON.stringify(cart));
+    } catch { /* ignore */ }
+  }, [cart]);
   const [quickView, setQuickView] = useState<Product | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -481,15 +499,38 @@ export default function LandingPageMaster({
   const cartSubtotal = cart.reduce((s, i) => s + i.product.price * i.qty, 0);
 
   const addToCart = useCallback((product: Product, qty = 1) => {
+    let mode: 'added' | 'updated' = 'added';
+    let newQty = qty;
     setCart(prev => {
       const ex = prev.find(i => i.product.id === product.id);
-      if (ex) return prev.map(i => i.product.id === product.id ? { ...i, qty: i.qty + qty } : i);
+      if (ex) {
+        mode = 'updated';
+        newQty = ex.qty + qty;
+        return prev.map(i => i.product.id === product.id ? { ...i, qty: i.qty + qty } : i);
+      }
       return [...prev, { product, qty }];
     });
-    setIsCartOpen(true);
-
-
+    // Show a bottom-right confirmation popup instead of opening the sidebar drawer
+    setCartToast({ product, qty: newQty, ts: Date.now(), mode });
   }, []);
+
+  // Auto-dismiss the cart popup after a short delay
+  useEffect(() => {
+    if (!cartToast) return;
+    const t = setTimeout(() => setCartToast(null), 3200);
+    return () => clearTimeout(t);
+  }, [cartToast]);
+
+  // Navigate to the dedicated checkout page (separate route, not a popup)
+  const openCheckout = () => {
+    setCartToast(null);
+    setIsCartOpen(false);
+    if (onOpenCheckout) {
+      onOpenCheckout();
+    } else {
+      onStart();
+    }
+  };
 
   const updateQty = (id: string, delta: number) => {
     setCart(prev =>
@@ -599,10 +640,6 @@ export default function LandingPageMaster({
                 Log in
               </button>
             )}
-            <button onClick={() => setIsCartOpen(true)} className="cart-btn" aria-label="Open cart">
-              <ShoppingBag style={{ width: 17, height: 17, color: 'var(--ink)' }} />
-              {cartItemCount > 0 && <span className="cart-badge">{cartItemCount}</span>}
-            </button>
             <button onClick={onStart} className="btn-cta hidden sm:inline-flex" style={{ padding: '10px 22px', fontSize: 13 }}>
               {isLoggedIn ? <><LayoutDashboard size={14} /> My Dashboard</> : <>Get My Sticker <ArrowRight size={14} /></>}
             </button>
@@ -1670,6 +1707,53 @@ export default function LandingPageMaster({
         </div>
       )}
 
+      {/* ── FLOATING CART BUTTON (bottom-right, persistent) ─────────── */}
+      {cart.length > 0 && !isCartOpen && (
+        <button onClick={() => { setCartToast(null); setIsCartOpen(true); }} className="floating-cart-btn" aria-label="Open cart">
+          <ShoppingBag size={17} />
+          <span>Cart</span>
+          {cartItemCount > 0 && <span className="fab-badge">{cartItemCount}</span>}
+        </button>
+      )}
+
+      {/* ── ADD-TO-CART POPUP (bottom-right, cart-based) ─────────────── */}
+      {cartToast && !isCartOpen && (
+        <div className="cart-toast" key={cartToast.ts}>
+          <button onClick={() => setCartToast(null)} className="cart-toast-close" aria-label="Dismiss">
+            <X size={14} />
+          </button>
+          <div className="cart-toast-row">
+            <div className="cart-toast-thumb">
+              <img src={cartToast.product.img} alt={cartToast.product.name} />
+            </div>
+            <div className="cart-toast-body">
+              <div className="cart-toast-title">
+                <CheckCircle2 size={13} style={{ color: 'var(--accent)' }} />
+                {cartToast.mode === 'updated' ? 'Quantity Updated' : 'Added to Cart'}
+              </div>
+              <div className="cart-toast-name">{cartToast.product.name}</div>
+              <div className="cart-toast-meta">
+                {cartToast.mode === 'updated' ? 'Now ' : ''}{cartToast.qty} × ₹{cartToast.product.price}
+              </div>
+              <div className="cart-toast-count">
+                Cart · {cartItemCount} {cartItemCount === 1 ? 'item' : 'items'} · <strong>₹{cartSubtotal}</strong>
+              </div>
+            </div>
+          </div>
+          <div className="cart-toast-actions">
+            <button onClick={() => { setIsCartOpen(true); setCartToast(null); }} className="cart-toast-view">
+              View Cart <ArrowRight size={12} />
+            </button>
+            <button
+              onClick={openCheckout}
+              className="cart-toast-checkout"
+            >
+              Checkout
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── CART DRAWER ─────────────────────────────────────────────── */}
       <div className={`cart-overlay${isCartOpen ? ' open' : ''}`} onClick={() => setIsCartOpen(false)}>
         <div className="cart-panel" onClick={e => e.stopPropagation()}>
@@ -1683,7 +1767,7 @@ export default function LandingPageMaster({
             </button>
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+          <div className="cart-items-scroll" style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
             {cart.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--ink-faint)', fontSize: 14 }}>
                 Your cart is empty.<br />
@@ -1719,7 +1803,7 @@ export default function LandingPageMaster({
                 <span>Subtotal</span>
                 <span style={{ color: 'var(--accent)' }}>₹{cartSubtotal}</span>
               </div>
-              <button onClick={onStart} className="btn-cta" style={{ width: '100%', justifyContent: 'center' }}>
+              <button onClick={openCheckout} className="btn-cta" style={{ width: '100%', justifyContent: 'center' }}>
                 Checkout <ArrowRight size={14} />
               </button>
               <p style={{ fontSize: 11, color: 'var(--ink-faint)', textAlign: 'center', marginTop: 10 }}>

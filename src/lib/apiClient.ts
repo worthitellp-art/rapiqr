@@ -64,6 +64,13 @@ export const apiClient = {
       });
     },
 
+    async adminSignIn(email: string, password: string) {
+      return request<{ success: boolean; token?: string; user?: any }>('/auth/admin-signin', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+    },
+
     async googleAuth(credentialOrUser: any) {
       return request<{ success: boolean; token?: string; user?: any }>('/auth/google', {
         method: 'POST',
@@ -135,4 +142,23 @@ export const apiClient = {
       });
     },
   },
+
+  // Live Operational Logs Services
+  logs: {
+    async getLogs(limit = 100, level?: string, category?: string) {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (level) params.set('level', level);
+      if (category) params.set('category', category);
+      return request<{ success: boolean; count: number; data: any[] }>(`/logs?${params.toString()}`, {
+        method: 'GET',
+      });
+    },
+
+    async clearLogs() {
+      return request<{ success: boolean; message: string }>('/logs', {
+        method: 'DELETE',
+      });
+    },
+  },
 };
+

@@ -1,7 +1,8 @@
 import type React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Trash2, Phone, Wrench, Battery, Truck, Settings, Users, Ambulance, ShieldAlert, Car, Lightbulb, AlertTriangle } from "lucide-react";
 import { useLocalStorage } from "./useLocalStorage";
+import { getCommunicationProvidersFromDb, saveCommunicationProviderToDb, deleteCommunicationProviderFromDb } from "../../../lib/supabaseService";
 
 const CATEGORIES = ["Ambulance", "Towing", "Mechanic", "Flat Tire", "Battery", "Fuel", "Parking", "Police", "Theft", "Headlights", "Family"];
 
@@ -25,21 +26,33 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
   const [label, setLabel] = useState("");
   const [phone, setPhone] = useState("");
 
-  const handleAdd = (e: React.FormEvent) => {
+  useEffect(() => {
+    getCommunicationProvidersFromDb().then((dbData) => {
+      if (dbData && Array.isArray(dbData) && dbData.length > 0) {
+        setProviders(dbData);
+      }
+    });
+  }, []);
+
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!label.trim() || !phone.trim()) return;
     const p = { id: `prov-${Date.now()}`, category, label: label.trim(), phone: phone.trim(), active: true };
     setProviders([p, ...providers]);
     window.dispatchEvent(new Event("namoqr-helplines-updated"));
+    
+    await saveCommunicationProviderToDb({ category, label: label.trim(), phone: phone.trim(), active: true });
+
     setLabel("");
     setPhone("");
-    setToast("Provider added");
+    setToast("Provider saved to database");
     setTimeout(() => setToast(null), 2000);
   };
 
-  const handleRemove = (id: string) => {
+  const handleRemove = async (id: string) => {
     setProviders((prev) => prev.filter((x: any) => x.id !== id));
-    setToast("Provider removed");
+    await deleteCommunicationProviderFromDb(id);
+    setToast("Provider removed from database");
     setTimeout(() => setToast(null), 1500);
   };
 

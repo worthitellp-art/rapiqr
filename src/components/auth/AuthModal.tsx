@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured, getAuthCallbackUrl } from '../../lib/supabase';
+import { Smartphone, Mail, Clock } from 'lucide-react';
 import groupLogo1 from '../../../assets/Group 1000005716-1.png';
 
 const AUTH_IMAGES = [
@@ -15,9 +16,10 @@ interface AuthModalProps {
   onClose: () => void;
   onSuccess?: () => void;
   initialMode?: 'login' | 'signup';
+  prefillEmail?: string;
 }
 
-export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'login' }: AuthModalProps) {
+export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'login', prefillEmail = '' }: AuthModalProps) {
   const { signIn, signUp, resetPassword, demoLogin } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>(initialMode);
   
@@ -30,6 +32,14 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // 2-way login method: Phone Number (coming soon) or Gmail/Email
+  const [authMethod, setAuthMethod] = useState<'phone' | 'email'>('email');
+  const [phoneNumber, setPhoneNumber] = useState('');
+
+  // Signup-only contact number — separate from the (disabled) phone-login tab above.
+  // Lets a newly created account auto-match stickers already activated with this phone.
+  const [signupPhone, setSignupPhone] = useState('');
+
   const [currentImgIndex, setCurrentImgIndex] = useState(0);
 
   useEffect(() => {
@@ -40,6 +50,16 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
     return () => clearInterval(timer);
   }, [isOpen]);
 
+  // One-click signup: prefill email from the checkout order
+  useEffect(() => {
+    if (isOpen && prefillEmail) {
+      setEmail(prefillEmail);
+      setMode('signup');
+      setErrorMsg(null);
+      setSuccessMsg(null);
+    }
+  }, [isOpen, prefillEmail]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,6 +67,13 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
     setErrorMsg(null);
     setSuccessMsg(null);
     setLoading(true);
+
+    // Phone login not wired up yet — politely route to email/Google
+    if (authMethod === 'phone' && mode !== 'forgot') {
+      setErrorMsg('Phone number login is coming soon — please use Gmail/Email or Continue with Google.');
+      setLoading(false);
+      return;
+    }
 
     try {
       if (mode === 'login') {
@@ -66,7 +93,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
           setLoading(false);
           return;
         }
-        const res = await signUp(email, password, fullName);
+        const res = await signUp(email, password, fullName, signupPhone.trim() || undefined);
         if (!res.success) {
           setErrorMsg(res.error || 'Failed to create account.');
         } else {
@@ -87,15 +114,6 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDemoMode = () => {
-    demoLogin();
-    setSuccessMsg('Logged in via Demo Mode');
-    setTimeout(() => {
-      onClose();
-      if (onSuccess) onSuccess();
-    }, 500);
   };
 
   const handleGoogleSignIn = async () => {
@@ -238,7 +256,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
               <div className="flex bg-gray-100 p-1.5 rounded-xl mt-6">
                 <button
                   type="button"
-                  onClick={() => { setMode('login'); setErrorMsg(null); setSuccessMsg(null); }}
+                  onClick={() => { setMode('login'); setAuthMethod('email'); setErrorMsg(null); setSuccessMsg(null); }}
                   className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${
                     mode === 'login' ? 'bg-black text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
                   }`}
@@ -247,7 +265,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setMode('signup'); setErrorMsg(null); setSuccessMsg(null); }}
+                  onClick={() => { setMode('signup'); setAuthMethod('email'); setErrorMsg(null); setSuccessMsg(null); }}
                   className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${
                     mode === 'signup' ? 'bg-black text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
                   }`}
@@ -297,6 +315,46 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
             </div>
           )}
 
+          {/* Login Method Choice: Phone Number | Gmail/Email */}
+          {mode !== 'forgot' && (
+            <div className="mb-6">
+              <label className="block text-xs font-bold text-gray-800 mb-2 uppercase tracking-wider">
+                Login method
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setAuthMethod('phone'); setErrorMsg(null); setSuccessMsg(null); }}
+                  className={`relative flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    authMethod === 'phone'
+                      ? 'border-black bg-black text-white shadow-sm'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <Smartphone size={14} />
+                  Phone Number
+                  {authMethod === 'phone' && (
+                    <span className="absolute -top-2 -right-1 text-[9px] font-black uppercase tracking-wider bg-amber-400 text-black px-1.5 py-0.5 rounded-full shadow-sm">
+                      Coming Soon
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAuthMethod('email'); setErrorMsg(null); setSuccessMsg(null); }}
+                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    authMethod === 'email'
+                      ? 'border-black bg-black text-white shadow-sm'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <Mail size={14} />
+                  Gmail / Email
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Main Auth Form — No Icons */}
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (
@@ -315,21 +373,59 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-bold text-gray-800 mb-1.5 uppercase tracking-wider">
-                Email Address
-              </label>
-              <input
-                type="email"
-                required
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3.5 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-black focus:ring-2 focus:ring-black/10 transition-all text-gray-900 font-medium"
-              />
-            </div>
+            {mode === 'signup' && (
+              <div>
+                <label className="block text-xs font-bold text-gray-800 mb-1.5 uppercase tracking-wider">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  placeholder="+91 98765 43210"
+                  value={signupPhone}
+                  onChange={(e) => setSignupPhone(e.target.value)}
+                  className="w-full px-4 py-3.5 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-black focus:ring-2 focus:ring-black/10 transition-all text-gray-900 font-medium"
+                />
+                <p className="mt-1.5 text-xs text-gray-400">
+                  Used to match stickers you've already activated to your dashboard.
+                </p>
+              </div>
+            )}
 
-            {mode !== 'forgot' && (
+            {(authMethod === 'email' || mode === 'forgot') && (
+              <div>
+                <label className="block text-xs font-bold text-gray-800 mb-1.5 uppercase tracking-wider">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-3.5 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-black focus:ring-2 focus:ring-black/10 transition-all text-gray-900 font-medium"
+                />
+              </div>
+            )}
+
+            {authMethod === 'phone' && mode !== 'forgot' && (
+              <div>
+                <label className="block text-xs font-bold text-gray-800 mb-1.5 uppercase tracking-wider">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  placeholder="+91 98765 43210"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className="w-full px-4 py-3.5 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-black focus:ring-2 focus:ring-black/10 transition-all text-gray-900 font-medium"
+                />
+                <p className="mt-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                  <Clock size={13} /> Phone OTP login is coming soon. Use Gmail/Email or Google to continue.
+                </p>
+              </div>
+            )}
+
+            {mode !== 'forgot' && authMethod === 'email' && (
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
@@ -369,30 +465,20 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
             {/* Black Submit Button */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (authMethod === 'phone' && mode !== 'forgot')}
               className="w-full py-4 rounded-xl font-extrabold text-white text-sm bg-black hover:bg-gray-900 active:scale-[0.99] transition-all shadow-lg shadow-black/10 disabled:opacity-60 mt-2"
             >
               {loading ? (
                 <span className="text-xs font-bold tracking-wider uppercase">Processing...</span>
               ) : (
                 <>
-                  {mode === 'login' && 'Sign In to Dashboard'}
-                  {mode === 'signup' && 'Create Account'}
                   {mode === 'forgot' && 'Send Password Reset Link'}
+                  {mode !== 'forgot' && authMethod === 'phone' && 'Phone Login — Coming Soon'}
+                  {mode !== 'forgot' && authMethod === 'email' && mode === 'login' && 'Sign In to Dashboard'}
+                  {mode !== 'forgot' && authMethod === 'email' && mode === 'signup' && 'Create Account'}
                 </>
               )}
             </button>
-
-            {/* Quick Demo Mode */}
-            <div className="pt-3 text-center">
-              <button
-                type="button"
-                onClick={handleDemoMode}
-                className="w-full py-3 px-4 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Quick Demo Access (Skip Login)
-              </button>
-            </div>
 
             {mode === 'forgot' && (
               <button

@@ -16,4 +16,5 @@ export const NAV_ITEMS = [
   { id: "customize", label: "Customization", icon: Palette },
 ];
 
+
 export const EDITOR_DISPLAY = { w: 320, h: 200 };

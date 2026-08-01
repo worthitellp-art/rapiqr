@@ -2,7 +2,8 @@ const jwt = require('jsonwebtoken');
 const { supabaseAdmin } = require('../config/db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'namoqr_secure_server_jwt_secret_key_2026';
-const ADMIN_EMAIL = 'worthitellp@gmail.com';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'worthitellp@gmail.com';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null;
 
 /**
  * Verify JWT or Supabase session token
@@ -60,5 +61,6 @@ module.exports = {
   verifyToken,
   verifyAdmin,
   JWT_SECRET,
-  ADMIN_EMAIL
+  ADMIN_EMAIL,
+  ADMIN_PASSWORD
 };

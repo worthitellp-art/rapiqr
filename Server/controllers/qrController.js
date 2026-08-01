@@ -40,16 +40,18 @@ class QrController {
   /**
    * Save or Update QR Code record
    */
+  /**
+   * Save or Update QR Code record
+   */
   static async saveQrCode(req, res) {
     try {
       const qrData = req.body;
-      logger.event('QR_SAVE', '💾', `Saving QR Code record: ${qrData.id || 'new'}`);
       const saved = await QrModel.save(qrData);
       if (!saved) {
-        logger.warn('QR_SAVE', `Failed to save QR Code record: ${qrData.id || 'unknown'}`);
+        logger.warn('QR_SAVE', `Failed to save QR Code row in database: ${qrData.id || 'unknown'}`);
         return res.status(500).json({ success: false, error: 'Failed to save QR Code record' });
       }
-      logger.success('QR_SAVE', `QR Code record saved: ${saved.id}`);
+      logger.rowInserted('qr_codes', saved.id, { category: saved.category, template: saved.template_name, status: saved.status });
       return res.json({ success: true, data: saved });
     } catch (err) {
       logger.error('QR_SAVE', 'Error saving QR Code record', err);
@@ -88,7 +90,7 @@ class QrController {
       const publicUrl = pub.publicUrl;
 
       const saved = await QrModel.saveStickerImage(id, publicUrl);
-      logger.success('STICKER_SAVE', `Sticker image saved for QR: ${id} → ${publicUrl}`);
+      logger.rowUpdated('qr_codes', id, { action: 'sticker_image_linked', sticker_image: publicUrl });
       return res.json({ success: true, data: saved, stickerImage: publicUrl });
     } catch (err) {
       logger.error('STICKER_SAVE', `Failed to save sticker image for QR: ${req.params.id}`, err);
@@ -103,9 +105,8 @@ class QrController {
     try {
       const { id } = req.params;
       const activationData = req.body;
-      logger.event('QR_ACTIVATE', '⚡', `Activating QR Code: ${id}`);
       const activated = await QrModel.activate(id, activationData);
-      logger.success('QR_ACTIVATE', `QR Code activated: ${id}`);
+      logger.rowUpdated('qr_codes', id, { action: 'activated', status: 'active' });
       return res.json({ success: true, data: activated });
     } catch (err) {
       logger.error('QR_ACTIVATE', `Failed to activate QR Code: ${req.params.id}`, err);
@@ -119,8 +120,8 @@ class QrController {
   static async recordScan(req, res) {
     try {
       const { id } = req.params;
-      logger.event('QR_SCAN', '📱', `Scan event recorded for QR Code: ${id}`);
       const updated = await QrModel.recordScan(id);
+      logger.rowUpdated('qr_codes', id, { action: 'scan_recorded', scans_count: updated?.scans_count });
       return res.json({ success: true, data: updated });
     } catch (err) {
       logger.error('QR_SCAN', `Failed to record scan for QR Code: ${req.params.id}`, err);
