@@ -45,6 +45,34 @@ async function verifyToken(req, res, next) {
 }
 
 /**
+ * Identifies the caller if a valid token is present, but never blocks the
+ * request — for endpoints that must stay usable by guests (e.g. checkout)
+ * while still linking the record to an account when the caller happens to
+ * be logged in.
+ */
+async function optionalAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return next();
+
+  const token = authHeader.split(' ')[1];
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+  } catch {
+    try {
+      const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+      if (user) {
+        req.user = {
+          id: user.id,
+          email: user.email,
+          role: user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() ? 'admin' : 'user'
+        };
+      }
+    } catch { /* invalid/expired token — proceed as guest */ }
+  }
+  next();
+}
+
+/**
  * Require admin privileges
  */
 function verifyAdmin(req, res, next) {
@@ -62,6 +90,7 @@ function verifyAdmin(req, res, next) {
 
 module.exports = {
   verifyToken,
+  optionalAuth,
   verifyAdmin,
   JWT_SECRET,
   ADMIN_EMAIL,

@@ -322,6 +322,40 @@ class AuthController {
   }
 
   /**
+   * Account Settings — permanently delete the account (DPDP/GDPR "right to be
+   * forgotten"). Re-verifies the current password first, same pattern as
+   * changePassword/changeEmail. Deleting the auth.users row cascades to
+   * public.profiles and public.products via their ON DELETE CASCADE FKs, so no
+   * manual cleanup is needed here.
+   */
+  static async deleteAccount(req, res) {
+    try {
+      const { password } = req.body || {};
+      if (!password) {
+        return res.status(400).json({ success: false, error: 'password is required to confirm account deletion' });
+      }
+
+      const { error: verifyError } = await supabaseAdmin.auth.signInWithPassword({
+        email: req.user.email,
+        password,
+      });
+      if (verifyError) {
+        logger.security('ACCOUNT_DELETE_DENIED', `Incorrect password for account deletion attempt: ${req.user.email}`);
+        return res.status(401).json({ success: false, error: 'Password is incorrect' });
+      }
+
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(req.user.id);
+      if (deleteError) return res.status(500).json({ success: false, error: deleteError.message });
+
+      logger.security('ACCOUNT_DELETED', `Account permanently deleted: ${req.user.email}`, { userId: req.user.id });
+      return res.json({ success: true, message: 'Account permanently deleted' });
+    } catch (err) {
+      logger.error('ACCOUNT_DELETE', 'Failed to delete account', err);
+      return res.status(500).json({ success: false, error: err.message || 'Failed to delete account' });
+    }
+  }
+
+  /**
    * Account Settings — change the account email. Requires current password re-entry.
    */
   static async changeEmail(req, res) {

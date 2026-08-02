@@ -33,6 +33,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   adminSignIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
+  deleteAccount: (password: string) => Promise<{ success: boolean; error?: string }>;
   resetPassword: (email: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   demoLogin: () => void;
   // Links a phone number to the logged-in account — used at signup and to auto-link
@@ -326,6 +327,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(null);
   };
 
+  // Permanently deletes the account server-side (task.md #3 — DPDP/GDPR "right to
+  // be forgotten"), then clears the local session the same way signOut does.
+  const deleteAccount = async (password: string) => {
+    if (!isApiBackendConfigured) {
+      return { success: false, error: 'Account deletion requires the RapiQR backend to be connected.' };
+    }
+    try {
+      await apiClient.auth.deleteAccount(password);
+      await signOut();
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to delete account.' };
+    }
+  };
+
   const resetPassword = async (email: string) => {
     try {
       if (!isSupabaseConfigured) {
@@ -416,6 +432,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updatePhoneNumber,
         refreshProfile,
         signOut,
+        deleteAccount,
         resetPassword,
         demoLogin,
       }}

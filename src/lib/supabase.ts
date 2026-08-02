@@ -13,25 +13,15 @@ export const SITE_URL = (import.meta.env.VITE_SITE_URL || 'https://rapiqr.worthi
 
 /**
  * Generates the OAuth and authentication callback URL for Google sign-in.
- * - When the app runs locally (localhost / 127.0.0.1 / .local) it keeps the
- *   current local origin, so the OAuth flow continues on localhost.
- * - Anywhere else (hosted preview, production) it always uses the configured
- *   hosting URL (VITE_SITE_URL), so Google always bounces back to the real
- *   live dashboard and never to a stray localhost / preview origin.
+ * - When running in the browser, always uses window.location.origin so Google OAuth
+ *   bounces back to the current active origin (localhost when running locally, live domain in production).
+ * - Fallback to SITE_URL for SSR or non-browser environments.
  */
 export function getAuthCallbackUrl(targetPath = '/auth/callback'): string {
   const normalizedPath = targetPath.startsWith('/') ? targetPath : `/${targetPath}`;
-  const hostname = typeof window !== 'undefined' ? window.location?.hostname || '' : '';
-  const isLocalHost =
-    hostname === '' ||
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname === '::1' ||
-    hostname.endsWith('.localhost') ||
-    hostname.endsWith('.local');
-
-  if (isLocalHost && typeof window !== 'undefined' && window.location?.origin) {
-    return `${window.location.origin.replace(/\/+$/, '')}${normalizedPath}`;
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    const activeOrigin = window.location.origin.replace(/\/+$/, '');
+    return `${activeOrigin}${normalizedPath}`;
   }
   return `${SITE_URL}${normalizedPath}`;
 }

@@ -16,6 +16,7 @@ const twilioRoutes = require('./routes/twilioRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const distributorRoutes = require('./routes/distributorRoutes');
+const orderRoutes = require('./routes/orderRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -57,6 +58,7 @@ app.use('/api/twilio', twilioRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/distributors', distributorRoutes);
+app.use('/api/orders', orderRoutes);
 
 
 // Global 404 Route Handler

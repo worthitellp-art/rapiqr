@@ -761,7 +761,7 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
 
           {/* ════ VIEW 6: ACCOUNT SETTINGS ════ */}
           {activeTab === 'settings' && (
-            <AccountSettingsPanel showToast={showToast} />
+            <AccountSettingsPanel showToast={showToast} onAccountDeleted={handleSignOut} />
           )}
 
           {/* ════ VIEW 7: SUPPORT & LEGAL ════ */}

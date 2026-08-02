@@ -16,7 +16,7 @@ function Banner({ tone, message }: { tone: 'success' | 'error'; message: string 
   );
 }
 
-export default function AccountSettingsPanel({ showToast }: { showToast: (msg: string) => void }) {
+export default function AccountSettingsPanel({ showToast, onAccountDeleted }: { showToast: (msg: string) => void; onAccountDeleted?: () => void }) {
   const { profile, refreshProfile } = useAuth();
 
   if (!isApiBackendConfigured) {
@@ -46,6 +46,66 @@ export default function AccountSettingsPanel({ showToast }: { showToast: (msg: s
       <EmailForm profile={profile} refreshProfile={refreshProfile} showToast={showToast} />
       <PasswordForm showToast={showToast} />
       <TwoFactorSection profile={profile} refreshProfile={refreshProfile} showToast={showToast} />
+      <DangerZoneSection onAccountDeleted={onAccountDeleted} />
+    </div>
+  );
+}
+
+function DangerZoneSection({ onAccountDeleted }: { onAccountDeleted?: () => void }) {
+  const { deleteAccount } = useAuth();
+  const [password, setPassword] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+
+  const handleDelete = async () => {
+    if (!password) {
+      setMsg({ tone: 'error', text: 'Enter your password to confirm.' });
+      return;
+    }
+    if (!confirming) {
+      setConfirming(true);
+      setMsg(null);
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    const res = await deleteAccount(password);
+    setBusy(false);
+    if (res.success) {
+      onAccountDeleted?.();
+    } else {
+      setMsg({ tone: 'error', text: res.error || 'Failed to delete account.' });
+      setConfirming(false);
+    }
+  };
+
+  return (
+    <div className={`${cardCls} border-[#FECACA]`}>
+      <h3 className="font-bold text-sm text-[#DC2626]">Danger Zone</h3>
+      <p className="text-xs text-[#64748B]">
+        Permanently delete your account, profile, and every sticker linked to it. This cannot be undone.
+      </p>
+      <div className="max-w-xs">
+        <label className={labelCls}>Confirm Your Password</label>
+        <input
+          type="password"
+          className={inputCls}
+          value={password}
+          onChange={(e) => { setPassword(e.target.value); setConfirming(false); setMsg(null); }}
+        />
+      </div>
+      {msg && <Banner tone={msg.tone} message={msg.text} />}
+      {confirming && !msg && (
+        <p className="text-xs font-bold text-[#B45309]">Click "Confirm Delete" again to permanently delete your account.</p>
+      )}
+      <button
+        onClick={handleDelete}
+        disabled={busy}
+        className="px-5 py-2.5 rounded-xl bg-[#FEE2E2] hover:bg-[#FECACA] text-[#DC2626] text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
+      >
+        {busy && <Loader2 size={13} className="animate-spin" />} {confirming ? 'Confirm Delete' : 'Delete Account'}
+      </button>
     </div>
   );
 }

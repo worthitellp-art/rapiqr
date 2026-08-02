@@ -116,6 +116,13 @@ export const apiClient = {
         body: JSON.stringify({ newEmail, currentPassword }),
       });
     },
+
+    async deleteAccount(password: string) {
+      return request<{ success: boolean; message?: string }>('/auth/me', {
+        method: 'DELETE',
+        body: JSON.stringify({ password }),
+      });
+    },
   },
 
   // Account Security (2FA) Services
@@ -261,6 +268,28 @@ export const apiClient = {
 
     async getAlerts(limit = 50) {
       return request<{ success: boolean; data: any[] }>(`/alerts?limit=${limit}`, {
+        method: 'GET',
+      });
+    },
+  },
+
+  // Checkout order receipts (backed by Supabase via the Express server — see task.md #6)
+  orders: {
+    async create(order: {
+      name: string; email: string; phone: string;
+      items: { name: string; qty: number; price: number }[];
+      subtotal: number; deliveryFee: number; total: number;
+      paymentMethod: string; deliveryMethod: string;
+      shippingAddress?: Record<string, string>;
+    }) {
+      return request<{ success: boolean; data: any }>('/orders', {
+        method: 'POST',
+        body: JSON.stringify(order),
+      });
+    },
+
+    async mine() {
+      return request<{ success: boolean; data: any[] }>('/orders/mine', {
         method: 'GET',
       });
     },

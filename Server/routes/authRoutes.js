@@ -9,6 +9,7 @@ router.post('/admin-signin', AuthController.adminSignIn);
 router.post('/google', AuthController.googleAuth);
 router.get('/me', verifyToken, AuthController.getMe);
 router.patch('/me', verifyToken, AuthController.updateProfile);
+router.delete('/me', verifyToken, AuthController.deleteAccount);
 router.post('/change-password', verifyToken, AuthController.changePassword);
 router.post('/change-email', verifyToken, AuthController.changeEmail);
 router.post('/2fa/setup', verifyToken, AuthController.setupTwoFactor);
