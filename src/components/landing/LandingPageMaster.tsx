@@ -22,6 +22,7 @@ import stepImg1 from '../../../assets/ChatGPT Image Aug 1, 2026, 03_07_26 PM.png
 import stepImg2 from '../../../assets/ChatGPT Image Aug 1, 2026, 03_09_09 PM.png';
 import stepImg3 from '../../../assets/ChatGPT Image Aug 1, 2026, 03_16_11 PM.png';
 import stepImg4 from '../../../assets/ChatGPT Image Aug 1, 2026, 03_17_54 PM.png';
+import stepImg5 from '../../../assets/ChatGPT Image Aug 2, 2026, 05_08_21 PM.png';
 
 const HOW_IT_WORKS_STEPS = [
   {
@@ -42,7 +43,7 @@ const HOW_IT_WORKS_STEPS = [
     step: 3,
     title: 'Anyone scans — no app',
     body: 'Camera → secure page. Nothing to install.',
-    img: stepImg4,
+    img: stepImg5,
     badge: 'Zero App Scan',
   },
   {
@@ -56,7 +57,7 @@ const HOW_IT_WORKS_STEPS = [
     step: 5,
     title: 'You get pinged instantly',
     body: 'Push + SMS + WhatsApp. Resolve in one tap.',
-    img: stepImg3,
+    img: stepImg4,
     badge: 'Instant Multi-Channel Alert',
   },
 ];
@@ -1016,11 +1017,11 @@ export default function LandingPageMaster({
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <div style={{ display: 'flex', items: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: 'var(--accent-deep)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: 'var(--accent-deep)' }}>
                       <Star size={13} style={{ fill: 'var(--accent)', color: 'var(--accent)' }} />
                       {product.rating} <span style={{ color: 'var(--ink-faint)', fontWeight: 400 }}>({product.reviewsCount.toLocaleString()})</span>
                     </div>
-                    <span style={{ fontSize: 12, color: 'var(--ink-faint)', textDecoration: 'line-through' }}>₹{product.mrp}</span>
+                    
                   </div>
 
                   <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>{product.name}</h3>
@@ -1043,8 +1044,22 @@ export default function LandingPageMaster({
                   display: 'flex', items: 'center', justifyContent: 'space-between',
                 }}>
                   <div>
-                    <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--ink)', lineHeight: 1 }}>₹{product.price}</div>
-                    <div style={{ fontSize: 10, color: '#10B981', fontWeight: 700, marginTop: 2 }}>Lifetime · ₹0 subscription</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                      <span style={{ fontSize: 24, fontWeight: 900, color: 'var(--ink)', lineHeight: 1 }}>₹{product.price}</span>
+                      <span style={{ fontSize: 13, color: 'var(--ink-faint)', textDecoration: 'line-through', fontWeight: 500 }}>₹{product.mrp}</span>
+                      <span style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: '#047857',
+                        backgroundColor: '#D1FAE5',
+                        padding: '1.5px 6px',
+                        borderRadius: 6,
+                        border: '1px solid #A7F3D0'
+                      }}>
+                        {Math.round(((product.mrp - product.price) / product.mrp) * 100)}% OFF
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 10, color: '#10B981', fontWeight: 700, marginTop: 4 }}>Lifetime · ₹0 subscription</div>
                   </div>
                   <button onClick={() => addToCart(product)} className="btn-brand" style={{ padding: '10px 18px', fontSize: 13 }}>
                     <Plus size={14} /> Add to Cart
@@ -1071,9 +1086,9 @@ export default function LandingPageMaster({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-            {/* Steps List */}
-            <div className="lg:col-span-5 space-y-4">
+          <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-center">
+            {/* Steps List (38%) */}
+            <div className="w-full lg:w-[38%] space-y-4 flex-shrink-0">
               {HOW_IT_WORKS_STEPS.map((s, i) => {
                 const isActive = hiwActiveStep === i;
                 return (
@@ -1119,11 +1134,11 @@ export default function LandingPageMaster({
 
                     {/* Mobile Inline Image Display */}
                     {isActive && (
-                      <div className="mt-4 lg:hidden rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                      <div className="mt-4 lg:hidden rounded-xl overflow-hidden border border-gray-800 bg-black p-1 shadow-sm">
                         <img
                           src={s.img}
                           alt={s.title}
-                          className="w-full h-64 sm:h-72 object-cover"
+                          className="w-full h-auto max-h-80 object-contain mx-auto bg-black"
                         />
                       </div>
                     )}
@@ -1132,14 +1147,14 @@ export default function LandingPageMaster({
               })}
             </div>
 
-            {/* Desktop Dynamic Preview Display */}
-            <div className="hidden lg:block lg:col-span-7">
-              <div className="relative rounded-3xl overflow-hidden border border-gray-800 bg-gray-950 shadow-2xl p-3 hover:shadow-[0_20px_50px_rgba(245,158,11,0.15)] transition-all duration-500">
-                <div className="relative aspect-[16/11] min-h-[500px] lg:min-h-[540px] rounded-2xl overflow-hidden bg-gray-900">
+            {/* Desktop Dynamic Preview Display (62%) */}
+            <div className="hidden lg:block lg:w-[62%] flex-1">
+              <div className="relative rounded-3xl overflow-hidden border border-gray-800 bg-black shadow-2xl p-2.5 hover:shadow-[0_20px_60px_rgba(245,158,11,0.15)] transition-all duration-500">
+                <div className="relative w-full aspect-[4/3] min-h-[480px] lg:min-h-[540px] rounded-2xl overflow-hidden bg-black flex items-center justify-center">
                   {HOW_IT_WORKS_STEPS.map((s, i) => (
                     <div
                       key={i}
-                      className={`absolute inset-0 transition-all duration-700 ease-in-out ${
+                      className={`absolute inset-0 flex items-center justify-center transition-all duration-700 ease-in-out ${
                         hiwActiveStep === i
                           ? 'opacity-100 scale-100 pointer-events-auto'
                           : 'opacity-0 scale-95 pointer-events-none'
@@ -1148,37 +1163,35 @@ export default function LandingPageMaster({
                       <img
                         src={s.img}
                         alt={s.title}
-                        className="w-full h-full object-cover transform transition-transform duration-700 hover:scale-105"
+                        className="w-full h-full object-contain bg-black"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent pointer-events-none" />
-                      
-                      <div className="absolute bottom-6 left-6 right-6 text-white">
-                        <span className="inline-block text-[10px] font-extrabold uppercase tracking-wider bg-amber-400 text-gray-950 px-3 py-1 rounded-full mb-2 shadow-md">
-                          {s.badge}
-                        </span>
-                        <h4 className="text-2xl font-bold text-white drop-shadow-md">
-                          Step {s.step}: {s.title}
-                        </h4>
-                        <p className="text-sm text-gray-200 mt-1 drop-shadow-sm leading-relaxed max-w-xl">
-                          {s.body}
-                        </p>
-                      </div>
                     </div>
                   ))}
                 </div>
 
-                {/* Step Indicators */}
-                <div className="flex items-center justify-center gap-2.5 p-3.5 bg-gray-950">
-                  {[1, 2, 3, 4, 5].map((num, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setHiwActiveStep(i)}
-                      className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                        hiwActiveStep === i ? 'w-10 bg-amber-400' : 'w-3 bg-gray-700 hover:bg-gray-500'
-                      }`}
-                      title={`Go to step ${num}`}
-                    />
-                  ))}
+                {/* Step Indicators & Info Bar */}
+                <div className="flex items-center justify-between gap-4 px-4 py-3 bg-gray-950 border-t border-gray-800/80 rounded-b-2xl">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider bg-amber-400 text-gray-950 px-2.5 py-0.5 rounded-full shadow-sm flex-shrink-0">
+                      {HOW_IT_WORKS_STEPS[hiwActiveStep].badge}
+                    </span>
+                    <span className="text-xs font-bold text-white truncate">
+                      Step {HOW_IT_WORKS_STEPS[hiwActiveStep].step}: {HOW_IT_WORKS_STEPS[hiwActiveStep].title}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {[1, 2, 3, 4, 5].map((num, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setHiwActiveStep(i)}
+                        className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                          hiwActiveStep === i ? 'w-8 bg-amber-400' : 'w-2.5 bg-gray-700 hover:bg-gray-500'
+                        }`}
+                        title={`Go to step ${num}`}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1853,11 +1866,26 @@ export default function LandingPageMaster({
               <X size={16} style={{ color: 'white' }} />
             </button>
             <div style={{ padding: '24px 28px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)' }}>{quickView.name}</h3>
-                <div style={{ fontSize: 10, color: 'var(--ink-faint)', textDecoration: 'line-through' }}>₹{quickView.mrp}</div>
+              <div style={{ marginBottom: 12 }}>
+                <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>{quickView.name}</h3>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                  <span style={{ fontSize: 28, fontWeight: 900, color: 'var(--accent)', lineHeight: 1 }}>₹{quickView.price}</span>
+                  <span style={{ fontSize: 15, color: 'var(--ink-faint)', textDecoration: 'line-through', fontWeight: 500 }}>₹{quickView.mrp}</span>
+                  {quickView.mrp > quickView.price && (
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: '#047857',
+                      backgroundColor: '#D1FAE5',
+                      padding: '3px 8px',
+                      borderRadius: 6,
+                      border: '1px solid #A7F3D0'
+                    }}>
+                      {Math.round(((quickView.mrp - quickView.price) / quickView.mrp) * 100)}% OFF
+                    </span>
+                  )}
+                </div>
               </div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--accent)', marginBottom: 12 }}>₹{quickView.price}</div>
               <p style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginBottom: 20, lineHeight: 1.65 }}>{quickView.desc}</p>
               <button onClick={() => { addToCart(quickView); setQuickView(null); }} className="btn-brand" style={{ width: '100%', justifyContent: 'center' }}>
                 Add to Cart <ArrowRight size={14} />

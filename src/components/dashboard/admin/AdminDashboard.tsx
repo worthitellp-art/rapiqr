@@ -16,6 +16,7 @@ import CommunicationPage from "./CommunicationPage";
 import UsersPage from "./UsersPage";
 import CustomizePage from "./CustomizePage";
 import DistributorsPage from "./DistributorsPage";
+import OrdersPage from "./OrdersPage";
 
 export default function AdminDashboard({ onBack, switchToClientPortal }: { onBack: () => void; switchToClientPortal?: () => void }) {
   const { profile, signOut, isAdmin } = useAuth();
@@ -62,7 +63,7 @@ export default function AdminDashboard({ onBack, switchToClientPortal }: { onBac
 
   // Reset search on page change & guard admin-only pages for client users
   useEffect(() => {
-    if (!isAdmin && (page === "overview" || page === "distributors" || page === "users" || page === "communication" || page === "customize")) {
+    if (!isAdmin && (page === "overview" || page === "orders" || page === "distributors" || page === "users" || page === "communication" || page === "customize")) {
       setPage("qr");
     }
     setSearchQuery("");
@@ -110,6 +111,7 @@ export default function AdminDashboard({ onBack, switchToClientPortal }: { onBac
               openRestore={() => setRestoreModalOpen(true)} setToast={setToast}
             />
           )}
+          {page === "orders" && <OrdersPage setToast={setToast} />}
           {page === "distributors" && <DistributorsPage setToast={setToast} />}
           {page === "qr" && (
             <QrCodesPage

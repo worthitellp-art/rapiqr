@@ -117,7 +117,7 @@ export default function CheckoutPage({
       });
       if (res.data?.id) id = res.data.id;
     } catch (err) {
-      console.warn('Failed to persist order to the server (kept locally only):', err);
+      console.error('Failed to persist order to the server — it will NOT appear in the admin Orders tab (kept locally only):', err);
     }
 
     setOrderId(id);

@@ -43,6 +43,24 @@ class OrderController {
       return res.status(500).json({ success: false, error: err.message });
     }
   }
+
+  /** PATCH /api/orders/:id/status — admin: mark placed/shipped/delivered/cancelled */
+  static async updateStatus(req, res) {
+    try {
+      const { id } = req.params;
+      const { status } = req.body || {};
+      const allowed = ['placed', 'shipped', 'delivered', 'cancelled'];
+      if (!allowed.includes(status)) {
+        return res.status(400).json({ success: false, error: `status must be one of: ${allowed.join(', ')}` });
+      }
+      const updated = await OrderModel.updateStatus(id, status);
+      logger.rowUpdated('orders', id, { action: 'status_updated', status });
+      return res.json({ success: true, data: updated });
+    } catch (err) {
+      logger.error('ORDER_STATUS_UPDATE', `Failed to update order status: ${req.params.id}`, err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
 }
 
 module.exports = OrderController;

@@ -1,6 +1,6 @@
 import type React from "react";
 import { useState, useEffect } from "react";
-import { Plus, Sparkles, Download, Trash2, RefreshCw, Eye, UserPlus, Tag } from "lucide-react";
+import { Plus, Sparkles, Download, Trash2, RefreshCw, Eye, UserPlus, Tag, Phone } from "lucide-react";
 import StatusPill from "./StatusPill";
 import IdBadge from "./ActCode";
 import CopyLinkButton from "./CopyLinkButton";
@@ -39,8 +39,10 @@ export default function QrCodesPage({
   const activeTemplate = templates.find((t) => t.id.toString() === templateId) || templates[0];
 
   const filtered = qrList.filter((q) => {
+    const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
     const matchesSearch = !searchQuery ||
       q.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      phoneNum.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (q.category || "").toLowerCase().includes(searchQuery.toLowerCase());
       
     const matchesCategory = categoryFilter === "all" || (q.category || "car") === categoryFilter;
@@ -68,37 +70,25 @@ export default function QrCodesPage({
     rec.qrUrl = qrFullUrl(rec.id);
 
     const stickerPos = activeTemplate?.stickerPos || { x: 110, y: 40, w: 100, h: 100 };
-    const stickerUrl = await saveGeneratedSticker(rec, stickerPos);
-    if (stickerUrl) {
-      rec.stickerImage = stickerUrl;
-    }
+    await saveGeneratedSticker(rec, activeTemplate, stickerPos);
 
     setQrList((prev) => [rec, ...prev]);
+    saveQrCodeToDb(rec);
 
-    await saveQrCodeToDb({ 
-      id: rec.id, 
-      clientId: rec.clientId, 
-      status: rec.status, 
-      templateName: rec.template, 
-      category: rec.category,
-      fgColor: rec.fg,
-      bgColor: rec.bg,
-      stickerImage: rec.stickerImage || stickerUrl || undefined,
-    });
-
-    dispatchActivationToUserDashboard(rec);
-    openQuickLook(rec);
-    setToast(`QR Generated (${selectedCategory.toUpperCase()})! Code: ${rec.id}`);
+    setToast(`Generated 1 ${rec.category || "Car"} Sticker`);
     setTimeout(() => setToast(null), 3000);
   }
 
   async function handleGenerateBulk() {
-    const count = Math.max(1, Math.min(1000, Number(bulkCount) || 0));
+    const count = Math.min(Math.max(1, bulkCount), 200);
     setBulkProgress(0);
-    const batch: QrRecord[] = Array.from({ length: count }).map(() => {
+
+    const batch: QrRecord[] = [];
+    for (let i = 0; i < count; i++) {
       const rec = buildQrRecord(selectedCategory);
-      return { ...rec, qrUrl: qrFullUrl(rec.id) };
-    });
+      rec.qrUrl = qrFullUrl(rec.id);
+      batch.push(rec);
+    }
 
     setQrList((prev) => [...batch, ...prev]);
 
@@ -110,14 +100,19 @@ export default function QrCodesPage({
 
     batch.forEach((item) => dispatchActivationToUserDashboard(item));
     setBulkProgress(null);
-    setToast(`${count} ${selectedCategory.toUpperCase()} QR stickers generated & sent to User Dashboard`);
+    setToast(`${count} QR codes generated & sent to User Dashboard`);
     setTimeout(() => setToast(null), 3000);
   }
 
   function downloadCsv() {
     const rows = [
-      ["QR Code", "Category", "Status", "Template", "Created"],
-      ...qrList.map((q) => [q.id, q.category || "car", q.status, q.template, fmtDate(q.createdAt)]),
+      ["QR ID", "Phone Number", "Category", "Status", "Template", "Created"],
+      ...qrList.map((q) => {
+        const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
+        const isActivated = Boolean(phoneNum && phoneNum.trim());
+        const computedStatus = isActivated ? "active" : q.status;
+        return [q.id, phoneNum || "N/A", q.category || "car", computedStatus, q.template, fmtDate(q.createdAt)];
+      }),
     ];
     const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -175,7 +170,6 @@ export default function QrCodesPage({
               </label>
               <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className={inputCls} style={{ borderColor: "#e2e8f0" }}>
                 {templates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.isPublicDefault ? " (default)" : ""}</option>)}
-                {templates.length === 0 && <option value="">No templates yet</option>}
               </select>
             </div>
             <div className="flex items-end">
@@ -208,34 +202,45 @@ export default function QrCodesPage({
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Quantity (max 1000)</label>
-              <input
-                type="number" min={1} max={1000} value={bulkCount}
-                onChange={(e) => setBulkCount(Math.min(1000, Number(e.target.value)))}
-                className={inputCls} style={{ borderColor: "#e2e8f0" }}
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Template</label>
+              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">
+                Template
+              </label>
               <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className={inputCls} style={{ borderColor: "#e2e8f0" }}>
-                {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                {templates.length === 0 && <option value="">No templates</option>}
+                {templates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.isPublicDefault ? " (default)" : ""}</option>)}
               </select>
             </div>
-            <div className="flex items-end gap-3">
+            <div>
+              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">
+                Quantity (1–200)
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={200}
+                value={bulkCount}
+                onChange={(e) => setBulkCount(parseInt(e.target.value) || 1)}
+                className={inputCls}
+                style={{ borderColor: "#e2e8f0" }}
+              />
+            </div>
+            <div className="flex items-end">
               <button
                 onClick={handleGenerateBulk}
                 disabled={bulkProgress !== null}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-60 cursor-pointer shadow-sm"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm"
                 style={{ background: "var(--accent)" }}
               >
-                {bulkProgress !== null ? (
-                  <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> {bulkProgress}%</>
-                ) : (
-                  <><Sparkles size={14} /> Generate {bulkCount}</>
-                )}
+                <Sparkles size={14} /> Generate {bulkCount} Stickers
               </button>
             </div>
+          </div>
+        )}
+        {bulkProgress !== null && (
+          <div className="px-6 pb-4">
+            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+              <div className="h-full transition-all duration-200" style={{ width: `${bulkProgress}%`, background: "var(--accent)" }} />
+            </div>
+            <p className="text-xs text-gray-600 mt-1 font-semibold text-right">{bulkProgress}% saved to cloud DB...</p>
           </div>
         )}
       </div>
@@ -290,7 +295,7 @@ export default function QrCodesPage({
               <thead>
                 <tr className="text-left text-[11px] text-gray-500 font-bold uppercase tracking-wider border-b" style={{ borderColor: "#f7f7f7" }}>
                   <th className="px-6 py-3">QR</th>
-                  <th className="px-2 py-3">QR ID</th>
+                  <th className="px-2 py-3">PHONE NUMBER</th>
                   <th className="px-2 py-3">Category</th>
                   <th className="px-2 py-3">Created</th>
                   <th className="px-2 py-3">Status</th>
@@ -302,6 +307,9 @@ export default function QrCodesPage({
                   const catKey = (q.category || "car") as any;
                   const icon = getCategoryIcon(catKey);
                   const label = getCategoryLabel(catKey);
+                  const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
+                  const isActivated = Boolean(phoneNum && phoneNum.trim());
+                  const computedStatus = isActivated ? "active" : q.status;
 
                   return (
                     <tr key={q.id} className="border-b last:border-0 hover:bg-gray-50/60 transition-colors" style={{ borderColor: "#f7f7f7" }}>
@@ -310,7 +318,16 @@ export default function QrCodesPage({
                           <StickerThumb qr={q} templates={templates} size={36} />
                         </button>
                       </td>
-                      <td className="px-2 py-3"><IdBadge code={q.id} /></td>
+                      <td className="px-2 py-3">
+                        {isActivated ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-950 border border-amber-200/80 shadow-2xs">
+                            <Phone size={12} className="text-amber-600 flex-shrink-0" />
+                            <span>{phoneNum}</span>
+                          </span>
+                        ) : (
+                          <span className="text-gray-300 font-medium text-xs">—</span>
+                        )}
+                      </td>
                       <td className="px-2 py-3">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-800 border border-gray-200">
                           <span>{icon}</span>
@@ -318,7 +335,7 @@ export default function QrCodesPage({
                         </span>
                       </td>
                       <td className="px-2 py-3 text-[11px] text-gray-600 font-semibold">{fmtDate(q.createdAt)}</td>
-                      <td className="px-2 py-3"><StatusPill status={q.status} /></td>
+                      <td className="px-2 py-3"><StatusPill status={computedStatus} /></td>
                       <td className="px-6 py-3">
                         <div className="flex items-center justify-end gap-0.5">
                           <button

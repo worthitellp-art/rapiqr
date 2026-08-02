@@ -69,6 +69,18 @@ class OrderModel {
     if (error) throw error;
     return (data || []).map(toApi);
   }
+
+  static async updateStatus(id, status) {
+    const { data, error } = await supabaseAdmin
+      .from('orders')
+      .update({ status })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return toApi(data);
+  }
 }
 
 module.exports = OrderModel;

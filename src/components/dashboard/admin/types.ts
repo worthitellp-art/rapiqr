@@ -13,6 +13,9 @@ export interface QrRecord {
   bg: string;
   assignedTo?: string;     // user name this sticker is assigned to
   assignedUserId?: number; // user ID this sticker is assigned to
+  ownerPhone?: string;
+  ownerName?: string;
+  phoneNumber?: string;
 }
 
 export interface Template {

@@ -286,6 +286,20 @@ export const apiClient = {
         method: 'GET',
       });
     },
+
+    // Admin: every order placed via checkout
+    async list() {
+      return request<{ success: boolean; data: any[] }>('/orders', {
+        method: 'GET',
+      });
+    },
+
+    async updateStatus(id: string, status: 'placed' | 'shipped' | 'delivered' | 'cancelled') {
+      return request<{ success: boolean; data: any }>(`/orders/${encodeURIComponent(id)}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      });
+    },
   },
 
   // Distributor / Partner Applications (backed by Supabase via the Express server — see task.md #3)
