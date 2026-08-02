@@ -267,15 +267,21 @@ export async function deleteTemplateFromDb(templateId: string | number) {
 /**
  * Save sticker QR Placement coordinates (x, y, w, h) to Supabase
  */
-export async function saveStickerPosToDb(pos: { x: number; y: number; w: number; h: number }) {
+export async function saveStickerPosToDb(pos: { x: number; y: number; w: number; h: number }, fgColor?: string, bgColor?: string) {
   if (!isSupabaseConfigured) return null;
   try {
+    const { data: existing } = await supabase
+      .from('templates')
+      .select('fg_color, bg_color')
+      .eq('is_default', true)
+      .maybeSingle();
+
     const { data, error } = await supabase
       .from('templates')
       .upsert({
         name: 'Default',
-        fg_color: 'EAB308',
-        bg_color: 'FFFFFF',
+        fg_color: fgColor || existing?.fg_color || 'D9581F',
+        bg_color: bgColor || existing?.bg_color || 'FFFFFF',
         sticker_pos: pos,
         is_default: true,
       }, { onConflict: 'name' })

@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from "recharts";
 import { STICKER_CATEGORIES, getStickerCategoryLabel } from "../stickerModules";
+import PhoneInputWithCountry from "./common/PhoneInputWithCountry";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
 
@@ -2071,7 +2072,7 @@ function HelplineProvidersPage({ setToast }: { setToast: (msg: string | null) =>
             </div>
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1.5">Phone Number *</label>
-              <input type="tel" required placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} className={`${inputCls} font-mono`} style={{ borderColor: "#e2e8f0" }} />
+              <PhoneInputWithCountry required value={phone} onChange={(full) => setPhone(full)} />
             </div>
             <button type="submit" className="w-full py-2.5 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-[0.98] mt-1 cursor-pointer shadow-sm" style={{ background: "var(--accent)" }}>
               <Plus size={14} /> Save Provider

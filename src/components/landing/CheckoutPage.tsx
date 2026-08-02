@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
   Lock, ShieldCheck, CreditCard, Smartphone, Truck,
-  CheckCircle2, ArrowRight, X, MapPin, User, Mail, Phone,
+  CheckCircle2, ArrowRight, X, MapPin, User, Mail,
   ArrowLeft, ShoppingBag
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiClient } from '../../lib/apiClient';
+import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
 import './landing.css';
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
@@ -279,15 +280,7 @@ export default function CheckoutPage({
                     </div>
                     <div>
                       <label style={labelCls}>Phone *</label>
-                      <div style={{ position: 'relative' }}>
-                        <Phone size={14} style={{ position: 'absolute', left: 12, top: 13, color: 'var(--ink-faint)' }} />
-                        <input
-                          style={{ ...inputCls, paddingLeft: 34 }}
-                          placeholder="+91 98765 43210"
-                          value={phone}
-                          onChange={e => setPhone(e.target.value)}
-                        />
-                      </div>
+                      <PhoneInputWithCountry value={phone} onChange={full => setPhone(full)} />
                     </div>
                   </div>
                   <div style={{ marginTop: 12 }}>

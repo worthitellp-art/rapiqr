@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured, getAuthCallbackUrl } from '../../lib/supabase';
 import { Smartphone, Mail, Clock } from 'lucide-react';
 import groupLogo1 from '../../../assets/Group 1000005716-1.png';
+import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
 
 const AUTH_IMAGES = [
   'https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&q=80&w=1200', // Car 1
@@ -380,12 +381,9 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
                 <label className="block text-xs font-bold text-gray-800 mb-1.5 uppercase tracking-wider">
                   Phone Number
                 </label>
-                <input
-                  type="tel"
-                  placeholder="+91 98765 43210"
+                <PhoneInputWithCountry
                   value={signupPhone}
-                  onChange={(e) => setSignupPhone(e.target.value)}
-                  className="w-full px-4 py-3.5 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-black focus:ring-2 focus:ring-black/10 transition-all text-gray-900 font-medium"
+                  onChange={(full) => setSignupPhone(full)}
                 />
                 <p className="mt-1.5 text-xs text-gray-400">
                   Used to match stickers you've already activated to your dashboard.
@@ -414,12 +412,9 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
                 <label className="block text-xs font-bold text-gray-800 mb-1.5 uppercase tracking-wider">
                   Phone Number
                 </label>
-                <input
-                  type="tel"
-                  placeholder="+91 98765 43210"
+                <PhoneInputWithCountry
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full px-4 py-3.5 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-black focus:ring-2 focus:ring-black/10 transition-all text-gray-900 font-medium"
+                  onChange={(full) => setPhoneNumber(full)}
                 />
                 <p className="mt-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
                   <Clock size={13} /> Phone OTP login is coming soon. Use Gmail/Email or Google to continue.

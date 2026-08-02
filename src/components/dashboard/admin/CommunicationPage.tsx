@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Plus, Trash2, Phone, Wrench, Battery, Truck, Settings, Users, Ambulance, ShieldAlert, Car, Lightbulb, AlertTriangle } from "lucide-react";
 import { useLocalStorage } from "./useLocalStorage";
 import { getCommunicationProvidersFromDb, saveCommunicationProviderToDb, deleteCommunicationProviderFromDb } from "../../../lib/supabaseService";
+import PhoneInputWithCountry from "../../common/PhoneInputWithCountry";
 
 const CATEGORIES = ["Ambulance", "Towing", "Mechanic", "Flat Tire", "Battery", "Fuel", "Parking", "Police", "Theft", "Headlights", "Family"];
 
@@ -92,12 +93,7 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
           </div>
           <div>
             <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">Phone Number</label>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+91 98765 43210"
-              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 outline-none focus:bg-white focus:border-gray-400 transition-all font-semibold text-gray-900"
-            />
+            <PhoneInputWithCountry value={phone} onChange={(full) => setPhone(full)} />
           </div>
           <div className="flex items-end">
             <button

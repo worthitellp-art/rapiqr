@@ -34,6 +34,7 @@ import { EditDetailsModal, EditContactsModal, TransferModal, ScanHistoryModal, C
 import EmergencyContactsPanel from './dashboard/client/EmergencyContactsPanel';
 import AccountSettingsPanel from './dashboard/client/AccountSettingsPanel';
 import SupportLegalPanel from './dashboard/client/SupportLegalPanel';
+import PhoneInputWithCountry from './common/PhoneInputWithCountry';
 import {
   getProductsFromDb,
   updateProductDetailsInDb,
@@ -597,12 +598,9 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
               <form onSubmit={handleLinkByPhone} className="bg-white border border-[#E8ECF4] rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-[#64748B] mb-1">Your Phone Number</label>
-                  <input
-                    type="tel"
+                  <PhoneInputWithCountry
                     value={linkPhone}
-                    onChange={(e) => { setLinkPhone(e.target.value); setLinkResult(null); }}
-                    placeholder="+91 98765 43210"
-                    className="w-full px-4 py-3 text-sm bg-[#F5F6FA] border border-[#E8ECF4] rounded-xl outline-none focus:border-[#111111] font-mono"
+                    onChange={(full) => { setLinkPhone(full); setLinkResult(null); }}
                   />
                 </div>
 

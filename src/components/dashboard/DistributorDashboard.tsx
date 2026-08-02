@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import groupLogo1 from '../../assets/Group 1000005716-1.png';
+import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
 
 interface CustomerTag {
   id: string;
@@ -301,13 +302,10 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Customer Phone Number</label>
-                  <input
-                    type="tel"
+                  <PhoneInputWithCountry
                     required
-                    placeholder="+91 98765 43210"
                     value={newCustomer.phone}
-                    onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-amber-500"
+                    onChange={full => setNewCustomer({ ...newCustomer, phone: full })}
                   />
                 </div>
 

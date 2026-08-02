@@ -9,6 +9,7 @@ import {
   Menu, Signal, Package, LogOut, LayoutDashboard, Store
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
 import { 
   saveDistributorApplication, 
   getUserDistributorApplication, 
@@ -2048,13 +2049,10 @@ export default function LandingPageMaster({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">Phone / WhatsApp Number</label>
-                      <input
-                        type="tel"
+                      <PhoneInputWithCountry
                         required
-                        placeholder="+91 98765 43210"
                         value={partnerForm.phone}
-                        onChange={e => setPartnerForm({ ...partnerForm, phone: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-amber-500"
+                        onChange={full => setPartnerForm({ ...partnerForm, phone: full })}
                       />
                     </div>
                     <div>

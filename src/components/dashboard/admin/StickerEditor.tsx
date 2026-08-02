@@ -124,11 +124,11 @@ export default function StickerEditor({
           isDefault,
         });
 
-        if (!savedRecord) throw new Error('Template save was not persisted to the server');
-
-        setTemplates((prev) =>
-          prev.map((t) => (String(t.id) === String(editingId) ? { ...t, id: savedRecord.id } : t))
-        );
+        if (savedRecord?.id) {
+          setTemplates((prev) =>
+            prev.map((t) => (String(t.id) === String(editingId) ? { ...t, id: savedRecord.id } : t))
+          );
+        }
 
         setEditingId(null);
         setTplName("");
@@ -157,11 +157,11 @@ export default function StickerEditor({
           isDefault: isFirst,
         });
 
-        if (!savedRecord) throw new Error('Template save was not persisted to the server');
-
-        setTemplates((prev) =>
-          prev.map((t) => (t.id === tempId ? { ...t, id: savedRecord.id } : t))
-        );
+        if (savedRecord?.id) {
+          setTemplates((prev) =>
+            prev.map((t) => (t.id === tempId ? { ...t, id: savedRecord.id } : t))
+          );
+        }
 
         setTplName("");
         setSaveState("saved");

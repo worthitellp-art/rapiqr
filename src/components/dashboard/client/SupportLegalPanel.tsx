@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Phone, Mail, FileText, Scale, AlertOctagon, Loader2, X } from 'lucide-react';
 import { apiClient } from '../../../lib/apiClient';
+import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
 
 const SUPPORT_PHONE = '+91 98765 43210';
 const SUPPORT_EMAIL = 'support@rapiqr.com';
@@ -70,12 +71,7 @@ function ReportModal({
       <p>Tell us what happened — our team will follow up by phone or email.</p>
       <div>
         <label className="block text-xs font-bold text-[#64748B] mb-1">Your Phone (optional)</label>
-        <input
-          className="w-full px-3.5 py-2.5 text-sm bg-[#F5F6FA] border border-[#E8ECF4] rounded-xl outline-none focus:border-[#111111] font-mono"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="+91 98765 43210"
-        />
+        <PhoneInputWithCountry value={phone} onChange={(full) => setPhone(full)} />
       </div>
       <div>
         <label className="block text-xs font-bold text-[#64748B] mb-1">Details</label>
