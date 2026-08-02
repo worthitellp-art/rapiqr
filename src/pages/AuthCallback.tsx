@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, getAuthCallbackUrl } from '../lib/supabase';
 
 type CallbackStatus = 'processing' | 'success' | 'error';
 
@@ -64,7 +64,9 @@ export default function AuthCallback({ onSuccess }: { onSuccess?: () => void }) 
       if (onSuccess) {
         onSuccess();
       } else {
-        window.location.href = window.location.origin;
+        // Land on the real dashboard: local origin when running locally, otherwise
+        // the configured hosting URL (never a stray localhost/preview origin).
+        window.location.href = getAuthCallbackUrl('/');
       }
     }
 
@@ -111,7 +113,7 @@ export default function AuthCallback({ onSuccess }: { onSuccess?: () => void }) 
           </p>
           <button
             onClick={() => {
-              window.location.href = window.location.origin;
+              window.location.href = getAuthCallbackUrl('/');
             }}
             className="w-full py-3 rounded-xl bg-[#FF6500] hover:bg-[#E55A00] text-white font-bold text-sm transition-colors shadow-sm"
           >

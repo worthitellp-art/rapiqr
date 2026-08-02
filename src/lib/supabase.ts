@@ -12,13 +12,25 @@ export const isSupabaseConfigured = Boolean(
 export const SITE_URL = (import.meta.env.VITE_SITE_URL || 'https://rapiqr.worthitellp.workers.dev').replace(/\/+$/, '');
 
 /**
- * Generates the OAuth and authentication callback URL based on the current origin.
- * Dynamically uses window.location.origin so Google sign-in redirects back
- * seamlessly both on localhost and on hosted production backend/frontend domains.
+ * Generates the OAuth and authentication callback URL for Google sign-in.
+ * - When the app runs locally (localhost / 127.0.0.1 / .local) it keeps the
+ *   current local origin, so the OAuth flow continues on localhost.
+ * - Anywhere else (hosted preview, production) it always uses the configured
+ *   hosting URL (VITE_SITE_URL), so Google always bounces back to the real
+ *   live dashboard and never to a stray localhost / preview origin.
  */
 export function getAuthCallbackUrl(targetPath = '/auth/callback'): string {
   const normalizedPath = targetPath.startsWith('/') ? targetPath : `/${targetPath}`;
-  if (typeof window !== 'undefined' && window.location?.origin) {
+  const hostname = typeof window !== 'undefined' ? window.location?.hostname || '' : '';
+  const isLocalHost =
+    hostname === '' ||
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1' ||
+    hostname.endsWith('.localhost') ||
+    hostname.endsWith('.local');
+
+  if (isLocalHost && typeof window !== 'undefined' && window.location?.origin) {
     return `${window.location.origin.replace(/\/+$/, '')}${normalizedPath}`;
   }
   return `${SITE_URL}${normalizedPath}`;

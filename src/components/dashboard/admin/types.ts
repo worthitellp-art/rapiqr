@@ -17,7 +17,7 @@ export interface QrRecord {
 }
 
 export interface Template {
-  id: number;
+  id: string | number;
   name: string;
   fg: string;
   bg: string;

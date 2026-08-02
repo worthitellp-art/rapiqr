@@ -9,7 +9,7 @@ class UserModel {
     try {
       const { data, error } = await supabaseAdmin
         .from('profiles')
-        .select('id, email, full_name, avatar_url, role, subscription_plan, is_subscribed')
+        .select('id, email, full_name, phone_number, avatar_url, role, subscription_plan, is_subscribed, metadata')
         .eq('id', userId)
         .maybeSingle();
 
@@ -28,7 +28,7 @@ class UserModel {
     try {
       const { data, error } = await supabaseAdmin
         .from('profiles')
-        .select('id, email, full_name, avatar_url, role, subscription_plan, is_subscribed')
+        .select('id, email, full_name, phone_number, avatar_url, role, subscription_plan, is_subscribed, metadata')
         .eq('email', email)
         .maybeSingle();
 
@@ -37,6 +37,99 @@ class UserModel {
     } catch (err) {
       console.error('UserModel.findByEmail Error:', err);
       return null;
+    }
+  }
+
+  /**
+   * Update the owner's own name / phone (used by Account Settings).
+   */
+  static async updateProfile(userId, updates) {
+    try {
+      const payload = {};
+      if (updates.fullName !== undefined) payload.full_name = updates.fullName;
+      if (updates.phoneNumber !== undefined) payload.phone_number = updates.phoneNumber;
+      if (Object.keys(payload).length === 0) return this.findById(userId);
+
+      const { data, error } = await supabaseAdmin
+        .from('profiles')
+        .update(payload)
+        .eq('id', userId)
+        .select('id, email, full_name, phone_number, avatar_url, role, subscription_plan, is_subscribed, metadata')
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.error('UserModel.updateProfile Error:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Shallow-merge new keys into profiles.metadata (used for 2FA state, etc).
+   */
+  static async mergeMetadata(userId, patch) {
+    try {
+      const current = await this.findById(userId);
+      const mergedMetadata = { ...(current?.metadata || {}), ...patch };
+
+      const { data, error } = await supabaseAdmin
+        .from('profiles')
+        .update({ metadata: mergedMetadata })
+        .eq('id', userId)
+        .select('id, email, full_name, phone_number, avatar_url, role, subscription_plan, is_subscribed, metadata')
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.error('UserModel.mergeMetadata Error:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Update the row's email (called after the Supabase Auth email has already changed).
+   */
+  static async updateEmail(userId, email) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('profiles')
+        .update({ email })
+        .eq('id', userId)
+        .select('id, email, full_name, phone_number, avatar_url, role, subscription_plan, is_subscribed, metadata')
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.error('UserModel.updateEmail Error:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Admin-only: list/search all profiles by name, email or phone (support console).
+   */
+  static async searchAll(query, limit = 200) {
+    try {
+      let q = supabaseAdmin
+        .from('profiles')
+        .select('id, email, full_name, phone_number, avatar_url, role, subscription_plan, is_subscribed, created_at')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      const term = String(query || '').trim().replace(/[,()]/g, '');
+      if (term) {
+        q = q.or(`email.ilike.%${term}%,full_name.ilike.%${term}%,phone_number.ilike.%${term}%`);
+      }
+
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.error('UserModel.searchAll Error:', err);
+      return [];
     }
   }
 

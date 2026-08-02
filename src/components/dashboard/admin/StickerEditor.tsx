@@ -42,7 +42,7 @@ export default function StickerEditor({
   const [tplName, setTplName] = useState("");
   const [tplFg, setTplFg] = useState("EAB308");
   const [tplBg, setTplBg] = useState("FFFFFF");
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | number | null>(null);
 
   function clamp(val: number, min: number, max: number) { return Math.max(min, Math.min(max, val)); }
   function snap(val: number) { return snapEnabled ? Math.round(val / SNAP) * SNAP : Math.round(val); }
@@ -89,37 +89,90 @@ export default function StickerEditor({
     return () => { window.removeEventListener("mousemove", handleMove); window.removeEventListener("mouseup", handleUp); };
   }, [dragging, resizing, stickerPos, setStickerPos, lockAspect, snapEnabled]);
 
-  function handleSave() {
+  async function handleSave() {
     if (saveState !== "idle") return;
     if (!tplName.trim()) { setToast("Enter a template name first"); setTimeout(() => setToast(null), 2000); return; }
     setSaveState("saving");
-    setTimeout(() => {
+    try {
+      const cleanName = tplName.trim();
+      const currentPos = { ...stickerPos };
+
       if (editingId !== null) {
-        setTemplates((prev) => prev.map((t) => t.id === editingId ? { ...t, name: tplName.trim(), fg: tplFg, bg: tplBg, stickerPos: { ...stickerPos } } : t));
-        const t = templates.find((x) => x.id === editingId);
-        saveTemplateToDb({ id: String(editingId), name: tplName.trim(), fgColor: tplFg, bgColor: tplBg, stickerPos, isDefault: t?.isPublicDefault || false });
+        const existingTpl = templates.find((x) => String(x.id) === String(editingId));
+        const isDefault = existingTpl?.isPublicDefault || false;
+
+        const updatedTpl: Template = {
+          id: editingId,
+          name: cleanName,
+          fg: tplFg,
+          bg: tplBg,
+          logo: null,
+          stickerPos: currentPos,
+          isPublicDefault: isDefault,
+        };
+
+        setTemplates((prev) =>
+          prev.map((t) => (String(t.id) === String(editingId) ? updatedTpl : t))
+        );
+
+        const savedRecord = await saveTemplateToDb({
+          id: editingId,
+          name: cleanName,
+          fgColor: tplFg,
+          bgColor: tplBg,
+          stickerPos: currentPos,
+          isDefault,
+        });
+
+        if (!savedRecord) throw new Error('Template save was not persisted to the server');
+
+        setTemplates((prev) =>
+          prev.map((t) => (String(t.id) === String(editingId) ? { ...t, id: savedRecord.id } : t))
+        );
+
         setEditingId(null);
         setTplName("");
         setSaveState("saved");
         setToast("Template updated!");
       } else {
+        const isFirst = templates.length === 0;
+        const tempId = Date.now();
         const newTpl: Template = {
-          id: Date.now(),
-          name: tplName.trim(),
+          id: tempId,
+          name: cleanName,
           fg: tplFg,
           bg: tplBg,
           logo: null,
-          stickerPos: { ...stickerPos },
-          isPublicDefault: templates.length === 0,
+          stickerPos: currentPos,
+          isPublicDefault: isFirst,
         };
+
         setTemplates((prev) => [...prev, newTpl]);
-        saveTemplateToDb({ name: newTpl.name, fgColor: newTpl.fg, bgColor: newTpl.bg, stickerPos, isDefault: newTpl.isPublicDefault });
+
+        const savedRecord = await saveTemplateToDb({
+          name: cleanName,
+          fgColor: tplFg,
+          bgColor: tplBg,
+          stickerPos: currentPos,
+          isDefault: isFirst,
+        });
+
+        if (!savedRecord) throw new Error('Template save was not persisted to the server');
+
+        setTemplates((prev) =>
+          prev.map((t) => (t.id === tempId ? { ...t, id: savedRecord.id } : t))
+        );
+
         setTplName("");
         setSaveState("saved");
-        setToast(`Template "${newTpl.name}" saved!`);
+        setToast(`Template "${cleanName}" saved!`);
       }
+    } catch (err) {
+      console.error("Failed to save template:", err);
+      setToast("Failed to save template");
+    } finally {
       setTimeout(() => { setSaveState("idle"); setToast(null); }, 2000);
-    }, 400);
+    }
   }
 
   function handleLoad(t: Template) {
@@ -141,27 +194,64 @@ export default function StickerEditor({
     setTimeout(() => setToast(null), 2200);
   }
 
-  function handleDuplicate(t: Template) {
-    const copy: Template = { ...t, id: Date.now(), name: `${t.name} (copy)`, isPublicDefault: false };
+  async function handleDuplicate(t: Template) {
+    const copyName = `${t.name} (copy)`;
+    const tempId = Date.now();
+    const copy: Template = { ...t, id: tempId, name: copyName, isPublicDefault: false };
+
     setTemplates((prev) => [...prev, copy]);
-    saveTemplateToDb({ id: String(copy.id), name: copy.name, fgColor: copy.fg, bgColor: copy.bg, stickerPos: copy.stickerPos, isDefault: false });
+    const savedRecord = await saveTemplateToDb({
+      name: copyName,
+      fgColor: copy.fg,
+      bgColor: copy.bg,
+      stickerPos: copy.stickerPos,
+      isDefault: false,
+    });
+
+    if (!savedRecord) {
+      setTemplates((prev) => prev.filter((item) => item.id !== tempId));
+      setToast("Failed to duplicate template");
+      setTimeout(() => setToast(null), 2000);
+      return;
+    }
+
+    setTemplates((prev) => prev.map((item) => (item.id === tempId ? { ...item, id: savedRecord.id } : item)));
     setToast(`Duplicated "${t.name}"`);
     setTimeout(() => setToast(null), 2000);
   }
 
-  function handleDelete(t: Template) {
+  async function handleDelete(t: Template) {
     if (t.isPublicDefault) { setToast("Set another template as default first"); setTimeout(() => setToast(null), 2000); return; }
-    if (editingId === t.id) setEditingId(null);
-    setTemplates((prev) => prev.filter((x) => x.id !== t.id));
-    deleteTemplateFromDb(String(t.id));
+    if (String(editingId) === String(t.id)) setEditingId(null);
+    const previous = templates;
+    setTemplates((prev) => prev.filter((x) => String(x.id) !== String(t.id)));
+    const ok = await deleteTemplateFromDb(t.id);
+    if (!ok) {
+      setTemplates(previous);
+      setToast("Failed to delete template");
+      setTimeout(() => setToast(null), 2000);
+      return;
+    }
     setToast(`Deleted "${t.name}"`);
     setTimeout(() => setToast(null), 2000);
   }
 
-  function handleSetDefault(t: Template) {
-    setTemplates((prev) => prev.map((x) => ({ ...x, isPublicDefault: x.id === t.id })));
+  async function handleSetDefault(t: Template) {
+    setTemplates((prev) => prev.map((x) => ({ ...x, isPublicDefault: String(x.id) === String(t.id) })));
     setStickerPos(t.stickerPos);
-    templates.forEach((x) => saveTemplateToDb({ id: String(x.id), name: x.name, fgColor: x.fg, bgColor: x.bg, stickerPos: x.stickerPos, isDefault: x.id === t.id }));
+
+    const updatedTemplates = templates.map((x) => ({ ...x, isPublicDefault: String(x.id) === String(t.id) }));
+    for (const x of updatedTemplates) {
+      await saveTemplateToDb({
+        id: x.id,
+        name: x.name,
+        fgColor: x.fg,
+        bgColor: x.bg,
+        stickerPos: x.stickerPos,
+        isDefault: x.isPublicDefault,
+      });
+    }
+
     setToast(`"${t.name}" set as default`);
     setTimeout(() => setToast(null), 2000);
   }

@@ -30,7 +30,7 @@ export default function Sidebar({
         >
           <div
             className="w-[34px] h-[34px] rounded-[10px] flex items-center justify-center"
-            style={{ background: "#111111" }}
+            style={{ background: "#0F172A" }}
           >
             <img src={groupLogo1} alt="" className="h-[18px] w-auto object-contain" />
           </div>
@@ -48,23 +48,25 @@ export default function Sidebar({
               <button
                 key={item.id}
                 onClick={() => setPage(item.id)}
-                className="w-full flex items-center gap-3 px-3 py-[10px] rounded-xl text-[13px] font-semibold transition-all duration-200 cursor-pointer"
+                className="w-full flex items-center gap-3 px-3 py-[10px] rounded-xl text-[13px] font-semibold transition-all duration-200 cursor-pointer relative"
                 style={{
-                  background: isActive ? "#111111" : "transparent",
-                  color: isActive ? "#fff" : "#64748B",
-                  boxShadow: isActive ? "0 2px 8px rgba(17,17,17,0.25)" : "none",
+                  background: isActive ? "#FEF3C7" : "transparent",
+                  color: isActive ? "#0F172A" : "#64748B",
                 }}
                 onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = "#F1F5F9"; e.currentTarget.style.color = "#1E293B"; } }}
                 onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#64748B"; } }}
               >
-                <Icon size={18} strokeWidth={isActive ? 2.2 : 1.7} />
+                {isActive && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[60%] rounded-full" style={{ background: "#D97706" }} />
+                )}
+                <Icon size={18} strokeWidth={isActive ? 2.2 : 1.7} style={{ color: isActive ? "#D97706" : undefined }} />
                 <span>{item.label}</span>
                 {item.id === "alerts" && (unreadAlerts ?? 0) > 0 && (
                   <span
                     className="ml-auto text-[10px] font-bold px-[7px] py-[2px] rounded-full"
                     style={{
-                      background: isActive ? "rgba(255,255,255,0.18)" : "#FEE2E2",
-                      color: isActive ? "#fff" : "#DC2626",
+                      background: isActive ? "rgba(217,119,6,0.18)" : "#FEE2E2",
+                      color: isActive ? "#92400E" : "#DC2626",
                     }}
                   >
                     {unreadAlerts}

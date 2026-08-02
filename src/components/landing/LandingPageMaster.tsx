@@ -422,8 +422,7 @@ export default function LandingPageMaster({
   // Sync user's distributor application status
   useEffect(() => {
     if (isLoggedIn && (profile?.email || profile?.phone)) {
-      const app = getUserDistributorApplication(profile?.email || profile?.phone || '');
-      setUserAppStatus(app);
+      getUserDistributorApplication(profile?.email || profile?.phone || '').then(setUserAppStatus);
     } else {
       setUserAppStatus(null);
     }
@@ -469,7 +468,7 @@ export default function LandingPageMaster({
   };
 
   // Submit handler for partner application
-  const handlePartnerSubmit = (e: React.FormEvent) => {
+  const handlePartnerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isLoggedIn) {
       localStorage.setItem('namoqr-pending-distributor-intent', JSON.stringify({ tier: partnerForm.tier }));
@@ -477,7 +476,7 @@ export default function LandingPageMaster({
       return;
     }
 
-    const app = saveDistributorApplication({
+    const app = await saveDistributorApplication({
       userId: profile?.id,
       userName: partnerForm.name,
       userEmail: profile?.email || partnerForm.phone,
@@ -487,6 +486,7 @@ export default function LandingPageMaster({
       tier: partnerForm.tier,
     });
 
+    if (!app) return; // submission failed — leave the form open rather than claiming success
     setUserAppStatus(app);
     setPartnerSubmitted(true);
   };

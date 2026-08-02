@@ -80,13 +80,14 @@ function MainAppContent() {
     setPage(next);
   };
 
-  // After auth loads: if we think we're on dashboard but not logged in → send to landing
+  // After auth loads or on signout: if on dashboard/distributor but not logged in → send to landing & reset dashboardMode
   useEffect(() => {
     if (loading) return; // wait for Supabase session to resolve
     if ((page === 'dashboard' || page === 'distributor') && !isLoggedIn) {
+      setDashboardMode(null);
       navigateTo('landing');
     }
-  }, [loading, isLoggedIn]);
+  }, [loading, isLoggedIn, page]);
 
   useEffect(() => {
     const handler = () => {
@@ -148,7 +149,10 @@ function MainAppContent() {
   if (page === 'scan') {
     return (
       <Suspense fallback={<PageLoader />}>
-        <ScanPage onBack={() => { window.history.pushState({}, '', '/'); navigateTo('landing'); }} />
+        <ScanPage
+          onBack={() => { window.history.pushState({}, '', '/'); navigateTo('landing'); }}
+          onGoToDashboard={() => { window.history.pushState({}, '', '/'); navigateTo('dashboard'); }}
+        />
       </Suspense>
     );
   }

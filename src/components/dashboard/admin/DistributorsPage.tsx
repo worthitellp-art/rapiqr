@@ -15,8 +15,8 @@ export default function DistributorsPage({ setToast }: { setToast: (msg: string)
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedApp, setSelectedApp] = useState<DistributorApplication | null>(null);
 
-  const loadApplications = () => {
-    const data = getDistributorApplications();
+  const loadApplications = async () => {
+    const data = await getDistributorApplications();
     setApps(data);
   };
 
@@ -24,8 +24,8 @@ export default function DistributorsPage({ setToast }: { setToast: (msg: string)
     loadApplications();
   }, []);
 
-  const handleStatusChange = (appId: string, status: 'approved' | 'rejected') => {
-    const updated = updateDistributorApplicationStatus(appId, status);
+  const handleStatusChange = async (appId: string, status: 'approved' | 'rejected') => {
+    const updated = await updateDistributorApplicationStatus(appId, status);
     if (updated) {
       loadApplications();
       if (selectedApp && selectedApp.id === appId) {

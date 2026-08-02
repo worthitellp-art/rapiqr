@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import { getTemplatesFromDb, saveStickerPosToDb, getReportsFromDb } from "../../../lib/supabaseService";
 import { useLocalStorage } from "./useLocalStorage";
-import { QrRecord, Template, TeamMember, StickerPos } from "./types";
+import { QrRecord, Template, StickerPos } from "./types";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
 import QuickLookModal from "./QuickLookModal";
@@ -20,11 +20,10 @@ import DistributorsPage from "./DistributorsPage";
 export default function AdminDashboard({ onBack, switchToClientPortal }: { onBack: () => void; switchToClientPortal?: () => void }) {
   const { profile, signOut, isAdmin } = useAuth();
   const [page, setPage] = useState(() => (isAdmin ? "overview" : "qr"));
-  const accent = "111111";
+  const accent = "0F172A";
   const fontCss = "'Inter', ui-sans-serif, system-ui";
   const [templates, setTemplates] = useLocalStorage<Template[]>("namoqr-templates", []);
   const [qrList, setQrList] = useLocalStorage<QrRecord[]>("namoqr-qrlist", []);
-  const [users, setUsers] = useLocalStorage<TeamMember[]>("namoqr-users", []);
   const [stickerPos, setStickerPos] = useLocalStorage<StickerPos>("namoqr-sticker-pos", { x: 110, y: 40, w: 100, h: 100 });
   const [quickLookQr, setQuickLookQr] = useState<QrRecord | null>(null);
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
@@ -126,7 +125,7 @@ export default function AdminDashboard({ onBack, switchToClientPortal }: { onBac
               setToast={setToast} searchQuery={searchQuery}
             />
           )}
-          {page === "users" && <UsersPage users={users} setUsers={setUsers} qrList={qrList} setQrList={setQrList} setToast={setToast} />}
+          {page === "users" && <UsersPage searchQuery={searchQuery} setSearchQuery={setSearchQuery} setToast={setToast} />}
 
           {page === "customize" && (
             <CustomizePage

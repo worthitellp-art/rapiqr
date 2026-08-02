@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { getQrCodeByIdFromDb, activateQrInDb } from "../../lib/supabaseService";
+import { getQrCodeByIdFromDb, activateQrInDb, sendActivationNotifications } from "../../lib/supabaseService";
 import { useAuth } from "../../context/AuthContext";
 import { getStickerCategoryLabel, getCategoryIcon, getCategoryLabel } from "../../stickerModules";
+import PhoneInputWithCountry from "../common/PhoneInputWithCountry";
+import { apiClient } from "../../lib/apiClient";
 import groupLogo from "../../../assets/Group 1000005716.png";
 import groupLogo1 from "../../../assets/Group 1000005716-1.png";
 import groupLogo2 from "../../../assets/Group 1000005716-2.png";
@@ -48,7 +50,11 @@ import {
   Siren,
   Lightbulb,
   Battery,
-  Settings
+  Settings,
+  Trash2,
+  Cpu,
+  Loader2,
+  BellRing
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -86,9 +92,26 @@ interface GeoLocation {
   timestamp: string;
 }
 
+interface EmergencyContact {
+  id: string;
+  name: string;
+  relationship: string;
+  phone: string;
+}
+
 /* ---------------------------------------------------------------------- */
 /*  Constants & Helpers                                                     */
 /* ---------------------------------------------------------------------- */
+
+const RELATIONSHIP_PRESETS = ["Mother", "Father", "Spouse/Partner", "Sibling", "Doctor", "Friend"];
+
+function makeContactId() {
+  return `ec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function isValidContactPhone(phone: string) {
+  return phone.replace(/\D/g, "").length >= 7;
+}
 
 function getQrBaseUrl() {
   if (typeof window !== "undefined" && window.location?.origin) {
@@ -379,7 +402,7 @@ function IconTheftDetected() {
 /*  Main Light Theme Component                                             */
 /* ---------------------------------------------------------------------- */
 
-export default function ScanPage({ onBack }: { onBack: () => void }) {
+export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => void; onGoToDashboard?: () => void }) {
   const { profile, updatePhoneNumber } = useAuth();
   const [phase, setPhase] = useState<Phase>("validating");
   const [qrData, setQrData] = useState<QrData | null>(null);
@@ -396,10 +419,20 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
   // Registration form fields (after activation code is validated)
   const [regName, setRegName] = useState("");
   const [regPhone, setRegPhone] = useState("");
-  const [regEmergencyPhone, setRegEmergencyPhone] = useState("");
   const [regBloodGroup, setRegBloodGroup] = useState("O+");
   const [regAllergies, setRegAllergies] = useState("");
   const [regAddress, setRegAddress] = useState("");
+
+  // Emergency contacts — collected on the "register" step after identity verification,
+  // before the sticker is finalized as active. At least one is required to continue,
+  // but the whole step can be skipped (optional but strongly encouraged).
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([
+    { id: makeContactId(), name: "", relationship: "", phone: "" },
+  ]);
+  const [contactsError, setContactsError] = useState<string | null>(null);
+  // Whether identity was OTP-verified vs. a limited/email-pending path — carried from the
+  // activation step into the register step, then used by the final activation submit.
+  const [pendingVerified, setPendingVerified] = useState(true);
 
   // Activation country (limited list with dial codes)
   const [regCountry, setRegCountry] = useState("+91");
@@ -414,6 +447,14 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
   ]);
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  const aiChatEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll AI chat to bottom when new messages arrive
+  useEffect(() => {
+    if (aiChatOpen) {
+      aiChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [aiMessages, aiLoading, aiChatOpen]);
 
   // ── Authentication choice (multi-method: Google / Phone+OTP / Email) ──
   const [authChoice, setAuthChoice] = useState<"google" | "phone" | "email">("phone");
@@ -507,7 +548,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
 
     // Decision branch: phone matches the purchase phone → skip OTP entirely
     if (phoneMatchesBuyer) {
-      handleRegisterSubmit(true);
+      proceedToEmergencyContacts(true);
       return;
     }
 
@@ -587,11 +628,19 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
       return;
     }
 
-    handleRegisterSubmit(true);
+    proceedToEmergencyContacts(true);
   };
 
   const handleContinueLimited = () => {
-    handleRegisterSubmit(false);
+    proceedToEmergencyContacts(false);
+  };
+
+  // Identity step is done (however it was verified) — move to the Emergency Contacts
+  // step before finalizing activation.
+  const proceedToEmergencyContacts = (verified: boolean) => {
+    setPendingVerified(verified);
+    setContactsError(null);
+    setPhase("register");
   };
 
   const handleSendAiMessage = async (customPrompt?: string) => {
@@ -604,47 +653,13 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
     if (!customPrompt) setAiInput('');
     setAiLoading(true);
 
-    const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY || "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";
-
-    // Array of active free models on OpenRouter
-    const freeModels = [
-      "meta-llama/llama-3.3-70b-instruct:free",
-      "google/gemini-2.5-flash:free",
-      "deepseek/deepseek-r1:free",
-      "openrouter/auto"
-    ];
-
+    // Routed through the backend so the OpenRouter API key never ships to the browser
     let reply = "";
-    for (const modelId of freeModels) {
-      try {
-        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "HTTP-Referer": window.location.origin,
-            "X-Title": "RapiQR Emergency AI Assistant",
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: modelId,
-            messages: [
-              {
-                role: "system",
-                content: `You are RapiQR Safety AI Assistant assisting a user who scanned vehicle QR tag ${qrData?.vehicleNumber || 'QR Tag'}. Help with wrong parking, emergency medical first aid, towing, or owner contact. Be concise, practical, direct, and polite.`
-              },
-              ...updated
-            ]
-          })
-        });
-
-        const data = await res.json();
-        if (data?.choices?.[0]?.message?.content) {
-          reply = data.choices[0].message.content;
-          break; // Success! Exit loop
-        }
-      } catch {
-        // Try next model if fetch fails
-      }
+    try {
+      const res = await apiClient.ai.chat(updated, qrData?.vehicleNumber);
+      if (res?.reply) reply = res.reply;
+    } catch {
+      // fall through to default reply below
     }
 
     if (!reply) {
@@ -655,26 +670,53 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
     setAiLoading(false);
   };
 
-  const handleSendCustomMessage = () => {
-    if (!visitorMessage.trim()) return;
-    if (qrData) {
-      const payload = {
-        qrId: qrData.id,
-        qrUrl: qrData.qrUrl,
-        latitude: location?.lat || 0,
-        longitude: location?.lng || 0,
-        accuracy: location?.accuracy || 0,
-        deviceId: navigator.userAgent.slice(0, 40),
-        timestamp: new Date().toISOString(),
-        message: `Custom Message: ${visitorMessage}`,
-        vehicleName: qrData.vehicleName,
-        vehicleNumber: qrData.vehicleNumber,
-      };
-      const alerts = JSON.parse(localStorage.getItem("namoqr-alerts") || "[]");
-      alerts.unshift({ ...payload, id: Date.now(), status: "sent" });
-      localStorage.setItem("namoqr-alerts", JSON.stringify(alerts));
-      alert("Custom message sent to vehicle owner!");
-      setVisitorMessage("");
+  const [customMsgSending, setCustomMsgSending] = useState(false);
+  const [customMsgSentBanner, setCustomMsgSentBanner] = useState<string | null>(null);
+
+  const handleSendCustomMessage = async (presetText?: string) => {
+    const textToSend = presetText || visitorMessage;
+    if (!textToSend.trim() || customMsgSending) return;
+
+    setCustomMsgSending(true);
+    setCustomMsgSentBanner(null);
+
+    try {
+      if (qrData) {
+        const payload = {
+          qrId: qrData.id,
+          qrUrl: qrData.qrUrl,
+          latitude: location?.lat || 0,
+          longitude: location?.lng || 0,
+          accuracy: location?.accuracy || 0,
+          deviceId: navigator.userAgent.slice(0, 40),
+          timestamp: new Date().toISOString(),
+          message: textToSend,
+          vehicleName: qrData.vehicleName,
+          vehicleNumber: qrData.vehicleNumber,
+        };
+
+        // 1. Save alert locally
+        const alerts = JSON.parse(localStorage.getItem("namoqr-alerts") || "[]");
+        alerts.unshift({ ...payload, id: Date.now(), status: "sent" });
+        localStorage.setItem("namoqr-alerts", JSON.stringify(alerts));
+
+        // 2. Post alert to backend API server (triggers server logs & real Twilio SMS to the owner, if configured)
+        let smsSent = false;
+        try {
+          const res = await apiClient.alerts.createAlert(payload);
+          smsSent = Boolean(res.smsResult?.sent);
+        } catch { /* alert still saved to localStorage above; server may be unreachable */ }
+
+        const preview = `"${textToSend.slice(0, 35)}${textToSend.length > 35 ? '...' : ''}"`;
+        setCustomMsgSentBanner(smsSent ? `SMS & Alert dispatched to owner: ${preview}` : `Alert logged for owner: ${preview}`);
+        setVisitorMessage("");
+
+        setTimeout(() => {
+          setCustomMsgSentBanner(null);
+        }, 6000);
+      }
+    } finally {
+      setCustomMsgSending(false);
     }
   };
 
@@ -686,7 +728,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
     const adminHelplines = JSON.parse(localStorage.getItem("namoqr-helplines") || "[]");
 
     const allRecords = [...storedQrList, ...storedClientStickers];
-    const fullRecord = allRecords.find((q: any) => q.id === qrData.id || q.clientId === qrData.clientId) || {};
+    const fullRecord = allRecords.find((q: any) => q.id === qrData.id || q.clientId === qrData.clientId || q.qrCodeId === qrData.id || q.code === qrData.id) || {};
     const contacts: { label: string; phone: string; role: string; primary?: boolean; category?: string }[] = [];
 
     // 1. Registered Vehicle Owner Contact from Admin/DB
@@ -700,8 +742,27 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
       });
     }
 
-    // 2. Secondary Emergency Phone
-    if (fullRecord.secondaryPhone || fullRecord.altPhone) {
+    // 2. Owner-provided Emergency Contacts (collected during sticker activation or client dashboard)
+    const ownerContacts: any[] =
+      fullRecord.contacts ||
+      fullRecord.emergencyContacts ||
+      fullRecord.details?.emergencyContacts ||
+      (qrData as any).contacts ||
+      (qrData as any).emergencyContacts ||
+      (qrData as any).details?.emergencyContacts ||
+      [];
+
+    if (ownerContacts.length > 0) {
+      ownerContacts.forEach((c: any) => {
+        if (!c.phone) return;
+        contacts.push({
+          label: c.relationship ? `${c.name} (${c.relationship})` : c.name || "Emergency Contact",
+          phone: c.phone,
+          role: "Family / Emergency Contact",
+        });
+      });
+    } else if (fullRecord.secondaryPhone || fullRecord.altPhone) {
+      // Legacy records activated before multi-contact support.
       contacts.push({
         label: fullRecord.secondaryName ? `${fullRecord.secondaryName} (Emergency)` : "Secondary Emergency Contact",
         phone: fullRecord.secondaryPhone || fullRecord.altPhone,
@@ -883,7 +944,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
   }, [requestLocation]);
 
   /* ---- Registration Form Submit (after activation code validated) ---- */
-  const handleRegisterSubmit = (verified = true) => {
+  const handleRegisterSubmit = async (verified = true) => {
     if (!qrData) return;
     if (!regName.trim() || (!regPhone.trim() && !regEmail.trim())) {
       setActivationError("Please enter your name and phone number.");
@@ -898,18 +959,30 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
         ? `${regCountry}${regPhone.trim().replace(/\s+/g, "")}`
         : regEmail.trim();
 
-    // Save to Supabase
-    activateQrInDb({
+    const validContacts = emergencyContacts
+      .filter((c) => c.name.trim() && isValidContactPhone(c.phone))
+      .map((c) => ({ name: c.name.trim(), relationship: c.relationship.trim() || "Contact", phone: c.phone.trim() }));
+
+    // Save to Supabase — must actually succeed before the UI is allowed to claim success
+    // (a prior version fired this without awaiting it, so a failed write still showed "Activated").
+    const activationResult = await activateQrInDb({
       qrId: qrData.id,
       category: qrData.category || "car",
       ownerName: regName.trim(),
       ownerPhone: fullPhone,
-      emergencyPhone: regEmergencyPhone.trim(),
+      ownerEmail: regEmail.trim(),
+      emergencyContacts: validContacts,
       bloodGroup: regBloodGroup,
       allergies: regAllergies.trim(),
       address: regAddress.trim(),
       userId: profile?.id,
     });
+
+    if (!activationResult) {
+      setActivatingQr(false);
+      setActivationError("We couldn't save your activation to the server. Please check your connection and try again.");
+      return;
+    }
 
     // Auto-link this phone number to the logged-in account (if any) so the sticker
     // shows up on their Client Dashboard the next time they sign in.
@@ -928,7 +1001,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
         ownerPhone: fullPhone,
         email: regEmail.trim(),
         verification: verified ? "verified" : "pending",
-        emergencyPhone: regEmergencyPhone.trim(),
+        emergencyContacts: validContacts,
         bloodGroup: regBloodGroup,
         allergies: regAllergies.trim(),
         address: regAddress.trim(),
@@ -942,7 +1015,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
         list[idx].ownerPhone = registrationData.ownerPhone;
         list[idx].email = registrationData.email;
         list[idx].verification = registrationData.verification;
-        list[idx].secondaryPhone = registrationData.emergencyPhone;
+        list[idx].emergencyContacts = registrationData.emergencyContacts;
         list[idx].bloodGroup = registrationData.bloodGroup;
         list[idx].allergies = registrationData.allergies;
         list[idx].address = registrationData.address;
@@ -965,11 +1038,76 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
 
       setQrData((prev) => (prev ? { ...prev, status: "active" } : null));
       setActivatingQr(false);
+
+      // Fire-and-forget: confirmation + sample "what responders see" test-scan email.
+      sendActivationNotifications({
+        qrId: qrData.id,
+        ownerName: regName.trim(),
+        ownerEmail: regEmail.trim() || undefined,
+        category: qrData.category,
+      }).catch(() => { /* non-blocking */ });
+
       setPhase("success");
-      setTimeout(() => {
-        setPhase("emergency");
-      }, 2000);
     }, 800);
+  };
+
+  /* ---- Emergency Contacts step: add / edit / remove rows ---- */
+  const addEmergencyContactRow = () => {
+    setEmergencyContacts((prev) => [...prev, { id: makeContactId(), name: "", relationship: "", phone: "" }]);
+  };
+
+  const updateEmergencyContact = (id: string, field: "name" | "relationship" | "phone", value: string) => {
+    setContactsError(null);
+    setEmergencyContacts((prev) => prev.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
+  };
+
+  const removeEmergencyContact = (id: string) => {
+    setEmergencyContacts((prev) => (prev.length > 1 ? prev.filter((c) => c.id !== id) : prev));
+  };
+
+  // Browser Contact Picker API (Android Chrome only) — progressive enhancement, no-op
+  // (button hidden) on unsupported browsers/desktop.
+  const isContactPickerSupported =
+    typeof navigator !== "undefined" && "contacts" in navigator && "ContactsManager" in window;
+
+  const handleImportContact = async () => {
+    try {
+      const nav = navigator as any;
+      const picked = await nav.contacts.select(["name", "tel"], { multiple: true });
+      if (!picked?.length) return;
+      const imported: EmergencyContact[] = picked
+        .filter((p: any) => p.tel?.[0])
+        .map((p: any) => ({
+          id: makeContactId(),
+          name: (p.name?.[0] || "").trim(),
+          relationship: "",
+          phone: (p.tel?.[0] || "").trim(),
+        }));
+      if (!imported.length) return;
+      setEmergencyContacts((prev) => {
+        const blankOnly = prev.length === 1 && !prev[0].name.trim() && !prev[0].phone.trim();
+        return blankOnly ? imported : [...prev, ...imported];
+      });
+      setContactsError(null);
+    } catch {
+      // User cancelled the picker or it's unavailable — nothing to do.
+    }
+  };
+
+  // Require at least one valid contact to continue; "Skip for now" bypasses this.
+  const handleFinishEmergencyContacts = () => {
+    const validContacts = emergencyContacts.filter((c) => c.name.trim() && isValidContactPhone(c.phone));
+    if (validContacts.length === 0) {
+      setContactsError("Add at least one contact (name + valid phone), or skip for now.");
+      return;
+    }
+    handleRegisterSubmit(pendingVerified);
+  };
+
+  // Skips the step entirely — handleRegisterSubmit already drops any incomplete rows,
+  // so this simply proceeds without requiring a valid contact first.
+  const handleSkipEmergencyContacts = () => {
+    handleRegisterSubmit(pendingVerified);
   };
 
   /* ---- Automatic Location Ping Dispatch (Every 5s, 7 times) ---- */
@@ -1115,10 +1253,10 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                             className={`flex h-11 items-center justify-center gap-1.5 rounded-xl border text-[11px] font-bold transition cursor-pointer ${authChoice === "google" ? "border-yellow-400 bg-yellow-50 text-slate-900 ring-2 ring-yellow-200" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`}
                           >
                             <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
-                              <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47a5.57 5.57 0 0 1-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"/>
-                              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09A11.99 11.99 0 0 0 12 24z"/>
-                              <path fill="#FBBC05" d="M5.27 14.29a7.19 7.19 0 0 1 0-4.58V6.62H1.29a12.01 12.01 0 0 0 0 10.76l3.98-3.09z"/>
-                              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.32 2.69 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z"/>
+                              <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47a5.57 5.57 0 0 1-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z" />
+                              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09A11.99 11.99 0 0 0 12 24z" />
+                              <path fill="#FBBC05" d="M5.27 14.29a7.19 7.19 0 0 1 0-4.58V6.62H1.29a12.01 12.01 0 0 0 0 10.76l3.98-3.09z" />
+                              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.32 2.69 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z" />
                             </svg>
                             Google
                           </button>
@@ -1212,7 +1350,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                       {/* ── PRIMARY ACTION ── */}
                       {authChoice === "google" ? (
                         <button
-                          onClick={googleAuthed ? () => handleRegisterSubmit(true) : handleContinueWithGoogle}
+                          onClick={googleAuthed ? () => proceedToEmergencyContacts(true) : handleContinueWithGoogle}
                           disabled={googleLoading}
                           className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 text-white font-bold shadow-md transition-all hover:scale-[1.02] active:scale-100 cursor-pointer text-xs disabled:opacity-60"
                         >
@@ -1229,7 +1367,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                         </button>
                       ) : phoneMatchesBuyer && authChoice === "phone" ? (
                         <button
-                          onClick={() => handleRegisterSubmit(true)}
+                          onClick={() => proceedToEmergencyContacts(true)}
                           disabled={activatingQr}
                           className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md transition-all hover:scale-[1.02] active:scale-100 cursor-pointer text-xs disabled:opacity-60"
                         >
@@ -1378,6 +1516,144 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
 
               </div>
 
+            </div>
+          </div>
+        )}
+
+        {/* ============ EMERGENCY CONTACTS (after identity verified, before final activation) ============ */}
+        {phase === "register" && qrData && (
+          <div className="w-full max-w-sm mx-auto animate-fade-in">
+            <div className="overflow-hidden rounded-3xl bg-white shadow-2xl">
+              <div className="relative bg-gradient-to-br from-yellow-300 via-amber-300 to-orange-300 px-8 pt-10 pb-12">
+                <h1 className="mt-2 text-center text-2xl font-bold text-slate-900">Emergency Contacts</h1>
+                <p className="mt-2 text-center text-sm text-slate-700">
+                  In an accident or emergency, these people will be alerted first.
+                </p>
+                <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/15" />
+                <div className="absolute -left-8 bottom-4 h-20 w-20 rounded-full bg-white/10" />
+              </div>
+
+              <div className="rounded-t-3xl bg-white px-6 pb-6 pt-5 space-y-4">
+                <div className="rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-3 text-[11px] text-slate-600 leading-relaxed">
+                  <strong className="text-slate-900">We will notify these people with your info in an emergency.</strong>{" "}
+                  Only shared during an actual scan/emergency event — never for marketing. Please make sure each
+                  person has agreed to be listed as your emergency contact. See our Privacy Policy for details.
+                </div>
+
+                {isContactPickerSupported && (
+                  <button
+                    type="button"
+                    onClick={handleImportContact}
+                    className="w-full h-10 rounded-xl border border-dashed border-slate-300 text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Smartphone size={13} /> Import from phone contacts
+                  </button>
+                )}
+
+                <div className="space-y-3">
+                  {emergencyContacts.map((contact, idx) => (
+                    <div key={contact.id} className="rounded-2xl border border-slate-200 p-3.5 space-y-2.5 relative">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                          Contact {idx + 1}
+                        </span>
+                        {emergencyContacts.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeEmergencyContact(contact.id)}
+                            className="text-slate-300 hover:text-red-500 transition-colors cursor-pointer"
+                            aria-label={`Remove contact ${idx + 1}`}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+
+                      <input
+                        type="text"
+                        value={contact.name}
+                        onChange={(e) => updateEmergencyContact(contact.id, "name", e.target.value)}
+                        placeholder="Full name"
+                        className="h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-medium"
+                      />
+
+                      <div>
+                        <input
+                          type="text"
+                          value={contact.relationship}
+                          onChange={(e) => updateEmergencyContact(contact.id, "relationship", e.target.value)}
+                          placeholder="Relationship (e.g. Mother)"
+                          className="h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-200 font-medium"
+                        />
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {RELATIONSHIP_PRESETS.map((label) => (
+                            <button
+                              key={label}
+                              type="button"
+                              onClick={() => updateEmergencyContact(contact.id, "relationship", label)}
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${contact.relationship === label
+                                  ? "border-amber-400 bg-amber-100 text-amber-800"
+                                  : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                                }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <PhoneInputWithCountry
+                        value={contact.phone}
+                        onChange={(full) => updateEmergencyContact(contact.id, "phone", full)}
+                        placeholder="10-digit mobile"
+                      />
+                      {contact.phone.trim() && !isValidContactPhone(contact.phone) && (
+                        <p className="text-[10px] font-semibold text-red-500">Enter a valid phone number.</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addEmergencyContactRow}
+                  className="w-full h-10 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  + Add another contact
+                </button>
+
+                {contactsError && (
+                  <p className="flex items-center gap-1 text-[11px] font-semibold text-red-500">
+                    <AlertTriangle size={12} />
+                    {contactsError}
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleFinishEmergencyContacts}
+                  disabled={activatingQr}
+                  className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md transition-all hover:scale-[1.02] active:scale-100 cursor-pointer text-xs disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {activatingQr ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      <span>Activating…</span>
+                    </>
+                  ) : (
+                    <><ShieldCheck size={15} /> Save Contacts &amp; Activate Sticker</>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSkipEmergencyContacts}
+                  disabled={activatingQr}
+                  className="w-full text-center text-[11px] font-bold text-slate-500 hover:text-slate-700 cursor-pointer disabled:opacity-50"
+                >
+                  Skip for now — I'll add contacts later
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1820,33 +2096,39 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                         </div>
                       )}
 
-                      {/* Button 2: Call Family Members (from Admin Communication Page) */}
-                      {getAdminContacts("Family").length > 0 ? (
-                        <button
-                          onClick={() => setActiveSubMenu("family")}
-                          className="w-full bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-green-600/20 active:scale-[0.98] transition-all cursor-pointer"
-                        >
-                          <div className="flex items-center gap-3.5 min-w-0">
-                            <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold flex-shrink-0">
-                              <User size={22} />
+                      {/* Button 2: Call Family Members */}
+                      {(() => {
+                        const familyContacts = [
+                          ...getTowingContacts().filter((c) => c.role === "Family / Emergency Contact"),
+                          ...getAdminContacts("Family"),
+                        ];
+                        return familyContacts.length > 0 ? (
+                          <button
+                            onClick={() => setActiveSubMenu("family")}
+                            className="w-full bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-green-600/20 active:scale-[0.98] transition-all cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3.5 min-w-0">
+                              <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold flex-shrink-0">
+                                <User size={22} />
+                              </div>
+                              <div className="text-left min-w-0">
+                                <p className="text-sm font-black text-white tracking-tight">Call Family Members</p>
+                                <p className="text-[11px] font-medium text-white/80">
+                                  {familyContacts.length} contact{familyContacts.length !== 1 ? "s" : ""} available
+                                </p>
+                              </div>
                             </div>
-                            <div className="text-left min-w-0">
-                              <p className="text-sm font-black text-white tracking-tight">Call Family Members</p>
-                              <p className="text-[11px] font-medium text-white/80">
-                                {getAdminContacts("Family").length} contact{getAdminContacts("Family").length !== 1 ? "s" : ""} available
-                              </p>
+                            <div className="bg-white text-emerald-700 font-black text-xs px-3 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
+                              <PhoneCall size={12} /> CALL
                             </div>
+                          </button>
+                        ) : (
+                          <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
+                            <p className="text-xs font-semibold text-gray-400">No family contacts configured</p>
+                            <p className="text-[10px] text-gray-300 mt-0.5">Add emergency contacts in your Client Dashboard</p>
                           </div>
-                          <div className="bg-white text-emerald-700 font-black text-xs px-3 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
-                            <PhoneCall size={12} /> CALL
-                          </div>
-                        </button>
-                      ) : (
-                        <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
-                          <p className="text-xs font-semibold text-gray-400">No family contacts configured</p>
-                          <p className="text-[10px] text-gray-300 mt-0.5">Ask admin to add Family contacts in Communication settings</p>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {/* Button 3: Share Location */}
                       <button
@@ -1900,10 +2182,13 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                     {/* Header bar with Back button */}
                     <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-3 shadow-2xs">
                       <button
-                        onClick={() => setActiveSubMenu("none")}
+                        onClick={() => {
+                          setActiveSubMenu("none");
+                          setTowingImage(null);
+                        }}
                         className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-gray-900 transition-colors bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-xl cursor-pointer"
                       >
-                        <ArrowLeft size={14} /> Back
+                        <ArrowLeft size={14} /> Back to Emergency Services
                       </button>
                       <div className="text-right">
                         <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5 justify-end">
@@ -1940,7 +2225,12 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                       <button
                         onClick={() => {
                           const flatTire = getAdminContacts("Flat Tire");
-                          if (flatTire.length > 0) window.open(`tel:${flatTire[0].phone.replace(/[^0-9+]/g, "")}`);
+                          if (flatTire.length > 0) {
+                            window.open(`tel:${flatTire[0].phone.replace(/[^0-9+]/g, "")}`);
+                          } else {
+                            setActiveSubMenu("towing");
+                            setTowingImage(null);
+                          }
                         }}
                         className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-amber-300 hover:bg-amber-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
                       >
@@ -1952,7 +2242,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                           <p className="text-[10px] font-bold text-gray-500 mt-0.5">
                             {getAdminContacts("Flat Tire").length > 0
                               ? getAdminContacts("Flat Tire")[0].label
-                              : "Not configured"}
+                              : "Towing & Repair"}
                           </p>
                         </div>
                       </button>
@@ -2007,10 +2297,13 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                   <div className="space-y-3 animate-fade-in">
                     <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-3 shadow-2xs">
                       <button
-                        onClick={() => setActiveSubMenu("mechanical")}
+                        onClick={() => {
+                          setActiveSubMenu("mechanical");
+                          setTowingImage(null);
+                        }}
                         className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-gray-900 transition-colors bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-xl cursor-pointer"
                       >
-                        <ArrowLeft size={14} /> Back
+                        <ArrowLeft size={14} /> Back to Mechanical
                       </button>
                       <div className="text-right">
                         <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5 justify-end">
@@ -2102,7 +2395,13 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                                 <div className="min-w-0 pr-1">
                                   <p className="text-xs font-bold text-gray-900 leading-tight">{c.label}</p>
                                   <p className="text-[10px] text-gray-400 font-semibold mt-0.5">{c.role}</p>
-                                  <p className="text-sm font-mono font-black text-gray-800 mt-1">{c.phone}</p>
+                                  {c.role === "Vehicle Owner / Primary" || c.role === "Family / Emergency Contact" ? (
+                                    <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 text-[9px] font-extrabold px-1.5 py-0.5 rounded-md mt-1 border border-emerald-200">
+                                      <Lock size={9} /> Number Hidden (Privacy Protected)
+                                    </span>
+                                  ) : (
+                                    <p className="text-sm font-mono font-bold text-gray-700 mt-1">{c.phone}</p>
+                                  )}
                                 </div>
                                 <button
                                   onClick={() => window.open(`tel:${c.phone.replace(/[^0-9+]/g, "")}`)}
@@ -2212,7 +2511,10 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                           <PhoneCall size={16} className="text-emerald-500" /> Family Contacts
                         </span>
                         <p className="text-[10px] font-semibold text-gray-400">
-                          {getAdminContacts("Family").length} number{getAdminContacts("Family").length !== 1 ? "s" : ""} available
+                          {(() => {
+                            const total = getAdminContacts("Family").length + getTowingContacts().filter((c) => c.role === "Family / Emergency Contact").length;
+                            return `${total} number${total !== 1 ? "s" : ""} available`;
+                          })()}
                         </p>
                       </div>
                     </div>
@@ -2231,16 +2533,71 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                       <ExternalLink size={14} className="text-gray-300 flex-shrink-0 ml-auto" />
                     </button>
 
-                    {getAdminContacts("Family").length === 0 ? (
+                    {getTowingContacts().filter((c) => c.role === "Family / Emergency Contact").length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 px-1">Owner's Emergency Contacts</p>
+                        {getTowingContacts().filter((c) => c.role === "Family / Emergency Contact").map((contact, i) => (
+                          <div
+                            key={`owner-ec-${i}`}
+                            className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 flex items-center justify-between gap-3 transition-all hover:border-emerald-300"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold flex-shrink-0">
+                                <User size={18} />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-xs font-bold text-gray-900 leading-tight truncate">{contact.label}</p>
+                                  <span className="bg-emerald-100 text-emerald-800 text-[9px] font-extrabold px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                                    <Lock size={9} /> Number Hidden (Privacy Protected)
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                // Trigger automated alert dispatch & initiate call bridge
+                                if (qrData && location) {
+                                  const payload = {
+                                    qrId: qrData.id,
+                                    qrUrl: qrData.qrUrl,
+                                    latitude: location.lat,
+                                    longitude: location.lng,
+                                    accuracy: location.accuracy,
+                                    deviceId: navigator.userAgent.slice(0, 40),
+                                    timestamp: new Date().toISOString(),
+                                    message: `EMERGENCY CALL REQUEST for ${contact.label}`,
+                                    vehicleName: qrData.vehicleName,
+                                    vehicleNumber: qrData.vehicleNumber,
+                                  };
+                                  const alerts = JSON.parse(localStorage.getItem("namoqr-alerts") || "[]");
+                                  alerts.unshift({ ...payload, id: Date.now(), status: "sent" });
+                                  localStorage.setItem("namoqr-alerts", JSON.stringify(alerts));
+                                }
+                                window.open(`tel:${contact.phone.replace(/[^0-9+]/g, "")}`);
+                              }}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer"
+                            >
+                              <PhoneCall size={14} /> CALL
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {getTowingContacts().filter((c) => c.role === "Family / Emergency Contact").length === 0 && getAdminContacts("Family").length === 0 && (
                       <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
                         <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
                           <PhoneCall size={20} className="text-gray-300" />
                         </div>
                         <p className="text-sm font-semibold text-gray-400">No family contacts configured</p>
-                        <p className="text-[11px] text-gray-300 mt-1">Ask admin to add Family contacts in Communication settings</p>
+                        <p className="text-[11px] text-gray-300 mt-1">Configure emergency contacts for this sticker in your Client Dashboard.</p>
                       </div>
-                    ) : (
+                    )}
+
+                    {getAdminContacts("Family").length > 0 && (
                       <div className="space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 px-1">Admin Helplines</p>
                         {getAdminContacts("Family").map((contact, i) => (
                           <div
                             key={i}
@@ -2273,29 +2630,56 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
-        {/* ============ SUCCESS (Light Mode) ============ */}
+        {/* ============ ACTIVATION SUCCESS (owner just activated their sticker) ============ */}
         {phase === "success" && qrData && (
           <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/60 p-6 sm:p-8 text-center animate-fade-in w-full space-y-4">
             <div className="w-20 h-20 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto text-emerald-600 shadow-md shadow-emerald-500/10">
               <CheckCircle2 size={40} />
             </div>
             <div>
-              <h2 className="text-2xl font-extrabold text-gray-900">Alert Dispatched!</h2>
-              <p className="text-xs text-gray-500 mt-1">The vehicle owner has been notified of your emergency ping.</p>
+              <h2 className="text-2xl font-extrabold text-gray-900">All set! Your sticker is active.</h2>
+              <p className="text-xs text-gray-500 mt-1">
+                {regEmail.trim()
+                  ? `We've sent a confirmation to ${regEmail.trim()}.`
+                  : "You can manage it anytime from your dashboard."}
+              </p>
             </div>
 
             <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 text-left space-y-2">
-              <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Alert Summary</p>
+              <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Activation Summary</p>
               <div className="text-xs font-semibold text-gray-800 space-y-1">
-                <p>• Vehicle: <span className="font-mono font-bold text-gray-900">{qrData.vehicleNumber}</span></p>
-                <p>• Time: {formatTime(new Date().toISOString())}</p>
-                {location && <p>• Location: {formatCoord(location.lat)}, {formatCoord(location.lng)}</p>}
+                <p>• Sticker: <span className="font-mono font-bold text-gray-900">{qrData.id}</span></p>
+                <p>• Owner: {regName.trim() || "—"}</p>
+                <p>• Activated: {formatTime(new Date().toISOString())}</p>
+                <p>
+                  • Emergency contacts:{" "}
+                  {emergencyContacts.filter((c) => c.name.trim() && isValidContactPhone(c.phone)).length} added
+                </p>
               </div>
             </div>
 
+            {onGoToDashboard && (
+              <button
+                onClick={onGoToDashboard}
+                className="w-full py-3.5 rounded-2xl bg-yellow-400 text-gray-900 font-bold text-sm shadow-md active:scale-95 transition-all hover:bg-yellow-500"
+              >
+                Go to Dashboard
+              </button>
+            )}
+
+            <button
+              onClick={() => setPhase("emergency")}
+              className={`w-full py-3.5 rounded-2xl font-bold text-sm shadow-md active:scale-95 transition-all ${onGoToDashboard
+                  ? "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+                  : "bg-yellow-400 text-gray-900 hover:bg-yellow-500"
+                }`}
+            >
+              View My Sticker's Safety Page
+            </button>
+
             <button
               onClick={onBack}
-              className="w-full py-3.5 rounded-2xl bg-yellow-400 text-gray-900 font-bold text-sm shadow-md active:scale-95 transition-all hover:bg-yellow-500"
+              className="w-full text-center text-xs font-bold text-gray-500 hover:text-gray-700 cursor-pointer"
             >
               Done
             </button>
@@ -2315,70 +2699,110 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
 
         {/* ============ OPENROUTER AI CHAT MODAL ============ */}
         {aiChatOpen && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
-            <div className="bg-white w-full max-w-md h-[85vh] sm:h-[600px] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-gray-100">
+          <div
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
+            onClick={() => setAiChatOpen(false)}
+          >
+            <div
+              className="bg-white w-full max-w-lg h-[90vh] sm:h-[620px] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-gray-100 relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Drag Handle Bar for Mobile */}
+              <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2 sm:hidden flex-shrink-0" />
+
               {/* Modal Header */}
-              <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-4 text-white flex items-center justify-between">
+              <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 p-4 text-white flex items-center justify-between flex-shrink-0 shadow-md">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center font-bold">
-                    <Bot size={22} />
+                  <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center font-bold shadow-inner">
+                    <Bot size={22} className="text-white" />
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-sm flex items-center gap-1.5">
-                      RapiQR Safety AI Assistant
-                      <span className="text-[10px] bg-white/20 text-white font-bold px-2 py-0.5 rounded-full">OpenRouter</span>
+                    <h3 className="font-extrabold text-sm flex items-center gap-2">
+                      RapiQR Safety AI
+                      <span className="text-[9px] bg-white/20 text-white font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Online
+                      </span>
                     </h3>
-                    <p className="text-[11px] text-white/80 font-medium">Instant Emergency &amp; Owner Assistance</p>
+                    <p className="text-[11px] text-white/90 font-medium">Instant Emergency &amp; Owner Assistance</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setAiChatOpen(false)}
                   className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center font-bold text-sm transition-colors cursor-pointer"
+                  title="Close Chat"
                 >
                   ✕
                 </button>
               </div>
 
               {/* Chat Message Stream */}
-              <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-gray-50/50">
+              <div className="flex-1 p-4 overflow-y-auto space-y-3.5 bg-slate-50/70">
                 {aiMessages.map((msg, idx) => (
                   <div
                     key={idx}
                     className={`flex items-start gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
                   >
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs flex-shrink-0 ${msg.role === 'user' ? 'bg-orange-500 text-white' : 'bg-gray-900 text-amber-400'
-                      }`}>
-                      {msg.role === 'user' ? 'U' : <Bot size={16} />}
+                    <div
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-xs ${msg.role === 'user'
+                          ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white'
+                          : 'bg-slate-900 text-amber-400'
+                        }`}
+                    >
+                      {msg.role === 'user' ? 'U' : <Bot size={17} />}
                     </div>
-                    <div className={`max-w-[80%] rounded-2xl p-3.5 text-xs font-medium leading-relaxed shadow-2xs ${msg.role === 'user'
-                      ? 'bg-orange-500 text-white rounded-tr-xs'
-                      : 'bg-white text-gray-800 border border-gray-200/80 rounded-tl-xs'
-                      }`}>
+                    <div
+                      className={`max-w-[85%] rounded-2xl p-3.5 text-xs font-medium leading-relaxed shadow-xs ${msg.role === 'user'
+                          ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-tr-xs font-semibold'
+                          : 'bg-white text-gray-800 border border-gray-200/90 rounded-tl-xs'
+                        }`}
+                    >
                       {msg.content}
                     </div>
                   </div>
                 ))}
 
                 {aiLoading && (
-                  <div className="flex items-center gap-2 text-xs font-bold text-gray-400 bg-white p-3 rounded-2xl border border-gray-200 max-w-[200px]">
-                    <Sparkles size={14} className="animate-spin text-amber-500" />
-                    <span>AI Assistant is typing...</span>
+                  <div className="flex items-start gap-3 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-slate-700/80 p-3.5 rounded-2xl shadow-lg max-w-[290px] animate-fade-in text-white">
+                    <div className="relative w-8 h-8 flex items-center justify-center flex-shrink-0">
+                      <div className="absolute inset-0 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
+                      <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 font-black text-[10px]">
+                        AI
+                      </div>
+                    </div>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">RapiQR Neural Core</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                      </div>
+                      <p className="text-[11px] font-semibold text-slate-200 leading-tight">Analyzing vehicle QR context &amp; safety protocols...</p>
+                      <div className="flex items-center gap-1 text-[9px] font-mono text-slate-400 pt-0.5">
+                        <span>Processing request</span>
+                        <span className="inline-flex gap-1">
+                          <span className="w-1 h-1 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="w-1 h-1 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="w-1 h-1 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 )}
+                <div ref={aiChatEndRef} />
               </div>
 
               {/* Quick Prompt Chips */}
-              <div className="p-2.5 bg-white border-t border-gray-100 flex items-center gap-2 overflow-x-auto">
+              <div className="p-2.5 bg-white border-t border-gray-100 flex items-center gap-2 overflow-x-auto no-scrollbar flex-shrink-0">
                 {[
                   '🚨 Vehicle Blocking Driveway',
                   '🚗 Need Towing Assistance',
                   '🚑 Medical Emergency Advice',
-                  '📱 How to Reach Owner'
+                  '🔒 How to Call Owner Safely',
+                  '💡 Headlights Left On'
                 ].map((chip, i) => (
                   <button
                     key={i}
                     onClick={() => handleSendAiMessage(chip)}
-                    className="text-[11px] font-bold text-gray-700 bg-gray-100 hover:bg-orange-50 hover:text-orange-600 px-3 py-1.5 rounded-full whitespace-nowrap border border-gray-200/60 transition-colors flex-shrink-0 cursor-pointer"
+                    disabled={aiLoading}
+                    className="text-[11px] font-bold text-gray-700 bg-gray-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-300 px-3 py-1.5 rounded-full whitespace-nowrap border border-gray-200 transition-all flex-shrink-0 cursor-pointer disabled:opacity-50"
                   >
                     {chip}
                   </button>
@@ -2391,19 +2815,19 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                   e.preventDefault();
                   handleSendAiMessage();
                 }}
-                className="p-3 bg-white border-t border-gray-200 flex items-center gap-2"
+                className="p-3 bg-white border-t border-gray-200 flex items-center gap-2 flex-shrink-0"
               >
                 <input
                   type="text"
                   placeholder="Ask AI safety assistant..."
                   value={aiInput}
                   onChange={(e) => setAiInput(e.target.value)}
-                  className="flex-1 px-4 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500 font-medium"
+                  className="flex-1 px-4 py-3 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500 focus:bg-white font-medium transition-all"
                 />
                 <button
                   type="submit"
                   disabled={!aiInput.trim() || aiLoading}
-                  className="w-10 h-10 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white flex items-center justify-center font-bold shadow-xs transition-all flex-shrink-0 cursor-pointer"
+                  className="w-10 h-10 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 text-white flex items-center justify-center font-bold shadow-md transition-all flex-shrink-0 cursor-pointer active:scale-95"
                 >
                   <Send size={16} />
                 </button>

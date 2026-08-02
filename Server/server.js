@@ -10,14 +10,24 @@ const authRoutes = require('./routes/authRoutes');
 const qrRoutes = require('./routes/qrRoutes');
 const alertRoutes = require('./routes/alertRoutes');
 const logRoutes = require('./routes/logRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const productRoutes = require('./routes/productRoutes');
+const twilioRoutes = require('./routes/twilioRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const aiRoutes = require('./routes/aiRoutes');
+const distributorRoutes = require('./routes/distributorRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const FRONTEND_ORIGIN = process.env.FRONTEND_URL || 'https://rapiqr.worthitellp.workers.dev';
 
-// Enable CORS & Request Parsing
+// Enable CORS & Request Parsing — only the configured frontend (plus local dev) may send credentials
+const ALLOWED_ORIGINS = [FRONTEND_ORIGIN, 'http://localhost:3000', 'http://localhost:5173'];
 app.use(cors({
-  origin: '*',
+  origin: (origin, callback) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -41,6 +51,12 @@ app.use('/api/auth', authRoutes);
 app.use('/api/qr', qrRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/logs', logRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/twilio', twilioRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/distributors', distributorRoutes);
 
 
 // Global 404 Route Handler

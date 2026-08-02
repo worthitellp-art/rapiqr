@@ -30,13 +30,10 @@ class AlertModel {
       return data;
     } catch (err) {
       console.error('AlertModel.createAlert Error:', err);
-      // Fallback object if table does not exist
-      return {
-        id: Date.now(),
-        ...alertPayload,
-        status: alertPayload.status || 'unread',
-        created_at: new Date().toISOString()
-      };
+      // Do not fabricate a fake success object here — this is the emergency SOS
+      // alert path, and a caller/reporter must know the alert was NOT actually
+      // saved so the UI can tell them to retry (task.md #13).
+      throw err;
     }
   }
 

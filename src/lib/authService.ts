@@ -9,6 +9,7 @@ export interface UserProfileData {
   role: 'user' | 'admin';
   subscriptionPlan?: string;
   isSubscribed?: boolean;
+  twoFactorEnabled?: boolean;
 }
 
 export const ADMIN_EMAIL = 'worthitellp@gmail.com';
@@ -36,7 +37,7 @@ export async function getUserProfile(userId: string, email: string): Promise<Use
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, full_name, phone_number, avatar_url, role, subscription_plan, is_subscribed')
+      .select('id, email, full_name, phone_number, avatar_url, role, subscription_plan, is_subscribed, metadata')
       .eq('id', userId)
       .maybeSingle();
 
@@ -52,6 +53,7 @@ export async function getUserProfile(userId: string, email: string): Promise<Use
         role: (data.role as 'user' | 'admin') || defaultRole,
         subscriptionPlan: data.subscription_plan,
         isSubscribed: data.is_subscribed,
+        twoFactorEnabled: Boolean((data as any).metadata?.twoFactor?.enabled),
       };
     }
 

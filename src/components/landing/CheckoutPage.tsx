@@ -380,13 +380,7 @@ export default function CheckoutPage({
                     >
                       <CreditCard size={16} /> Card
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setPayment('cod')}
-                      className={`co-pay-opt${payment === 'cod' ? ' active' : ''}`}
-                    >
-                      <Truck size={16} /> Cash on Delivery
-                    </button>
+                   
                   </div>
                   <div className="co-secure-note" style={{ marginTop: 10 }}>
                     <Lock size={12} /> Your payment details are encrypted end-to-end.

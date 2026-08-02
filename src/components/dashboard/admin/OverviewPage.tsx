@@ -44,7 +44,7 @@ function DonutRing({ percentage, size = 150 }: { percentage: number; size?: numb
       <circle cx={cx} cy={cy} r={r} fill="none" stroke="#F1F5F9" strokeWidth="14" />
       <circle
         cx={cx} cy={cy} r={r} fill="none"
-        stroke="#8B5CF6" strokeWidth="14" strokeLinecap="round"
+        stroke="#D97706" strokeWidth="14" strokeLinecap="round"
         strokeDasharray={`${filled} ${empty}`}
         strokeDashoffset={circ * 0.25}
         style={{ transition: "stroke-dasharray 1.2s cubic-bezier(0.34,1.56,0.64,1)" }}
@@ -173,12 +173,39 @@ export default function OverviewPage({
           </button>
           <button
             className="flex items-center gap-2 px-4 py-[8px] rounded-xl text-[12px] font-bold text-white transition-all hover:opacity-90 cursor-pointer"
-            style={{ background: "#111111", boxShadow: "0 2px 8px rgba(17,17,17,0.25)" }}
+            style={{ background: "#0F172A", boxShadow: "0 2px 8px rgba(15,23,42,0.25)" }}
           >
             <Download size={13} />
             Export
           </button>
         </div>
+      </div>
+
+      {/* ════════ Insight Banner ════════ */}
+      <div
+        className="rounded-2xl p-5 flex items-center justify-between gap-4 border"
+        style={{ background: "#FFFBEB", borderColor: "#FDE68A" }}
+      >
+        <div className="flex items-start gap-3">
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-lg" style={{ background: "#FDE68A" }}>✨</span>
+          <div>
+            <p className="text-[13px] font-bold text-[#1A1D26]">
+              {activeRate >= 50
+                ? `${activeRate}% of your fleet is active and scanning — you're on a roll, keep the momentum going.`
+                : `Only ${activeRate}% of your fleet is active. Follow up on pending activations to boost coverage.`}
+            </p>
+            <p className="text-[11px] font-medium mt-0.5" style={{ color: "#92400E" }}>
+              {qrList.length} total stickers · {active} active · {inactive} pending
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setPage("qr")}
+          className="flex-shrink-0 px-4 py-2 rounded-xl text-[12px] font-bold cursor-pointer transition-all hover:opacity-90"
+          style={{ background: "#D97706", color: "#fff" }}
+        >
+          View Fleet
+        </button>
       </div>
 
       {/* ════════ Stat Cards ════════ */}
@@ -232,8 +259,8 @@ export default function OverviewPage({
             <button
               onClick={() => setPage("qr")}
               className="flex items-center gap-1 text-[11px] font-bold transition-all hover:gap-2 cursor-pointer px-2.5 py-1 rounded-lg"
-              style={{ color: "#6366F1" }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#EEF2FF"; }}
+              style={{ color: "#D97706" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#FEF3C7"; }}
               onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
             >
               View all <ChevronRight size={11} />
@@ -256,8 +283,8 @@ export default function OverviewPage({
             <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
               <defs>
                 <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#6366F1" stopOpacity={0.15} />
-                  <stop offset="100%" stopColor="#6366F1" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#D97706" stopOpacity={0.15} />
+                  <stop offset="100%" stopColor="#D97706" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#94A3B8", fontWeight: 600 }} axisLine={false} tickLine={false} />
@@ -269,8 +296,8 @@ export default function OverviewPage({
                 }}
                 cursor={{ stroke: "rgba(99,102,241,0.15)", strokeWidth: 1 }}
               />
-              <Area type="monotone" dataKey="v" stroke="#6366F1" strokeWidth={2.5} fill="url(#areaGrad)" dot={false}
-                activeDot={{ r: 5, fill: "#6366F1", stroke: "#fff", strokeWidth: 2.5 }} />
+              <Area type="monotone" dataKey="v" stroke="#D97706" strokeWidth={2.5} fill="url(#areaGrad)" dot={false}
+                activeDot={{ r: 5, fill: "#D97706", stroke: "#fff", strokeWidth: 2.5 }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -301,7 +328,7 @@ export default function OverviewPage({
               />
               <Bar dataKey="v" radius={[6, 6, 6, 6]}>
                 {weekdayData.map((entry, i) => (
-                  <Cell key={i} fill={entry.isToday ? "#0EA5E9" : "#E8ECF4"} />
+                  <Cell key={i} fill={entry.isToday ? "#D97706" : "#E8ECF4"} />
                 ))}
               </Bar>
             </BarChart>
@@ -312,7 +339,7 @@ export default function OverviewPage({
               <div key={i} className="flex flex-col items-center">
                 <div
                   className="w-[18px] h-[3px] rounded-full"
-                  style={{ background: d.isToday ? "#0EA5E9" : "transparent" }}
+                  style={{ background: d.isToday ? "#D97706" : "transparent" }}
                 />
               </div>
             ))}
@@ -368,7 +395,7 @@ export default function OverviewPage({
           <DonutRing percentage={activeRate} />
           <button
             className="mt-3 text-[11px] font-bold transition-all cursor-pointer"
-            style={{ color: "#6366F1" }}
+            style={{ color: "#D97706" }}
             onClick={() => setPage("qr")}
           >
             Show details
@@ -388,7 +415,7 @@ export default function OverviewPage({
             <button
               onClick={() => setPage("qr")}
               className="flex items-center gap-1 text-[11px] font-bold cursor-pointer"
-              style={{ color: "#6366F1" }}
+              style={{ color: "#D97706" }}
             >
               See all <ChevronRight size={11} />
             </button>
@@ -421,7 +448,7 @@ export default function OverviewPage({
                         <StickerThumb qr={q} templates={templates} size={36} />
                       </button>
                     </td>
-                    <td className="px-3 py-3 font-mono text-[11px] font-bold" style={{ color: "#111111" }}>{q.id}</td>
+                    <td className="px-3 py-3 font-mono text-[11px] font-bold" style={{ color: "#0F172A" }}>{q.id}</td>
                     <td className="px-3 py-3 text-[11px] font-bold text-[#1A1D26]">{(q.scans || 0).toLocaleString()}</td>
                     <td className="px-3 py-3"><StatusPill status={q.status} /></td>
                     <td className="px-6 py-3 text-right">
@@ -455,7 +482,7 @@ export default function OverviewPage({
             <div className="flex flex-col items-center py-16 text-center">
               <div
                 className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-                style={{ background: "#EEF2FF", color: "#6366F1" }}
+                style={{ background: "#FEF3C7", color: "#D97706" }}
               >
                 <QrCode size={24} />
               </div>
@@ -464,7 +491,7 @@ export default function OverviewPage({
               <button
                 onClick={() => setPage("qr")}
                 className="mt-5 flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-[12px] font-bold transition-all hover:opacity-90 cursor-pointer"
-                style={{ background: "#111111", boxShadow: "0 2px 8px rgba(17,17,17,0.25)" }}
+                style={{ background: "#0F172A", boxShadow: "0 2px 8px rgba(15,23,42,0.25)" }}
               >
                 <Plus size={13} /> Generate First QR
               </button>
@@ -481,7 +508,7 @@ export default function OverviewPage({
           <button
             onClick={() => setPage("qr")}
             className="w-full flex items-center gap-3 p-3 rounded-xl text-white text-[12px] font-bold cursor-pointer transition-all duration-300 hover:opacity-90"
-            style={{ background: "linear-gradient(135deg, #111111 0%, #374151 100%)", boxShadow: "0 4px 12px rgba(17,17,17,0.3)" }}
+            style={{ background: "linear-gradient(135deg, #0F172A 0%, #334155 100%)", boxShadow: "0 4px 12px rgba(15,23,42,0.3)" }}
           >
             <span className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
               <QrCode size={15} />

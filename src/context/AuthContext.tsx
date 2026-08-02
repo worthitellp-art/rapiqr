@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured, getAuthCallbackUrl } from '../lib/supabase';
-import { getUserProfile, updateProfilePhoneNumber, UserProfileData } from '../lib/authService';
+import { getUserProfile, updateProfilePhoneNumber, UserProfileData, ADMIN_EMAIL } from '../lib/authService';
 import { apiClient, isApiBackendConfigured } from '../lib/apiClient';
 import type { Session, User } from '@supabase/supabase-js';
 
@@ -13,10 +13,12 @@ function backendUserToProfile(u: any): UserProfileData {
     id: u?.id,
     email: u?.email,
     fullName: u?.full_name || u?.fullName || u?.email?.split('@')[0] || 'User',
+    phoneNumber: u?.phone_number || u?.phoneNumber || undefined,
     avatarUrl: u?.avatar_url || u?.avatarUrl,
     role: (u?.role as 'user' | 'admin') || 'user',
     subscriptionPlan: u?.subscription_plan || u?.subscriptionPlan || 'free',
     isSubscribed: u?.is_subscribed ?? u?.isSubscribed ?? false,
+    twoFactorEnabled: Boolean(u?.metadata?.twoFactor?.enabled),
   };
 }
 
@@ -36,6 +38,9 @@ interface AuthContextType {
   // Links a phone number to the logged-in account — used at signup and to auto-link
   // the phone entered during sticker activation, so the dashboard can match by phone.
   updatePhoneNumber: (phoneNumber: string) => Promise<{ success: boolean; error?: string }>;
+  // Re-pulls the profile from the backend (Account Settings uses this after saving
+  // name/phone/email changes so the header/avatar/email stay in sync immediately).
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -84,48 +89,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // Fetch initial session
-    supabase.auth.getSession().then(({ data: { session: initSession } }) => {
-      setSession(initSession);
-      setUser(initSession?.user ?? null);
-      if (initSession?.user) {
-        getUserProfile(initSession.user.id, initSession.user.email || '').then((p) => {
-          if (p) {
-            // Admin role only carries over from a previously-established admin session.
-            const saved = localStorage.getItem('namoqr-auth-user');
-            const savedRole = saved ? JSON.parse(saved).role : null;
-            p.role = savedRole === 'admin' ? 'admin' : 'user';
-            setProfile(p);
-            localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
-          }
-        });
-      }
-      setLoading(false);
-    });
-
-    // Listen to Auth State Changes
+    // Single source of truth for session restoration: onAuthStateChange fires an
+    // INITIAL_SESSION event immediately with whatever session it recovers from storage
+    // (or null), then SIGNED_IN / TOKEN_REFRESHED / SIGNED_OUT on later changes.
+    // Previously this also called supabase.auth.getSession() separately up front, which
+    // races the same internal recovery this listener already does — the two calls could
+    // resolve in either order and stomp on each other's setSession/setProfile/setLoading,
+    // which was intermittently wiping a valid session on page reload. Relying on this one
+    // listener as the only writer avoids that race.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
 
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        if (currentSession?.user) {
-          const userProfile = await getUserProfile(currentSession.user.id, currentSession.user.email || '');
-          if (userProfile) {
-            // Admin role only carries over from a previously-established admin session
-            // (set by adminSignIn) — a normal sign-in never unlocks admin,
-            // even if the email happens to match the designated admin address.
-            const saved = localStorage.getItem('namoqr-auth-user');
-            const savedRole = saved ? JSON.parse(saved).role : null;
-            userProfile.role = savedRole === 'admin' ? 'admin' : 'user';
-            setProfile(userProfile);
-            localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
-          }
+      if (currentSession?.user && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')) {
+        const userProfile = await getUserProfile(currentSession.user.id, currentSession.user.email || '');
+        if (userProfile) {
+          // Admin role only carries over from a previously-established admin session
+          // (set by adminSignIn) — a normal sign-in never unlocks admin,
+          // even if the email happens to match the designated admin address.
+          const saved = localStorage.getItem('namoqr-auth-user');
+          const savedRole = saved ? JSON.parse(saved).role : null;
+          userProfile.role = savedRole === 'admin' ? 'admin' : 'user';
+          setProfile(userProfile);
+          localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
         }
       } else if (event === 'SIGNED_OUT') {
         setProfile(null);
         localStorage.removeItem('namoqr-auth-user');
       }
+      // INITIAL_SESSION with no Supabase session: leave `profile` untouched — it may hold
+      // a valid admin/demo login that never used Supabase auth, and clearing it here would
+      // wrongly force a relogin for those accounts.
 
       setLoading(false);
     });
@@ -198,17 +192,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Standard login: ALWAYS assigns role = 'user' so regular users go to Client Dashboard.
-  // Admin access is only available through adminSignIn() in the AdminAuthModal.
+  // Standard login: assigns role = 'user' for everyone EXCEPT the designated admin
+  // email, which unlocks the Admin Fleet Dashboard. Admin access can also be gained
+  // through adminSignIn() in the AdminAuthModal (secret /admin route).
   const signIn = async (email: string, password: string) => {
     try {
+      const isAdminEmail = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
       // Backend-first signin when the Render API is configured
       if (isApiBackendConfigured) {
         const res = await apiClient.auth.signIn(email, password);
         if (res?.token) localStorage.setItem('namoqr-token', res.token);
         if (res?.user) {
           const p = backendUserToProfile(res.user);
-          p.role = 'user'; // regular login never unlocks admin
+          p.role = isAdminEmail ? 'admin' : 'user';
           setProfile(p);
           localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
         }
@@ -236,10 +232,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) return { success: false, error: error.message };
 
       if (data.user) {
-        // Force role to 'user' — even if DB has admin, regular login doesn't unlock admin
+        // Designated admin email unlocks admin; everyone else stays a user
         const p = await getUserProfile(data.user.id, data.user.email || email);
         if (p) {
-          p.role = 'user';
+          p.role = isAdminEmail ? 'admin' : 'user';
           setProfile(p);
           localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
         }
@@ -311,14 +307,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    if (isSupabaseConfigured) {
-      await supabase.auth.signOut();
-    }
-    localStorage.removeItem('namoqr-token');
+    try {
+      if (isSupabaseConfigured) {
+        await supabase.auth.signOut().catch(() => { /* ignore */ });
+      }
+    } catch { /* ignore */ }
+
+    try {
+      localStorage.removeItem('namoqr-token');
+      localStorage.removeItem('namoqr-auth-user');
+      localStorage.removeItem('namoqr-current-page');
+      localStorage.removeItem('namoqr-pending-distributor-intent');
+      sessionStorage.clear();
+    } catch { /* ignore */ }
+
     setSession(null);
     setUser(null);
     setProfile(null);
-    localStorage.removeItem('namoqr-auth-user');
   };
 
   const resetPassword = async (email: string) => {
@@ -372,6 +377,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Re-pulls the profile after Account Settings changes (name/phone/email). Only
+  // meaningful for backend-authenticated sessions — a no-op otherwise since there's
+  // nothing server-side to re-fetch (demo/Supabase-direct profiles already update
+  // the local `profile` state directly at the call site).
+  const refreshProfile = async () => {
+    if (!isApiBackendConfigured || !localStorage.getItem('namoqr-token')) return;
+    try {
+      const res = await apiClient.auth.getMe();
+      if (res?.user) {
+        const p = backendUserToProfile(res.user);
+        const savedRole = profile?.role;
+        if (savedRole === 'admin') p.role = 'admin';
+        setProfile(p);
+        localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+      }
+    } catch {
+      // Non-fatal — the UI already reflects the just-saved values optimistically.
+    }
+  };
+
   const isLoggedIn = Boolean(user || profile);
   // isAdmin is purely role-based — only adminSignIn() produces role='admin'
   const isAdmin = profile?.role === 'admin';
@@ -389,6 +414,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signIn,
         adminSignIn,
         updatePhoneNumber,
+        refreshProfile,
         signOut,
         resetPassword,
         demoLogin,

@@ -35,8 +35,8 @@ export default function TopBar({
           onFocus={e => {
             e.currentTarget.style.width = "320px";
             e.currentTarget.style.background = "#fff";
-            e.currentTarget.style.borderColor = "rgba(17,17,17,0.35)";
-            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(17,17,17,0.08)";
+            e.currentTarget.style.borderColor = "rgba(217,119,6,0.45)";
+            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(217,119,6,0.12)";
           }}
           onBlur={e => {
             e.currentTarget.style.width = "280px";

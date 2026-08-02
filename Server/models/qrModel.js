@@ -97,49 +97,50 @@ class QrModel {
    * Updates qr_codes status to active and upserts a products record
    */
   static async activate(qrId, activationData) {
-    try {
-      const payload = {
-        status: 'active'
+    // Intentionally does not catch-and-return-null like the other methods here:
+    // a swallowed error here previously let the controller report success:true
+    // on a failed write (task.md #4/#13/#14) — real failures must propagate.
+    const payload = {
+      status: 'active'
+    };
+
+    const { data, error } = await supabaseAdmin
+      .from('qr_codes')
+      .update(payload)
+      .eq('id', qrId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Upsert product record for user dashboard
+    if (activationData.ownerName || activationData.ownerPhone) {
+      const productPayload = {
+        qr_code_id: qrId,
+        user_id: activationData.userId || activationData.user_id || null,
+        category: activationData.category || data?.category || 'car',
+        name: activationData.ownerName || 'Vehicle Owner',
+        status: 'active',
+        assigned_to: activationData.ownerName || 'Vehicle Owner',
+        details: {
+          ownerPhone: activationData.ownerPhone || '',
+          ownerEmail: activationData.ownerEmail || '',
+          emergencyContacts: activationData.emergencyContacts || [],
+          bloodGroup: activationData.bloodGroup || '',
+          allergies: activationData.allergies || '',
+          address: activationData.address || '',
+          activatedAt: new Date().toISOString(),
+        },
       };
 
-      const { data, error } = await supabaseAdmin
-        .from('qr_codes')
-        .update(payload)
-        .eq('id', qrId)
-        .select()
-        .single();
+      const { error: productError } = await supabaseAdmin
+        .from('products')
+        .upsert(productPayload, { onConflict: 'qr_code_id' });
 
-      if (error) throw error;
-
-      // Upsert product record for user dashboard
-      if (activationData.ownerName || activationData.ownerPhone) {
-        const productPayload = {
-          qr_code_id: qrId,
-          user_id: activationData.userId || activationData.user_id || null,
-          category: activationData.category || data?.category || 'car',
-          name: activationData.ownerName || 'Vehicle Owner',
-          status: 'active',
-          assigned_to: activationData.ownerName || 'Vehicle Owner',
-          details: {
-            ownerPhone: activationData.ownerPhone || '',
-            emergencyPhone: activationData.emergencyPhone || '',
-            bloodGroup: activationData.bloodGroup || '',
-            allergies: activationData.allergies || '',
-            address: activationData.address || '',
-            activatedAt: new Date().toISOString(),
-          },
-        };
-
-        await supabaseAdmin
-          .from('products')
-          .upsert(productPayload, { onConflict: 'qr_code_id' });
-      }
-
-      return data;
-    } catch (err) {
-      console.error(`QrModel.activate (${qrId}) Error:`, err);
-      return null;
+      if (productError) throw productError;
     }
+
+    return data;
   }
 
   /**

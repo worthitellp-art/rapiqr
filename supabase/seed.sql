@@ -1,7 +1,10 @@
 -- ============================================================================
 -- NAMOQR DATABASE SEED SCRIPT (ADMIN AUTH & DEFAULT TEMPLATES)
 -- Admin Account: worthitellp@gmail.com
--- Password: NamoQR#WorthIT@2026!Secured
+-- Password: puYEJbTX%R2q!4qK7U8%
+-- NOTE: This seed inserts a Supabase AUTH user + admin profile. The admin panel
+-- login itself validates against ADMIN_EMAIL/ADMIN_PASSWORD env vars (server) or
+-- VITE_ADMIN_EMAIL/VITE_ADMIN_PASSWORD (local dev) — NOT against this DB row.
 -- ============================================================================
 
 -- Enable pgcrypto extension for password hashing
@@ -9,6 +12,17 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 1. SEED ADMIN USER IN AUTH.USERS (Real Supabase Auth Integration)
+-- NOTE: instance_id is NULL (matches normal Supabase-created users; the all-zeros
+-- instance_id used by older seeds can make GoTrue fail with "Database error querying
+-- schema" during login). `confirmed_at` is the modern generated confirmation column.
+-- If a broken row already exists, remove it first so the insert rebuilds it cleanly
+-- (the profiles row below is re-upserted afterwards).
+DELETE FROM auth.users WHERE id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+
+-- NOTE: `confirmed_at` is a GENERATED ALWAYS column in modern Supabase auth schema
+-- (derived from LEAST(email_confirmed_at, phone_confirmed_at)) — it must NOT be
+-- inserted/updated explicitly or Postgres rejects the row. email_confirmed_at = NOW()
+-- populates it automatically.
 INSERT INTO auth.users (
     instance_id,
     id,
@@ -22,12 +36,12 @@ INSERT INTO auth.users (
     created_at,
     updated_at
 ) VALUES (
-    '00000000-0000-0000-0000-000000000000',
+    NULL,
     'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
     'authenticated',
     'authenticated',
     'worthitellp@gmail.com',
-    crypt('NamoQR#WorthIT@2026!Secured', gen_salt('bf')),
+    crypt('puYEJbTX%R2q!4qK7U8%', gen_salt('bf')),
     NOW(),
     '{"provider": "email", "providers": ["email"]}'::jsonb,
     '{"full_name": "WorthIT Fleet Admin", "role": "admin"}'::jsonb,
@@ -35,7 +49,9 @@ INSERT INTO auth.users (
     NOW()
 ) ON CONFLICT (id) DO UPDATE SET
     email = 'worthitellp@gmail.com',
-    encrypted_password = crypt('NamoQR#WorthIT@2026!Secured', gen_salt('bf')),
+    encrypted_password = crypt('puYEJbTX%R2q!4qK7U8%', gen_salt('bf')),
+    email_confirmed_at = NOW(),
+    instance_id = NULL,
     updated_at = NOW();
 
 -- 2. SEED ADMIN PROFILE IN PUBLIC.PROFILES

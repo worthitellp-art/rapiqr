@@ -1,7 +1,10 @@
 const jwt = require('jsonwebtoken');
 const { supabaseAdmin } = require('../config/db');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'namoqr_secure_server_jwt_secret_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET is not set in Server/.env — refusing to start with an insecure default secret.');
+}
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'worthitellp@gmail.com';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null;
 

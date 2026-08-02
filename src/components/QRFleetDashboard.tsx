@@ -67,7 +67,7 @@ interface QrRecord {
 }
 
 interface Template {
-  id: number;
+  id: string | number;
   name: string;
   fg: string;
   bg: string;
@@ -1743,14 +1743,16 @@ function StickerEditor({
     return () => { window.removeEventListener("mousemove", handleMove); window.removeEventListener("mouseup", handleUp); };
   }, [dragging, resizing, stickerPos, setStickerPos, lockAspect]);
 
-  function handleSave() {
+  async function handleSave() {
     if (saveState !== "idle") return;
     if (!tplName.trim()) { setToast("Enter a template name first"); setTimeout(() => setToast(null), 2000); return; }
     setSaveState("saving");
-    setTimeout(() => {
+    try {
+      const tempId = Date.now();
+      const cleanName = tplName.trim();
       const newTpl: Template = {
-        id: Date.now(),
-        name: tplName.trim(),
+        id: tempId,
+        name: cleanName,
         fg: tplFg,
         bg: tplBg,
         logo: null,
@@ -1758,13 +1760,20 @@ function StickerEditor({
         isPublicDefault: templates.length === 0,
       };
       setTemplates((prev) => [...prev, newTpl]);
-      saveTemplateToDb({ name: newTpl.name, fgColor: newTpl.fg, bgColor: newTpl.bg, stickerPos, isDefault: newTpl.isPublicDefault });
+      const savedRecord = await saveTemplateToDb({ name: newTpl.name, fgColor: newTpl.fg, bgColor: newTpl.bg, stickerPos, isDefault: newTpl.isPublicDefault });
+      if (savedRecord?.id) {
+        setTemplates((prev) => prev.map((t) => (t.id === tempId ? { ...t, id: savedRecord.id } : t)));
+      }
       setTplName("");
       setSaveState("saved");
-      setToast(`"${newTpl.name}" template saved`);
+      setToast(`"${cleanName}" template saved`);
+    } catch (err) {
+      console.error("Failed to save template:", err);
+      setToast("Failed to save template");
+    } finally {
       setTimeout(() => setSaveState("idle"), 1800);
       setTimeout(() => setToast(null), 2500);
-    }, 600);
+    }
   }
 
   const handleStyle = (dir: string): React.CSSProperties => ({

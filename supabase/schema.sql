@@ -212,11 +212,18 @@ CREATE POLICY "Users can view own products" ON public.products FOR SELECT USING 
 DROP POLICY IF EXISTS "Public can view product details via active QR" ON public.products;
 CREATE POLICY "Public can view product details via active QR" ON public.products FOR SELECT USING (status = 'active');
 
+-- Public insert/update (not owner-restricted): sticker activation is an anonymous
+-- public flow — a scanner activates a fresh sticker often without being logged in
+-- (same reasoning as the qr_codes policies above). Client code still sets user_id
+-- when the activator is logged in, so ownership is preserved whenever we have an
+-- account to attach it to; this just stops RLS from blocking the anonymous case.
 DROP POLICY IF EXISTS "Users can insert own products" ON public.products;
-CREATE POLICY "Users can insert own products" ON public.products FOR INSERT WITH CHECK ((select auth.uid()) = user_id);
+DROP POLICY IF EXISTS "Products public insert policy" ON public.products;
+CREATE POLICY "Products public insert policy" ON public.products FOR INSERT WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Users can update own products" ON public.products;
-CREATE POLICY "Users can update own products" ON public.products FOR UPDATE USING ((select auth.uid()) = user_id);
+DROP POLICY IF EXISTS "Products public update policy" ON public.products;
+CREATE POLICY "Products public update policy" ON public.products FOR UPDATE USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Users can delete own products" ON public.products;
 CREATE POLICY "Users can delete own products" ON public.products FOR DELETE USING ((select auth.uid()) = user_id);
@@ -317,6 +324,33 @@ CREATE POLICY "Server logs insert policy" ON public.server_logs FOR INSERT WITH 
 
 DROP POLICY IF EXISTS "Server logs delete policy" ON public.server_logs;
 CREATE POLICY "Server logs delete policy" ON public.server_logs FOR DELETE USING (true);
+
+-- ============================================================================
+-- 10. DISTRIBUTOR APPLICATIONS TABLE (B2B partner/franchise requests)
+-- Previously localStorage-only (task.md #3) — every write here goes through
+-- the Express backend using the service-role key, so RLS is left deny-all
+-- for anon/authenticated: no policies are defined below on purpose.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.distributor_applications (
+    id TEXT PRIMARY KEY, -- e.g. 'DIST-10234'
+    user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    user_name TEXT NOT NULL,
+    user_email TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    city TEXT NOT NULL,
+    business TEXT NOT NULL,
+    tier TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'approved' | 'rejected'
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    approved_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_distributor_apps_status ON public.distributor_applications(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_distributor_apps_user_email ON public.distributor_applications(user_email);
+CREATE INDEX IF NOT EXISTS idx_distributor_apps_phone ON public.distributor_applications(phone);
+
+ALTER TABLE public.distributor_applications ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================================
 -- 9. COMMUNICATION TABLE (Helpline Phone Numbers)

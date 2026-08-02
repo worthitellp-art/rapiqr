@@ -52,6 +52,30 @@ export async function getQrCodeByIdFromDb(qrId: string) {
       .maybeSingle();
 
     if (error) throw error;
+
+    if (data) {
+      try {
+        const { data: product } = await supabase
+          .from('products')
+          .select('*')
+          .or(`qr_code_id.eq.${qrId},id.eq.${qrId}`)
+          .maybeSingle();
+
+        if (product) {
+          return {
+            ...data,
+            vehicleName: product.name || data.vehicleName,
+            vehicleNumber: product.vehicle_number || data.vehicleNumber,
+            contacts: product.details?.emergencyContacts || product.contacts,
+            emergencyContacts: product.details?.emergencyContacts || product.contacts,
+            details: product.details,
+          };
+        }
+      } catch {
+        // Non-blocking fallback if products table query fails
+      }
+    }
+
     return data;
   } catch (err) {
     console.warn(`Supabase fetch QR ${qrId} error:`, err);
@@ -176,7 +200,7 @@ export async function getTemplatesFromDb() {
  * Save / Upsert sticker template to Supabase
  */
 export async function saveTemplateToDb(template: {
-  id?: string;
+  id?: string | number;
   name: string;
   fgColor: string;
   bgColor: string;
@@ -192,16 +216,26 @@ export async function saveTemplateToDb(template: {
       sticker_pos: template.stickerPos || { x: 110, y: 40, w: 100, h: 100 },
       is_default: template.isDefault || false,
     };
-    if (template.id && typeof template.id === 'string' && template.id.includes('-')) {
-      payload.id = template.id;
+
+    const templateIdStr = template.id != null ? String(template.id) : null;
+    const isUuid = !!templateIdStr && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(templateIdStr);
+
+    if (isUuid) {
+      payload.id = templateIdStr;
     }
-    const { data, error } = await supabase
-      .from('templates')
-      .upsert(payload, { onConflict: 'name' })
-      .select('id, name, fg_color, bg_color, sticker_pos');
+
+    const { data, error } = isUuid
+      ? await supabase
+          .from('templates')
+          .upsert(payload, { onConflict: 'id' })
+          .select('id, name, fg_color, bg_color, sticker_pos, is_default')
+      : await supabase
+          .from('templates')
+          .upsert(payload, { onConflict: 'name' })
+          .select('id, name, fg_color, bg_color, sticker_pos, is_default');
 
     if (error) throw error;
-    return data;
+    return data && data.length > 0 ? data[0] : null;
   } catch (err) {
     console.warn('Supabase save template error:', err);
     return null;
@@ -211,14 +245,20 @@ export async function saveTemplateToDb(template: {
 /**
  * Delete template from Supabase
  */
-export async function deleteTemplateFromDb(templateId: string) {
+export async function deleteTemplateFromDb(templateId: string | number) {
   if (!isSupabaseConfigured) return null;
   try {
-    const { error } = await supabase
-      .from('templates')
-      .delete()
-      .eq('id', templateId);
+    const idStr = String(templateId);
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idStr);
 
+    let query = supabase.from('templates').delete();
+    if (isUuid) {
+      query = query.eq('id', idStr);
+    } else {
+      query = query.or(`id.eq.${idStr},name.eq.${idStr}`);
+    }
+
+    const { error } = await query;
     if (error) throw error;
     return true;
   } catch (err) {
@@ -310,7 +350,8 @@ export async function activateQrInDb(data: {
   category?: string;
   ownerName: string;
   ownerPhone: string;
-  emergencyPhone?: string;
+  ownerEmail?: string;
+  emergencyContacts?: { name: string; relationship: string; phone: string }[];
   bloodGroup?: string;
   allergies?: string;
   address?: string;
@@ -346,7 +387,8 @@ export async function activateQrInDb(data: {
         assigned_to: data.ownerName,
         details: {
           ownerPhone: data.ownerPhone,
-          emergencyPhone: data.emergencyPhone || '',
+          ownerEmail: data.ownerEmail || '',
+          emergencyContacts: data.emergencyContacts || [],
           bloodGroup: data.bloodGroup || '',
           allergies: data.allergies || '',
           address: data.address || '',
@@ -363,9 +405,88 @@ export async function activateQrInDb(data: {
 }
 
 /**
- * Fetch user products/vehicles with minimal payload requirement
+ * Send the post-activation confirmation email (and a sample "test scan" preview email)
+ * to the sticker owner. Real delivery requires SMTP credentials configured on the Express
+ * backend (Server/.env) — without a backend at all (Supabase-direct setups), this instead
+ * writes what WOULD have been sent as server_logs entries, visible in the admin Live Logs
+ * page, so activation confirmations are never silently dropped.
+ */
+export async function sendActivationNotifications(data: {
+  qrId: string;
+  ownerName: string;
+  ownerEmail?: string;
+  category?: string;
+}) {
+  if (isApiBackendConfigured) {
+    try {
+      await apiClient.notifications.sendActivationConfirmation(data);
+      return true;
+    } catch (err) {
+      console.warn('Backend activation notification error (falling back to logging):', err);
+    }
+  }
+  if (!isSupabaseConfigured) return false;
+  try {
+    const to = data.ownerEmail?.trim();
+    const rows: Record<string, any>[] = to
+      ? [
+          {
+            level: 'INFO',
+            category: 'EXTERNAL',
+            service: 'namoqr-client',
+            tag: 'ACTIVATION_CONFIRMATION_EMAIL',
+            event: 'ACTIVATION_CONFIRMATION_EMAIL',
+            message: `[SIMULATED] Would send "Your RapiQR sticker is now active!" to ${to} (no Express backend/SMTP configured to send for real)`,
+            details: { to, qrId: data.qrId, ownerName: data.ownerName },
+            resource_id: data.qrId,
+          },
+          {
+            level: 'INFO',
+            category: 'EXTERNAL',
+            service: 'namoqr-client',
+            tag: 'SAMPLE_TEST_SCAN_EMAIL',
+            event: 'SAMPLE_TEST_SCAN_EMAIL',
+            message: `[SIMULATED] Would send a sample "what responders see" test-scan preview to ${to}`,
+            details: { to, qrId: data.qrId, category: data.category || 'car' },
+            resource_id: data.qrId,
+          },
+        ]
+      : [
+          {
+            level: 'WARN',
+            category: 'EXTERNAL',
+            service: 'namoqr-client',
+            tag: 'ACTIVATION_CONFIRMATION_EMAIL',
+            event: 'ACTIVATION_CONFIRMATION_EMAIL',
+            message: `Skipped activation confirmation email for ${data.qrId} — no email on file`,
+            details: { qrId: data.qrId, ownerName: data.ownerName },
+            resource_id: data.qrId,
+          },
+        ];
+
+    const { error } = await supabase.from('server_logs').insert(rows);
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.warn('Supabase activation notification log error:', err);
+    return false;
+  }
+}
+
+/**
+ * Fetch the logged-in user's registered stickers/products (My Products dashboard).
+ * Prefers the Render/Express API (scoped to the authenticated user server-side);
+ * falls back to a direct Supabase query filtered by userId.
  */
 export async function getProductsFromDb(userId?: string, limitCount = 100) {
+  if (isApiBackendConfigured) {
+    try {
+      const res = await apiClient.products.list();
+      return (res.data || []) as any[];
+    } catch (err) {
+      console.warn('Backend fetch products error (falling back to Supabase):', err);
+    }
+  }
   if (!isSupabaseConfigured) return null;
   try {
     let query = supabase
@@ -384,6 +505,218 @@ export async function getProductsFromDb(userId?: string, limitCount = 100) {
   } catch (err) {
     console.warn('Supabase fetch products error:', err);
     return null;
+  }
+}
+
+/**
+ * Claim an already-activated sticker (e.g. scanned/activated anonymously before the
+ * owner signed in) into the current account by code + registered phone number.
+ * Backend-only — direct-Supabase mode has no way to match "unowned" rows safely.
+ */
+export async function claimProductByCode(code: string, phone: string) {
+  if (isApiBackendConfigured) {
+    try {
+      const res = await apiClient.products.claim(code, phone);
+      return { success: true, data: res.data } as { success: boolean; data?: any; error?: string };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to verify code' };
+    }
+  }
+  return { success: false, error: 'This requires the RapiQR backend to be configured.' };
+}
+
+/**
+ * Edit a sticker/product's details (name, category, vehicle number, address,
+ * blood group, allergies, owner phone/email). Merges into the `details` JSONB
+ * blob so unspecified fields are preserved.
+ */
+export async function updateProductDetailsInDb(productId: string, updates: Record<string, any>) {
+  if (isApiBackendConfigured) {
+    try {
+      const res = await apiClient.products.updateDetails(productId, updates);
+      return (res.data || null) as any;
+    } catch (err) {
+      console.warn('Backend update product details error (falling back to Supabase):', err);
+    }
+  }
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { data: current, error: fetchError } = await supabase
+      .from('products')
+      .select('details')
+      .eq('id', productId)
+      .maybeSingle();
+    if (fetchError) throw fetchError;
+
+    const payload: Record<string, any> = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.vehicleNumber !== undefined) payload.vehicle_number = updates.vehicleNumber;
+    if (updates.category !== undefined) payload.category = updates.category;
+    if (updates.assignedTo !== undefined) payload.assigned_to = updates.assignedTo;
+
+    const detailFields = ['address', 'bloodGroup', 'allergies', 'ownerPhone', 'ownerEmail', 'notes'];
+    const mergedDetails = { ...(current?.details || {}) };
+    let changed = false;
+    for (const field of detailFields) {
+      if (updates[field] !== undefined) {
+        mergedDetails[field] = updates[field];
+        changed = true;
+      }
+    }
+    if (changed) payload.details = mergedDetails;
+
+    const { data, error } = await supabase
+      .from('products')
+      .update(payload)
+      .eq('id', productId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.warn('Supabase update product details error:', err);
+    return null;
+  }
+}
+
+/**
+ * Replace a sticker's emergency contacts list: [{ name, phone }, ...]
+ */
+export async function updateProductContactsInDb(productId: string, contacts: { name: string; phone: string }[]) {
+  if (isApiBackendConfigured) {
+    try {
+      const res = await apiClient.products.updateContacts(productId, contacts);
+      return (res.data || null) as any;
+    } catch (err) {
+      console.warn('Backend update product contacts error (falling back to Supabase):', err);
+    }
+  }
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { data: current, error: fetchError } = await supabase
+      .from('products')
+      .select('details')
+      .eq('id', productId)
+      .maybeSingle();
+    if (fetchError) throw fetchError;
+
+    const mergedDetails = { ...(current?.details || {}), emergencyContacts: contacts };
+
+    const { data, error } = await supabase
+      .from('products')
+      .update({ details: mergedDetails })
+      .eq('id', productId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.warn('Supabase update product contacts error:', err);
+    return null;
+  }
+}
+
+/**
+ * Deactivate / reactivate a sticker (also mirrors status onto its qr_codes row).
+ */
+export async function setProductStatusInDb(productId: string, active: boolean, qrCodeId?: string) {
+  if (isApiBackendConfigured) {
+    try {
+      const res = active ? await apiClient.products.reactivate(productId) : await apiClient.products.deactivate(productId);
+      return (res.data || null) as any;
+    } catch (err) {
+      console.warn('Backend set product status error (falling back to Supabase):', err);
+    }
+  }
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .update({ status: active ? 'active' : 'inactive' })
+      .eq('id', productId)
+      .select()
+      .single();
+    if (error) throw error;
+
+    if (qrCodeId) {
+      await supabase.from('qr_codes').update({ status: active ? 'active' : 'inactive' }).eq('id', qrCodeId);
+    }
+    return data;
+  } catch (err) {
+    console.warn('Supabase set product status error:', err);
+    return null;
+  }
+}
+
+/**
+ * Transfer sticker ownership to another registered RapiQR account by email.
+ * Direct-Supabase fallback can only look up profiles the client is allowed to read
+ * under RLS, so this is best-effort outside the Express backend.
+ */
+export async function transferProductInDb(productId: string, targetEmail: string) {
+  if (isApiBackendConfigured) {
+    try {
+      const res = await apiClient.products.transfer(productId, targetEmail);
+      return { success: true, data: res.data } as { success: boolean; data?: any; error?: string };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to transfer sticker' };
+    }
+  }
+  return { success: false, error: 'Transfers require the RapiQR backend to be configured.' };
+}
+
+/**
+ * Permanently remove a sticker/product from the owner's dashboard.
+ */
+export async function deleteProductFromDb(productId: string, qrCodeId?: string) {
+  if (isApiBackendConfigured) {
+    try {
+      await apiClient.products.remove(productId);
+      return true;
+    } catch (err) {
+      console.warn('Backend delete product error (falling back to Supabase):', err);
+    }
+  }
+  if (!isSupabaseConfigured) return false;
+  try {
+    const { error } = await supabase.from('products').delete().eq('id', productId);
+    if (error) throw error;
+    if (qrCodeId) {
+      await supabase.from('qr_codes').update({ status: 'inactive' }).eq('id', qrCodeId);
+    }
+    return true;
+  } catch (err) {
+    console.warn('Supabase delete product error:', err);
+    return false;
+  }
+}
+
+/**
+ * Scan/alert history for a single sticker/product, newest first.
+ */
+export async function getProductHistoryFromDb(productId: string) {
+  if (isApiBackendConfigured) {
+    try {
+      const res = await apiClient.products.getHistory(productId);
+      return (res.data || []) as any[];
+    } catch (err) {
+      console.warn('Backend fetch product history error (falling back to Supabase):', err);
+    }
+  }
+  if (!isSupabaseConfigured) return [];
+  try {
+    const { data, error } = await supabase
+      .from('reports')
+      .select('id, type, message, reporter_phone, location, status, created_at')
+      .eq('product_id', productId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.warn('Supabase fetch product history error:', err);
+    return [];
   }
 }
 
