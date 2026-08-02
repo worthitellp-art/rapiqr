@@ -7,18 +7,22 @@ import { fmtDateTime } from "./helpers";
 import { getReportsFromDb } from "../../../lib/supabaseService";
 
 export default function AlertsPage({
-  qrList, setQrList, templates, setToast, searchQuery,
+  qrList, setQrList, templates, setToast, searchQuery, isAdmin,
 }: {
   qrList: QrRecord[]; setQrList: React.Dispatch<React.SetStateAction<QrRecord[]>>;
-  templates: Template[]; setToast: (msg: string | null) => void; searchQuery: string;
+  templates: Template[]; setToast: (msg: string | null) => void; searchQuery: string; isAdmin: boolean;
 }) {
   const [filter, setFilter] = useState<"all" | "emergency" | "activation" | "scan">("all");
   const [reports, setReports] = useState<any[]>([]);
   const [expandedAlert, setExpandedAlert] = useState<string | null>(null);
 
-  // Fetch reports from Supabase & LocalStorage (real reports only — no mocks)
+  // Fetch reports from Supabase & LocalStorage (real reports only — no mocks).
+  // GET /api/alerts is admin-only (reporter phone + GPS location) — client accounts
+  // can never pass verifyAdmin, so skip the backend call entirely for them rather
+  // than polling it into a permanent 401 loop every 15s.
   const loadReports = useCallback(() => {
-    getReportsFromDb().then((dbReports) => {
+    const reportsPromise = isAdmin ? getReportsFromDb() : Promise.resolve(null);
+    reportsPromise.then((dbReports) => {
       let combined: any[] = dbReports || [];
       try {
         const local = JSON.parse(localStorage.getItem("repiqr-reports") || localStorage.getItem("namoqr-reports") || "[]");
@@ -30,20 +34,20 @@ export default function AlertsPage({
       } catch { /* ignore */ }
       setReports(combined);
     });
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     loadReports();
     const onReportsUpdated = () => loadReports();
     window.addEventListener("repiqr-reports-updated", onReportsUpdated);
     window.addEventListener("namoqr-reports-updated", onReportsUpdated);
-    const interval = setInterval(loadReports, 15000);
+    const interval = isAdmin ? setInterval(loadReports, 15000) : null;
     return () => {
       window.removeEventListener("repiqr-reports-updated", onReportsUpdated);
       window.removeEventListener("namoqr-reports-updated", onReportsUpdated);
-      clearInterval(interval);
+      if (interval) clearInterval(interval);
     };
-  }, [loadReports]);
+  }, [loadReports, isAdmin]);
 
   // Construct unified alerts list
   const unifiedAlerts: SystemAlertItem[] = [];

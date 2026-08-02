@@ -145,11 +145,12 @@ export default function CheckoutPage({
 
     // Create sticker records so purchased tags appear in the dashboard
     const newStickers: any[] = [];
+    let stickerSeq = 0;
     cart.forEach(item => {
       for (let i = 0; i < item.qty; i++) {
         const codeId = 'NQ-' + (item.product.category || 'car').slice(0, 4).toUpperCase() + '-' + Math.floor(1000 + Math.random() * 9000);
         newStickers.push({
-          id: 'p' + Date.now() + '-' + i,
+          id: 'p' + Date.now() + '-' + (stickerSeq++),
           code: codeId,
           nickname: item.product.name + (item.qty > 1 ? ` #${i + 1}` : ''),
           category: (item.product.category || 'car').toLowerCase(),

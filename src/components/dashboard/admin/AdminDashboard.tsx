@@ -32,8 +32,12 @@ export default function AdminDashboard({ onBack, switchToClientPortal }: { onBac
   const [searchQuery, setSearchQuery] = useState("");
   const [unreadAlerts, setUnreadAlerts] = useState(0);
 
-  // Live unread alert count for the sidebar badge (real reports only)
+  // Live unread alert count for the sidebar badge (real reports only).
+  // GET /api/alerts is admin-only (reporter phone + GPS location) — skip entirely
+  // for client accounts, which can never pass verifyAdmin and would otherwise
+  // poll it into a permanent 401 loop every 15s.
   useEffect(() => {
+    if (!isAdmin) return;
     const update = () => {
       getReportsFromDb().then((dbReports) => {
         let combined: any[] = dbReports || [];
@@ -53,7 +57,7 @@ export default function AdminDashboard({ onBack, switchToClientPortal }: { onBac
       window.removeEventListener("repiqr-reports-updated", onUpdated);
       clearInterval(interval);
     };
-  }, []);
+  }, [isAdmin]);
 
   const admin = {
     name: profile?.fullName || (isAdmin ? "System Admin" : "Client User"),
@@ -124,7 +128,7 @@ export default function AdminDashboard({ onBack, switchToClientPortal }: { onBac
           {page === "alerts" && (
             <AlertsPage
               qrList={qrList} setQrList={setQrList} templates={templates}
-              setToast={setToast} searchQuery={searchQuery}
+              setToast={setToast} searchQuery={searchQuery} isAdmin={isAdmin}
             />
           )}
           {page === "users" && <UsersPage searchQuery={searchQuery} setSearchQuery={setSearchQuery} setToast={setToast} />}

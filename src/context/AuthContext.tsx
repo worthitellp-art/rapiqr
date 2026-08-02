@@ -62,6 +62,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Backend session restore first (when a backend token exists)
     if (isApiBackendConfigured) {
       const token = localStorage.getItem('repiqr-token') || localStorage.getItem('namoqr-token');
+
+      // adminSignIn()'s local-only fallback (used when the Render API was NOT yet
+      // configured) stamps this exact id with role:'admin' and never obtains any
+      // token — no Supabase session, no backend JWT. If that cached profile is
+      // still around now that the API IS configured, every apiClient call (Orders,
+      // Alerts, ...) will 401 forever since there was never a real token to restore.
+      // Force a clean re-login instead of leaving a permanently-broken "logged in" state.
+      if (!token && profile?.id === 'admin-101') {
+        setProfile(null);
+        localStorage.removeItem('repiqr-auth-user');
+        localStorage.removeItem('namoqr-auth-user');
+      }
+
       if (token) {
         apiClient.auth.getMe()
           .then((res) => {
@@ -107,10 +120,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setProfile(userProfile);
           localStorage.setItem('repiqr-auth-user', JSON.stringify(userProfile));
         }
+        // A session established purely via Supabase (Google OAuth, or a session
+        // restored from before the Render API was configured) never goes through
+        // apiClient.auth.signIn(), so repiqr-token/namoqr-token would stay empty —
+        // every apiClient call (Orders, Alerts, ...) would 401 with "Missing or
+        // invalid token" despite the user genuinely being signed in. The backend's
+        // verifyToken already accepts a raw Supabase access_token as a fallback, so
+        // mirror it into the same keys apiClient reads.
+        if (isApiBackendConfigured && currentSession.access_token) {
+          localStorage.setItem('repiqr-token', currentSession.access_token);
+          localStorage.setItem('namoqr-token', currentSession.access_token);
+        }
       } else if (event === 'SIGNED_OUT') {
         setProfile(null);
         localStorage.removeItem('repiqr-auth-user');
         localStorage.removeItem('namoqr-auth-user');
+        localStorage.removeItem('repiqr-token');
+        localStorage.removeItem('namoqr-token');
       }
       // INITIAL_SESSION with no Supabase session: leave `profile` untouched — it may hold
       // a valid admin/demo login that never used Supabase auth, and clearing it here would
