@@ -102,12 +102,16 @@ export default function CheckoutPage({
     return false;
   };
 
-  const persistOrderAndStickers = async (isRecognized: boolean) => {
+  const persistOrderAndStickers = async (isRecognized: boolean): Promise<{ id: string; success: boolean }> => {
     const items = cart.map(i => ({ name: i.product.name, qty: i.qty, price: i.product.price }));
 
     // Real, durable order record (task.md #6 — this used to be localStorage-only,
-    // invisible across devices/browsers and gone if storage was cleared).
-    let id = '#NQ-' + Math.floor(100000 + Math.random() * 899999);
+    // invisible across devices/browsers and gone if storage was cleared). The order
+    // MUST actually persist server-side before the customer is told it succeeded —
+    // this used to fall back to a fake local-only id on any failure, showing a
+    // "success" screen for an order that was never actually saved anywhere the
+    // admin Orders tab (or anyone else) could see it.
+    let id: string;
     try {
       const res = await apiClient.orders.create({
         name: name.trim(), email: email.trim(), phone: phone.trim(),
@@ -115,9 +119,11 @@ export default function CheckoutPage({
         paymentMethod: payment, deliveryMethod: delivery,
         shippingAddress: { address: address.trim(), city: city.trim(), state: state.trim(), pincode: pincode.trim() },
       });
-      if (res.data?.id) id = res.data.id;
+      if (!res.data?.id) throw new Error('Server did not return an order id');
+      id = res.data.id;
     } catch (err) {
-      console.error('Failed to persist order to the server — it will NOT appear in the admin Orders tab (kept locally only):', err);
+      console.error('Failed to persist order to the server — order NOT placed:', err);
+      return { id: '', success: false };
     }
 
     setOrderId(id);
@@ -178,7 +184,7 @@ export default function CheckoutPage({
       localStorage.setItem('namoqr-qrlist', JSON.stringify(updatedQrList));
     } catch { /* ignore */ }
 
-    return id;
+    return { id, success: true };
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -201,7 +207,12 @@ export default function CheckoutPage({
     setRecognized(isRecognized);
     setStep('processing');
     setTimeout(async () => {
-      await persistOrderAndStickers(isRecognized);
+      const result = await persistOrderAndStickers(isRecognized);
+      if (!result.success) {
+        setStep('details');
+        setError("We couldn't confirm your order with our server. Nothing was charged and your cart is unchanged — please try again in a moment, or contact support if this keeps happening.");
+        return;
+      }
       setStep('success');
       if (onOrderComplete) onOrderComplete();
     }, 1800);
