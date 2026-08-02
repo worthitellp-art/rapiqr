@@ -3,86 +3,114 @@ import { supabase, getAuthCallbackUrl } from '../lib/supabase';
 
 type CallbackStatus = 'processing' | 'success' | 'error';
 
-export default function AuthCallback({ onSuccess }: { onSuccess?: () => void }) {
+interface AuthCallbackProps {
+  onSuccess?: () => void;
+}
+
+export default function AuthCallback({ onSuccess }: AuthCallbackProps) {
   const [status, setStatus] = useState<CallbackStatus>('processing');
-  const [error, setError] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    let isCancelled = false;
 
-    const handleCallback = async () => {
+    const executeAuthenticationCallback = async () => {
       try {
-        // 1) Check existing session first
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData?.session) {
-          finish();
+        const searchParameters = new URLSearchParams(window.location.search);
+        const oauthErrorDescription = searchParameters.get('error_description') || searchParameters.get('error');
+
+        if (oauthErrorDescription) {
+          if (!isCancelled) {
+            setErrorMessage(oauthErrorDescription);
+            setStatus('error');
+          }
           return;
         }
 
-        // 2) Listen for auth state change
-        const { data: authListener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+        // 1. Check if session already exists
+        const { data: initialSessionData } = await supabase.auth.getSession();
+        if (initialSessionData?.session) {
+          completeAuthentication();
+          return;
+        }
+
+        // 2. Listen for auth state change
+        const { data: authStateListener } = supabase.auth.onAuthStateChange((_event, newSession) => {
           if (newSession) {
-            authListener.subscription.unsubscribe();
-            finish();
+            authStateListener.subscription.unsubscribe();
+            completeAuthentication();
           }
         });
 
-        // 3) Try explicit PKCE code exchange if ?code= parameter is in URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
+        // 3. Exchange PKCE code if present in URL
+        const authCode = searchParameters.get('code');
+        if (authCode) {
+          const { data: codeExchangeData, error: codeExchangeError } = await supabase.auth.exchangeCodeForSession(authCode);
+          if (!codeExchangeError && codeExchangeData?.session) {
+            authStateListener.subscription.unsubscribe();
+            completeAuthentication();
+            return;
+          }
 
-        if (code) {
-          const { data: exchangeData, error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
-          if (!exchangeErr && exchangeData?.session) {
-            authListener.subscription.unsubscribe();
-            finish();
+          // If code was already exchanged by internal listener, re-check session
+          const { data: retrySessionData } = await supabase.auth.getSession();
+          if (retrySessionData?.session) {
+            authStateListener.subscription.unsubscribe();
+            completeAuthentication();
             return;
           }
         }
 
-        // 4) Check again after short delay
+        // 4. Fallback delay check
         setTimeout(async () => {
-          if (cancelled) return;
-          const retry = await supabase.auth.getSession();
-          authListener.subscription.unsubscribe();
-          finish();
+          if (isCancelled) return;
+          const { data: finalSessionData } = await supabase.auth.getSession();
+          authStateListener.subscription.unsubscribe();
+          if (finalSessionData?.session) {
+            completeAuthentication();
+          } else {
+            setErrorMessage('Authentication session could not be established.');
+            setStatus('error');
+          }
         }, 1200);
 
       } catch (err: any) {
-        if (!cancelled) {
+        if (!isCancelled) {
           console.warn('OAuth Callback Error:', err);
-          finish();
+          completeAuthentication();
         }
       }
     };
 
-    function finish() {
-      if (cancelled) return;
+    function completeAuthentication() {
+      if (isCancelled) return;
       setStatus('success');
-      // Clean up URL pathname away from /auth/callback to root '/' so App router advances
-      window.history.replaceState({}, document.title, '/');
+      
+      const targetUrl = typeof window !== 'undefined' && window.location?.origin ? window.location.origin + '/' : '/';
+      window.history.replaceState({}, document.title, targetUrl);
+      
       if (onSuccess) {
         onSuccess();
       } else {
-        // Land on the real dashboard: local origin when running locally, otherwise
-        // the configured hosting URL (never a stray localhost/preview origin).
         window.location.href = getAuthCallbackUrl('/');
       }
     }
 
-    handleCallback();
+    executeAuthenticationCallback();
 
     return () => {
-      cancelled = true;
+      isCancelled = true;
     };
-  }, []);
+  }, [onSuccess]);
 
-  // ─── Full-page loader ──────────────────────────────────────────────
+  const handleRedirectHome = () => {
+    window.location.href = getAuthCallbackUrl('/');
+  };
+
   if (status === 'processing') {
     return (
       <div className="min-h-screen bg-[#FAFAFC] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          {/* Animated circles */}
           <div className="relative w-16 h-16">
             <div className="absolute inset-0 border-[3px] border-[#FF6500]/20 rounded-full" />
             <div
@@ -99,7 +127,6 @@ export default function AuthCallback({ onSuccess }: { onSuccess?: () => void }) 
     );
   }
 
-  // ─── Error state ───────────────────────────────────────────────────
   if (status === 'error') {
     return (
       <div className="min-h-screen bg-[#FAFAFC] flex items-center justify-center p-4">
@@ -109,12 +136,10 @@ export default function AuthCallback({ onSuccess }: { onSuccess?: () => void }) 
           </div>
           <h2 className="text-lg font-bold text-gray-900 mb-1">Sign-in Failed</h2>
           <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-            {error || 'We couldn\'t complete the Google sign-in. Please try again.'}
+            {errorMessage || 'We couldn\'t complete the Google sign-in. Please try again.'}
           </p>
           <button
-            onClick={() => {
-              window.location.href = getAuthCallbackUrl('/');
-            }}
+            onClick={handleRedirectHome}
             className="w-full py-3 rounded-xl bg-[#FF6500] hover:bg-[#E55A00] text-white font-bold text-sm transition-colors shadow-sm"
           >
             Back to Home
@@ -126,3 +151,4 @@ export default function AuthCallback({ onSuccess }: { onSuccess?: () => void }) 
 
   return null;
 }
+

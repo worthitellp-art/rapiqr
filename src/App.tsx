@@ -141,8 +141,14 @@ function MainAppContent() {
     );
   }
 
-  // OAuth / password-reset callback — exchange the code, then go to dashboard
-  if (window.location.pathname.startsWith('/auth/callback')) {
+  // OAuth / password-reset callback — exchange the code/token, then navigate to dashboard
+  const isAuthCallbackRoute =
+    window.location.pathname.startsWith('/auth/callback') ||
+    window.location.search.includes('code=') ||
+    window.location.hash.includes('access_token=') ||
+    window.location.search.includes('error=');
+
+  if (isAuthCallbackRoute) {
     return <AuthCallback onSuccess={() => navigateTo('dashboard')} />;
   }
 

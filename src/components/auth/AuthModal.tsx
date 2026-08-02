@@ -116,19 +116,21 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignInClick = async () => {
     if (isSupabaseConfigured) {
-      // Real Google OAuth via Supabase — redirects to Google, then back to callback
+      try {
+        localStorage.setItem('namoqr-current-page', 'dashboard');
+      } catch {
+        // Fallback if localStorage access is blocked
+      }
       await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: getAuthCallbackUrl(),
+          redirectTo: getAuthCallbackUrl('/auth/callback'),
         },
       });
-      // Modal stays open until redirect; AuthProvider picks up session on return
       return;
     }
-    // Demo fallback when Supabase is not configured
     demoLogin();
     setSuccessMsg('Logged in as Demo User');
     setTimeout(() => {
@@ -294,7 +296,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
             <div className="mb-6">
               <button
                 type="button"
-                onClick={handleGoogleSignIn}
+                onClick={handleGoogleSignInClick}
                 className="w-full py-3.5 px-4 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-800 text-sm font-semibold flex items-center justify-center gap-3 transition-all shadow-xs"
               >
                 <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
