@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Store, QrCode, ShieldCheck, Plus, CheckCircle2, TrendingUp, 
   MapPin, Phone, Users, Download, ArrowRight, LogOut, Package,
@@ -19,7 +19,21 @@ interface CustomerTag {
 
 export default function DistributorDashboard({ onBack }: { onBack: () => void }) {
   const { profile, signOut } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'activate' | 'pos'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'activate' | 'pos'>(() => {
+    try {
+      const saved = localStorage.getItem('repiqr-distributor-active-tab') || localStorage.getItem('namoqr-distributor-active-tab');
+      if (saved && ['overview', 'activate', 'pos'].includes(saved)) {
+        return saved as 'overview' | 'activate' | 'pos';
+      }
+    } catch { /* fallback */ }
+    return 'overview';
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('repiqr-distributor-active-tab', activeTab);
+    } catch { /* fallback */ }
+  }, [activeTab]);
   
   // Sample customer activations state
   const [customerTags, setCustomerTags] = useState<CustomerTag[]>(() => {

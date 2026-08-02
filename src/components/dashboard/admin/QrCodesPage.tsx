@@ -70,7 +70,7 @@ export default function QrCodesPage({
     rec.qrUrl = qrFullUrl(rec.id);
 
     const stickerPos = activeTemplate?.stickerPos || { x: 110, y: 40, w: 100, h: 100 };
-    await saveGeneratedSticker(rec, activeTemplate, stickerPos);
+    await saveGeneratedSticker(rec, stickerPos);
 
     setQrList((prev) => [rec, ...prev]);
     saveQrCodeToDb(rec);

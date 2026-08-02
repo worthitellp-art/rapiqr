@@ -276,16 +276,19 @@ export async function saveStickerPosToDb(pos: { x: number; y: number; w: number;
       .eq('is_default', true)
       .maybeSingle();
 
+    const cleanFg = (fgColor || existing?.fg_color || 'EAB308').replace(/#/g, '').toUpperCase();
+    const cleanBg = (bgColor || existing?.bg_color || 'FFFFFF').replace(/#/g, '').toUpperCase();
+
     const { data, error } = await supabase
       .from('templates')
       .upsert({
         name: 'Default',
-        fg_color: fgColor || existing?.fg_color || 'D9581F',
-        bg_color: bgColor || existing?.bg_color || 'FFFFFF',
+        fg_color: cleanFg,
+        bg_color: cleanBg,
         sticker_pos: pos,
         is_default: true,
       }, { onConflict: 'name' })
-      .select('name, sticker_pos');
+      .select('name, sticker_pos, fg_color, bg_color');
 
     if (error) throw error;
     return data;

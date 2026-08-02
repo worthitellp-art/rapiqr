@@ -119,7 +119,21 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
   }, []);
 
   // Active navigation view tab
-  const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    try {
+      const saved = localStorage.getItem('repiqr-client-active-tab') || localStorage.getItem('namoqr-client-active-tab');
+      if (saved && ['overview', 'activate', 'catalog', 'contacts', 'history', 'settings', 'support'].includes(saved)) {
+        return saved as TabId;
+      }
+    } catch { /* fallback */ }
+    return 'overview';
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('repiqr-client-active-tab', activeTab);
+    } catch { /* fallback */ }
+  }, [activeTab]);
 
   // Mobile sidebar toggle
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);

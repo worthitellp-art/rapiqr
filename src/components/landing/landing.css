@@ -319,6 +319,36 @@
   border: 2px solid var(--paper-white);
 }
 
+/* ── Mobile Sticky Buy Bar (hidden on desktop; hidden once the cart has
+   items, where the floating cart button takes over the same role) ── */
+.mobile-sticky-cta {
+  display: none;
+}
+@media (max-width: 767px) {
+  /* Reserve space so the fixed bar never covers footer content, regardless
+     of whether the bar or the floating cart button is the one showing. */
+  .namo-landing {
+    padding-bottom: 76px;
+  }
+  .mobile-sticky-cta {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 370;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: var(--paper-white);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -8px 24px rgba(14,17,23,0.08);
+  }
+  .mobile-sticky-cta .btn-cta {
+    width: 100%;
+  }
+}
+
 /* ── Hero Section ── */
 .hero-section {
   font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;

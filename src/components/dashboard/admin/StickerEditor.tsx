@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Save, Grid3X3, Lock, Unlock, Magnet, Copy, Trash2, Pencil, Play, Star, X } from "lucide-react";
 import { Template, StickerPos } from "./types";
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
-import { saveTemplateToDb, deleteTemplateFromDb } from "../../../lib/supabaseService";
+import { saveTemplateToDb, deleteTemplateFromDb, saveStickerPosToDb } from "../../../lib/supabaseService";
 import { qrImageUrl } from "./helpers";
 
 const STICKER_SRC = stickerTemplateImg;
@@ -96,6 +96,8 @@ export default function StickerEditor({
     try {
       const cleanName = tplName.trim();
       const currentPos = { ...stickerPos };
+      const cleanFg = (tplFg || "EAB308").replace(/#/g, "").toUpperCase();
+      const cleanBg = (tplBg || "FFFFFF").replace(/#/g, "").toUpperCase();
 
       if (editingId !== null) {
         const existingTpl = templates.find((x) => String(x.id) === String(editingId));
@@ -104,8 +106,8 @@ export default function StickerEditor({
         const updatedTpl: Template = {
           id: editingId,
           name: cleanName,
-          fg: tplFg,
-          bg: tplBg,
+          fg: cleanFg,
+          bg: cleanBg,
           logo: null,
           stickerPos: currentPos,
           isPublicDefault: isDefault,
@@ -115,20 +117,25 @@ export default function StickerEditor({
           prev.map((t) => (String(t.id) === String(editingId) ? updatedTpl : t))
         );
 
-        if (isDefault) {
-          saveStickerPosToDb(currentPos, tplFg, tplBg).catch(() => {});
-        }
-
         const savedRecord = await saveTemplateToDb({
           id: editingId,
           name: cleanName,
-          fgColor: tplFg,
-          bgColor: tplBg,
+          fgColor: cleanFg,
+          bgColor: cleanBg,
           stickerPos: currentPos,
           isDefault,
         });
 
-        if (savedRecord?.id) {
+        saveStickerPosToDb(currentPos, cleanFg, cleanBg);
+
+        if (!savedRecord) {
+          setTemplates((prev) =>
+            prev.map((t) => (String(t.id) === String(editingId) ? (existingTpl as Template) : t))
+          );
+          throw new Error("Server rejected the template update");
+        }
+
+        if (savedRecord.id) {
           setTemplates((prev) =>
             prev.map((t) => (String(t.id) === String(editingId) ? { ...t, id: savedRecord.id } : t))
           );
@@ -144,8 +151,8 @@ export default function StickerEditor({
         const newTpl: Template = {
           id: tempId,
           name: cleanName,
-          fg: tplFg,
-          bg: tplBg,
+          fg: cleanFg,
+          bg: cleanBg,
           logo: null,
           stickerPos: currentPos,
           isPublicDefault: isFirst,
@@ -153,19 +160,22 @@ export default function StickerEditor({
 
         setTemplates((prev) => [...prev, newTpl]);
 
-        if (isFirst) {
-          saveStickerPosToDb(currentPos, tplFg, tplBg).catch(() => {});
-        }
-
         const savedRecord = await saveTemplateToDb({
           name: cleanName,
-          fgColor: tplFg,
-          bgColor: tplBg,
+          fgColor: cleanFg,
+          bgColor: cleanBg,
           stickerPos: currentPos,
           isDefault: isFirst,
         });
 
-        if (savedRecord?.id) {
+        saveStickerPosToDb(currentPos, cleanFg, cleanBg);
+
+        if (!savedRecord) {
+          setTemplates((prev) => prev.filter((t) => t.id !== tempId));
+          throw new Error("Server rejected the new template");
+        }
+
+        if (savedRecord.id) {
           setTemplates((prev) =>
             prev.map((t) => (t.id === tempId ? { ...t, id: savedRecord.id } : t))
           );
@@ -184,34 +194,40 @@ export default function StickerEditor({
   }
 
   function handleLoad(t: Template) {
+    const cleanFg = (t.fg || "EAB308").replace(/#/g, "").toUpperCase();
+    const cleanBg = (t.bg || "FFFFFF").replace(/#/g, "").toUpperCase();
     setTplName(t.name);
-    setTplFg(t.fg);
-    setTplBg(t.bg);
+    setTplFg(cleanFg);
+    setTplBg(cleanBg);
     setStickerPos(t.stickerPos);
     setToast(`Loaded "${t.name}"`);
     setTimeout(() => setToast(null), 2000);
   }
 
   function handleEdit(t: Template) {
+    const cleanFg = (t.fg || "EAB308").replace(/#/g, "").toUpperCase();
+    const cleanBg = (t.bg || "FFFFFF").replace(/#/g, "").toUpperCase();
     setEditingId(t.id);
     setTplName(t.name);
-    setTplFg(t.fg);
-    setTplBg(t.bg);
+    setTplFg(cleanFg);
+    setTplBg(cleanBg);
     setStickerPos(t.stickerPos);
     setToast(`Editing "${t.name}" — press Update Template to save`);
     setTimeout(() => setToast(null), 2200);
   }
 
   async function handleDuplicate(t: Template) {
+    const cleanFg = (t.fg || "EAB308").replace(/#/g, "").toUpperCase();
+    const cleanBg = (t.bg || "FFFFFF").replace(/#/g, "").toUpperCase();
     const copyName = `${t.name} (copy)`;
     const tempId = Date.now();
-    const copy: Template = { ...t, id: tempId, name: copyName, isPublicDefault: false };
+    const copy: Template = { ...t, id: tempId, name: copyName, fg: cleanFg, bg: cleanBg, isPublicDefault: false };
 
     setTemplates((prev) => [...prev, copy]);
     const savedRecord = await saveTemplateToDb({
       name: copyName,
-      fgColor: copy.fg,
-      bgColor: copy.bg,
+      fgColor: cleanFg,
+      bgColor: cleanBg,
       stickerPos: copy.stickerPos,
       isDefault: false,
     });
@@ -245,15 +261,19 @@ export default function StickerEditor({
   }
 
   async function handleSetDefault(t: Template) {
-    setTemplates((prev) => prev.map((x) => ({ ...x, isPublicDefault: String(x.id) === String(t.id) })));
+    const cleanFg = (t.fg || "EAB308").replace(/#/g, "").toUpperCase();
+    const cleanBg = (t.bg || "FFFFFF").replace(/#/g, "").toUpperCase();
+    const previous = templates;
+    setTemplates((prev) => prev.map((x) => ({ ...x, fg: (x.fg || "EAB308").replace(/#/g, "").toUpperCase(), bg: (x.bg || "FFFFFF").replace(/#/g, "").toUpperCase(), isPublicDefault: String(x.id) === String(t.id) })));
     setStickerPos(t.stickerPos);
-    setTplFg(t.fg);
-    setTplBg(t.bg);
-    saveStickerPosToDb(t.stickerPos, t.fg, t.bg).catch(() => {});
+    setTplFg(cleanFg);
+    setTplBg(cleanBg);
+    saveStickerPosToDb(t.stickerPos, cleanFg, cleanBg);
 
-    const updatedTemplates = templates.map((x) => ({ ...x, isPublicDefault: String(x.id) === String(t.id) }));
+    const updatedTemplates = previous.map((x) => ({ ...x, fg: (x.fg || "EAB308").replace(/#/g, "").toUpperCase(), bg: (x.bg || "FFFFFF").replace(/#/g, "").toUpperCase(), isPublicDefault: String(x.id) === String(t.id) }));
+    let allSaved = true;
     for (const x of updatedTemplates) {
-      await saveTemplateToDb({
+      const saved = await saveTemplateToDb({
         id: x.id,
         name: x.name,
         fgColor: x.fg,
@@ -261,6 +281,14 @@ export default function StickerEditor({
         stickerPos: x.stickerPos,
         isDefault: x.isPublicDefault,
       });
+      if (!saved) allSaved = false;
+    }
+
+    if (!allSaved) {
+      setTemplates(previous);
+      setToast("Failed to set default template");
+      setTimeout(() => setToast(null), 2000);
+      return;
     }
 
     setToast(`"${t.name}" set as default`);
@@ -305,32 +333,28 @@ export default function StickerEditor({
             {/* QR overlay */}
             <div
               onMouseDown={handleDragDown}
+              className="absolute cursor-move border-2 border-amber-500 rounded-lg shadow-lg flex items-center justify-center bg-white/40 backdrop-blur-[1px] group"
               style={{
-                position: "absolute", left: stickerPos.x, top: stickerPos.y,
-                width: stickerPos.w, height: stickerPos.h,
-                cursor: "move", border: "2px solid rgba(234,179,8,0.8)",
-                borderRadius: 4, boxShadow: "0 0 0 1px rgba(0,0,0,0.2)",
-                display: "flex", alignItems: "center", justifyContent: "center",
+                left: Math.round(stickerPos.x * (previewSize / EDITOR_DISPLAY.w)),
+                top: Math.round(stickerPos.y * (previewSize * (EDITOR_DISPLAY.h / EDITOR_DISPLAY.w) / EDITOR_DISPLAY.h)),
+                width: Math.round(stickerPos.w * (previewSize / EDITOR_DISPLAY.w)),
+                height: Math.round(stickerPos.h * (previewSize * (EDITOR_DISPLAY.h / EDITOR_DISPLAY.w) / EDITOR_DISPLAY.h)),
               }}
             >
               <img
-                src={qrImageUrl("PREVIEW", tplFg, tplBg, 128)}
-                style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }}
-                alt="QR Preview"
+                src={qrImageUrl("https://repiqr.com/demo", (tplFg || "EAB308").replace(/#/g, ""), (tplBg || "FFFFFF").replace(/#/g, ""), 128)}
+                className="w-full h-full object-contain pointer-events-none"
+                alt="QR"
               />
 
               {/* Resize handles */}
-              {["se", "sw", "ne", "nw"].map((dir) => (
+              {(["nw", "ne", "sw", "se"] as const).map((dir) => (
                 <div
                   key={dir}
-                  onMouseDown={handleResizeDown(dir as "se" | "sw" | "ne" | "nw")}
-                  style={{
-                    position: "absolute",
-                    width: 10, height: 10, background: "white", border: "2px solid var(--accent)", borderRadius: 2,
-                    ...(dir.includes("s") ? { bottom: -5 } : { top: -5 }),
-                    ...(dir.includes("e") ? { right: -5 } : { left: -5 }),
-                    cursor: `${dir}-resize`,
-                  }}
+                  onMouseDown={handleResizeDown(dir)}
+                  className={`absolute w-3 h-3 bg-amber-500 border border-white rounded-full transition-transform hover:scale-125 cursor-${dir}-resize ${
+                    dir === "nw" ? "-top-1.5 -left-1.5" : dir === "ne" ? "-top-1.5 -right-1.5" : dir === "sw" ? "-bottom-1.5 -left-1.5" : "-bottom-1.5 -right-1.5"
+                  }`}
                 />
               ))}
             </div>
@@ -359,15 +383,31 @@ export default function StickerEditor({
           <div>
             <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1.5">Theme Presets</label>
             <div className="grid grid-cols-8 gap-1.5">
-              {PRESETS.map((p) => (
-                <button
-                  key={p.name}
-                  title={p.name}
-                  onClick={() => { setTplFg(p.fg); setTplBg(p.bg); if (!tplName.trim()) setTplName(p.name); }}
-                  className="w-6 h-6 rounded-lg border transition-transform hover:scale-110 cursor-pointer"
-                  style={{ background: `#${p.fg}`, borderColor: p.fg === "FFFFFF" ? "#e2e8f0" : "#e2e8f0", boxShadow: tplFg === p.fg && tplBg === p.bg ? "0 0 0 2px #111111" : "none" }}
-                />
-              ))}
+              {PRESETS.map((p) => {
+                const pFg = p.fg.replace(/#/g, "").toUpperCase();
+                const pBg = p.bg.replace(/#/g, "").toUpperCase();
+                const curFg = (tplFg || "EAB308").replace(/#/g, "").toUpperCase();
+                const curBg = (tplBg || "FFFFFF").replace(/#/g, "").toUpperCase();
+                const isSelected = curFg === pFg && curBg === pBg;
+
+                return (
+                  <button
+                    key={p.name}
+                    title={p.name}
+                    onClick={() => {
+                      setTplFg(pFg);
+                      setTplBg(pBg);
+                      if (!tplName.trim()) setTplName(p.name);
+                    }}
+                    className="w-6 h-6 rounded-lg border transition-transform hover:scale-110 cursor-pointer"
+                    style={{
+                      background: `#${pFg}`,
+                      borderColor: pFg === "FFFFFF" ? "#e2e8f0" : "#e2e8f0",
+                      boxShadow: isSelected ? "0 0 0 2px #111111" : "none"
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
 
@@ -375,15 +415,27 @@ export default function StickerEditor({
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">QR Color</label>
               <div className="flex items-center gap-2">
-                <input type="color" value={`#${tplFg}`} onChange={(e) => setTplFg(e.target.value.replace("#", ""))} className="w-8 h-8 rounded-lg border cursor-pointer" style={{ borderColor: "#e2e8f0" }} />
-                <span className="text-[11px] font-mono font-bold text-gray-700">#{tplFg}</span>
+                <input
+                  type="color"
+                  value={`#${(tplFg || "EAB308").replace(/#/g, "")}`}
+                  onChange={(e) => setTplFg(e.target.value.replace(/#/g, "").toUpperCase())}
+                  className="w-8 h-8 rounded-lg border cursor-pointer"
+                  style={{ borderColor: "#e2e8f0" }}
+                />
+                <span className="text-[11px] font-mono font-bold text-gray-700">#{(tplFg || "EAB308").replace(/#/g, "").toUpperCase()}</span>
               </div>
             </div>
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">BG Color</label>
               <div className="flex items-center gap-2">
-                <input type="color" value={`#${tplBg}`} onChange={(e) => setTplBg(e.target.value.replace("#", ""))} className="w-8 h-8 rounded-lg border cursor-pointer" style={{ borderColor: "#e2e8f0" }} />
-                <span className="text-[11px] font-mono font-bold text-gray-700">#{tplBg}</span>
+                <input
+                  type="color"
+                  value={`#${(tplBg || "FFFFFF").replace(/#/g, "")}`}
+                  onChange={(e) => setTplBg(e.target.value.replace(/#/g, "").toUpperCase())}
+                  className="w-8 h-8 rounded-lg border cursor-pointer"
+                  style={{ borderColor: "#e2e8f0" }}
+                />
+                <span className="text-[11px] font-mono font-bold text-gray-700">#{(tplBg || "FFFFFF").replace(/#/g, "").toUpperCase()}</span>
               </div>
             </div>
           </div>

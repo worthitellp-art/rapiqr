@@ -20,7 +20,13 @@ import OrdersPage from "./OrdersPage";
 
 export default function AdminDashboard({ onBack, switchToClientPortal }: { onBack: () => void; switchToClientPortal?: () => void }) {
   const { profile, signOut, isAdmin } = useAuth();
-  const [page, setPage] = useState(() => (isAdmin ? "overview" : "qr"));
+  const [page, setPage] = useState(() => {
+    try {
+      const saved = localStorage.getItem("repiqr-admin-active-menu") || localStorage.getItem("namoqr-admin-active-menu");
+      if (saved) return saved;
+    } catch { /* fallback */ }
+    return isAdmin ? "overview" : "qr";
+  });
   const accent = "0F172A";
   const fontCss = "'Inter', ui-sans-serif, system-ui";
   const [templates, setTemplates] = useLocalStorage<Template[]>("repiqr-templates", []);
@@ -65,8 +71,11 @@ export default function AdminDashboard({ onBack, switchToClientPortal }: { onBac
     role: isAdmin ? "Administrator" : "Client Account",
   };
 
-  // Reset search on page change & guard admin-only pages for client users
+  // Persist active menu & reset search on page change & guard admin-only pages for client users
   useEffect(() => {
+    try {
+      localStorage.setItem("repiqr-admin-active-menu", page);
+    } catch { /* fallback */ }
     if (!isAdmin && (page === "overview" || page === "orders" || page === "distributors" || page === "users" || page === "communication" || page === "customize")) {
       setPage("qr");
     }

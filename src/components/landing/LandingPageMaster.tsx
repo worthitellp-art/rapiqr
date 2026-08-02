@@ -596,6 +596,40 @@ export default function LandingPageMaster({
     }
   };
 
+  // Single-item purchase is the dominant case for a ₹249–499 sticker — skip the
+  // cart drawer entirely for shoppers who already know what they want.
+  const buyNow = (product: Product) => {
+    addToCart(product);
+    openCheckout();
+  };
+
+  // Pricing-tier CTAs previously all just opened sign-up regardless of which
+  // plan was clicked, discarding the choice the visitor just made. Route each
+  // one to what it actually promises instead.
+  const handlePlanCta = (planId: string) => {
+    if (planId === 'starter') {
+      // "1 sticker of your choice" can't be pre-selected — send them to pick one.
+      document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    if (planId === 'family') {
+      // Bundle = the 3 named tags at a combined ₹899 (vs ₹947 summed individually).
+      // Each cart line keeps its real product/category so 3 correctly-typed
+      // stickers get created at checkout — only the price is bundle-adjusted,
+      // spread evenly so the cart total matches the advertised bundle price exactly.
+      const bundleIds = ['car-qr', 'home-qr', 'child-qr'];
+      const bundleProducts = PRODUCTS.filter(p => bundleIds.includes(p.id));
+      const fullPrice = bundleProducts.reduce((s, p) => s + p.price, 0);
+      const discount = fullPrice - 899;
+      const perItemCut = Math.round(discount / bundleProducts.length);
+      bundleProducts.forEach(p => addToCart({ ...p, price: p.price - perItemCut }, 1));
+      openCheckout();
+      return;
+    }
+    // Society/Fleet: custom quote — no cart action, route to sign-up/contact.
+    onStart();
+  };
+
   const updateQty = (id: string, delta: number) => {
     setCart(prev =>
       prev.map(i => i.product.id === id ? { ...i, qty: i.qty + delta } : i)
@@ -653,7 +687,6 @@ export default function LandingPageMaster({
             <a href="#how-it-works" className="nav-link">How It Works</a>
             <a href="#categories" className="nav-link">Use Cases</a>
             <a href="#pricing" className="nav-link">Pricing</a>
-            <a href="#distributorship" className="nav-link">Partner Program</a>
             <a href="#faq" className="nav-link">FAQ</a>
           </div>
 
@@ -724,7 +757,6 @@ export default function LandingPageMaster({
             <a href="#how-it-works" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>How It Works</a>
             <a href="#categories" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>Use Cases</a>
             <a href="#pricing" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
-            <a href="#distributorship" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>Partner Program</a>
             <a href="#faq" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>FAQ</a>
             {isLoggedIn ? (
               <>
@@ -1041,29 +1073,31 @@ export default function LandingPageMaster({
                 <div style={{
                   marginTop: 'auto', padding: '16px 20px 20px',
                   borderTop: '1px solid var(--border)',
-                  display: 'flex', items: 'center', justifyContent: 'space-between',
                 }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                      <span style={{ fontSize: 24, fontWeight: 900, color: 'var(--ink)', lineHeight: 1 }}>₹{product.price}</span>
-                      <span style={{ fontSize: 13, color: 'var(--ink-faint)', textDecoration: 'line-through', fontWeight: 500 }}>₹{product.mrp}</span>
-                      <span style={{
-                        fontSize: 10,
-                        fontWeight: 800,
-                        color: '#047857',
-                        backgroundColor: '#D1FAE5',
-                        padding: '1.5px 6px',
-                        borderRadius: 6,
-                        border: '1px solid #A7F3D0'
-                      }}>
-                        {Math.round(((product.mrp - product.price) / product.mrp) * 100)}% OFF
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 10, color: '#10B981', fontWeight: 700, marginTop: 4 }}>Lifetime · ₹0 subscription</div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{ fontSize: 24, fontWeight: 900, color: 'var(--ink)', lineHeight: 1 }}>₹{product.price}</span>
+                    <span style={{ fontSize: 13, color: 'var(--ink-faint)', textDecoration: 'line-through', fontWeight: 500 }}>₹{product.mrp}</span>
+                    <span style={{
+                      fontSize: 10,
+                      fontWeight: 800,
+                      color: '#047857',
+                      backgroundColor: '#D1FAE5',
+                      padding: '1.5px 6px',
+                      borderRadius: 6,
+                      border: '1px solid #A7F3D0'
+                    }}>
+                      {Math.round(((product.mrp - product.price) / product.mrp) * 100)}% OFF
+                    </span>
                   </div>
-                  <button onClick={() => addToCart(product)} className="btn-brand" style={{ padding: '10px 18px', fontSize: 13 }}>
-                    <Plus size={14} /> Add to Cart
-                  </button>
+                  <div style={{ fontSize: 10, color: '#10B981', fontWeight: 700, marginTop: 4, marginBottom: 14 }}>Lifetime · ₹0 subscription</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => buyNow(product)} className="btn-brand" style={{ flex: 1, justifyContent: 'center', padding: '10px 14px', fontSize: 13 }}>
+                      Buy Now
+                    </button>
+                    <button onClick={() => addToCart(product)} className="btn-ghost" style={{ padding: '10px 14px', fontSize: 13 }} aria-label="Add to cart">
+                      <Plus size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -1503,7 +1537,6 @@ export default function LandingPageMaster({
             </h2>
             <p className="mt-4 text-sm" style={{ color: 'var(--ink-soft)', maxWidth: 320, margin: '12px auto 0' }}>
               No monthly fees. No renewals.
-              <span style={{ color: 'var(--ink-faint)', fontStyle: 'italic' }}> (Sample prices — replace before launch.)</span>
             </p>
           </div>
 
@@ -1562,7 +1595,7 @@ export default function LandingPageMaster({
 
                 <div style={{ marginTop: 'auto' }}>
                   <button
-                    onClick={onStart}
+                    onClick={() => handlePlanCta(plan.id)}
                     className={plan.popular ? 'btn-cta' : 'btn-ghost'}
                     style={{ width: '100%', justifyContent: 'center' }}
                   >
@@ -1887,11 +1920,25 @@ export default function LandingPageMaster({
                 </div>
               </div>
               <p style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginBottom: 20, lineHeight: 1.65 }}>{quickView.desc}</p>
-              <button onClick={() => { addToCart(quickView); setQuickView(null); }} className="btn-brand" style={{ width: '100%', justifyContent: 'center' }}>
-                Add to Cart <ArrowRight size={14} />
-              </button>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => { buyNow(quickView); setQuickView(null); }} className="btn-brand" style={{ flex: 1, justifyContent: 'center' }}>
+                  Buy Now <ArrowRight size={14} />
+                </button>
+                <button onClick={() => { addToCart(quickView); setQuickView(null); }} className="btn-ghost" style={{ justifyContent: 'center' }} aria-label="Add to cart">
+                  <Plus size={16} />
+                </button>
+              </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── MOBILE STICKY BUY BAR (persistent CTA before anything's in cart) ── */}
+      {cart.length === 0 && (
+        <div className="mobile-sticky-cta">
+          <button onClick={onStart} className="btn-cta">
+            {isLoggedIn ? <><LayoutDashboard size={14} /> My Dashboard</> : <>Get My Sticker <ArrowRight size={14} /></>}
+          </button>
         </div>
       )}
 

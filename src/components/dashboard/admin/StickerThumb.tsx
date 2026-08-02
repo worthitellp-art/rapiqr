@@ -13,8 +13,8 @@ export default function StickerThumb({ qr, templates, size = 96 }: { qr: QrRecor
   const qrY = (sp.y / EDITOR_DISPLAY.h) * thumbH;
   const qrW = (sp.w / EDITOR_DISPLAY.w) * size;
   const qrH = (sp.h / EDITOR_DISPLAY.h) * thumbH;
-  const qrFg = qr?.fg || "EAB308";
-  const qrBg = qr?.bg || "FFFFFF";
+  const qrFg = (qr?.fg || tpl?.fg || "EAB308").replace(/#/g, "");
+  const qrBg = (qr?.bg || tpl?.bg || "FFFFFF").replace(/#/g, "");
 
   return (
     <div

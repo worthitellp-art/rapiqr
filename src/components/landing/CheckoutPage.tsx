@@ -62,6 +62,7 @@ export default function CheckoutPage({
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [pincode, setPincode] = useState('');
+  const [pincodeStatus, setPincodeStatus] = useState<'idle' | 'looking' | 'found' | 'not-found'>('idle');
   const [delivery, setDelivery] = useState<'standard' | 'express'>('standard');
   const [payment, setPayment] = useState<'upi' | 'card' | 'cod'>('upi');
   const [error, setError] = useState('');
@@ -78,6 +79,36 @@ export default function CheckoutPage({
       setPhone(profile.phoneNumber || '');
     }
   }, [profile]);
+
+  // Auto-fill City & State from a valid 6-digit pincode (India Post's public
+  // lookup) so the visitor only has to confirm, not type, two extra fields.
+  useEffect(() => {
+    const digits = pincode.replace(/\D/g, '');
+    if (digits.length !== 6) {
+      setPincodeStatus('idle');
+      return;
+    }
+    let cancelled = false;
+    setPincodeStatus('looking');
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`https://api.postalpincode.in/pincode/${digits}`);
+        const data = await res.json();
+        const office = data?.[0]?.Status === 'Success' ? data[0].PostOffice?.[0] : null;
+        if (cancelled) return;
+        if (office) {
+          setCity(office.District || office.Name || '');
+          setState(office.State || '');
+          setPincodeStatus('found');
+        } else {
+          setPincodeStatus('not-found');
+        }
+      } catch {
+        if (!cancelled) setPincodeStatus('not-found');
+      }
+    }, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [pincode]);
 
   const cleanDigits = (v: string) => (v || '').replace(/\D/g, '');
 
@@ -334,16 +365,32 @@ export default function CheckoutPage({
                   </div>
                   <div className="co-grid-3" style={{ marginTop: 12 }}>
                     <div>
+                      <label style={labelCls}>Pincode *</label>
+                      <input
+                        style={inputCls}
+                        placeholder="360001"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={pincode}
+                        onChange={e => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      />
+                      {pincodeStatus === 'looking' && (
+                        <span style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 4, display: 'block' }}>Looking up city &amp; state…</span>
+                      )}
+                      {pincodeStatus === 'found' && (
+                        <span style={{ fontSize: 11, color: '#16A34A', marginTop: 4, display: 'block' }}>✓ City &amp; state filled in</span>
+                      )}
+                      {pincodeStatus === 'not-found' && (
+                        <span style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 4, display: 'block' }}>Enter city &amp; state manually</span>
+                      )}
+                    </div>
+                    <div>
                       <label style={labelCls}>City *</label>
                       <input style={inputCls} placeholder="Rajkot" value={city} onChange={e => setCity(e.target.value)} />
                     </div>
                     <div>
                       <label style={labelCls}>State *</label>
                       <input style={inputCls} placeholder="Gujarat" value={state} onChange={e => setState(e.target.value)} />
-                    </div>
-                    <div>
-                      <label style={labelCls}>Pincode *</label>
-                      <input style={inputCls} placeholder="360001" value={pincode} onChange={e => setPincode(e.target.value)} />
                     </div>
                   </div>
                 </div>
