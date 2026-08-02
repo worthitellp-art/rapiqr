@@ -115,6 +115,10 @@ export default function StickerEditor({
           prev.map((t) => (String(t.id) === String(editingId) ? updatedTpl : t))
         );
 
+        if (isDefault) {
+          saveStickerPosToDb(currentPos, tplFg, tplBg).catch(() => {});
+        }
+
         const savedRecord = await saveTemplateToDb({
           id: editingId,
           name: cleanName,
@@ -148,6 +152,10 @@ export default function StickerEditor({
         };
 
         setTemplates((prev) => [...prev, newTpl]);
+
+        if (isFirst) {
+          saveStickerPosToDb(currentPos, tplFg, tplBg).catch(() => {});
+        }
 
         const savedRecord = await saveTemplateToDb({
           name: cleanName,
@@ -239,6 +247,9 @@ export default function StickerEditor({
   async function handleSetDefault(t: Template) {
     setTemplates((prev) => prev.map((x) => ({ ...x, isPublicDefault: String(x.id) === String(t.id) })));
     setStickerPos(t.stickerPos);
+    setTplFg(t.fg);
+    setTplBg(t.bg);
+    saveStickerPosToDb(t.stickerPos, t.fg, t.bg).catch(() => {});
 
     const updatedTemplates = templates.map((x) => ({ ...x, isPublicDefault: String(x.id) === String(t.id) }));
     for (const x of updatedTemplates) {
@@ -352,7 +363,7 @@ export default function StickerEditor({
                 <button
                   key={p.name}
                   title={p.name}
-                  onClick={() => { setTplFg(p.fg); setTplBg(p.bg); }}
+                  onClick={() => { setTplFg(p.fg); setTplBg(p.bg); if (!tplName.trim()) setTplName(p.name); }}
                   className="w-6 h-6 rounded-lg border transition-transform hover:scale-110 cursor-pointer"
                   style={{ background: `#${p.fg}`, borderColor: p.fg === "FFFFFF" ? "#e2e8f0" : "#e2e8f0", boxShadow: tplFg === p.fg && tplBg === p.bg ? "0 0 0 2px #111111" : "none" }}
                 />

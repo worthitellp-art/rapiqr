@@ -479,10 +479,20 @@ export default function LandingPageMaster({
     }
   }, [isLoggedIn, profile, isPartnerModalOpen]);
 
+  // Auto-fill applicant details from profile when modal opens
+  useEffect(() => {
+    if (isPartnerModalOpen && profile) {
+      setPartnerForm(prev => ({
+        ...prev,
+        name: prev.name || profile.fullName || '',
+      }));
+    }
+  }, [isLoggedIn, profile, isPartnerModalOpen]);
+
   // Handle auto-opening distributor modal after user logs in
   useEffect(() => {
     if (isLoggedIn) {
-      const pendingIntent = localStorage.getItem('namoqr-pending-distributor-intent');
+      const pendingIntent = localStorage.getItem('repiqr-pending-distributor-intent') || localStorage.getItem('namoqr-pending-distributor-intent');
       if (pendingIntent) {
         try {
           const parsed = JSON.parse(pendingIntent);
@@ -490,6 +500,7 @@ export default function LandingPageMaster({
             setPartnerForm(prev => ({ ...prev, tier: parsed.tier }));
           }
         } catch {}
+        localStorage.removeItem('repiqr-pending-distributor-intent');
         localStorage.removeItem('namoqr-pending-distributor-intent');
         setIsPartnerModalOpen(true);
       }
@@ -504,6 +515,7 @@ export default function LandingPageMaster({
 
     if (!isLoggedIn) {
       // User must log in first before applying
+      localStorage.setItem('repiqr-pending-distributor-intent', JSON.stringify({ tier: tier || partnerForm.tier }));
       localStorage.setItem('namoqr-pending-distributor-intent', JSON.stringify({ tier: tier || partnerForm.tier }));
       onLogin();
       return;
@@ -1046,7 +1058,7 @@ export default function LandingPageMaster({
 
       {/* ── HOW IT WORKS ────────────────────────────────────────────── */}
       <section id="how-it-works" className="hiw-section py-20 bg-white" aria-labelledby="hiw-heading">
-        <div className="namo-wrap max-w-6xl">
+        <div className="namo-wrap max-w-7xl">
           <div className="text-center mb-16 reveal">
             <div className="section-divider justify-center">
               <span className="section-label">How it works</span>
@@ -1061,7 +1073,7 @@ export default function LandingPageMaster({
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             {/* Steps List */}
-            <div className="lg:col-span-6 space-y-4">
+            <div className="lg:col-span-5 space-y-4">
               {HOW_IT_WORKS_STEPS.map((s, i) => {
                 const isActive = hiwActiveStep === i;
                 return (
@@ -1111,7 +1123,7 @@ export default function LandingPageMaster({
                         <img
                           src={s.img}
                           alt={s.title}
-                          className="w-full h-52 object-cover"
+                          className="w-full h-64 sm:h-72 object-cover"
                         />
                       </div>
                     )}
@@ -1121,9 +1133,9 @@ export default function LandingPageMaster({
             </div>
 
             {/* Desktop Dynamic Preview Display */}
-            <div className="hidden lg:block lg:col-span-6">
-              <div className="relative rounded-3xl overflow-hidden border border-gray-200 bg-gray-950 shadow-2xl p-2">
-                <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-gray-900">
+            <div className="hidden lg:block lg:col-span-7">
+              <div className="relative rounded-3xl overflow-hidden border border-gray-800 bg-gray-950 shadow-2xl p-3 hover:shadow-[0_20px_50px_rgba(245,158,11,0.15)] transition-all duration-500">
+                <div className="relative aspect-[16/11] min-h-[500px] lg:min-h-[540px] rounded-2xl overflow-hidden bg-gray-900">
                   {HOW_IT_WORKS_STEPS.map((s, i) => (
                     <div
                       key={i}
@@ -1136,18 +1148,18 @@ export default function LandingPageMaster({
                       <img
                         src={s.img}
                         alt={s.title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transform transition-transform duration-700 hover:scale-105"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent pointer-events-none" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent pointer-events-none" />
                       
-                      <div className="absolute bottom-5 left-5 right-5 text-white">
-                        <span className="inline-block text-[10px] font-extrabold uppercase tracking-wider bg-amber-400 text-gray-950 px-2.5 py-1 rounded-full mb-2 shadow-sm">
+                      <div className="absolute bottom-6 left-6 right-6 text-white">
+                        <span className="inline-block text-[10px] font-extrabold uppercase tracking-wider bg-amber-400 text-gray-950 px-3 py-1 rounded-full mb-2 shadow-md">
                           {s.badge}
                         </span>
-                        <h4 className="text-xl font-bold text-white drop-shadow-md">
+                        <h4 className="text-2xl font-bold text-white drop-shadow-md">
                           Step {s.step}: {s.title}
                         </h4>
-                        <p className="text-xs text-gray-200 mt-1 drop-shadow-sm leading-relaxed">
+                        <p className="text-sm text-gray-200 mt-1 drop-shadow-sm leading-relaxed max-w-xl">
                           {s.body}
                         </p>
                       </div>
@@ -1156,13 +1168,13 @@ export default function LandingPageMaster({
                 </div>
 
                 {/* Step Indicators */}
-                <div className="flex items-center justify-center gap-2 p-3 bg-gray-950">
+                <div className="flex items-center justify-center gap-2.5 p-3.5 bg-gray-950">
                   {[1, 2, 3, 4, 5].map((num, i) => (
                     <button
                       key={i}
                       onClick={() => setHiwActiveStep(i)}
-                      className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                        hiwActiveStep === i ? 'w-8 bg-amber-400' : 'w-2 bg-gray-700 hover:bg-gray-500'
+                      className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                        hiwActiveStep === i ? 'w-10 bg-amber-400' : 'w-3 bg-gray-700 hover:bg-gray-500'
                       }`}
                       title={`Go to step ${num}`}
                     />

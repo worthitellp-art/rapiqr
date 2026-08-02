@@ -175,7 +175,10 @@ function EmailForm({ profile, refreshProfile, showToast }: any) {
     setMsg(null);
     try {
       const res = await apiClient.auth.changeEmail(newEmail, currentPassword);
-      if (res.token) localStorage.setItem('namoqr-token', res.token);
+      if (res.token) {
+        localStorage.setItem('repiqr-token', res.token);
+        localStorage.setItem('namoqr-token', res.token);
+      }
       await refreshProfile();
       setMsg({ tone: 'success', text: 'Email updated.' });
       showToast('Email address updated');

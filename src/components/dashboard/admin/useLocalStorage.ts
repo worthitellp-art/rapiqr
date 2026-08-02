@@ -5,7 +5,14 @@ export function useLocalStorage<T>(key: string, initial: T): [T, React.Dispatch<
   const [val, setVal] = useState<T>(() => {
     try {
       const raw = localStorage.getItem(key);
-      return raw ? (JSON.parse(raw) as T) : initial;
+      if (raw) return JSON.parse(raw) as T;
+
+      if (key.startsWith('repiqr-')) {
+        const legacyKey = key.replace('repiqr-', 'namoqr-');
+        const legacyRaw = localStorage.getItem(legacyKey);
+        if (legacyRaw) return JSON.parse(legacyRaw) as T;
+      }
+      return initial;
     } catch {
       return initial;
     }

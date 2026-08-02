@@ -28,7 +28,7 @@ export const isApiBackendConfigured = (() => {
 })();
 
 function getAuthHeader(): Record<string, string> {
-  const token = localStorage.getItem('namoqr-token');
+  const token = localStorage.getItem('repiqr-token') || localStorage.getItem('namoqr-token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -62,10 +62,10 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 export const apiClient = {
   // Authentication Services
   auth: {
-    async signUp(email: string, password: string, fullName: string) {
+    async signUp(email: string, password: string, fullName: string, phoneNumber?: string) {
       return request<{ success: boolean; token?: string; user?: any }>('/auth/signup', {
         method: 'POST',
-        body: JSON.stringify({ email, password, fullName }),
+        body: JSON.stringify({ email, password, fullName, phoneNumber }),
       });
     },
 

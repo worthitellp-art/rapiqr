@@ -116,7 +116,7 @@ function getQrBaseUrl() {
   if (typeof window !== "undefined" && window.location?.origin) {
     return window.location.origin;
   }
-  return "https://namoqr.linkspace-service.workers.dev";
+  return "https://repiqr.linkspace-service.workers.dev";
 }
 
 function getQrIdFromUrl(): string | null {
@@ -485,7 +485,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   // Prefill owner phone/name/email from the most recent purchase order (decision branch)
   useEffect(() => {
     try {
-      const orders = JSON.parse(localStorage.getItem("namoqr-orders") || "[]");
+      const orders = JSON.parse(localStorage.getItem("repiqr-orders") || localStorage.getItem("namoqr-orders") || "[]");
       if (orders.length > 0) {
         // Orders are persisted with unshift → index 0 is the newest purchase
         const last = orders[0];
@@ -715,9 +715,9 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   /* ---- Get Admin Provided Contact Numbers ---- */
   const getTowingContacts = (filterCategory?: string) => {
     if (!qrData) return [];
-    const storedQrList = JSON.parse(localStorage.getItem("namoqr-qrlist") || "[]");
-    const storedClientStickers = JSON.parse(localStorage.getItem("namoqr-client-stickers") || "[]");
-    const adminHelplines = JSON.parse(localStorage.getItem("namoqr-helplines") || "[]");
+    const storedQrList = JSON.parse(localStorage.getItem("repiqr-qrlist") || localStorage.getItem("namoqr-qrlist") || "[]");
+    const storedClientStickers = JSON.parse(localStorage.getItem("repiqr-client-stickers") || localStorage.getItem("namoqr-client-stickers") || "[]");
+    const adminHelplines = JSON.parse(localStorage.getItem("repiqr-helplines") || localStorage.getItem("namoqr-helplines") || "[]");
 
     const allRecords = [...storedQrList, ...storedClientStickers];
     const fullRecord = allRecords.find((q: any) => q.id === qrData.id || q.clientId === qrData.clientId || q.qrCodeId === qrData.id || q.code === qrData.id) || {};
@@ -857,7 +857,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     }
 
     const cleanQrId = qrId.trim().toUpperCase();
-    const stored = localStorage.getItem("namoqr-qrlist");
+    const stored = localStorage.getItem("repiqr-qrlist") || localStorage.getItem("namoqr-qrlist");
     const list: any[] = stored ? JSON.parse(stored) : [];
 
     let found = list.find(
@@ -924,6 +924,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           template: "Default",
         };
         const updatedList = [fallback, ...list];
+        localStorage.setItem("repiqr-qrlist", JSON.stringify(updatedList));
         localStorage.setItem("namoqr-qrlist", JSON.stringify(updatedList));
         resolveQr(fallback);
       } else {
@@ -982,7 +983,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
     setTimeout(() => {
       // Also save to localStorage as fallback
-      const stored = localStorage.getItem("namoqr-qrlist");
+      const stored = localStorage.getItem("repiqr-qrlist") || localStorage.getItem("namoqr-qrlist");
       const list: any[] = stored ? JSON.parse(stored) : [];
       const idx = list.findIndex((q: any) => q.id === qrData.id);
 
@@ -1010,6 +1011,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         list[idx].allergies = registrationData.allergies;
         list[idx].address = registrationData.address;
         list[idx].visitorMessage = "Self-activated via code";
+        localStorage.setItem("repiqr-qrlist", JSON.stringify(list));
         localStorage.setItem("namoqr-qrlist", JSON.stringify(list));
       } else {
         const newRecord = {
@@ -1023,6 +1025,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           category: qrData.category,
           ...registrationData,
         };
+        localStorage.setItem("repiqr-qrlist", JSON.stringify([newRecord, ...list]));
         localStorage.setItem("namoqr-qrlist", JSON.stringify([newRecord, ...list]));
       }
 
@@ -1120,17 +1123,19 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         totalPings: maxPings,
       };
 
-      const alerts = JSON.parse(localStorage.getItem("namoqr-alerts") || "[]");
+      const alerts = JSON.parse(localStorage.getItem("repiqr-alerts") || localStorage.getItem("namoqr-alerts") || "[]");
       alerts.unshift({ ...payload, id: Date.now() + index, status: "sent" });
+      localStorage.setItem("repiqr-alerts", JSON.stringify(alerts));
       localStorage.setItem("namoqr-alerts", JSON.stringify(alerts));
 
-      const stored = localStorage.getItem("namoqr-qrlist");
+      const stored = localStorage.getItem("repiqr-qrlist") || localStorage.getItem("namoqr-qrlist");
       const list: any[] = stored ? JSON.parse(stored) : [];
       const idx = list.findIndex((q: any) => q.id === qrData.id);
       if (idx >= 0) {
         list[idx].scans = (list[idx].scans || 0) + 1;
         list[idx].lastScannedAt = new Date().toISOString();
         list[idx].lastLocation = { lat: currentLoc.lat, lng: currentLoc.lng };
+        localStorage.setItem("repiqr-qrlist", JSON.stringify(list));
         localStorage.setItem("namoqr-qrlist", JSON.stringify(list));
       }
     };
@@ -1859,8 +1864,9 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                             vehicleName: qrData.vehicleName,
                             vehicleNumber: qrData.vehicleNumber,
                           };
-                          const alerts = JSON.parse(localStorage.getItem("namoqr-alerts") || "[]");
+                          const alerts = JSON.parse(localStorage.getItem("repiqr-alerts") || localStorage.getItem("namoqr-alerts") || "[]");
                           alerts.unshift({ ...payload, id: Date.now(), status: "sent" });
+                          localStorage.setItem("repiqr-alerts", JSON.stringify(alerts));
                           localStorage.setItem("namoqr-alerts", JSON.stringify(alerts));
                           alert("Parking Issue alert sent to vehicle owner!");
                         }
@@ -2560,8 +2566,9 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                                     vehicleName: qrData.vehicleName,
                                     vehicleNumber: qrData.vehicleNumber,
                                   };
-                                  const alerts = JSON.parse(localStorage.getItem("namoqr-alerts") || "[]");
+                                  const alerts = JSON.parse(localStorage.getItem("repiqr-alerts") || localStorage.getItem("namoqr-alerts") || "[]");
                                   alerts.unshift({ ...payload, id: Date.now(), status: "sent" });
+                                  localStorage.setItem("repiqr-alerts", JSON.stringify(alerts));
                                   localStorage.setItem("namoqr-alerts", JSON.stringify(alerts));
                                 }
                                 window.open(`tel:${contact.phone.replace(/[^0-9+]/g, "")}`);

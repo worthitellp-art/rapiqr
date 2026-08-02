@@ -42,7 +42,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'online',
     timestamp: new Date().toISOString(),
-    service: 'NamoQR Secure Backend Engine',
+    service: 'RapiQR Secure Backend Engine',
     frontendUrl: FRONTEND_ORIGIN
   });
 });
@@ -79,7 +79,7 @@ app.use((err, req, res, next) => {
 // Start Express Server
 app.listen(PORT, () => {
   console.log('\n==================================================');
-  logger.event('SERVER', '🚀', `NamoQR Backend Server running securely on port ${PORT}`);
+  logger.event('SERVER', '🚀', `RapiQR Backend Server running securely on port ${PORT}`);
   logger.event('SERVER', '🌐', `Expected Frontend Origin: ${FRONTEND_ORIGIN}`);
   logger.event('SERVER', '📡', `Health Check URL: http://localhost:${PORT}/api/health${process.env.APP_URL ? ` (production: ${process.env.APP_URL}/api/health)` : ''}`);
   logger.event('SERVER', '📊', 'Live Console Request & Event Logging ENABLED');

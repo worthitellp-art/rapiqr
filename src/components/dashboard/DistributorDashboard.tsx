@@ -56,7 +56,10 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
 
     const updated = [newTag, ...customerTags];
     setCustomerTags(updated);
-    localStorage.setItem('namoqr-distributor-assigned-tags', JSON.stringify(updated));
+    try {
+      localStorage.setItem('repiqr-distributor-assigned-tags', JSON.stringify(updated));
+      localStorage.setItem('namoqr-distributor-assigned-tags', JSON.stringify(updated));
+    } catch {}
 
     setSuccessMsg(`✓ Tag ${newTag.tagCode} successfully assigned to ${newTag.customerName}! Customer notified.`);
     setNewCustomer({ name: '', phone: '', tagCode: '', type: 'Vehicle' });

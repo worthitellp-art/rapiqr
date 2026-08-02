@@ -21,7 +21,7 @@ export default function AlertsPage({
     getReportsFromDb().then((dbReports) => {
       let combined: any[] = dbReports || [];
       try {
-        const local = JSON.parse(localStorage.getItem("namoqr-reports") || "[]");
+        const local = JSON.parse(localStorage.getItem("repiqr-reports") || localStorage.getItem("namoqr-reports") || "[]");
         if (local.length > 0) {
           const existingIds = new Set(combined.map((r) => r.id));
           const uniqueLocal = local.filter((r: any) => !existingIds.has(r.id));
@@ -35,9 +35,11 @@ export default function AlertsPage({
   useEffect(() => {
     loadReports();
     const onReportsUpdated = () => loadReports();
+    window.addEventListener("repiqr-reports-updated", onReportsUpdated);
     window.addEventListener("namoqr-reports-updated", onReportsUpdated);
     const interval = setInterval(loadReports, 15000);
     return () => {
+      window.removeEventListener("repiqr-reports-updated", onReportsUpdated);
       window.removeEventListener("namoqr-reports-updated", onReportsUpdated);
       clearInterval(interval);
     };

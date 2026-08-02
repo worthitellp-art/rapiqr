@@ -123,7 +123,7 @@ export default function QrCodesPage({
     const blob = new Blob([csv], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "namoqr-export.csv";
+    a.download = "repiqr-export.csv";
     a.click();
   }
 

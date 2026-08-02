@@ -47,7 +47,7 @@ export default function CheckoutPage({
   // Cart is persisted to localStorage by the landing page
   const [cart, setCart] = useState<CheckoutCartItem[]>(() => {
     try {
-      const saved = localStorage.getItem('namoqr-cart');
+      const saved = localStorage.getItem('repiqr-cart') || localStorage.getItem('namoqr-cart');
       return saved ? (JSON.parse(saved) as CheckoutCartItem[]) : [];
     } catch {
       return [];
@@ -91,7 +91,7 @@ export default function CheckoutPage({
       if (ph && pPhone && ph.includes(pPhone)) return true;
     }
     try {
-      const saved = localStorage.getItem('namoqr-auth-user');
+      const saved = localStorage.getItem('repiqr-auth-user') || localStorage.getItem('namoqr-auth-user');
       if (saved) {
         const u = JSON.parse(saved);
         if (em && (u.email || '').toLowerCase() === em) return true;
@@ -126,7 +126,7 @@ export default function CheckoutPage({
     // Local receipt copy — kept for the guest "order history" fallback when the
     // backend save above didn't go through (e.g. offline).
     try {
-      const orders = JSON.parse(localStorage.getItem('namoqr-orders') || '[]');
+      const orders = JSON.parse(localStorage.getItem('repiqr-orders') || localStorage.getItem('namoqr-orders') || '[]');
       orders.unshift({
         orderId: id,
         email: email.trim(),
@@ -139,6 +139,7 @@ export default function CheckoutPage({
         date: new Date().toISOString(),
         linkedToAccount: isRecognized
       });
+      localStorage.setItem('repiqr-orders', JSON.stringify(orders));
       localStorage.setItem('namoqr-orders', JSON.stringify(orders));
     } catch { /* ignore */ }
 
@@ -165,12 +166,15 @@ export default function CheckoutPage({
       }
     });
     try {
-      const existing = JSON.parse(localStorage.getItem('namoqr-client-stickers') || '[]');
+      const existing = JSON.parse(localStorage.getItem('repiqr-client-stickers') || localStorage.getItem('namoqr-client-stickers') || '[]');
+      localStorage.setItem('repiqr-client-stickers', JSON.stringify([...newStickers, ...existing]));
       localStorage.setItem('namoqr-client-stickers', JSON.stringify([...newStickers, ...existing]));
-      const qrList = JSON.parse(localStorage.getItem('namoqr-qrlist') || '[]');
-      localStorage.setItem('namoqr-qrlist', JSON.stringify([...qrList, ...newStickers.map(s => ({
+      const qrList = JSON.parse(localStorage.getItem('repiqr-qrlist') || localStorage.getItem('namoqr-qrlist') || '[]');
+      const updatedQrList = [...qrList, ...newStickers.map(s => ({
         id: s.id, code: s.code, status: 'active', ownerPhone: s.ownerPhone, ownerName: s.assigned, category: s.category
-      }))]));
+      }))];
+      localStorage.setItem('repiqr-qrlist', JSON.stringify(updatedQrList));
+      localStorage.setItem('namoqr-qrlist', JSON.stringify(updatedQrList));
     } catch { /* ignore */ }
 
     return id;

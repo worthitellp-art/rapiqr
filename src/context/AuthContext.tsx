@@ -50,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfileData | null>(() => {
-    const saved = localStorage.getItem('namoqr-auth-user');
+    const saved = localStorage.getItem('repiqr-auth-user') || localStorage.getItem('namoqr-auth-user');
     if (saved) {
       return JSON.parse(saved);
     }
@@ -61,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Backend session restore first (when a backend token exists)
     if (isApiBackendConfigured) {
-      const token = localStorage.getItem('namoqr-token');
+      const token = localStorage.getItem('repiqr-token') || localStorage.getItem('namoqr-token');
       if (token) {
         apiClient.auth.getMe()
           .then((res) => {
@@ -69,17 +69,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const p = backendUserToProfile(res.user);
               // Admin role only carries over from a previously-established admin session
               // (set by adminSignIn) — never granted just by email match here.
-              const saved = localStorage.getItem('namoqr-auth-user');
+              const saved = localStorage.getItem('repiqr-auth-user') || localStorage.getItem('namoqr-auth-user');
               const savedRole = saved ? JSON.parse(saved).role : null;
               if (savedRole === 'admin') {
                 p.role = 'admin';
               }
               setProfile(p);
-              localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+              localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
             }
           })
           .catch(() => {
             // Token invalid/expired — clear it; Supabase flow below will take over.
+            localStorage.removeItem('repiqr-token');
             localStorage.removeItem('namoqr-token');
           });
       }
@@ -93,11 +94,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Single source of truth for session restoration: onAuthStateChange fires an
     // INITIAL_SESSION event immediately with whatever session it recovers from storage
     // (or null), then SIGNED_IN / TOKEN_REFRESHED / SIGNED_OUT on later changes.
-    // Previously this also called supabase.auth.getSession() separately up front, which
-    // races the same internal recovery this listener already does — the two calls could
-    // resolve in either order and stomp on each other's setSession/setProfile/setLoading,
-    // which was intermittently wiping a valid session on page reload. Relying on this one
-    // listener as the only writer avoids that race.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
@@ -105,17 +101,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (currentSession?.user && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')) {
         const userProfile = await getUserProfile(currentSession.user.id, currentSession.user.email || '');
         if (userProfile) {
-          // Admin role only carries over from a previously-established admin session
-          // (set by adminSignIn) — a normal sign-in never unlocks admin,
-          // even if the email happens to match the designated admin address.
-          const saved = localStorage.getItem('namoqr-auth-user');
+          const saved = localStorage.getItem('repiqr-auth-user') || localStorage.getItem('namoqr-auth-user');
           const savedRole = saved ? JSON.parse(saved).role : null;
           userProfile.role = savedRole === 'admin' ? 'admin' : 'user';
           setProfile(userProfile);
-          localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
+          localStorage.setItem('repiqr-auth-user', JSON.stringify(userProfile));
         }
       } else if (event === 'SIGNED_OUT') {
         setProfile(null);
+        localStorage.removeItem('repiqr-auth-user');
         localStorage.removeItem('namoqr-auth-user');
       }
       // INITIAL_SESSION with no Supabase session: leave `profile` untouched — it may hold
@@ -135,13 +129,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // Backend-first signup when the Render API is configured
       if (isApiBackendConfigured) {
-        const res = await apiClient.auth.signUp(email, password, fullName);
-        if (res?.token) localStorage.setItem('namoqr-token', res.token);
+        const res = await apiClient.auth.signUp(email, password, fullName, phoneNumber);
+        if (res?.token) {
+          localStorage.setItem('repiqr-token', res.token);
+          localStorage.setItem('namoqr-token', res.token);
+        }
         if (res?.user) {
           const p = backendUserToProfile(res.user);
           p.role = 'user';
           if (phoneNumber) p.phoneNumber = phoneNumber;
           setProfile(p);
+          localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
           localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
         }
         return { success: true };
@@ -157,6 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           subscriptionPlan: 'free'
         };
         setProfile(newUser);
+        localStorage.setItem('repiqr-auth-user', JSON.stringify(newUser));
         localStorage.setItem('namoqr-auth-user', JSON.stringify(newUser));
         return { success: true };
       }
@@ -183,6 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await updateProfilePhoneNumber(data.user.id, phoneNumber);
           }
           setProfile(p);
+          localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
           localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
         }
       }
@@ -202,11 +202,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Backend-first signin when the Render API is configured
       if (isApiBackendConfigured) {
         const res = await apiClient.auth.signIn(email, password);
-        if (res?.token) localStorage.setItem('namoqr-token', res.token);
+        if (res?.token) {
+          localStorage.setItem('repiqr-token', res.token);
+          localStorage.setItem('namoqr-token', res.token);
+        }
         if (res?.user) {
           const p = backendUserToProfile(res.user);
           p.role = isAdminEmail ? 'admin' : 'user';
           setProfile(p);
+          localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
           localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
         }
         return { success: true };
@@ -221,6 +225,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           subscriptionPlan: 'free'
         };
         setProfile(demoUser);
+        localStorage.setItem('repiqr-auth-user', JSON.stringify(demoUser));
         localStorage.setItem('namoqr-auth-user', JSON.stringify(demoUser));
         return { success: true };
       }
@@ -238,6 +243,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (p) {
           p.role = isAdminEmail ? 'admin' : 'user';
           setProfile(p);
+          localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
           localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
         }
       }
@@ -267,8 +273,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           const p = backendUserToProfile(res.user);
           p.role = 'admin';
+          localStorage.setItem('repiqr-token', res.token);
           localStorage.setItem('namoqr-token', res.token);
           setProfile(p);
+          localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
           localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
           return { success: true };
         } catch (err: any) {
@@ -300,6 +308,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isSubscribed: true,
       };
       setProfile(adminUser);
+      localStorage.setItem('repiqr-auth-user', JSON.stringify(adminUser));
       localStorage.setItem('namoqr-auth-user', JSON.stringify(adminUser));
       return { success: true };
     } catch (err: any) {
@@ -315,9 +324,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch { /* ignore */ }
 
     try {
+      localStorage.removeItem('repiqr-token');
       localStorage.removeItem('namoqr-token');
+      localStorage.removeItem('repiqr-auth-user');
       localStorage.removeItem('namoqr-auth-user');
+      localStorage.removeItem('repiqr-current-page');
       localStorage.removeItem('namoqr-current-page');
+      localStorage.removeItem('repiqr-pending-distributor-intent');
       localStorage.removeItem('namoqr-pending-distributor-intent');
       sessionStorage.clear();
     } catch { /* ignore */ }
@@ -371,6 +384,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isSubscribed: false,
     };
     setProfile(demoUser);
+    localStorage.setItem('repiqr-auth-user', JSON.stringify(demoUser));
     localStorage.setItem('namoqr-auth-user', JSON.stringify(demoUser));
   };
 
@@ -380,12 +394,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updatePhoneNumber = async (phoneNumber: string) => {
     if (!profile) return { success: false, error: 'Not signed in.' };
     try {
+      // Backend-first when the Render API is configured — this is also what
+      // triggers the server-side auto-claim of stickers registered under this phone.
+      if (isApiBackendConfigured && !profile.id.startsWith('demo-') && profile.id !== 'demo-user') {
+        const res = await apiClient.auth.updateProfile({ phoneNumber });
+        if (!res?.success) return { success: false, error: 'Failed to save phone number.' };
+        const updated = res.user ? backendUserToProfile(res.user) : { ...profile, phoneNumber };
+        if (profile.role === 'admin') updated.role = 'admin';
+        setProfile(updated);
+        localStorage.setItem('repiqr-auth-user', JSON.stringify(updated));
+        localStorage.setItem('namoqr-auth-user', JSON.stringify(updated));
+        return { success: true };
+      }
+
       if (isSupabaseConfigured && !profile.id.startsWith('demo-') && profile.id !== 'demo-user') {
         const ok = await updateProfilePhoneNumber(profile.id, phoneNumber);
         if (!ok) return { success: false, error: 'Failed to save phone number.' };
       }
       const updated = { ...profile, phoneNumber };
       setProfile(updated);
+      localStorage.setItem('repiqr-auth-user', JSON.stringify(updated));
       localStorage.setItem('namoqr-auth-user', JSON.stringify(updated));
       return { success: true };
     } catch (err: any) {
@@ -398,7 +426,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // nothing server-side to re-fetch (demo/Supabase-direct profiles already update
   // the local `profile` state directly at the call site).
   const refreshProfile = async () => {
-    if (!isApiBackendConfigured || !localStorage.getItem('namoqr-token')) return;
+    const token = localStorage.getItem('repiqr-token') || localStorage.getItem('namoqr-token');
+    if (!isApiBackendConfigured || !token) return;
     try {
       const res = await apiClient.auth.getMe();
       if (res?.user) {
@@ -406,6 +435,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const savedRole = profile?.role;
         if (savedRole === 'admin') p.role = 'admin';
         setProfile(p);
+        localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
         localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
       }
     } catch {

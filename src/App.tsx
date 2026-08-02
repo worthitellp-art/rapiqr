@@ -63,7 +63,7 @@ function MainAppContent() {
   const [page, setPage] = useState<'landing' | 'dashboard' | 'scan' | 'distributor' | 'checkout'>(() => {
     if (isScanUrl()) return 'scan';
     try {
-      const saved = localStorage.getItem('namoqr-current-page');
+      const saved = localStorage.getItem('repiqr-current-page') || localStorage.getItem('namoqr-current-page');
       if (saved === 'dashboard') return 'dashboard';
       if (saved === 'distributor') return 'distributor';
       if (saved === 'checkout') return 'checkout';
@@ -74,8 +74,13 @@ function MainAppContent() {
   // Persist page to localStorage whenever it changes
   const navigateTo = (next: 'landing' | 'dashboard' | 'scan' | 'distributor' | 'checkout') => {
     try {
-      if (next === 'landing') localStorage.removeItem('namoqr-current-page');
-      else localStorage.setItem('namoqr-current-page', next);
+      if (next === 'landing') {
+        localStorage.removeItem('repiqr-current-page');
+        localStorage.removeItem('namoqr-current-page');
+      } else {
+        localStorage.setItem('repiqr-current-page', next);
+        localStorage.setItem('namoqr-current-page', next);
+      }
     } catch { /* ignore */ }
     setPage(next);
   };

@@ -150,6 +150,9 @@ class UserModel {
         subscription_plan: profileData.subscriptionPlan || (isDefaultAdmin ? 'enterprise' : 'free'),
         is_subscribed: profileData.isSubscribed ?? isDefaultAdmin
       };
+      if (profileData.phoneNumber || profileData.phone_number) {
+        payload.phone_number = profileData.phoneNumber || profileData.phone_number;
+      }
 
       const { data, error } = await supabaseAdmin
         .from('profiles')

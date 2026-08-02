@@ -17,7 +17,7 @@ class AuthController {
    */
   static async signUp(req, res) {
     try {
-      const { email, password, fullName } = req.body;
+      const { email, password, fullName, phoneNumber } = req.body;
 
       if (!email || !password) {
         logger.warn('AUTH_SIGNUP', 'Signup attempt missing email or password');
@@ -43,8 +43,18 @@ class AuthController {
       const profile = await UserModel.upsertProfile({
         id: user.id,
         email: user.email,
-        fullName: fullName || email.split('@')[0]
+        fullName: fullName || email.split('@')[0],
+        phoneNumber: phoneNumber || undefined
       });
+
+      // Immediately link any sticker already registered under this phone number
+      // (e.g. activated on the scan page before this account existed), rather
+      // than waiting for the next products fetch to pick it up.
+      if (phoneNumber) {
+        ProductModel.autoClaimByPhone(profile.id, profile.full_name, phoneNumber).catch((err) => {
+          logger.error('PRODUCT_AUTO_CLAIM', 'Failed to auto-claim products after signup', err);
+        });
+      }
 
       const token = jwt.sign(
         { id: profile.id, email: profile.email, role: profile.role },

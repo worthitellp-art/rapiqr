@@ -42,7 +42,7 @@ export function uid(prefix = "QR") {
 export function dispatchActivationToUserDashboard(qrItem: QrRecord) {
   if (typeof window === "undefined") return;
   try {
-    const existing = JSON.parse(localStorage.getItem("namoqr-pending-activations") || "[]");
+    const existing = JSON.parse(localStorage.getItem("repiqr-pending-activations") || localStorage.getItem("namoqr-pending-activations") || "[]");
     const filtered = existing.filter((item: QrRecord) => item.id !== qrItem.id);
     const updated = [
       {
@@ -56,7 +56,9 @@ export function dispatchActivationToUserDashboard(qrItem: QrRecord) {
       },
       ...filtered,
     ];
+    localStorage.setItem("repiqr-pending-activations", JSON.stringify(updated));
     localStorage.setItem("namoqr-pending-activations", JSON.stringify(updated));
+    window.dispatchEvent(new Event("repiqr-pending-activations-updated"));
     window.dispatchEvent(new Event("namoqr-pending-activations-updated"));
   } catch (err) {
     console.error("Error dispatching activation code:", err);
@@ -64,8 +66,10 @@ export function dispatchActivationToUserDashboard(qrItem: QrRecord) {
 }
 
 export function getQrBaseUrl() {
-  if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
-  return "https://namoqr.linkspace-service.workers.dev";
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
+  return "https://repiqr.linkspace-service.workers.dev";
 }
 
 export function qrFullUrl(qrId: string) {

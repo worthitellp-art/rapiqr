@@ -120,6 +120,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
   const handleGoogleSignInClick = async () => {
     if (isSupabaseConfigured) {
       try {
+        localStorage.setItem('repiqr-current-page', 'dashboard');
         localStorage.setItem('namoqr-current-page', 'dashboard');
       } catch {
         // Fallback if localStorage access is blocked

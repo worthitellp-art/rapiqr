@@ -436,7 +436,7 @@ export async function sendActivationNotifications(data: {
           {
             level: 'INFO',
             category: 'EXTERNAL',
-            service: 'namoqr-client',
+            service: 'repiqr-client',
             tag: 'ACTIVATION_CONFIRMATION_EMAIL',
             event: 'ACTIVATION_CONFIRMATION_EMAIL',
             message: `[SIMULATED] Would send "Your RapiQR sticker is now active!" to ${to} (no Express backend/SMTP configured to send for real)`,
@@ -446,7 +446,7 @@ export async function sendActivationNotifications(data: {
           {
             level: 'INFO',
             category: 'EXTERNAL',
-            service: 'namoqr-client',
+            service: 'repiqr-client',
             tag: 'SAMPLE_TEST_SCAN_EMAIL',
             event: 'SAMPLE_TEST_SCAN_EMAIL',
             message: `[SIMULATED] Would send a sample "what responders see" test-scan preview to ${to}`,
@@ -458,7 +458,7 @@ export async function sendActivationNotifications(data: {
           {
             level: 'WARN',
             category: 'EXTERNAL',
-            service: 'namoqr-client',
+            service: 'repiqr-client',
             tag: 'ACTIVATION_CONFIRMATION_EMAIL',
             event: 'ACTIVATION_CONFIRMATION_EMAIL',
             message: `Skipped activation confirmation email for ${data.qrId} — no email on file`,

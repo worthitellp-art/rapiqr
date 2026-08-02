@@ -22,9 +22,9 @@ export default function AdminDashboard({ onBack, switchToClientPortal }: { onBac
   const [page, setPage] = useState(() => (isAdmin ? "overview" : "qr"));
   const accent = "0F172A";
   const fontCss = "'Inter', ui-sans-serif, system-ui";
-  const [templates, setTemplates] = useLocalStorage<Template[]>("namoqr-templates", []);
-  const [qrList, setQrList] = useLocalStorage<QrRecord[]>("namoqr-qrlist", []);
-  const [stickerPos, setStickerPos] = useLocalStorage<StickerPos>("namoqr-sticker-pos", { x: 110, y: 40, w: 100, h: 100 });
+  const [templates, setTemplates] = useLocalStorage<Template[]>("repiqr-templates", []);
+  const [qrList, setQrList] = useLocalStorage<QrRecord[]>("repiqr-qrlist", []);
+  const [stickerPos, setStickerPos] = useLocalStorage<StickerPos>("repiqr-sticker-pos", { x: 110, y: 40, w: 100, h: 100 });
   const [quickLookQr, setQuickLookQr] = useState<QrRecord | null>(null);
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -37,7 +37,7 @@ export default function AdminDashboard({ onBack, switchToClientPortal }: { onBac
       getReportsFromDb().then((dbReports) => {
         let combined: any[] = dbReports || [];
         try {
-          const local = JSON.parse(localStorage.getItem("namoqr-reports") || "[]");
+          const local = JSON.parse(localStorage.getItem("repiqr-reports") || localStorage.getItem("namoqr-reports") || "[]");
           const existingIds = new Set(combined.map((r) => r.id));
           combined = [...local.filter((r: any) => !existingIds.has(r.id)), ...combined];
         } catch { /* ignore */ }
@@ -46,10 +46,10 @@ export default function AdminDashboard({ onBack, switchToClientPortal }: { onBac
     };
     update();
     const onUpdated = () => update();
-    window.addEventListener("namoqr-reports-updated", onUpdated);
+    window.addEventListener("repiqr-reports-updated", onUpdated);
     const interval = setInterval(update, 15000);
     return () => {
-      window.removeEventListener("namoqr-reports-updated", onUpdated);
+      window.removeEventListener("repiqr-reports-updated", onUpdated);
       clearInterval(interval);
     };
   }, []);

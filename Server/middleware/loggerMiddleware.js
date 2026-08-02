@@ -19,7 +19,7 @@ const { supabaseAdmin } = require('../config/db');
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 
-const SERVICE_NAME = 'namoqr-server';
+const SERVICE_NAME = 'repiqr-server';
 const MAX_BUFFER_SIZE = 200;
 
 const LEVELS = ['DEBUG', 'INFO', 'SUCCESS', 'HTTP', 'EVENT', 'WARN', 'ERROR', 'FATAL'];
@@ -153,17 +153,17 @@ function sanitize(input, seen = new WeakSet()) {
 
 /* ── In-memory live buffer ──────────────────────────────────────────────── */
 
-global.__NAMOQR_LIVE_LOGS__ = global.__NAMOQR_LIVE_LOGS__ || [];
+global.__REPIQR_LIVE_LOGS__ = global.__REPIQR_LIVE_LOGS__ || global.__NAMOQR_LIVE_LOGS__ || [];
 
 function pushToMemoryBuffer(logItem) {
-  global.__NAMOQR_LIVE_LOGS__.unshift(logItem);
-  if (global.__NAMOQR_LIVE_LOGS__.length > MAX_BUFFER_SIZE) {
-    global.__NAMOQR_LIVE_LOGS__.pop();
+  global.__REPIQR_LIVE_LOGS__.unshift(logItem);
+  if (global.__REPIQR_LIVE_LOGS__.length > MAX_BUFFER_SIZE) {
+    global.__REPIQR_LIVE_LOGS__.pop();
   }
 }
 
 function getMemoryLogs({ limit = 100, level = null, tag = null, category = null, event = null, userId = null, requestId = null } = {}) {
-  let result = [...(global.__NAMOQR_LIVE_LOGS__ || [])];
+  let result = [...(global.__REPIQR_LIVE_LOGS__ || [])];
   if (level && level !== 'ALL') {
     result = result.filter(l => String(l.level || '').toUpperCase() === String(level).toUpperCase());
   }
@@ -187,7 +187,7 @@ function getMemoryLogs({ limit = 100, level = null, tag = null, category = null,
 }
 
 function clearMemoryLogs() {
-  if (global.__NAMOQR_LIVE_LOGS__) global.__NAMOQR_LIVE_LOGS__.length = 0;
+  if (global.__REPIQR_LIVE_LOGS__) global.__REPIQR_LIVE_LOGS__.length = 0;
 }
 
 /* ── Persistence ────────────────────────────────────────────────────────── */

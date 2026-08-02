@@ -22,7 +22,14 @@ const CATEGORY_META: Record<string, { icon: React.ReactNode; color: string; bg: 
 };
 
 export default function CommunicationPage({ setToast }: { setToast: (msg: string | null) => void }) {
-  const [providers, setProviders] = useLocalStorage<any[]>("namoqr-helplines", []);
+  const [providers, setProviders] = useLocalStorage<any[]>("repiqr-helplines", []);
+
+  // Save changes & dispatch update event
+  const saveProviders = (newProviders: any[]) => {
+    setProviders(newProviders);
+    window.dispatchEvent(new Event("repiqr-helplines-updated"));
+    window.dispatchEvent(new Event("namoqr-helplines-updated"));
+  };
   const [category, setCategory] = useState("Ambulance");
   const [label, setLabel] = useState("");
   const [phone, setPhone] = useState("");
