@@ -73,7 +73,7 @@ export default function AlertsPage({
         id: `activation-${q.id}`,
         category: "activation",
         title: `QR Activation Pending: ${q.vehicleName || q.id}`,
-        subtitle: `Code: ${q.activationCode || "ACT????"} · ${q.vehicleNumber || "N/A"}`,
+        subtitle: `QR ID: ${q.id} · ${q.vehicleNumber || "N/A"}`,
         timestamp: q.createdAt,
         status: "active",
         qrId: q.id,

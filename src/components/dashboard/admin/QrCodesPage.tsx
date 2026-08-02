@@ -2,11 +2,11 @@ import type React from "react";
 import { useState, useEffect } from "react";
 import { Plus, Sparkles, Download, Trash2, RefreshCw, Eye, UserPlus, Tag } from "lucide-react";
 import StatusPill from "./StatusPill";
-import ActCode from "./ActCode";
+import IdBadge from "./ActCode";
 import CopyLinkButton from "./CopyLinkButton";
 import StickerThumb from "./StickerThumb";
 import { QrRecord, Template } from "./types";
-import { uid, generateActivationCode, qrFullUrl, fmtDate, dispatchActivationToUserDashboard, saveGeneratedSticker } from "./helpers";
+import { uid, qrFullUrl, fmtDate, dispatchActivationToUserDashboard, saveGeneratedSticker } from "./helpers";
 import { saveQrCodeToDb, bulkSaveQrCodesToDb } from "../../../lib/supabaseService";
 import { STICKER_CATEGORIES, getCategoryIcon, getCategoryLabel } from "../../../stickerModules";
 import ConfirmModal from "./ConfirmModal";
@@ -39,9 +39,8 @@ export default function QrCodesPage({
   const activeTemplate = templates.find((t) => t.id.toString() === templateId) || templates[0];
 
   const filtered = qrList.filter((q) => {
-    const matchesSearch = !searchQuery || 
+    const matchesSearch = !searchQuery ||
       q.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (q.activationCode || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (q.category || "").toLowerCase().includes(searchQuery.toLowerCase());
       
     const matchesCategory = categoryFilter === "all" || (q.category || "car") === categoryFilter;
@@ -57,7 +56,6 @@ export default function QrCodesPage({
       createdAt: new Date().toISOString(),
       scans: 0,
       status: "inactive",
-      activationCode: codeId,
       template: activeTemplate?.name || "Default",
       category: targetCategory,
       fg: activeTemplate?.fg || "EAB308",
@@ -83,10 +81,9 @@ export default function QrCodesPage({
       status: rec.status, 
       templateName: rec.template, 
       category: rec.category,
-      fgColor: rec.fg, 
-      bgColor: rec.bg, 
+      fgColor: rec.fg,
+      bgColor: rec.bg,
       stickerImage: rec.stickerImage || stickerUrl || undefined,
-      activationCode: rec.activationCode 
     });
 
     dispatchActivationToUserDashboard(rec);
@@ -119,8 +116,8 @@ export default function QrCodesPage({
 
   function downloadCsv() {
     const rows = [
-      ["QR Code", "Activation Code", "Category", "Status", "Template", "Created"],
-      ...qrList.map((q) => [q.id, q.activationCode || "ACTPENDING", q.category || "car", q.status, q.template, fmtDate(q.createdAt)]),
+      ["QR Code", "Category", "Status", "Template", "Created"],
+      ...qrList.map((q) => [q.id, q.category || "car", q.status, q.template, fmtDate(q.createdAt)]),
     ];
     const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -293,7 +290,7 @@ export default function QrCodesPage({
               <thead>
                 <tr className="text-left text-[11px] text-gray-500 font-bold uppercase tracking-wider border-b" style={{ borderColor: "#f7f7f7" }}>
                   <th className="px-6 py-3">QR</th>
-                  <th className="px-2 py-3">Activation Code</th>
+                  <th className="px-2 py-3">QR ID</th>
                   <th className="px-2 py-3">Category</th>
                   <th className="px-2 py-3">Created</th>
                   <th className="px-2 py-3">Status</th>
@@ -302,7 +299,6 @@ export default function QrCodesPage({
               </thead>
               <tbody>
                 {filtered.slice(0, 60).map((q) => {
-                  const actCode = q.activationCode || q.id;
                   const catKey = (q.category || "car") as any;
                   const icon = getCategoryIcon(catKey);
                   const label = getCategoryLabel(catKey);
@@ -314,7 +310,7 @@ export default function QrCodesPage({
                           <StickerThumb qr={q} templates={templates} size={36} />
                         </button>
                       </td>
-                      <td className="px-2 py-3"><ActCode code={actCode} /></td>
+                      <td className="px-2 py-3"><IdBadge code={q.id} /></td>
                       <td className="px-2 py-3">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-800 border border-gray-200">
                           <span>{icon}</span>
@@ -326,7 +322,7 @@ export default function QrCodesPage({
                       <td className="px-6 py-3">
                         <div className="flex items-center justify-end gap-0.5">
                           <button
-                            onClick={() => { dispatchActivationToUserDashboard(q); setToast(`Code ${actCode} dispatched`); setTimeout(() => setToast(null), 2000); }}
+                            onClick={() => { dispatchActivationToUserDashboard(q); setToast(`${q.id} dispatched`); setTimeout(() => setToast(null), 2000); }}
                             className="w-7 h-7 rounded-lg hover:bg-yellow-50 hover:text-yellow-600 flex items-center justify-center text-gray-500 transition-all cursor-pointer"
                             title="Dispatch to user"
                           >

@@ -5,7 +5,6 @@ const { verifyToken } = require('../middleware/authMiddleware');
 
 router.use(verifyToken);
 
-router.post('/claim', ProductController.claimByCode);
 router.get('/', ProductController.getMyProducts);
 router.get('/:id', ProductController.getProductById);
 router.get('/:id/history', ProductController.getHistory);

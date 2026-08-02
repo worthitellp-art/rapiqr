@@ -7,7 +7,6 @@ export interface QrRecord {
   createdAt: string;
   scans: number;
   status: string;
-  activationCode?: string;
   template: string;
   category?: string;
   fg: string;

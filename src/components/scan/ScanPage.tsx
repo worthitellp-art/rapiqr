@@ -81,7 +81,6 @@ interface QrData {
   clientId: string;
   status: string;
   template: string;
-  activationCode?: string;
   category?: string;
 }
 
@@ -539,13 +538,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       return;
     }
 
-    // Verify the sticker's stored activation code before sending OTP.
-    const storedCode = (qrData.activationCode || qrData.id || "").trim();
-    if (!storedCode) {
-      setActivationError("No activation code found for this QR tag.");
-      return;
-    }
-
     // Decision branch: phone matches the purchase phone → skip OTP entirely
     if (phoneMatchesBuyer) {
       proceedToEmergencyContacts(true);
@@ -886,7 +878,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
             vehicleName: `Vehicle (${dbRecord.id})`,
             vehicleNumber: `REG-${dbRecord.id.slice(-4)}`,
             template: dbRecord.template_name || "Default",
-            activationCode: dbRecord.activation_code,
             category: dbRecord.category,
           };
           resolveQr(dbFound);
@@ -910,12 +901,11 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         clientId: record.clientId || record.id,
         status: record.status || "inactive",
         template: record.template || "Default",
-        activationCode: record.activationCode,
         category: record.category,
       };
       setQrData(data);
 
-      // First-time scan → activation code required; Already active → emergency page
+      // First-time scan → show the registration/activation form; already active → emergency page
       if (record.status === "inactive") {
         setPhase("activation");
       } else {
@@ -1408,12 +1398,12 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                         <p className="text-xs text-slate-600">
                           <strong className="text-slate-900">Check your email.</strong> We've sent a 4-digit code to{" "}
                           <strong className="font-mono text-slate-900">{regEmail}</strong> to verify your identity and activate QR code{" "}
-                          <strong className="font-mono text-amber-600">{qrData.activationCode || qrData.id}</strong>.
+                          <strong className="font-mono text-amber-600">{qrData.id}</strong>.
                         </p>
                       ) : (
                         <p className="text-xs text-slate-600">
                           We've sent a 4-digit code to <strong className="font-mono text-slate-900">{otpSentTo || `${regCountry} ${regPhone}`}</strong> to verify your phone number and activate QR code{" "}
-                          <strong className="font-mono text-amber-600">{qrData.activationCode || qrData.id}</strong>.
+                          <strong className="font-mono text-amber-600">{qrData.id}</strong>.
                         </p>
                       )}
 

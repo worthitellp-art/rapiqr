@@ -133,10 +133,8 @@ export default function OverviewPage({
   const fleetSegments = useMemo(() => {
     const segments = [
       { label: "Active", count: active, color: "#EAB308" },
-      { label: "Pending", count: qrList.filter(q => q.status !== "active" && q.activationCode).length, color: "#22C55E" },
-      { label: "Inactive", count: 0, color: "#F97316" },
+      { label: "Inactive", count: qrList.length - active, color: "#F97316" },
     ];
-    segments[2].count = qrList.length - segments[0].count - segments[1].count;
     return segments.filter(s => s.count > 0);
   }, [qrList, active]);
 

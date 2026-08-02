@@ -75,8 +75,8 @@ export default function QuickLookModal({
                 <ShieldCheck size={15} />
               </div>
               <div>
-                <p className="text-[9px] font-extrabold text-amber-800 uppercase tracking-wider">Activation Code</p>
-                <p className="font-mono font-black text-amber-950 text-sm">{qr.activationCode || "ACT?????"}</p>
+                <p className="text-[9px] font-extrabold text-amber-800 uppercase tracking-wider">Status</p>
+                <p className="font-bold text-amber-950 text-xs">Links to owner by phone number on activation</p>
               </div>
             </div>
             <button

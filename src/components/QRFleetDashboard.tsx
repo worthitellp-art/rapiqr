@@ -860,7 +860,7 @@ function QrCodesPage({
       category,
     };
     setQrList((prev) => [rec, ...prev]);
-    saveQrCodeToDb({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, category: rec.category, fgColor: rec.fg, bgColor: rec.bg, activationCode: actCode });
+    saveQrCodeToDb({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, category: rec.category, fgColor: rec.fg, bgColor: rec.bg });
     saveGeneratedSticker(rec, activeTemplate?.stickerPos || { x: 110, y: 40, w: 100, h: 100 });
     dispatchActivationToUserDashboard(rec);
     openQuickLook(rec);

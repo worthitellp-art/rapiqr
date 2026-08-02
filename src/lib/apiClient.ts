@@ -192,13 +192,6 @@ export const apiClient = {
 
   // My Stickers / Products Services (dashboard sticker management)
   products: {
-    async claim(code: string, phone: string) {
-      return request<{ success: boolean; data?: any; message?: string }>('/products/claim', {
-        method: 'POST',
-        body: JSON.stringify({ code, phone }),
-      });
-    },
-
     async list() {
       return request<{ success: boolean; data: any[] }>('/products', {
         method: 'GET',

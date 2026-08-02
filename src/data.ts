@@ -123,7 +123,6 @@ export const INITIAL_QR_CODES: QRCodeData[] = [
     status: 'active',
     scansCount: 12,
     createdAt: '2026-05-16T10:05:00Z',
-    activationCode: 'ACT8A3F',
   },
   {
     id: 'QR9K2L',
@@ -131,7 +130,6 @@ export const INITIAL_QR_CODES: QRCodeData[] = [
     status: 'active',
     scansCount: 4,
     createdAt: '2026-05-17T11:35:00Z',
-    activationCode: 'ACT9K2L',
   },
   {
     id: 'QR5T7S',
@@ -139,7 +137,6 @@ export const INITIAL_QR_CODES: QRCodeData[] = [
     status: 'active',
     scansCount: 1,
     createdAt: '2026-05-18T14:20:00Z',
-    activationCode: 'ACT5T7S',
   },
   {
     id: 'QR2B9X',
@@ -147,7 +144,6 @@ export const INITIAL_QR_CODES: QRCodeData[] = [
     status: 'active',
     scansCount: 0,
     createdAt: '2026-05-19T09:05:00Z',
-    activationCode: 'ACT2B9X',
   },
   {
     id: 'QR7C3Y',
@@ -155,7 +151,6 @@ export const INITIAL_QR_CODES: QRCodeData[] = [
     status: 'active',
     scansCount: 3,
     createdAt: '2026-05-20T08:05:00Z',
-    activationCode: 'ACT7C3Y',
   },
   {
     id: 'QR0Z2A',
@@ -163,7 +158,6 @@ export const INITIAL_QR_CODES: QRCodeData[] = [
     status: 'unlinked',
     scansCount: 0,
     createdAt: '2026-06-01T10:00:00Z',
-    activationCode: 'ACT0Z2A',
   }
 ];
 

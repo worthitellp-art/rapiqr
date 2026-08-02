@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const { supabaseAdmin } = require('../config/db');
 const UserModel = require('../models/userModel');
+const ProductModel = require('../models/productModel');
 const { JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD } = require('../middleware/authMiddleware');
 const { logger } = require('../middleware/loggerMiddleware');
 const { generateSecret, verifyTOTP, buildOtpauthUrl } = require('../utils/totp');
@@ -279,6 +280,15 @@ class AuthController {
       const updated = await UserModel.updateProfile(req.user.id, { fullName, phoneNumber });
       if (!updated) return res.status(500).json({ success: false, error: 'Failed to update profile' });
       logger.user('PROFILE_UPDATED', `Profile updated for ${req.user.email}`, { fullName: !!fullName, phoneNumber: !!phoneNumber });
+
+      // Immediately link any sticker registered under this phone number, rather
+      // than waiting for the next products fetch to pick it up.
+      if (phoneNumber) {
+        ProductModel.autoClaimByPhone(req.user.id, updated.full_name, phoneNumber).catch((err) => {
+          logger.error('PRODUCT_AUTO_CLAIM', 'Failed to auto-claim products after phone update', err);
+        });
+      }
+
       return res.json({ success: true, user: updated });
     } catch (err) {
       logger.error('PROFILE_UPDATE', 'Failed to update profile', err);

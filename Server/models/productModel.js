@@ -1,6 +1,6 @@
 const { supabaseAdmin } = require('../config/db');
 
-const LIST_SELECT = '*, qr_codes(id, status, scans_count, last_scanned_at, activation_code, sticker_image, fg_color, bg_color)';
+const LIST_SELECT = '*, qr_codes(id, status, scans_count, last_scanned_at, sticker_image, fg_color, bg_color)';
 const ADMIN_SEARCH_SELECT = `${LIST_SELECT}, profiles(id, email, full_name, phone_number)`;
 
 class ProductModel {
@@ -98,6 +98,45 @@ class ProductModel {
       console.error(`ProductModel.claim (${productId}) Error:`, err);
       return null;
     }
+  }
+
+  /**
+   * Auto-link every unclaimed product (activated on the public scan page, no
+   * account attached yet) whose registered owner phone matches this user's
+   * account phone number — no activation code needed, purely phone-based
+   * (replaces the old manual code+phone claim flow).
+   */
+  static async autoClaimByPhone(userId, userName, phone) {
+    const suppliedPhone = String(phone || '').replace(/\D/g, '');
+    if (!suppliedPhone) return [];
+
+    const { data, error } = await supabaseAdmin
+      .from('products')
+      .select(LIST_SELECT)
+      .is('user_id', null);
+
+    if (error) throw error;
+
+    const matches = (data || []).filter((p) => {
+      const registeredPhone = String(p.details?.ownerPhone || '').replace(/\D/g, '');
+      return registeredPhone && (registeredPhone.includes(suppliedPhone) || suppliedPhone.includes(registeredPhone));
+    });
+
+    const claimed = [];
+    for (const p of matches) {
+      const { data: updated, error: claimError } = await supabaseAdmin
+        .from('products')
+        .update({ user_id: userId, assigned_to: userName || 'Self' })
+        .eq('id', p.id)
+        .select(LIST_SELECT)
+        .single();
+      if (claimError) {
+        console.error(`ProductModel.autoClaimByPhone: failed to claim ${p.id}`, claimError);
+        continue;
+      }
+      claimed.push(updated);
+    }
+    return claimed;
   }
 
   static async getById(productId) {

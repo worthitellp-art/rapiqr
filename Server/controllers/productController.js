@@ -22,52 +22,27 @@ async function loadOwnedProduct(req, res) {
   return product;
 }
 
-function normalizePhone(v) {
-  return String(v || '').replace(/\D/g, '');
-}
-
 class ProductController {
   /**
-   * Claim an already-activated-but-unowned sticker (e.g. activated anonymously via a
-   * public scan before the owner signed in) by its QR code + registered phone number.
+   * Auto-links any unclaimed sticker whose registered owner phone matches this
+   * account's phone number, then returns the user's full product list. No
+   * activation code needed — a sticker's owner phone (set during scan-page
+   * activation) is the only thing that connects it to a dashboard account.
    */
-  static async claimByCode(req, res) {
-    try {
-      const { code, phone } = req.body || {};
-      if (!code) return res.status(400).json({ success: false, error: 'code is required' });
-
-      const product = await ProductModel.getByQrCodeId(String(code).trim().toUpperCase());
-      if (!product) {
-        return res.status(404).json({ success: false, error: 'No sticker found for that code' });
-      }
-      if (product.user_id === req.user.id) {
-        return res.json({ success: true, data: product, message: 'Already in your dashboard' });
-      }
-      if (product.user_id) {
-        return res.status(409).json({ success: false, error: 'This sticker is already linked to another account' });
-      }
-
-      const registeredPhone = normalizePhone(product.details?.ownerPhone);
-      const suppliedPhone = normalizePhone(phone);
-      const phoneMatches = registeredPhone && suppliedPhone &&
-        (registeredPhone.includes(suppliedPhone) || suppliedPhone.includes(registeredPhone));
-
-      if (!phoneMatches) {
-        return res.status(403).json({ success: false, error: 'Phone number does not match the number registered on this sticker' });
-      }
-
-      const claimed = await ProductModel.claim(product.id, req.user.id, product.name);
-      if (!claimed) return res.status(500).json({ success: false, error: 'Failed to claim sticker' });
-      logger.rowUpdated('products', product.id, { action: 'claimed', byUserId: req.user.id });
-      return res.json({ success: true, data: claimed });
-    } catch (err) {
-      logger.error('PRODUCT_CLAIM', 'Failed to claim product by code', err);
-      return res.status(500).json({ success: false, error: err.message });
-    }
-  }
-
   static async getMyProducts(req, res) {
     try {
+      const profile = await UserModel.findById(req.user.id);
+      if (profile?.phone_number) {
+        try {
+          const claimed = await ProductModel.autoClaimByPhone(req.user.id, profile.full_name, profile.phone_number);
+          if (claimed.length > 0) {
+            logger.rowUpdated('products', 'auto-claim', { userId: req.user.id, count: claimed.length });
+          }
+        } catch (err) {
+          logger.error('PRODUCT_AUTO_CLAIM', 'Failed to auto-claim products by phone', err);
+        }
+      }
+
       const data = await ProductModel.getAllByUser(req.user.id);
       return res.json({ success: true, data });
     } catch (err) {

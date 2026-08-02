@@ -39,16 +39,6 @@ export function uid(prefix = "QR") {
   return `${prefix}${numPart}${letterPart}`;
 }
 
-export function generateActivationCode(): string {
-  const digits = "0123456789";
-  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-  let numPart = "";
-  for (let i = 0; i < 4; i++) numPart += digits.charAt(Math.floor(Math.random() * digits.length));
-  let letterPart = "";
-  for (let i = 0; i < 3; i++) letterPart += letters.charAt(Math.floor(Math.random() * letters.length));
-  return `ACT${numPart}${letterPart}`;
-}
-
 export function dispatchActivationToUserDashboard(qrItem: QrRecord) {
   if (typeof window === "undefined") return;
   try {
@@ -57,7 +47,6 @@ export function dispatchActivationToUserDashboard(qrItem: QrRecord) {
     const updated = [
       {
         id: qrItem.id,
-        activationCode: qrItem.id,
         vehicleName: qrItem.vehicleName || "Unassigned QR Sticker",
         vehicleNumber: qrItem.vehicleNumber || "PENDING",
         status: "pending_activation",

@@ -8,7 +8,7 @@ class QrModel {
     try {
       const { data, error } = await supabaseAdmin
         .from('qr_codes')
-        .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, category, created_at, activation_code')
+        .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, category, created_at')
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -54,7 +54,6 @@ class QrModel {
         fg_color: qrData.fgColor || qrData.fg_color || 'D9581F',
         bg_color: qrData.bgColor || qrData.bg_color || 'FFFFFF',
         sticker_image: qrData.stickerImage || qrData.sticker_image || null,
-        activation_code: qrData.activationCode || qrData.activation_code || null,
         created_at: qrData.createdAt || qrData.created_at || new Date().toISOString()
       };
 

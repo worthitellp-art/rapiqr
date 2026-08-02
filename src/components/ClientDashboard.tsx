@@ -36,7 +36,6 @@ import AccountSettingsPanel from './dashboard/client/AccountSettingsPanel';
 import SupportLegalPanel from './dashboard/client/SupportLegalPanel';
 import {
   getProductsFromDb,
-  claimProductByCode,
   updateProductDetailsInDb,
   updateProductContactsInDb,
   setProductStatusInDb,
@@ -84,7 +83,7 @@ type TabId = 'overview' | 'activate' | 'catalog' | 'contacts' | 'history' | 'set
 
 const NAV_ITEMS: { id: TabId; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
   { id: 'overview', label: 'My Products', icon: Grid },
-  { id: 'activate', label: 'Activate / Link Tag', icon: Link2 },
+  { id: 'activate', label: 'Link My Stickers', icon: Link2 },
   { id: 'catalog', label: 'Product Catalog', icon: BookOpen },
   { id: 'contacts', label: 'Emergency Contacts', icon: Users },
   { id: 'history', label: 'Emergency History', icon: History },
@@ -103,7 +102,7 @@ type ModalState =
   | null;
 
 export default function ClientDashboard({ onBack }: ClientDashboardProps) {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, updatePhoneNumber } = useAuth();
 
   const handleSignOut = async () => {
     await signOut();
@@ -132,7 +131,9 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
     setProductsLoading(true);
     try {
       const rows = await getProductsFromDb(profile?.id);
-      setProducts(Array.isArray(rows) ? rows.map(mapProductRow) : []);
+      const mapped = Array.isArray(rows) ? rows.map(mapProductRow) : [];
+      setProducts(mapped);
+      return mapped;
     } finally {
       setProductsLoading(false);
     }
@@ -156,40 +157,34 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
     setTimeout(() => setToastMsg(null), 2800);
   };
 
-  // ─── CLAIM / LINK STICKER (for stickers activated before the owner signed in) ───
-  const [claimCode, setClaimCode] = useState('');
-  const [claimPhone, setClaimPhone] = useState(() => profile?.phoneNumber || '');
-  const [claiming, setClaiming] = useState(false);
-  const [claimResult, setClaimResult] = useState<{ success: boolean; msg: string } | null>(null);
+  // ─── LINK STICKERS BY PHONE (no activation code — a sticker's owner phone,
+  // set during first-scan activation on the public scan page, is the only thing
+  // that connects it to a dashboard account) ───
+  const [linkPhone, setLinkPhone] = useState(() => profile?.phoneNumber || '');
+  const [linking, setLinking] = useState(false);
+  const [linkResult, setLinkResult] = useState<{ success: boolean; msg: string } | null>(null);
 
   useEffect(() => {
-    if (profile?.phoneNumber && !claimPhone) setClaimPhone(profile.phoneNumber);
-  }, [profile?.phoneNumber]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (profile?.phoneNumber) setLinkPhone(profile.phoneNumber);
+  }, [profile?.phoneNumber]);
 
-  const handleClaim = async (e?: React.FormEvent) => {
+  const handleLinkByPhone = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const code = claimCode.trim();
-    if (!code) {
-      setClaimResult({ success: false, msg: "Enter the sticker's activation code." });
+    const phone = linkPhone.trim();
+    if (!phone) {
+      setLinkResult({ success: false, msg: 'Enter the phone number registered on your sticker.' });
       return;
     }
-    if (!claimPhone.trim()) {
-      setClaimResult({ success: false, msg: 'Enter the phone number registered on this sticker.' });
-      return;
+    setLinking(true);
+    setLinkResult(null);
+    const countBefore = products.length;
+    if (phone !== profile?.phoneNumber) {
+      await updatePhoneNumber(phone);
     }
-    setClaiming(true);
-    setClaimResult(null);
-    const res = await claimProductByCode(code, claimPhone.trim());
-    setClaiming(false);
-    if (res.success) {
-      setClaimResult({ success: true, msg: `Sticker ${code.toUpperCase()} linked to your dashboard!` });
-      showToast('Sticker linked to your dashboard!');
-      setClaimCode('');
-      await loadProducts();
-      setActiveTab('overview');
-    } else {
-      setClaimResult({ success: false, msg: res.error || 'Could not verify that code.' });
-    }
+    const refreshed = await loadProducts();
+    setLinking(false);
+    setLinkResult({ success: true, msg: 'Checked — any sticker registered with this phone number is now linked below.' });
+    if (refreshed.length > countBefore) showToast('Sticker linked to your dashboard!');
   };
 
   // ─── SHARE PROFILE ───
@@ -589,50 +584,40 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
             </div>
           )}
 
-          {/* ════ VIEW 2: ACTIVATE / LINK STICKER ════ */}
+          {/* ════ VIEW 2: LINK STICKERS BY PHONE ════ */}
           {activeTab === 'activate' && (
             <div className="space-y-6 animate-fade-in max-w-xl">
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1D26]">Activate / Link a Sticker</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1D26]">Link Your Stickers</h1>
                 <p className="text-xs sm:text-sm text-[#64748B] mt-1">
-                  Scan your physical RepiQR sticker's QR code first to activate it — then link it to this account here using its code and the phone number you registered.
+                  Scan your physical RepiQR sticker's QR code first to activate it and register your phone number there — no code needed here. Any sticker registered with the phone number below automatically appears in your dashboard.
                 </p>
               </div>
 
-              <form onSubmit={handleClaim} className="bg-white border border-[#E8ECF4] rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
+              <form onSubmit={handleLinkByPhone} className="bg-white border border-[#E8ECF4] rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-[#64748B] mb-1">Sticker Activation Code</label>
-                  <input
-                    type="text"
-                    value={claimCode}
-                    onChange={(e) => { setClaimCode(e.target.value.toUpperCase()); setClaimResult(null); }}
-                    placeholder="e.g. QR-8A3F"
-                    className="w-full px-4 py-3 text-sm bg-[#F5F6FA] border border-[#E8ECF4] rounded-xl outline-none focus:border-[#111111] font-mono font-bold uppercase"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#64748B] mb-1">Phone Number Registered on the Sticker</label>
+                  <label className="block text-xs font-bold text-[#64748B] mb-1">Your Phone Number</label>
                   <input
                     type="tel"
-                    value={claimPhone}
-                    onChange={(e) => { setClaimPhone(e.target.value); setClaimResult(null); }}
+                    value={linkPhone}
+                    onChange={(e) => { setLinkPhone(e.target.value); setLinkResult(null); }}
                     placeholder="+91 98765 43210"
                     className="w-full px-4 py-3 text-sm bg-[#F5F6FA] border border-[#E8ECF4] rounded-xl outline-none focus:border-[#111111] font-mono"
                   />
                 </div>
 
-                {claimResult && (
-                  <p className={`text-xs font-bold ${claimResult.success ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
-                    {claimResult.msg}
+                {linkResult && (
+                  <p className={`text-xs font-bold ${linkResult.success ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
+                    {linkResult.msg}
                   </p>
                 )}
 
                 <button
                   type="submit"
-                  disabled={claiming}
+                  disabled={linking}
                   className="w-full py-3 rounded-xl bg-[#111111] hover:bg-black text-white text-sm font-bold shadow-md transition-all active:scale-95 cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
                 >
-                  {claiming && <Loader2 size={15} className="animate-spin" />} Link Sticker to My Account
+                  {linking && <Loader2 size={15} className="animate-spin" />} Save & Link My Stickers
                 </button>
               </form>
 

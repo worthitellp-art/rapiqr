@@ -19,7 +19,7 @@ export async function getQrCodesFromDb(limitCount = 100) {
   try {
     const { data, error } = await supabase
       .from('qr_codes')
-      .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, category, created_at, activation_code')
+      .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, category, created_at')
       .order('created_at', { ascending: false })
       .limit(limitCount);
 
@@ -47,7 +47,7 @@ export async function getQrCodeByIdFromDb(qrId: string) {
   try {
     const { data, error } = await supabase
       .from('qr_codes')
-      .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, category, created_at, activation_code')
+      .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, category, created_at')
       .eq('id', qrId)
       .maybeSingle();
 
@@ -96,7 +96,6 @@ export async function saveQrCodeToDb(qr: {
   fgColor?: string;
   bgColor?: string;
   stickerImage?: string;
-  activationCode?: string;
 }) {
   if (isApiBackendConfigured) {
     try {
@@ -120,9 +119,8 @@ export async function saveQrCodeToDb(qr: {
         fg_color: qr.fgColor || 'D9581F',
         bg_color: qr.bgColor || 'FFFFFF',
         sticker_image: qr.stickerImage || (qr as any).sticker_image || null,
-        activation_code: qr.activationCode,
       }, { onConflict: 'id' })
-      .select('id, client_id, status, scans_count, category, sticker_image, fg_color, bg_color, created_at, activation_code');
+      .select('id, client_id, status, scans_count, category, sticker_image, fg_color, bg_color, created_at');
 
     if (error) throw error;
     return data;
@@ -161,13 +159,12 @@ export async function bulkSaveQrCodesToDb(qrList: any[]) {
       fg_color: qr.fg || qr.fgColor || 'D9581F',
       bg_color: qr.bg || qr.bgColor || 'FFFFFF',
       sticker_image: qr.stickerImage || qr.sticker_image || null,
-      activation_code: qr.activationCode,
     }));
 
     const { data, error } = await supabase
       .from('qr_codes')
       .upsert(records, { onConflict: 'id' })
-      .select('id, client_id, status, category, sticker_image, activation_code');
+      .select('id, client_id, status, category, sticker_image');
       
     if (error) throw error;
     return data;
@@ -506,23 +503,6 @@ export async function getProductsFromDb(userId?: string, limitCount = 100) {
     console.warn('Supabase fetch products error:', err);
     return null;
   }
-}
-
-/**
- * Claim an already-activated sticker (e.g. scanned/activated anonymously before the
- * owner signed in) into the current account by code + registered phone number.
- * Backend-only — direct-Supabase mode has no way to match "unowned" rows safely.
- */
-export async function claimProductByCode(code: string, phone: string) {
-  if (isApiBackendConfigured) {
-    try {
-      const res = await apiClient.products.claim(code, phone);
-      return { success: true, data: res.data } as { success: boolean; data?: any; error?: string };
-    } catch (err: any) {
-      return { success: false, error: err?.message || 'Failed to verify code' };
-    }
-  }
-  return { success: false, error: 'This requires the RapiQR backend to be configured.' };
 }
 
 /**

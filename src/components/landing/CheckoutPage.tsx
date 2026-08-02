@@ -5,6 +5,7 @@ import {
   ArrowLeft, ShoppingBag
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { apiClient } from '../../lib/apiClient';
 import './landing.css';
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
@@ -100,12 +101,29 @@ export default function CheckoutPage({
     return false;
   };
 
-  const persistOrderAndStickers = (isRecognized: boolean) => {
-    const id = '#NQ-' + Math.floor(100000 + Math.random() * 899999);
+  const persistOrderAndStickers = async (isRecognized: boolean) => {
+    const items = cart.map(i => ({ name: i.product.name, qty: i.qty, price: i.product.price }));
+
+    // Real, durable order record (task.md #6 — this used to be localStorage-only,
+    // invisible across devices/browsers and gone if storage was cleared).
+    let id = '#NQ-' + Math.floor(100000 + Math.random() * 899999);
+    try {
+      const res = await apiClient.orders.create({
+        name: name.trim(), email: email.trim(), phone: phone.trim(),
+        items, subtotal, deliveryFee, total,
+        paymentMethod: payment, deliveryMethod: delivery,
+        shippingAddress: { address: address.trim(), city: city.trim(), state: state.trim(), pincode: pincode.trim() },
+      });
+      if (res.data?.id) id = res.data.id;
+    } catch (err) {
+      console.warn('Failed to persist order to the server (kept locally only):', err);
+    }
+
     setOrderId(id);
     setConfirmedTotal(total); // capture before the parent clears the cart
 
-    // Save order receipt
+    // Local receipt copy — kept for the guest "order history" fallback when the
+    // backend save above didn't go through (e.g. offline).
     try {
       const orders = JSON.parse(localStorage.getItem('namoqr-orders') || '[]');
       orders.unshift({
@@ -113,7 +131,7 @@ export default function CheckoutPage({
         email: email.trim(),
         phone: phone.trim(),
         name: name.trim(),
-        items: cart.map(i => ({ name: i.product.name, qty: i.qty, price: i.product.price })),
+        items,
         total,
         payment,
         delivery,
@@ -176,8 +194,8 @@ export default function CheckoutPage({
     const isRecognized = checkRecognized();
     setRecognized(isRecognized);
     setStep('processing');
-    setTimeout(() => {
-      persistOrderAndStickers(isRecognized);
+    setTimeout(async () => {
+      await persistOrderAndStickers(isRecognized);
       setStep('success');
       if (onOrderComplete) onOrderComplete();
     }, 1800);

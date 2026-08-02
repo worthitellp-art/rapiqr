@@ -16,8 +16,49 @@ import {
 } from '../../lib/distributorService';
 import groupLogo from '../../../assets/Group 1000005716.png';
 import groupLogo1 from '../../../assets/Group 1000005716-1.png';
-import groupLogo2 from '../../../assets/Group 1000005716-2.png';
 import logoForWhBg from '../../../assets/logo for wh bg.png';
+import stepImg1 from '../../../assets/ChatGPT Image Aug 1, 2026, 03_07_26 PM.png';
+import stepImg2 from '../../../assets/ChatGPT Image Aug 1, 2026, 03_09_09 PM.png';
+import stepImg3 from '../../../assets/ChatGPT Image Aug 1, 2026, 03_16_11 PM.png';
+import stepImg4 from '../../../assets/ChatGPT Image Aug 1, 2026, 03_17_54 PM.png';
+
+const HOW_IT_WORKS_STEPS = [
+  {
+    step: 1,
+    title: 'Order your sticker',
+    body: 'Pick a type — vehicle, gate, bag, keychain. Ships in 2–3 days.',
+    img: stepImg1,
+    badge: 'Pick Your Tag',
+  },
+  {
+    step: 2,
+    title: 'Stick it on',
+    body: 'Weatherproof 3M adhesive. Rated 3+ years outdoors.',
+    img: stepImg2,
+    badge: '3M Weatherproof',
+  },
+  {
+    step: 3,
+    title: 'Anyone scans — no app',
+    body: 'Camera → secure page. Nothing to install.',
+    img: stepImg4,
+    badge: 'Zero App Scan',
+  },
+  {
+    step: 4,
+    title: 'They reach you',
+    body: 'Call, message, GPS, or alert. Your number? Never visible.',
+    img: stepImg3,
+    badge: 'Masked Call & GPS',
+  },
+  {
+    step: 5,
+    title: 'You get pinged instantly',
+    body: 'Push + SMS + WhatsApp. Resolve in one tap.',
+    img: stepImg3,
+    badge: 'Instant Multi-Channel Alert',
+  },
+];
 
 // ── Animated Counter Component ─────────────────────────────────────────────
 
@@ -410,6 +451,7 @@ export default function LandingPageMaster({
   const [navHidden, setNavHidden] = useState(false);
   const lastScrollY = useRef(0);
   const [activeCat, setActiveCat] = useState(0);
+  const [hiwActiveStep, setHiwActiveStep] = useState(0);
   const [demoStep, setDemoStep] = useState(0);
   const [demoAlert, setDemoAlert] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -418,6 +460,14 @@ export default function LandingPageMaster({
   const [partnerForm, setPartnerForm] = useState({ name: '', phone: '', city: '', business: 'Auto Accessories Shop', tier: 'Retail Kit (50 Units)' });
   const [partnerSubmitted, setPartnerSubmitted] = useState(false);
   const [userAppStatus, setUserAppStatus] = useState<DistributorApplication | null>(null);
+
+  // Auto-rotate How It Works active step
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setHiwActiveStep(prev => (prev + 1) % 5);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, []);
 
   // Sync user's distributor application status
   useEffect(() => {
@@ -994,8 +1044,8 @@ export default function LandingPageMaster({
       </section>
 
       {/* ── HOW IT WORKS ────────────────────────────────────────────── */}
-      <section id="how-it-works" className="hiw-section" aria-labelledby="hiw-heading">
-        <div className="namo-wrap max-w-3xl">
+      <section id="how-it-works" className="hiw-section py-20 bg-white" aria-labelledby="hiw-heading">
+        <div className="namo-wrap max-w-6xl">
           <div className="text-center mb-16 reveal">
             <div className="section-divider justify-center">
               <span className="section-label">How it works</span>
@@ -1003,25 +1053,122 @@ export default function LandingPageMaster({
             <h2 id="hiw-heading" className="display-title text-4xl sm:text-5xl mt-4" style={{ color: 'var(--ink)' }}>
               Five steps. Done.
             </h2>
+            <p className="text-sm mt-3" style={{ color: 'var(--ink-soft)' }}>
+              Simple, instant, and privacy-protected from start to finish.
+            </p>
           </div>
 
-          <div className="space-y-10">
-            {[
-              { title: 'Order your sticker', body: 'Pick a type — vehicle, gate, bag, keychain. Ships in 2–3 days.' },
-              { title: 'Stick it on', body: 'Weatherproof 3M adhesive. Rated 3+ years outdoors.' },
-              { title: 'Anyone scans — no app', body: 'Camera → secure page. Nothing to install.' },
-              { title: 'They reach you', body: 'Call, message, GPS, or alert. Your number? Never visible.' },
-              { title: 'You get pinged instantly', body: 'Push + SMS + WhatsApp. Resolve in one tap.' },
-            ].map((step, i) => (
-              <div key={i} className={`hiw-step reveal delay-${i + 1}`}>
-                <div className="hiw-num">{i + 1}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--ink)', marginBottom: 6 }}>{step.title}</div>
-                  <div style={{ fontSize: 14.5, color: 'var(--ink-soft)', lineHeight: 1.65 }}>{step.body}</div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+            {/* Steps List */}
+            <div className="lg:col-span-6 space-y-4">
+              {HOW_IT_WORKS_STEPS.map((s, i) => {
+                const isActive = hiwActiveStep === i;
+                return (
+                  <div
+                    key={i}
+                    onClick={() => setHiwActiveStep(i)}
+                    className={`group p-5 rounded-2xl border transition-all duration-300 cursor-pointer ${
+                      isActive
+                        ? 'bg-amber-500/10 border-amber-500/40 shadow-md translate-x-1'
+                        : 'bg-gray-50/70 border-gray-200/80 hover:bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base transition-all duration-300 flex-shrink-0 ${
+                          isActive
+                            ? 'bg-amber-500 text-gray-950 shadow-sm scale-105'
+                            : 'bg-gray-200 text-gray-700 group-hover:bg-gray-300'
+                        }`}
+                      >
+                        {s.step}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3
+                            className={`font-bold text-base transition-colors ${
+                              isActive ? 'text-gray-900' : 'text-gray-700 group-hover:text-gray-900'
+                            }`}
+                          >
+                            {s.title}
+                          </h3>
+                          {isActive && (
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider bg-amber-400/30 text-amber-800 px-2 py-0.5 rounded-full border border-amber-400/40 animate-pulse">
+                              Active Step
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs sm:text-sm text-gray-600 mt-1 leading-relaxed">
+                          {s.body}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Mobile Inline Image Display */}
+                    {isActive && (
+                      <div className="mt-4 lg:hidden rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                        <img
+                          src={s.img}
+                          alt={s.title}
+                          className="w-full h-52 object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Dynamic Preview Display */}
+            <div className="hidden lg:block lg:col-span-6">
+              <div className="relative rounded-3xl overflow-hidden border border-gray-200 bg-gray-950 shadow-2xl p-2">
+                <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-gray-900">
+                  {HOW_IT_WORKS_STEPS.map((s, i) => (
+                    <div
+                      key={i}
+                      className={`absolute inset-0 transition-all duration-700 ease-in-out ${
+                        hiwActiveStep === i
+                          ? 'opacity-100 scale-100 pointer-events-auto'
+                          : 'opacity-0 scale-95 pointer-events-none'
+                      }`}
+                    >
+                      <img
+                        src={s.img}
+                        alt={s.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent pointer-events-none" />
+                      
+                      <div className="absolute bottom-5 left-5 right-5 text-white">
+                        <span className="inline-block text-[10px] font-extrabold uppercase tracking-wider bg-amber-400 text-gray-950 px-2.5 py-1 rounded-full mb-2 shadow-sm">
+                          {s.badge}
+                        </span>
+                        <h4 className="text-xl font-bold text-white drop-shadow-md">
+                          Step {s.step}: {s.title}
+                        </h4>
+                        <p className="text-xs text-gray-200 mt-1 drop-shadow-sm leading-relaxed">
+                          {s.body}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                {i < 4 && <div className="hiw-connector" />}
+
+                {/* Step Indicators */}
+                <div className="flex items-center justify-center gap-2 p-3 bg-gray-950">
+                  {[1, 2, 3, 4, 5].map((num, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setHiwActiveStep(i)}
+                      className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                        hiwActiveStep === i ? 'w-8 bg-amber-400' : 'w-2 bg-gray-700 hover:bg-gray-500'
+                      }`}
+                      title={`Go to step ${num}`}
+                    />
+                  ))}
+                </div>
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </section>
