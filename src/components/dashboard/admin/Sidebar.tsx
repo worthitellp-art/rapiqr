@@ -1,7 +1,7 @@
 import { LogOut, HelpCircle } from "lucide-react";
 import { NAV_ITEMS } from "./constants";
 import { avatarUrl } from "./helpers";
-import groupLogo1 from "../../../assets/Group 1000005716-1.png";
+import AppLogo from "../../common/AppLogo";
 
 export default function Sidebar({
   page, setPage, admin, onBack, onSignOut, unreadAlerts,
@@ -22,19 +22,13 @@ export default function Sidebar({
   return (
     <aside className="w-[256px] flex-shrink-0 flex flex-col h-full bg-white border-r" style={{ borderColor: "#E8ECF4" }}>
       {/* ── Logo ─────────────────────────── */}
-      <div className="px-5 h-[64px] flex items-center gap-2.5 flex-shrink-0">
+      <div className="px-5 h-[64px] flex items-center flex-shrink-0">
         <a
           href="/"
-          className="flex items-center gap-2.5 cursor-pointer"
+          className="flex items-center cursor-pointer"
           onClick={e => { e.preventDefault(); onBack(); }}
         >
-          <div
-            className="w-[34px] h-[34px] rounded-[10px] flex items-center justify-center"
-            style={{ background: "#0F172A" }}
-          >
-            <img src={groupLogo1} alt="" className="h-[18px] w-auto object-contain" />
-          </div>
-          <span className="text-[15px] font-extrabold text-[#1A1D26] tracking-[-0.02em]">RapiQR</span>
+          <AppLogo variant="light" className="h-7 w-auto object-contain" />
         </a>
       </div>
 

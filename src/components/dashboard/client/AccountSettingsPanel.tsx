@@ -111,18 +111,18 @@ function DangerZoneSection({ onAccountDeleted }: { onAccountDeleted?: () => void
 }
 
 function ProfileForm({ profile, refreshProfile, showToast }: any) {
+  const { sendPhoneOtp, verifyPhoneOtp } = useAuth();
   const [fullName, setFullName] = useState(profile?.fullName || '');
-  const [phoneNumber, setPhoneNumber] = useState(profile?.phoneNumber || '');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
-  const handleSave = async () => {
+  const handleSaveName = async () => {
     setSaving(true);
     setMsg(null);
     try {
-      await apiClient.auth.updateProfile({ fullName, phoneNumber });
+      await apiClient.auth.updateProfile({ fullName });
       await refreshProfile();
-      setMsg({ tone: 'success', text: 'Profile updated.' });
+      setMsg({ tone: 'success', text: 'Name updated.' });
       showToast('Profile updated successfully');
     } catch (err: any) {
       setMsg({ tone: 'error', text: err.message || 'Failed to update profile' });
@@ -131,31 +131,141 @@ function ProfileForm({ profile, refreshProfile, showToast }: any) {
     }
   };
 
+  // Phone number is OTP-verified before it's ever attached to the account —
+  // otherwise anyone could type in a stranger's number here and silently
+  // auto-claim any sticker registered under it.
+  const [phoneDraft, setPhoneDraft] = useState('');
+  const [otpStep, setOtpStep] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [phoneBusy, setPhoneBusy] = useState(false);
+  const [phoneMsg, setPhoneMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+
+  const handleSendOtp = async () => {
+    if (!phoneDraft.trim()) {
+      setPhoneMsg({ tone: 'error', text: 'Enter a phone number first.' });
+      return;
+    }
+    setPhoneBusy(true);
+    setPhoneMsg(null);
+    const res = await sendPhoneOtp(phoneDraft.trim());
+    setPhoneBusy(false);
+    if (!res.success) {
+      setPhoneMsg({ tone: 'error', text: res.error || 'Failed to send code.' });
+      return;
+    }
+    setOtpCode('');
+    setOtpStep(true);
+    setPhoneMsg({
+      tone: 'success',
+      text: res.simulated ? "Code generated — SMS/WhatsApp isn't configured on the server yet." : 'Code sent via SMS/WhatsApp.',
+    });
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpCode.trim()) {
+      setPhoneMsg({ tone: 'error', text: 'Enter the code sent to your phone.' });
+      return;
+    }
+    setPhoneBusy(true);
+    setPhoneMsg(null);
+    const res = await verifyPhoneOtp(otpCode.trim());
+    setPhoneBusy(false);
+    if (!res.success) {
+      setPhoneMsg({ tone: 'error', text: res.error || 'Verification failed.' });
+      return;
+    }
+    await refreshProfile();
+    setOtpStep(false);
+    setPhoneDraft('');
+    setPhoneMsg({
+      tone: 'success',
+      text: res.claimedCount ? `Phone verified! ${res.claimedCount} sticker(s) linked to your account.` : 'Phone number verified.',
+    });
+    showToast('Phone number verified');
+  };
+
   return (
     <div className={cardCls}>
       <h3 className="font-bold text-sm text-[#1A1D26] flex items-center gap-2"><Smartphone size={15} /> Profile</h3>
-      <div className="grid sm:grid-cols-2 gap-3.5">
-        <div>
-          <label className={labelCls}>Full Name</label>
-          <input className={inputCls} value={fullName} onChange={(e) => setFullName(e.target.value)} />
-        </div>
-        <div>
-          <label className={labelCls}>Phone Number</label>
-          <PhoneInputWithCountry
-            value={phoneNumber}
-            onChange={(full) => setPhoneNumber(full)}
-            placeholder="10-digit mobile"
-          />
-        </div>
+
+      <div className="max-w-sm">
+        <label className={labelCls}>Full Name</label>
+        <input className={inputCls} value={fullName} onChange={(e) => setFullName(e.target.value)} />
       </div>
       {msg && <Banner tone={msg.tone} message={msg.text} />}
       <button
-        onClick={handleSave}
+        onClick={handleSaveName}
         disabled={saving}
         className="px-5 py-2.5 rounded-xl bg-[#111111] hover:bg-black text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
       >
-        {saving && <Loader2 size={13} className="animate-spin" />} Save Profile
+        {saving && <Loader2 size={13} className="animate-spin" />} Save Name
       </button>
+
+      <div className="pt-4 border-t border-[#E8ECF4] space-y-3">
+        <div className="flex items-center justify-between">
+          <label className={`${labelCls} mb-0`}>Phone Number <span className="text-[#DC2626]">*</span></label>
+          {profile?.phoneNumber ? (
+            <span className="text-[10px] font-black uppercase tracking-wider text-[#16A34A] flex items-center gap-1">
+              <Check size={11} /> Verified
+            </span>
+          ) : (
+            <span className="text-[10px] font-black uppercase tracking-wider text-[#DC2626]">Required</span>
+          )}
+        </div>
+        {profile?.phoneNumber && !otpStep && (
+          <p className="text-sm font-mono font-bold text-[#1A1D26]">{profile.phoneNumber}</p>
+        )}
+        {!profile?.phoneNumber && (
+          <p className="text-xs text-[#64748B]">
+            A verified phone number is required — it's what your stickers auto-link to the first time they're scanned and activated.
+          </p>
+        )}
+
+        {!otpStep ? (
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center max-w-sm">
+            <PhoneInputWithCountry
+              value={phoneDraft}
+              onChange={(full) => { setPhoneDraft(full); setPhoneMsg(null); }}
+              placeholder={profile?.phoneNumber ? 'Enter new number to change' : '10-digit mobile'}
+            />
+            <button
+              onClick={handleSendOtp}
+              disabled={phoneBusy}
+              className="px-4 py-2.5 rounded-xl bg-[#F5F6FA] border border-[#E8ECF4] text-xs font-bold text-[#1A1D26] hover:bg-[#E2E8F0] disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 flex-shrink-0"
+            >
+              {phoneBusy ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
+              {profile?.phoneNumber ? 'Verify New Number' : 'Verify Number'}
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center max-w-sm">
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              autoFocus
+              value={otpCode}
+              onChange={(e) => { setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setPhoneMsg(null); }}
+              placeholder="6-digit code"
+              className={`${inputCls} font-mono tracking-widest`}
+            />
+            <button
+              onClick={handleVerifyOtp}
+              disabled={phoneBusy}
+              className="px-4 py-2.5 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 flex-shrink-0"
+            >
+              {phoneBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Verify
+            </button>
+            <button
+              onClick={() => { setOtpStep(false); setPhoneMsg(null); }}
+              className="px-3 py-2.5 rounded-xl border border-[#E8ECF4] text-xs font-bold text-[#64748B] hover:bg-[#F5F6FA] cursor-pointer flex-shrink-0"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+        {phoneMsg && <Banner tone={phoneMsg.tone} message={phoneMsg.text} />}
+      </div>
     </div>
   );
 }

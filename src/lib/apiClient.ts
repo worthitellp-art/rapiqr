@@ -103,6 +103,23 @@ export const apiClient = {
       });
     },
 
+    // Phone verification (two-step): send a code, then verify it before the
+    // number is attached to the account — required before any sticker can be
+    // auto-claimed by phone. See ClientDashboard.tsx / AccountSettingsPanel.tsx.
+    async sendPhoneOtp(phoneNumber: string) {
+      return request<{ success: boolean; simulated?: boolean; error?: string }>('/auth/phone/send-otp', {
+        method: 'POST',
+        body: JSON.stringify({ phoneNumber }),
+      });
+    },
+
+    async verifyPhoneOtp(code: string) {
+      return request<{ success: boolean; user?: any; claimedCount?: number; error?: string }>('/auth/phone/verify-otp', {
+        method: 'POST',
+        body: JSON.stringify({ code }),
+      });
+    },
+
     async changePassword(currentPassword: string, newPassword: string) {
       return request<{ success: boolean; message?: string }>('/auth/change-password', {
         method: 'POST',
@@ -253,7 +270,13 @@ export const apiClient = {
   // Emergency Alerts Services
   alerts: {
     async createAlert(alertPayload: any) {
-      return request<{ success: boolean; data: any; smsResult?: { sent: boolean; simulated: boolean; reason?: string; error?: string } }>('/alerts', {
+      return request<{
+        success: boolean;
+        data: any;
+        smsResult?: { sent: boolean; simulated: boolean; reason?: string; error?: string };
+        whatsappResult?: { sent: boolean; simulated: boolean; reason?: string; error?: string };
+        contactsNotified?: number;
+      }>('/alerts', {
         method: 'POST',
         body: JSON.stringify(alertPayload),
       });
@@ -405,12 +428,14 @@ export const apiClient = {
     },
   },
 
-  // Twilio Masked Call Proxy Service
+  // Twilio Masked Call Proxy Service — the target phone (owner, or a named
+  // emergency contact) is resolved server-side from qrId; it's never sent from
+  // or echoed back to the browser, so the real number stays hidden.
   twilio: {
-    async callBridge(visitorPhone: string, ownerPhone: string) {
-      return request<{ success: boolean; message: string; callSid?: string; maskedHelplineNumber?: string }>('/twilio/call-bridge', {
+    async callBridge(opts: { qrId: string; visitorPhone: string; contactName?: string }) {
+      return request<{ success: boolean; message?: string; error?: string; callSid?: string; maskedHelplineNumber?: string }>('/twilio/call-bridge', {
         method: 'POST',
-        body: JSON.stringify({ visitorPhone, ownerPhone }),
+        body: JSON.stringify(opts),
       });
     },
   },

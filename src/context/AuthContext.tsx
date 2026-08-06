@@ -39,6 +39,11 @@ interface AuthContextType {
   // Links a phone number to the logged-in account — used at signup and to auto-link
   // the phone entered during sticker activation, so the dashboard can match by phone.
   updatePhoneNumber: (phoneNumber: string) => Promise<{ success: boolean; error?: string }>;
+  // Two-step OTP phone verification — required before the Client Dashboard's "Link
+  // Sticker" card or Account Settings can attach/change the account's phone number,
+  // so a sticker only auto-claims once ownership of the phone is actually proven.
+  sendPhoneOtp: (phoneNumber: string) => Promise<{ success: boolean; simulated?: boolean; error?: string }>;
+  verifyPhoneOtp: (code: string) => Promise<{ success: boolean; claimedCount?: number; error?: string }>;
   // Re-pulls the profile from the backend (Account Settings uses this after saving
   // name/phone/email changes so the header/avatar/email stay in sync immediately).
   refreshProfile: () => Promise<void>;
@@ -423,14 +428,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Backend-first when the Render API is configured — this is also what
       // triggers the server-side auto-claim of stickers registered under this phone.
       if (isApiBackendConfigured && !profile.id.startsWith('demo-') && profile.id !== 'demo-user') {
-        const res = await apiClient.auth.updateProfile({ phoneNumber });
-        if (!res?.success) return { success: false, error: 'Failed to save phone number.' };
-        const updated = res.user ? backendUserToProfile(res.user) : { ...profile, phoneNumber };
-        if (profile.role === 'admin') updated.role = 'admin';
-        setProfile(updated);
-        localStorage.setItem('repiqr-auth-user', JSON.stringify(updated));
-        localStorage.setItem('namoqr-auth-user', JSON.stringify(updated));
-        return { success: true };
+        try {
+          const res = await apiClient.auth.updateProfile({ phoneNumber });
+          if (res?.success) {
+            const updated = res.user ? backendUserToProfile(res.user) : { ...profile, phoneNumber };
+            if (profile.role === 'admin') updated.role = 'admin';
+            setProfile(updated);
+            localStorage.setItem('repiqr-auth-user', JSON.stringify(updated));
+            localStorage.setItem('namoqr-auth-user', JSON.stringify(updated));
+            return { success: true };
+          }
+        } catch (apiErr) {
+          console.warn('API updateProfile failed, falling back to direct update:', apiErr);
+        }
       }
 
       if (isSupabaseConfigured && !profile.id.startsWith('demo-') && profile.id !== 'demo-user') {
@@ -444,6 +454,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || 'Failed to save phone number.' };
+    }
+  };
+
+  // Phone verification step 1 — backend-only (SMS/WhatsApp delivery requires the
+  // Express/Twilio backend; there's no Supabase-direct equivalent).
+  const sendPhoneOtp = async (phoneNumber: string) => {
+    if (!profile) return { success: false, error: 'Not signed in.' };
+    if (!isApiBackendConfigured) return { success: false, error: 'Phone verification requires the RapiQR backend to be connected.' };
+    try {
+      const res = await apiClient.auth.sendPhoneOtp(phoneNumber);
+      return { success: true, simulated: res.simulated };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to send verification code.' };
+    }
+  };
+
+  // Phone verification step 2 — only on a correct code does the backend attach
+  // the phone to the account and run the auto-claim of matching stickers.
+  const verifyPhoneOtp = async (code: string) => {
+    if (!profile) return { success: false, error: 'Not signed in.' };
+    if (!isApiBackendConfigured) return { success: false, error: 'Phone verification requires the RapiQR backend to be connected.' };
+    try {
+      const res = await apiClient.auth.verifyPhoneOtp(code);
+      if (!res?.success) return { success: false, error: 'Verification failed.' };
+      const updated = res.user ? backendUserToProfile(res.user) : profile;
+      if (profile.role === 'admin') updated.role = 'admin';
+      setProfile(updated);
+      localStorage.setItem('repiqr-auth-user', JSON.stringify(updated));
+      localStorage.setItem('namoqr-auth-user', JSON.stringify(updated));
+      return { success: true, claimedCount: res.claimedCount || 0 };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to verify code.' };
     }
   };
 
@@ -486,6 +528,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signIn,
         adminSignIn,
         updatePhoneNumber,
+        sendPhoneOtp,
+        verifyPhoneOtp,
         refreshProfile,
         signOut,
         deleteAccount,

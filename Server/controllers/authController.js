@@ -6,6 +6,8 @@ const ProductModel = require('../models/productModel');
 const { JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD } = require('../middleware/authMiddleware');
 const { logger } = require('../middleware/loggerMiddleware');
 const { generateSecret, verifyTOTP, buildOtpauthUrl } = require('../utils/totp');
+const { sendSms, sendWhatsApp } = require('../services/smsService');
+const { createOtp, verifyOtp } = require('../services/phoneVerificationService');
 
 // No hardcoded fallback: an unset GOOGLE_CLIENT_ID would otherwise let
 // verifyIdToken's audience check silently pass against the wrong project (task.md #7/#23).
@@ -302,6 +304,77 @@ class AuthController {
       return res.json({ success: true, user: updated });
     } catch (err) {
       logger.error('PROFILE_UPDATE', 'Failed to update profile', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Phone verification step 1 — send a 6-digit code to the candidate number via
+   * SMS + WhatsApp (real Twilio send, honestly reports back if unconfigured).
+   * The number is NOT attached to the account until verifyPhoneOtp succeeds —
+   * this is what closes the "type any phone and silently claim its stickers"
+   * gap, since autoClaimByPhone only ever runs after a real code match.
+   */
+  static async sendPhoneOtp(req, res) {
+    try {
+      const { phoneNumber } = req.body || {};
+      if (!phoneNumber || String(phoneNumber).replace(/\D/g, '').length < 7) {
+        return res.status(400).json({ success: false, error: 'Enter a valid phone number.' });
+      }
+
+      const code = createOtp(req.user.id, phoneNumber);
+      const body = `Your RapiQR phone verification code is ${code}. It expires in 5 minutes.`;
+      const [smsResult, whatsappResult] = await Promise.all([
+        sendSms({ to: phoneNumber, body, event: 'PHONE_VERIFY_SMS' }),
+        sendWhatsApp({ to: phoneNumber, body, event: 'PHONE_VERIFY_WHATSAPP' }),
+      ]);
+
+      const simulated = Boolean(smsResult.simulated && whatsappResult.simulated);
+      logger.user('PHONE_OTP_SENT', `Phone verification code sent for ${req.user.email}`, { simulated });
+      return res.json({ success: true, simulated });
+    } catch (err) {
+      logger.error('PHONE_OTP_SEND', 'Failed to send phone verification code', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Phone verification step 2 — check the code, and only on a match does this
+   * actually write profiles.phone_number and run the phone-based auto-claim
+   * (Server/models/productModel.js autoClaimByPhone), so a sticker only ever
+   * lands in a dashboard once ownership of the phone number is proven.
+   */
+  static async verifyPhoneOtp(req, res) {
+    try {
+      const { code } = req.body || {};
+      if (!code) return res.status(400).json({ success: false, error: 'Enter the code sent to your phone.' });
+
+      const result = verifyOtp(req.user.id, code);
+      if (!result.ok) {
+        const messages = {
+          no_pending_otp: 'No verification in progress — request a new code.',
+          expired: 'This code has expired — request a new one.',
+          too_many_attempts: 'Too many incorrect attempts — request a new code.',
+          invalid_code: `Incorrect code.${result.attemptsLeft ? ` ${result.attemptsLeft} attempt(s) left.` : ''}`,
+        };
+        return res.status(400).json({ success: false, error: messages[result.reason] || 'Verification failed.' });
+      }
+
+      const updated = await UserModel.updateProfile(req.user.id, { phoneNumber: result.phone });
+      if (!updated) return res.status(500).json({ success: false, error: 'Failed to save verified phone number.' });
+
+      let claimedCount = 0;
+      try {
+        const claimed = await ProductModel.autoClaimByPhone(req.user.id, updated.full_name, result.phone);
+        claimedCount = claimed.length;
+      } catch (err) {
+        logger.error('PRODUCT_AUTO_CLAIM', 'Failed to auto-claim products after verified phone update', err);
+      }
+
+      logger.user('PHONE_VERIFIED', `Phone number verified & linked for ${req.user.email}`, { claimedCount });
+      return res.json({ success: true, user: updated, claimedCount });
+    } catch (err) {
+      logger.error('PHONE_OTP_VERIFY', 'Failed to verify phone code', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

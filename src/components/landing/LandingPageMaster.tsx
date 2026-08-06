@@ -15,6 +15,7 @@ import {
   getUserDistributorApplication, 
   DistributorApplication 
 } from '../../lib/distributorService';
+import AppLogo from '../common/AppLogo';
 import groupLogo from '../../../assets/Group 1000005716.png';
 import groupLogo1 from '../../../assets/Group 1000005716-1.png';
 import logoForWhBg from '../../../assets/logo for wh bg.png';
@@ -679,7 +680,7 @@ export default function LandingPageMaster({
             className="flex items-center flex-shrink-0 cursor-pointer py-1"
             aria-label="RapiQR home"
           >
-            <img src={groupLogo1} alt="RapiQR Logo" className="h-6.5 sm:h-8 w-auto object-contain max-h-8" />
+            <AppLogo variant="dark" className="h-6.5 sm:h-8 w-auto object-contain max-h-8" />
           </button>
 
           {/* Desktop nav */}
@@ -1834,7 +1835,7 @@ export default function LandingPageMaster({
           <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
             <div>
               <div style={{ marginBottom: 16 }} className="flex items-center">
-                <img src={groupLogo1} alt="RapiQR Logo" className="h-10 sm:h-12 w-auto object-contain" />
+                <AppLogo variant="dark" className="h-10 sm:h-12 w-auto object-contain" />
               </div>
               <p style={{ fontSize: 13, lineHeight: 1.7 }}>
                 One QR. Lifetime protection.

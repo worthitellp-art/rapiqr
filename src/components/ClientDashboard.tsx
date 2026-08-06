@@ -1,32 +1,27 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getCategoryIcon, getCategoryLabel, STICKER_CATEGORIES } from '../stickerModules';
+import { getCategoryIcon, getCategoryLabel } from '../stickerModules';
 import {
   Bell,
-  Plus,
   ShieldCheck,
   LogOut,
-  Sparkles,
-  X,
   Eye,
-  Share2,
   Menu,
   Grid,
   History,
-  BookOpen,
-  Store,
-  AlertTriangle,
-  ShoppingBag,
   Trash2,
   Loader2,
-  Pencil,
   Users,
   Settings,
   LifeBuoy,
+  X,
+  Share2,
+  ShoppingBag,
+  Pencil,
   ArrowRightLeft,
   Power,
   RefreshCcw,
-  Link2
+  Sparkles,
 } from 'lucide-react';
 import type { DashboardSticker } from './dashboard/client/types';
 import { mapProductRow } from './dashboard/client/types';
@@ -34,7 +29,7 @@ import { EditDetailsModal, EditContactsModal, TransferModal, ScanHistoryModal, C
 import EmergencyContactsPanel from './dashboard/client/EmergencyContactsPanel';
 import AccountSettingsPanel from './dashboard/client/AccountSettingsPanel';
 import SupportLegalPanel from './dashboard/client/SupportLegalPanel';
-import PhoneInputWithCountry from './common/PhoneInputWithCountry';
+import AppLogo from './common/AppLogo';
 import {
   getProductsFromDb,
   updateProductDetailsInDb,
@@ -50,46 +45,14 @@ interface ClientDashboardProps {
   switchToDistributor?: () => void;
 }
 
-// Product descriptions keyed by the admin sticker category value.
-const CATALOG_DESCRIPTIONS: Record<string, string> = {
-  car: 'Wrong-parking alerts, crash SOS & masked calling for cars, autos & trucks.',
-  bike: 'Rider safety with crash alerts & instant emergency contact sharing.',
-  home: 'Courier arrival pings, visitor check-in & neighbour hazard alerts for home & office.',
-  pet: 'Vet details & instant finder calling for your pets.',
-  child: 'School-bag tracking, guardian alerts & pickup verification for kids.',
-  luggage: 'Anonymous finder messaging & recovery support for your luggage.'
-};
-
-// Banner images keyed by the admin sticker category value.
-const CATALOG_IMAGES: Record<string, string> = {
-  car: 'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=400',
-  bike: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=400',
-  home: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=400',
-  pet: 'https://images.unsplash.com/photo-1583337130417-3346a1be7dee?auto=format&fit=crop&q=80&w=400',
-  child: 'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?auto=format&fit=crop&q=80&w=400',
-  luggage: 'https://images.unsplash.com/photo-1553531384-cc64ac80f931?auto=format&fit=crop&q=80&w=400'
-};
-
-// Product Catalog — driven by the same admin sticker categories. Purchases happen on the website.
-const CATALOG_ITEMS = STICKER_CATEGORIES.map((cat) => ({
-  category: cat.value,
-  icon: getCategoryIcon(cat.value),
-  name: `RepiQR${cat.label} Sticker`,
-  desc: CATALOG_DESCRIPTIONS[cat.value] || `${cat.label} sticker with instant scan-and-alert protection.`,
-  price: 299,
-  img: CATALOG_IMAGES[cat.value] || ''
-}));
-
-type TabId = 'overview' | 'activate' | 'catalog' | 'contacts' | 'history' | 'settings' | 'support';
+type TabId = 'overview' | 'contacts' | 'history' | 'settings' | 'support';
 
 const NAV_ITEMS: { id: TabId; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
-  { id: 'overview', label: 'My Products', icon: Grid },
-  { id: 'activate', label: 'Link My Stickers', icon: Link2 },
-  { id: 'catalog', label: 'Product Catalog', icon: BookOpen },
+  { id: 'overview', label: 'My Stickers', icon: Grid },
   { id: 'contacts', label: 'Emergency Contacts', icon: Users },
-  { id: 'history', label: 'Emergency History', icon: History },
+  { id: 'history', label: 'Alert History', icon: History },
   { id: 'settings', label: 'Account Settings', icon: Settings },
-  { id: 'support', label: 'Support & Legal', icon: LifeBuoy },
+  { id: 'support', label: 'Support & Help', icon: LifeBuoy },
 ];
 
 type ModalState =
@@ -103,7 +66,7 @@ type ModalState =
   | null;
 
 export default function ClientDashboard({ onBack }: ClientDashboardProps) {
-  const { profile, signOut, updatePhoneNumber } = useAuth();
+  const { profile, signOut } = useAuth();
 
   const handleSignOut = async () => {
     await signOut();
@@ -161,46 +124,17 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
   // Drawer & Toast State
   const [drawerProductId, setDrawerProductId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  }, []);
+
   const [notifBadgeVisible, setNotifBadgeVisible] = useState(true);
   const [modal, setModal] = useState<ModalState>(null);
   const [modalBusy, setModalBusy] = useState(false);
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-
-  const showToast = (msg: string) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 2800);
-  };
-
-  // ─── LINK STICKERS BY PHONE (no activation code — a sticker's owner phone,
-  // set during first-scan activation on the public scan page, is the only thing
-  // that connects it to a dashboard account) ───
-  const [linkPhone, setLinkPhone] = useState(() => profile?.phoneNumber || '');
-  const [linking, setLinking] = useState(false);
-  const [linkResult, setLinkResult] = useState<{ success: boolean; msg: string } | null>(null);
-
-  useEffect(() => {
-    if (profile?.phoneNumber) setLinkPhone(profile.phoneNumber);
-  }, [profile?.phoneNumber]);
-
-  const handleLinkByPhone = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const phone = linkPhone.trim();
-    if (!phone) {
-      setLinkResult({ success: false, msg: 'Enter the phone number registered on your sticker.' });
-      return;
-    }
-    setLinking(true);
-    setLinkResult(null);
-    const countBefore = products.length;
-    if (phone !== profile?.phoneNumber) {
-      await updatePhoneNumber(phone);
-    }
-    const refreshed = await loadProducts();
-    setLinking(false);
-    setLinkResult({ success: true, msg: 'Checked — any sticker registered with this phone number is now linked below.' });
-    if (refreshed.length > countBefore) showToast('Sticker linked to your dashboard!');
-  };
 
   // ─── SHARE PROFILE ───
   const handleShareProfile = (code: string) => {
@@ -329,30 +263,12 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
           >
             <Menu size={20} />
           </button>
-          <div onClick={onBack} className="flex items-center gap-2 cursor-pointer font-extrabold text-xl tracking-tight">
-            <div className="w-7 h-7 text-[#111111]">
-              <svg viewBox="0 0 32 32" fill="none" className="w-full h-full">
-                <rect x="2" y="2" width="11" height="11" rx="3" stroke="#111111" strokeWidth="3"/>
-                <rect x="19" y="2" width="11" height="11" rx="3" stroke="#111111" strokeWidth="3"/>
-                <rect x="2" y="19" width="11" height="11" rx="3" stroke="#111111" strokeWidth="3"/>
-                <rect x="19" y="19" width="5" height="5" rx="1" fill="#111111"/>
-                <rect x="26" y="26" width="4" height="4" rx="1" fill="#111111"/>
-                <rect x="19" y="26" width="4" height="4" rx="1" fill="#111111"/>
-                <rect x="26" y="19" width="4" height="4" rx="1" fill="#111111"/>
-              </svg>
-            </div>
-            <span>Namo<span className="text-[#111111]">QR</span></span>
-          </div>
+          <button onClick={onBack} className="flex items-center cursor-pointer">
+            <AppLogo variant="light" className="h-7 w-auto object-contain" />
+          </button>
         </div>
 
         <div className="flex items-center gap-3.5">
-          <button
-            onClick={onBack}
-            className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#F5F6FA] border border-[#E8ECF4] text-xs font-bold text-[#1A1D26] hover:bg-[#E2E8F0] transition-colors cursor-pointer"
-          >
-            <Store size={15} /> Store
-          </button>
-
           <div className="hidden sm:flex items-center gap-2 bg-[#DCFCE7] text-[#16A34A] px-3.5 py-1.5 rounded-full text-xs font-extrabold">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#16A34A] opacity-75"></span>
@@ -412,24 +328,9 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                 </button>
               ))}
             </nav>
-
-            <button
-              onClick={() => { setActiveTab('activate'); setIsMobileSidebarOpen(false); }}
-              className="w-full flex items-center justify-center gap-2 bg-[#111111] hover:bg-black text-white font-bold text-xs py-3 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
-            >
-              <Plus size={15} /> Link a Sticker
-            </button>
-
           </div>
 
           <div className="space-y-3">
-            <div className="bg-[#DCFCE7] rounded-xl p-3.5 border border-emerald-200">
-              <div className="text-[10px] font-black uppercase tracking-wider text-[#16A34A] mb-1">SYSTEM SECURE</div>
-              <p className="text-[11px] text-[#166534] leading-relaxed">
-                Your data is encrypted at rest and in transit. All RepiQR emergency calls &amp; scans are masked.
-              </p>
-            </div>
-
             <button
               onClick={handleSignOut}
               className="w-full flex items-center justify-center gap-2 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 py-3 rounded-xl transition-all cursor-pointer"
@@ -445,22 +346,15 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
           {/* ════ VIEW 1: MY PRODUCTS / OVERVIEW ════ */}
           {activeTab === 'overview' && (
             <div className="space-y-6 animate-fade-in">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1D26]">
-                    Welcome back, {profile?.fullName ? profile.fullName.split(' ')[0] : 'there'}.
-                  </h1>
-                  <p className="text-xs sm:text-sm text-[#64748B] mt-1">
-                    Here's what's happening across your family's safety network.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setActiveTab('activate')}
-                  className="bg-[#111111] hover:bg-black text-white font-extrabold text-xs px-5 py-3 rounded-full shadow-lg transition-all active:scale-95 cursor-pointer flex items-center gap-2"
-                >
-                  <Plus size={16} /> Link a Sticker
-                </button>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1D26]">
+                  My Safety Stickers
+                </h1>
+                <p className="text-xs sm:text-sm text-[#64748B] mt-1">
+                  Manage your active QR tags, emergency contacts, and protection settings.
+                </p>
               </div>
+
               {/* Stat Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-white border border-[#E8ECF4] rounded-2xl p-5 shadow-2xs flex flex-col gap-2">
@@ -503,26 +397,12 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                   <p className="text-xs font-semibold text-[#64748B]">Loading your stickers…</p>
                 </div>
               ) : products.length === 0 ? (
-                <div className="bg-white border border-[#E8ECF4] rounded-3xl p-12 text-center space-y-4 shadow-sm">
-                  <div className="w-16 h-16 rounded-full bg-[#F1F5F9] flex items-center justify-center mx-auto text-3xl">🛡️</div>
-                  <h3 className="text-xl font-bold text-[#1A1D26]">No QR Tags Connected Yet</h3>
-                  <p className="text-xs sm:text-sm text-[#64748B] max-w-md mx-auto">
-                    You haven't activated any RepiQR tags yet. Link an already-activated tag from the sidebar or buy safety stickers on our website.
+                <div className="bg-white border border-[#E8ECF4] rounded-3xl p-12 text-center space-y-3 shadow-sm max-w-md mx-auto">
+                  <div className="w-14 h-14 rounded-full bg-[#F1F5F9] flex items-center justify-center mx-auto text-2xl">🛡️</div>
+                  <h3 className="text-lg font-bold text-[#1A1D26]">No QR Tags Found</h3>
+                  <p className="text-xs text-[#64748B] leading-relaxed">
+                    Scan the QR code on your physical safety sticker to activate it and connect it to your account.
                   </p>
-                  <div className="flex justify-center gap-3 pt-2">
-                    <button
-                      onClick={() => setActiveTab('activate')}
-                      className="bg-[#111111] hover:bg-black text-white text-xs font-bold px-5 py-3 rounded-full cursor-pointer"
-                    >
-                      Link a Sticker
-                    </button>
-                    <button
-                      onClick={onBack}
-                      className="bg-[#111111] hover:bg-black text-white text-xs font-bold px-5 py-3 rounded-full shadow-md cursor-pointer"
-                    >
-                      Buy on Website
-                    </button>
-                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -596,114 +476,6 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                   ))}
                 </div>
               )}
-            </div>
-          )}
-
-          {/* ════ VIEW 2: LINK STICKERS BY PHONE ════ */}
-          {activeTab === 'activate' && (
-            <div className="space-y-6 animate-fade-in max-w-xl">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1D26]">Link Your Stickers</h1>
-                <p className="text-xs sm:text-sm text-[#64748B] mt-1">
-                  Scan your physical RepiQR sticker's QR code first to activate it and register your phone number there — no code needed here. Any sticker registered with the phone number below automatically appears in your dashboard.
-                </p>
-              </div>
-
-              <form onSubmit={handleLinkByPhone} className="bg-white border border-[#E8ECF4] rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-[#64748B] mb-1">Your Phone Number</label>
-                  <PhoneInputWithCountry
-                    value={linkPhone}
-                    onChange={(full) => { setLinkPhone(full); setLinkResult(null); }}
-                  />
-                </div>
-
-                {linkResult && (
-                  <p className={`text-xs font-bold ${linkResult.success ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
-                    {linkResult.msg}
-                  </p>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={linking}
-                  className="w-full py-3 rounded-xl bg-[#111111] hover:bg-black text-white text-sm font-bold shadow-md transition-all active:scale-95 cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
-                >
-                  {linking && <Loader2 size={15} className="animate-spin" />} Save & Link My Stickers
-                </button>
-              </form>
-
-              <div className="bg-white border border-[#E8ECF4] rounded-2xl p-5 flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#F1F5F9] flex items-center justify-center flex-shrink-0 text-lg">🛒</div>
-                <div>
-                  <h4 className="font-bold text-sm text-[#1A1D26]">Don't have a sticker yet?</h4>
-                  <p className="text-xs text-[#64748B] mt-0.5 mb-2">Browse the RepiQR safety tag range and purchase on our website.</p>
-                  <button
-                    onClick={onBack}
-                    className="px-4 py-2 rounded-xl bg-[#F5F6FA] border border-[#E8ECF4] text-xs font-bold text-[#1A1D26] hover:bg-[#E2E8F0] cursor-pointer flex items-center gap-1.5"
-                  >
-                    <ShoppingBag size={13} /> Buy on Website
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ════ VIEW 3: PRODUCT CATALOG ════ */}
-          {activeTab === 'catalog' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider bg-[#F1F5F9] text-[#111111] px-2.5 py-1 rounded-full">
-                      Safety Tag Collection
-                    </span>
-                  </div>
-                  <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1D26]">Product Catalog</h1>
-                  <p className="text-xs sm:text-sm text-[#64748B] mt-1">Browse the RepiQRsafety tag range. Purchase is handled securely on our website.</p>
-                </div>
-                <button
-                  onClick={onBack}
-                  className="flex items-center gap-2 bg-[#111111] hover:bg-black text-white font-bold text-xs px-5 py-3 rounded-full shadow-md transition-all active:scale-95 cursor-pointer"
-                >
-                  <ShoppingBag size={15} /> Buy on Website
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {CATALOG_ITEMS.map((item, idx) => (
-                  <div key={idx} className="group bg-white border border-[#E8ECF4] rounded-2xl overflow-hidden shadow-2xs hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col">
-                    <div className="relative h-36 bg-gradient-to-br from-[#F1F5F9] to-[#F1F5F9] flex items-center justify-center">
-                      {item.img ? (
-                        <img src={item.img} alt={item.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                      ) : (
-                        <span className="text-4xl">{item.icon}</span>
-                      )}
-                      <div className="absolute top-3 right-3 text-[9.5px] font-extrabold uppercase bg-[#111111] text-white px-2.5 py-1 rounded-full shadow">
-                        New
-                      </div>
-                    </div>
-                    <div className="p-5 flex flex-col justify-between flex-1 space-y-3">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-lg">{item.icon}</span>
-                          <h4 className="font-bold text-base text-[#1A1D26]">{item.name}</h4>
-                        </div>
-                        <p className="text-xs text-[#64748B] leading-relaxed">{item.desc}</p>
-                      </div>
-                      <div className="flex items-center justify-between pt-3 border-t border-dashed border-[#E8ECF4]">
-                        <span className="text-lg font-extrabold text-[#1A1D26]">₹{item.price}</span>
-                        <button
-                          onClick={onBack}
-                          className="px-4 py-2.5 rounded-xl bg-[#111111] hover:bg-black text-white font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
-                        >
-                          <ShoppingBag size={14} /> Buy on Website
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
 

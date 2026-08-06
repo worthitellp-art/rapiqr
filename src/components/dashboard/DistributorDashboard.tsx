@@ -5,7 +5,7 @@ import {
   ExternalLink, Sparkles, Copy, Check
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import groupLogo1 from '../../assets/Group 1000005716-1.png';
+import AppLogo from '../common/AppLogo';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
 
 interface CustomerTag {
@@ -91,13 +91,10 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={onBack} className="flex items-center gap-2 cursor-pointer">
-              <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center text-gray-950 font-black">
-                <img src={groupLogo1} alt="RapiQR" className="h-5 w-auto object-contain" />
-              </div>
+            <button onClick={onBack} className="flex items-center gap-2.5 cursor-pointer">
+              <AppLogo variant="light" className="h-7.5 w-auto object-contain" />
               <div>
-                <span className="font-black text-base text-gray-900 block leading-tight">RapiQR Partner Desk</span>
-                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Distributor Portal</span>
+                <span className="font-black text-xs text-amber-600 uppercase tracking-wider block">Partner Desk</span>
               </div>
             </button>
           </div>

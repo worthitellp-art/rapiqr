@@ -56,6 +56,11 @@ We recommend the following tables and fields. Primary keys (`id`) should be rand
 
 **Security Notes:** Encrypt or hash sensitive fields (e.g. passwords). PCI compliance governs any payment info (though that may be handled by a payment gateway). Do not store full OTP codes. Comply with DPDP/GDPR by keeping personal data minimal, and supporting deletion (“right to be forgotten”).  
 
+
+
+
+
+
 ## Sequence Diagram (Activation Flow)  
 Below is a Mermaid sequence diagram of the main interactions (purchase to activation). It shows the Buyer (user), the Website/App (front-end), and the Backend System. This includes branches for login vs registration and OTP verification.  
 
@@ -162,3 +167,31 @@ This intuitive design lets users quickly verify and update their emergency info.
 Each feature is marked **Effort:** Low/Med/High based on development complexity. We prioritize core flows (account auth, activation, dashboard CRUD) first, as these directly impact user conversion and trust. Subsequent features (analytics, admin tools) are valuable but lower priority for MVP. Throughout, iterative testing and user feedback should guide refinements.  
 
 **Summary:** By following this roadmap—building from purchase to activation to dashboard—we ensure a robust, user-friendly system that upholds security and privacy standards (e.g. DPDP Act’s consent and purpose limitations) while delivering a premium user experience focused on ease of activation and management.
+
+
+
+
+
+
+
+Unknown Person
+      │
+      ▼
+ Scan RepiQR
+      │
+      ▼
+ Browser asks Location Permission
+      │
+      ▼
+ Send GPS → RepiQR Backend
+      │
+      ├── WhatsApp API
+      ├── SMS Gateway
+      ├── Voice API
+      └── Push Notification
+             │
+             ▼
+Emergency Contacts
+
+Sender:
+✓ RepiQR

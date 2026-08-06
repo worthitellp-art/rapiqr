@@ -1,12 +1,17 @@
 import type React from "react";
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Copy, ExternalLink } from "lucide-react";
 import { qrFullUrl } from "./helpers";
 
-export default function CopyLinkButton({ qrId, compact }: { qrId: string; compact?: boolean }) {
+interface CopyLinkButtonProps {
+  qrId: string;
+  compact?: boolean;
+}
+
+export default function CopyLinkButton({ qrId, compact }: CopyLinkButtonProps) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = (e: React.MouseEvent) => {
+  const handleCopyLink = (e: React.MouseEvent) => {
     e.stopPropagation();
     navigator.clipboard.writeText(qrFullUrl(qrId)).then(() => {
       setCopied(true);
@@ -14,61 +19,56 @@ export default function CopyLinkButton({ qrId, compact }: { qrId: string; compac
     });
   };
 
-  const handleOpen = (e: React.MouseEvent) => {
+  const handleOpenPage = (e: React.MouseEvent) => {
     e.stopPropagation();
     window.open(qrFullUrl(qrId), "_blank");
   };
 
   if (compact) {
     return (
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-1">
         <button
-          onClick={handleCopy}
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all cursor-pointer"
+          onClick={handleCopyLink}
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-all cursor-pointer"
           title={copied ? "Copied!" : "Copy link"}
         >
-          {copied ? <Check size={12} className="text-teal-600" /> : (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-            </svg>
-          )}
+          {copied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
         </button>
         <button
-          onClick={handleOpen}
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all cursor-pointer"
+          onClick={handleOpenPage}
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-all cursor-pointer"
           title="Open scan page"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
-          </svg>
+          <ExternalLink size={13} />
         </button>
       </div>
     );
   }
 
   return (
-    <div className="flex gap-2 w-full">
+    <div className="flex gap-2.5 w-full">
       <button
-        onClick={handleCopy}
-        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold text-gray-800 hover:bg-gray-50 transition-all cursor-pointer"
-        style={{ borderColor: "#e5e7eb" }}
+        onClick={handleCopyLink}
+        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] transition-all cursor-pointer shadow-xs"
       >
-        {copied ? <Check size={12} className="text-teal-600" /> : (
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-          </svg>
+        {copied ? (
+          <>
+            <Check size={14} className="text-emerald-600" />
+            <span className="text-emerald-600">Copied!</span>
+          </>
+        ) : (
+          <>
+            <Copy size={14} className="text-slate-500" />
+            <span>Copy Link</span>
+          </>
         )}
-        {copied ? "Copied!" : "Copy Link"}
       </button>
       <button
-        onClick={handleOpen}
-        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold text-gray-800 hover:bg-gray-50 transition-all cursor-pointer"
-        style={{ borderColor: "#e5e7eb" }}
+        onClick={handleOpenPage}
+        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] transition-all cursor-pointer shadow-xs"
       >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
-        </svg>
-        Open Page
+        <ExternalLink size={14} className="text-slate-500" />
+        <span>Open Page</span>
       </button>
     </div>
   );

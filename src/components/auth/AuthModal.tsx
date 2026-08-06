@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured, getAuthCallbackUrl } from '../../lib/supabase';
 import { Smartphone, Mail, Clock } from 'lucide-react';
-import groupLogo1 from '../../../assets/Group 1000005716-1.png';
+import AppLogo from '../common/AppLogo';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
 
 const AUTH_IMAGES = [
@@ -175,7 +175,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
         <div className="relative z-10">
           <div className="mb-16 flex items-center justify-between">
             <div className="flex items-center">
-              <img src={groupLogo1} alt="RapiQR Logo" className="h-10 sm:h-12 w-auto object-contain" />
+              <AppLogo variant="dark" className="h-10 sm:h-12 w-auto object-contain" />
             </div>
 
             {/* Image Changing Loop Dot Indicators */}

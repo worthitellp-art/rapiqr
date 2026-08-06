@@ -38,10 +38,6 @@ export default function AdminDashboard({ onBack, switchToClientPortal }: { onBac
   const [searchQuery, setSearchQuery] = useState("");
   const [unreadAlerts, setUnreadAlerts] = useState(0);
 
-  // Live unread alert count for the sidebar badge (real reports only).
-  // GET /api/alerts is admin-only (reporter phone + GPS location) — skip entirely
-  // for client accounts, which can never pass verifyAdmin and would otherwise
-  // poll it into a permanent 401 loop every 15s.
   useEffect(() => {
     if (!isAdmin) return;
     const update = () => {
