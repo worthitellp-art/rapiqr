@@ -3,5 +3,6 @@ main = "src/worker.ts"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Serve static assets from the dist/ folder
-assets = { directory = "./dist" }
+# Serve static assets from the dist/ folder with single-page-application fallback
+assets = { directory = "./dist", not_found_handling = "single-page-application" }
+

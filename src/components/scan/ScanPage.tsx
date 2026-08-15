@@ -125,26 +125,53 @@ function getQrBaseUrl() {
 }
 
 function getQrIdFromUrl(): string | null {
-  const path = window.location.pathname;
-  const hash = window.location.hash;
-  const search = window.location.search;
+  if (typeof window === "undefined") return null;
 
-  const urlParams = new URLSearchParams(search);
-  const paramId = urlParams.get('sticker') || urlParams.get('code') || urlParams.get('qr');
-  if (paramId) return decodeURIComponent(paramId);
+  const pathName = window.location.pathname;
+  const hashString = window.location.hash;
+  const searchString = window.location.search;
 
-  const directMatch = path.match(/^\/([^/]+)/);
-  const hashMatch = hash.match(/#\/(qr|activate|verify)\/([^/]+)/);
-  const legacyMatch = path.match(/\/(qr|activate|verify)\/([^/]+)/);
+  const urlSearchParams = new URLSearchParams(searchString);
+  const queryParameterId =
+    urlSearchParams.get("sticker") ||
+    urlSearchParams.get("code") ||
+    urlSearchParams.get("qr") ||
+    urlSearchParams.get("id");
 
-  if (directMatch && directMatch[1] !== "" && directMatch[1] !== "activate" && directMatch[1] !== "verify") {
-    const id = directMatch[1];
-    if (id.toUpperCase().startsWith("QR") || id.toUpperCase().startsWith("CL") || id.toUpperCase().startsWith("NQ")) {
-      return decodeURIComponent(id);
+  if (queryParameterId) {
+    return decodeURIComponent(queryParameterId);
+  }
+
+  const hashRouteMatch = hashString.match(/#\/(qr|activate|verify|emergency|scan)\/([^/]+)/i);
+  if (hashRouteMatch) {
+    return decodeURIComponent(hashRouteMatch[2]);
+  }
+
+  const legacyPathMatch = pathName.match(/\/(qr|activate|verify|emergency|scan)\/([^/]+)/i);
+  if (legacyPathMatch) {
+    return decodeURIComponent(legacyPathMatch[2]);
+  }
+
+  const singleSegmentMatch = pathName.match(/^\/([^/]+)/);
+  if (singleSegmentMatch && singleSegmentMatch[1] !== "") {
+    const candidateId = singleSegmentMatch[1];
+    const reservedRoutes = [
+      "activate",
+      "verify",
+      "emergency",
+      "scan",
+      "admin",
+      "distributor",
+      "checkout",
+      "auth",
+      "index.html",
+    ];
+
+    if (!reservedRoutes.includes(candidateId.toLowerCase())) {
+      return decodeURIComponent(candidateId);
     }
   }
-  if (hashMatch) return decodeURIComponent(hashMatch[2]);
-  if (legacyMatch) return decodeURIComponent(legacyMatch[2]);
+
   return null;
 }
 

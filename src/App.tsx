@@ -24,22 +24,24 @@ function PageLoader() {
 
 /**
  * Universal QR Scan URL Detector:
- * Matches /QR-8A3F, /CL-CXTF2, /QR482KLM, /CL482KLM, /qr/8A3F, ?qr=8A3F, #/qr/8A3F on any mobile or desktop browser.
- * QR/CL IDs are generated without hyphens (e.g. QR482KLM) as well as legacy hyphenated IDs (QR-8A3F).
+ * Matches /QR805ERB, /QR-8A3F, /CL-CXTF2, /QR482KLM, /emergency/QR805ERB, ?qr=8A3F on any mobile or desktop browser.
  */
 function isScanUrl(): boolean {
   if (typeof window === 'undefined') return false;
-  const path = window.location.pathname;
-  const hash = window.location.hash;
-  const search = window.location.search;
+  const pathName = window.location.pathname;
+  const hashString = window.location.hash;
+  const searchString = window.location.search;
 
-  // Matches /QR..., /CL..., /NQ... with at least one char (handles QR482KLM, QR-8A3F, NQ-CAR-9081)
-  const directQrMatch = path.match(/\/(QR|CL|NQ)[A-Z0-9_-]+/i);
-  const legacyPathMatch = /\/(qr|activate|verify)(\/|$)/i.test(path);
-  const hashMatch = /#\/(qr|activate|verify)/i.test(hash);
-  const queryMatch = /\?(qr|sticker|code)=/i.test(search);
+  const directQrMatch = pathName.match(/\/(QR|CL|NQ|EMERGENCY)[A-Z0-9_-]+/i);
+  const legacyPathMatch = /\/(qr|activate|verify|emergency|scan)(\/|$)/i.test(pathName);
+  const hashMatch = /#\/(qr|activate|verify|emergency|scan)/i.test(hashString);
+  const queryMatch = /\?(qr|sticker|code|id)=/i.test(searchString);
 
-  return !!directQrMatch || legacyPathMatch || hashMatch || queryMatch;
+  const isSingleSegmentQrPath =
+    /^\/([A-Z0-9_-]{3,})$/i.test(pathName) &&
+    !/^\/(admin|distributor|checkout|auth|callback)$/i.test(pathName);
+
+  return !!directQrMatch || legacyPathMatch || hashMatch || queryMatch || isSingleSegmentQrPath;
 }
 
 /**
