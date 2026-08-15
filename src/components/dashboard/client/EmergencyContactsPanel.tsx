@@ -10,6 +10,7 @@ function StickerContactsCard({
   sticker,
   onSave,
 }: {
+  key?: string;
   sticker: DashboardSticker;
   onSave: (stickerId: string, contacts: EmergencyContact[]) => Promise<void>;
 }) {
@@ -44,13 +45,13 @@ function StickerContactsCard({
   };
 
   return (
-    <div className="bg-white border border-[#E8ECF4] rounded-2xl p-5 space-y-3.5 shadow-2xs">
+    <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 space-y-3.5 shadow-xs">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-[#F1F5F9] flex items-center justify-center text-lg flex-shrink-0">
+        <div className="w-10 h-10 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center text-lg flex-shrink-0">
           {getCategoryIcon(sticker.category as any) || '🏷️'}
         </div>
         <div>
-          <h3 className="font-bold text-sm text-[#1A1D26] leading-tight">{sticker.nickname}</h3>
+          <h3 className="font-bold text-sm text-[#0F172A] leading-tight">{sticker.nickname}</h3>
           <p className="text-[11px] font-semibold text-[#94A3B8]">{getCategoryLabel(sticker.category as any) || sticker.code}</p>
         </div>
       </div>
@@ -79,12 +80,12 @@ function StickerContactsCard({
       </div>
 
       <div className="flex items-center gap-2 pt-1">
-        <button onClick={addContact} className="flex-1 py-2 rounded-lg border border-dashed border-[#E8ECF4] text-[11px] font-bold text-[#64748B] hover:bg-[#F5F6FA] flex items-center justify-center gap-1.5 cursor-pointer">
+        <button onClick={addContact} className="flex-1 py-2.5 rounded-xl border border-dashed border-[#CBD5E1] text-[11px] font-bold text-[#64748B] hover:bg-[#F8FAFC] flex items-center justify-center gap-1.5 cursor-pointer">
           <Plus size={12} /> Add Contact
         </button>
         {dirty && (
-          <button onClick={handleSave} disabled={saving} className="flex-1 py-2 rounded-lg bg-[#111111] hover:bg-black text-white text-[11px] font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5">
-            {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Save
+          <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-white text-[11px] font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5">
+            {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Save Contacts
           </button>
         )}
       </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { getQrCodeByIdFromDb } from "../../lib/supabaseService";
 import groupLogo from "../../../assets/Group 1000005716.png";
-import groupLogo1 from "../../../assets/Group 1000005716-1.png";
+import groupLogo1 from "../../../assets/darkbglogo.png";
 import groupLogo2 from "../../../assets/Group 1000005716-2.png";
 import {
   PhoneCall,
@@ -122,7 +122,7 @@ function Security3DGraphic() {
           <defs>
             <linearGradient id="shieldGradMain" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#FFF3B0" />
-              <stop offset="35%" stopColor="#FF9900" />
+              <stop offset="35%" stopColor="#FACC15" />
               <stop offset="85%" stopColor="#D93800" />
               <stop offset="100%" stopColor="#991B00" />
             </linearGradient>
@@ -565,7 +565,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
           <div className="flex flex-col items-center w-full max-w-sm px-2 animate-fade-in space-y-5 text-center">
             {/* Sleek Minimalist Ring Spinner */}
             <div className="relative flex items-center justify-center py-2">
-              <div className="w-12 h-12 rounded-full border-2 border-gray-100 border-t-orange-500 animate-spin" />
+              <div className="w-12 h-12 rounded-full border-2 border-gray-100 border-t-yellow-500 animate-spin" />
             </div>
 
             {/* Minimalist Title */}
@@ -605,7 +605,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                     className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all duration-200 ${isDone
                       ? "bg-white border-emerald-200 text-gray-900 font-semibold shadow-2xs"
                       : isActive
-                        ? "bg-orange-50/60 border-orange-200 text-orange-600 font-bold"
+                        ? "bg-yellow-50/60 border-yellow-200 text-yellow-700 font-bold"
                         : "bg-gray-50/50 border-gray-100 text-gray-400 font-normal opacity-50"
                       }`}
                   >
@@ -613,7 +613,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                       {isDone ? (
                         <CheckCircle2 size={15} className="text-emerald-500" />
                       ) : isActive ? (
-                        <div className="w-3.5 h-3.5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                        <div className="w-3.5 h-3.5 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
                       ) : (
                         <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
                       )}
@@ -632,7 +632,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
             <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50 p-6 space-y-5">
               {/* Sleek Vehicle Header */}
               <div className="flex items-center gap-3.5 pb-4 border-b border-gray-100">
-                <div className="w-11 h-11 rounded-2xl bg-[#EAB308] text-white flex items-center justify-center font-bold flex-shrink-0 shadow-md shadow-orange-500/20">
+                <div className="w-11 h-11 rounded-2xl bg-[#EAB308] text-white flex items-center justify-center font-bold flex-shrink-0 shadow-md shadow-yellow-500/20">
                   <Car size={20} />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -1131,7 +1131,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                       }}
                       className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-red-300 hover:bg-red-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
                     >
-                      <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold shadow-2xs">
+                      <div className="w-8 h-8 rounded-xl bg-yellow-100 text-yellow-700 flex items-center justify-center font-bold shadow-2xs">
                         <Wrench size={18} />
                       </div>
                       <div>
@@ -1163,7 +1163,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                   {!towingImage ? (
                     <div className="bg-white border border-gray-200/80 rounded-2xl p-4 space-y-3 shadow-2xs">
                       <div className="grid grid-cols-2 gap-3">
-                        <label className="bg-[#FF5500] hover:bg-[#E64D00] text-white font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95 transition-all text-center">
+                        <label className="bg-[#EAB308] hover:bg-[#CA8A04] text-gray-950 font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95 transition-all text-center">
                           <Camera size={18} />
                           <span>Take Photo</span>
                           <input
@@ -1182,7 +1182,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
                           />
                         </label>
 
-                        <label className="bg-white border-2 border-[#FFD6B3] hover:bg-orange-50/50 text-[#FF5500] font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-xs cursor-pointer active:scale-95 transition-all text-center">
+                        <label className="bg-white border-2 border-yellow-300 hover:bg-yellow-50/50 text-amber-800 font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-xs cursor-pointer active:scale-95 transition-all text-center">
                           <Upload size={18} />
                           <span>Upload Picture</span>
                           <input
@@ -1413,7 +1413,7 @@ export default function ScanPage({ onBack }: { onBack: () => void }) {
               {/* Footer Support Info Pill */}
               <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-4 flex items-center justify-around text-[11px] font-semibold text-gray-600 mt-2">
                 <span className="flex items-center gap-1.5">
-                  <ShieldCheck size={14} className="text-orange-500" />
+                  <ShieldCheck size={14} className="text-yellow-500" />
                   Your safety is our priority
                 </span>
                 <div className="w-px h-4 bg-gray-200" />

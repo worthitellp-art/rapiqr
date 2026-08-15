@@ -56,7 +56,7 @@ function MainAppContent() {
   const { isLoggedIn, isAdmin, loading } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login');
-  const [dashboardMode, setDashboardMode] = useState<'admin' | 'client' | null>(null);
+  const [dashboardMode, setDashboardMode] = useState<'admin' | null>(null);
   const [adminModalOpen, setAdminModalOpen] = useState(() => isAdminUrl());
 
   // Restore page from localStorage, but only non-scan pages
@@ -169,13 +169,13 @@ function MainAppContent() {
   }
 
   if (page === 'dashboard') {
-    const showAdmin = (dashboardMode === 'admin') || (dashboardMode !== 'client' && isAdmin);
+    // Only users with isAdmin === true are allowed to view the Fleet Admin Dashboard
+    const showAdminPanel = isAdmin && dashboardMode !== 'client';
     return (
       <Suspense fallback={<PageLoader />}>
-        {showAdmin ? (
+        {showAdminPanel ? (
           <QRFleetDashboard
             onBack={() => navigateTo('landing')}
-            switchToClientPortal={() => setDashboardMode('client')}
           />
         ) : (
           <ClientDashboard

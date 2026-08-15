@@ -257,6 +257,9 @@ CREATE POLICY "Anyone can insert templates" ON public.templates FOR INSERT WITH 
 DROP POLICY IF EXISTS "Anyone can update templates" ON public.templates;
 CREATE POLICY "Anyone can update templates" ON public.templates FOR UPDATE USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Anyone can delete templates" ON public.templates;
+CREATE POLICY "Anyone can delete templates" ON public.templates FOR DELETE USING (true);
+
 -- ============================================================================
 -- STORAGE: STICKERS BUCKET (Generated sticker images)
 -- Public read so sticker URLs work anywhere; uploads allowed for any client.
@@ -404,3 +407,77 @@ CREATE POLICY "Communication public update policy" ON public.communication FOR U
 
 DROP POLICY IF EXISTS "Communication public delete policy" ON public.communication;
 CREATE POLICY "Communication public delete policy" ON public.communication FOR DELETE USING (true);
+
+-- ============================================================================
+-- 12. SHOP PRODUCTS TABLE (admin-managed catalog shown on the landing page)
+-- Reads are public (landing page); writes only via the Express backend's
+-- service-role key (supabaseAdmin) from the admin Products panel — same
+-- deny-all-except-select RLS shape as orders/communication above.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.shop_products (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'Vehicle', -- 'Vehicle' | 'Home' | 'Family' | 'Travel' — matches landing page filter chips
+    badge TEXT DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    features JSONB NOT NULL DEFAULT '[]'::jsonb, -- string[]
+    price NUMERIC NOT NULL DEFAULT 0,
+    mrp NUMERIC NOT NULL DEFAULT 0,
+    image_url TEXT NOT NULL DEFAULT '',
+    rating NUMERIC NOT NULL DEFAULT 4.8,
+    reviews_count INT NOT NULL DEFAULT 0,
+    sku TEXT,
+    weight_grams INT NOT NULL DEFAULT 100, -- shipment weight for Shiprocket
+    length_cm INT NOT NULL DEFAULT 10,
+    breadth_cm INT NOT NULL DEFAULT 10,
+    height_cm INT NOT NULL DEFAULT 1,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+DROP TRIGGER IF EXISTS update_shop_products_modtime ON public.shop_products;
+CREATE TRIGGER update_shop_products_modtime BEFORE UPDATE ON public.shop_products FOR EACH ROW EXECUTE PROCEDURE update_timestamp();
+
+ALTER TABLE public.shop_products ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public can view active shop products" ON public.shop_products;
+CREATE POLICY "Public can view active shop products" ON public.shop_products FOR SELECT USING (is_active = true);
+
+-- Seed with the catalog that used to be hardcoded in LandingPageMaster.tsx, so the
+-- storefront looks identical on first deploy of this table — admins can edit from here.
+INSERT INTO public.shop_products (name, category, badge, description, features, price, mrp, image_url, rating, reviews_count, sort_order)
+SELECT * FROM (VALUES
+    ('Automobile Safety Tag', 'Vehicle', 'Best Seller',
+     'Wrong-parking alerts, vehicle-blocking pings, and crash SOS — all without giving your number to anyone.',
+     '["Wrong parking & obstruction alerts","Masked call routing — number never shown","Crash SOS at 40G deceleration","Weatherproof 3M polycarbonate, 3+ years"]'::jsonb,
+     349, 499, 'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=800', 4.9, 3420, 1),
+    ('Motorcycle & Helmet Tag', 'Vehicle', 'Popular',
+     'Anti-tamper movement alerts, first-responder medical access, and insurance reminders for riders.',
+     '["Emergency hotline for first responders","Blood group & allergy medical card","Insurance & PUC service reminders","Scratch-resistant, fits helmet or tank"]'::jsonb,
+     249, 399, 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=800', 4.8, 2150, 2),
+    ('Residential Gate Tag', 'Home', 'Smart Home',
+     'Courier drop-off pings, visitor check-in, and hazard reports — without publishing your number at your gate.',
+     '["Courier drop-off WhatsApp pings","Visitor check-in without number exposure","Hazard & pipe leak reporting by neighbours","Heavy-duty weatherproof acrylic mount"]'::jsonb,
+     349, 499, 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=800', 4.9, 1890, 3),
+    ('Pediatric School Bag Tag', 'Family', 'Kids Safety',
+     'Emergency medical card, blood group, allergy info, and masked parent hotline — for when a stranger finds your child.',
+     '["Blood group & allergy directives visible to finder","School bus pickup & drop-off alerts","Encrypted guardian contact for school staff","Child-safe non-toxic TPU clip"]'::jsonb,
+     249, 349, 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&q=80&w=800', 5.0, 1420, 4),
+    ('Senior Medical Keychain', 'Family', 'Senior Care',
+     'Vital health record access and one-tap guardian alert — essential for elderly family members out alone.',
+     '["Medical notes & doctor contacts for responders","Masked phone proxy connects finder to family","Designed for elderly parents on walks or travel","Ultra-light anodised aircraft aluminium case"]'::jsonb,
+     249, 349, 'https://images.unsplash.com/photo-1584036561566-baf8f5f1b144?auto=format&fit=crop&q=80&w=800', 4.9, 1650, 5),
+    ('Smart Luggage Tag', 'Travel', 'Travel Essential',
+     'Instant scan-notification with GPS pin to your phone — and anonymous finder messaging, no address exposed.',
+     '["Anonymous finder messaging — no address shown","Instant SMS & WhatsApp scan notification","Works across airlines, transit hubs, globally","Braided stainless steel cable included"]'::jsonb,
+     249, 349, 'https://images.unsplash.com/photo-1553531384-cc64ac80f931?auto=format&fit=crop&q=80&w=800', 4.8, 980, 6)
+) AS seed(name, category, badge, description, features, price, mrp, image_url, rating, reviews_count, sort_order)
+WHERE NOT EXISTS (SELECT 1 FROM public.shop_products);
+
+-- ============================================================================
+-- 13. Shiprocket shipment info on orders (single JSONB, same idiom as
+-- products.details) — { orderId, shipmentId, awbCode, courierName, trackingUrl }
+-- ============================================================================
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shiprocket JSONB;

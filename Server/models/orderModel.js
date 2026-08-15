@@ -16,6 +16,7 @@ function toApi(row) {
     deliveryMethod: row.delivery_method,
     status: row.status,
     shippingAddress: row.shipping_address,
+    shiprocket: row.shiprocket || null,
     createdAt: row.created_at,
   };
 }
@@ -74,6 +75,33 @@ class OrderModel {
     const { data, error } = await supabaseAdmin
       .from('orders')
       .update({ status })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return toApi(data);
+  }
+
+  static async getById(id) {
+    const { data, error } = await supabaseAdmin
+      .from('orders')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) throw error;
+    return toApi(data);
+  }
+
+  /** Persist the Shiprocket shipment result on an order and optionally flip its status */
+  static async attachShiprocketInfo(id, shiprocketData, newStatus = null) {
+    const payload = { shiprocket: shiprocketData };
+    if (newStatus) payload.status = newStatus;
+
+    const { data, error } = await supabaseAdmin
+      .from('orders')
+      .update(payload)
       .eq('id', id)
       .select()
       .single();

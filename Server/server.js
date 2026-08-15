@@ -4,7 +4,9 @@ const dotenv = require('dotenv');
 const path = require('path');
 const { requestLogger, logger } = require('./middleware/loggerMiddleware');
 
-dotenv.config({ path: path.join(__dirname, '.env') });
+// Single project-wide env file lives at the repo root (shared with Vite) —
+// see .env.example for the documented template.
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const authRoutes = require('./routes/authRoutes');
 const qrRoutes = require('./routes/qrRoutes');
@@ -13,10 +15,14 @@ const logRoutes = require('./routes/logRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const productRoutes = require('./routes/productRoutes');
 const twilioRoutes = require('./routes/twilioRoutes');
+const exotelRoutes = require('./routes/exotelRoutes');
+const cloudshopeRoutes = require('./routes/cloudshopeRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const distributorRoutes = require('./routes/distributorRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const shopProductRoutes = require('./routes/shopProductRoutes');
+const shiprocketRoutes = require('./routes/shiprocketRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -55,10 +61,14 @@ app.use('/api/logs', logRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/twilio', twilioRoutes);
+app.use('/api/exotel', exotelRoutes);
+app.use('/api/cloudshope', cloudshopeRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/distributors', distributorRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/shop-products', shopProductRoutes);
+app.use('/api/shiprocket', shiprocketRoutes);
 
 
 // Global 404 Route Handler

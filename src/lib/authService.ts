@@ -16,21 +16,20 @@ export const ADMIN_EMAIL = 'worthitellp@gmail.com';
 
 /**
  * Fetch or auto-create profile for the logged in user.
+ * Role is strictly derived from the database profile or designated admin identity.
  * Default role is ALWAYS 'user' for standard signups/logins.
- * Only designated admin credentials (worthitellp@gmail.com) get role = 'admin'.
  */
 export async function getUserProfile(userId: string, email: string): Promise<UserProfileData | null> {
-  const isDefaultAdmin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-  const defaultRole: 'user' | 'admin' = isDefaultAdmin ? 'admin' : 'user';
+  const isDesignatedAdminEmail = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
   if (!isSupabaseConfigured) {
     return {
       id: userId,
       email,
-      fullName: email.split('@')[0] || 'Admin',
-      role: defaultRole,
-      subscriptionPlan: isDefaultAdmin ? 'enterprise' : 'free',
-      isSubscribed: isDefaultAdmin,
+      fullName: email.split('@')[0] || 'User',
+      role: isDesignatedAdminEmail ? 'admin' : 'user',
+      subscriptionPlan: isDesignatedAdminEmail ? 'enterprise' : 'free',
+      isSubscribed: isDesignatedAdminEmail,
     };
   }
 
@@ -44,27 +43,32 @@ export async function getUserProfile(userId: string, email: string): Promise<Use
     if (error) throw error;
 
     if (data) {
+      // Role priority: designated admin email OR database profile role
+      const authoritativeRole: 'user' | 'admin' = isDesignatedAdminEmail || data.role === 'admin' ? 'admin' : 'user';
+
       return {
         id: data.id,
         email: data.email,
         fullName: data.full_name || email.split('@')[0],
         phoneNumber: data.phone_number || undefined,
         avatarUrl: data.avatar_url,
-        role: (data.role as 'user' | 'admin') || defaultRole,
-        subscriptionPlan: data.subscription_plan,
-        isSubscribed: data.is_subscribed,
+        role: authoritativeRole,
+        subscriptionPlan: data.subscription_plan || (authoritativeRole === 'admin' ? 'enterprise' : 'free'),
+        isSubscribed: data.is_subscribed ?? authoritativeRole === 'admin',
         twoFactorEnabled: Boolean((data as any).metadata?.twoFactor?.enabled),
       };
     }
 
-    // Always create profile with default role = 'user' (unless designated admin email)
+    const defaultRole: 'user' | 'admin' = isDesignatedAdminEmail ? 'admin' : 'user';
+
+    // Create new profile with authoritative role
     const newProfile: UserProfileData = {
       id: userId,
       email,
       fullName: email.split('@')[0] || 'User',
       role: defaultRole,
-      subscriptionPlan: isDefaultAdmin ? 'enterprise' : 'free',
-      isSubscribed: isDefaultAdmin,
+      subscriptionPlan: defaultRole === 'admin' ? 'enterprise' : 'free',
+      isSubscribed: defaultRole === 'admin',
     };
 
     await supabase.from('profiles').upsert({
@@ -79,13 +83,14 @@ export async function getUserProfile(userId: string, email: string): Promise<Use
     return newProfile;
   } catch (err) {
     console.warn('Error fetching user profile from Supabase:', err);
+    const fallbackRole: 'user' | 'admin' = isDesignatedAdminEmail ? 'admin' : 'user';
     return {
       id: userId,
       email,
       fullName: email.split('@')[0] || 'User',
-      role: defaultRole,
-      subscriptionPlan: 'free',
-      isSubscribed: false,
+      role: fallbackRole,
+      subscriptionPlan: fallbackRole === 'admin' ? 'enterprise' : 'free',
+      isSubscribed: fallbackRole === 'admin',
     };
   }
 }

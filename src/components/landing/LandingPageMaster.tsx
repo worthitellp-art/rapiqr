@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './landing.css';
 import {
   ShieldAlert, ShieldCheck, Car, Home, Luggage,
@@ -6,7 +6,7 @@ import {
   Smartphone, HeartPulse, Bell, ChevronDown, Check,
   MapPin, Phone, MessageSquare, AlertTriangle, Lock,
   Key, Star, RotateCcw, Eye, Navigation, Zap, Users,
-  Menu, Signal, Package, LogOut, LayoutDashboard, Store
+  Package, LayoutDashboard, Store, CloudRain
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
@@ -16,8 +16,10 @@ import {
   DistributorApplication 
 } from '../../lib/distributorService';
 import AppLogo from '../common/AppLogo';
+import Hero from './hero/Hero';
+import Navbar from './nav/Navbar';
 import groupLogo from '../../../assets/Group 1000005716.png';
-import groupLogo1 from '../../../assets/Group 1000005716-1.png';
+import groupLogo1 from '../../../assets/darkbglogo.png';
 import logoForWhBg from '../../../assets/logo for wh bg.png';
 import stepImg1 from '../../../assets/ChatGPT Image Aug 1, 2026, 03_07_26 PM.png';
 import stepImg2 from '../../../assets/ChatGPT Image Aug 1, 2026, 03_09_09 PM.png';
@@ -62,54 +64,6 @@ const HOW_IT_WORKS_STEPS = [
     badge: 'Instant Multi-Channel Alert',
   },
 ];
-
-// ── Animated Counter Component ─────────────────────────────────────────────
-
-function AnimatedCounter({ end, prefix = '', suffix = '', duration = 1800 }: { end: number; prefix?: string; suffix?: string; duration?: number }) {
-  const [count, setCount] = useState(0);
-  const [hasStarted, setHasStarted] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !hasStarted) {
-          setHasStarted(true);
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [hasStarted]);
-
-  useEffect(() => {
-    if (!hasStarted) return;
-    let startTime: number | null = null;
-
-    const step = (timestamp: number) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / duration, 1);
-      const easeProgress = 1 - Math.pow(1 - progress, 3);
-      setCount(Math.floor(easeProgress * end));
-
-      if (progress < 1) {
-        requestAnimationFrame(step);
-      }
-    };
-
-    requestAnimationFrame(step);
-  }, [hasStarted, end, duration]);
-
-  return (
-    <span ref={ref}>
-      {prefix}
-      {count.toLocaleString()}
-      {suffix}
-    </span>
-  );
-}
 
 // ── Real SVG QR Code Component ──────────────────────────────────────────────
 
@@ -450,16 +404,11 @@ export default function LandingPageMaster({
   }, [cart]);
   const [quickView, setQuickView] = useState<Product | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [navHidden, setNavHidden] = useState(false);
-  const lastScrollY = useRef(0);
   const [activeCat, setActiveCat] = useState(0);
   const [hiwActiveStep, setHiwActiveStep] = useState(0);
   const [demoStep, setDemoStep] = useState(0);
   const [demoAlert, setDemoAlert] = useState<string | null>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [partnerForm, setPartnerForm] = useState({ name: '', phone: '', city: '', business: 'Auto Accessories Shop', tier: 'Retail Kit (50 Units)' });
   const [partnerSubmitted, setPartnerSubmitted] = useState(false);
   const [userAppStatus, setUserAppStatus] = useState<DistributorApplication | null>(null);
@@ -644,14 +593,7 @@ export default function LandingPageMaster({
       entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('is-visible'); });
     }, { threshold: 0.12 });
     document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
-    const onScroll = () => {
-      const y = window.scrollY;
-      setIsScrolled(y > 40);
-      setNavHidden(y > 80 && y > lastScrollY.current);
-      lastScrollY.current = y;
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => { obs.disconnect(); window.removeEventListener('scroll', onScroll); };
+    return () => obs.disconnect();
   }, []);
 
   // Auto-advance demo every 3.5s if no interaction
@@ -671,319 +613,34 @@ export default function LandingPageMaster({
     <div className="namo-landing">
 
       {/* ── NAV ─────────────────────────────────────────────────────── */}
-      <nav className={`namo-nav${isScrolled ? ' scrolled' : ''}${navHidden ? ' nav-hidden' : ''}`}>
-        <div className="namo-wrap flex items-center justify-between gap-6">
-
-          {/* Logo - Text Only */}
-          <button
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="flex items-center flex-shrink-0 cursor-pointer py-1"
-            aria-label="RapiQR home"
-          >
-            <AppLogo variant="dark" className="h-6.5 sm:h-8 w-auto object-contain max-h-8" />
-          </button>
-
-          {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-7">
-            <a href="#how-it-works" className="nav-link">How It Works</a>
-            <a href="#categories" className="nav-link">Use Cases</a>
-            <a href="#pricing" className="nav-link">Pricing</a>
-            <a href="#faq" className="nav-link">FAQ</a>
-          </div>
-
-          {/* Right actions */}
-          <div className="flex items-center gap-3">
-            {isLoggedIn ? (
-              <div className="relative">
-                <button
-                  onClick={() => setIsProfileOpen(o => !o)}
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold transition-all cursor-pointer"
-                  style={{ background: 'var(--brand)' }}
-                >
-                  {profile?.fullName?.charAt(0)?.toUpperCase() || 'U'}
-                </button>
-                {isProfileOpen && (
-                  <>
-                    <div className="fixed inset-0" style={{ zIndex: 250 }} onClick={() => setIsProfileOpen(false)} />
-                    <div
-                      className="absolute right-0 top-full mt-2 w-56 rounded-xl shadow-lg overflow-hidden"
-                      style={{ background: 'var(--paper-white)', border: '1px solid var(--border)', zIndex: 260 }}
-                    >
-                      <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
-                        <p className="text-sm font-bold" style={{ color: 'var(--ink)' }}>{profile?.fullName || 'User'}</p>
-                        <p className="text-xs" style={{ color: 'var(--ink-soft)' }}>{profile?.email || ''}</p>
-                      </div>
-                      <button
-                        onClick={() => { setIsProfileOpen(false); onStart(); }}
-                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-black/5"
-                        style={{ color: 'var(--ink)' }}
-                      >
-                        <LayoutDashboard size={15} />
-                        My Dashboard
-                      </button>
-                      <button
-                        onClick={async () => { setIsProfileOpen(false); await signOut(); }}
-                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-red-50"
-                        style={{ color: '#DC2626' }}
-                      >
-                        <LogOut size={15} />
-                        Log Out
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ) : (
-              <button onClick={onLogin} className="hidden sm:block nav-link" style={{ fontSize: 13 }}>
-                Log in
-              </button>
-            )}
-            <button onClick={onStart} className="btn-cta hidden sm:inline-flex" style={{ padding: '10px 22px', fontSize: 13 }}>
-              {isLoggedIn ? <><LayoutDashboard size={14} /> My Dashboard</> : <>Get My Sticker <ArrowRight size={14} /></>}
-            </button>
-            <button
-              className="md:hidden p-2 rounded-lg"
-              style={{ background: 'var(--paper-white)', border: '1px solid var(--border)' }}
-              onClick={() => setMobileMenuOpen(o => !o)}
-              aria-label="Menu"
-            >
-              <Menu size={18} />
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden px-4 pb-4 pt-2 flex flex-col gap-3 border-t mt-2" style={{ borderColor: 'var(--border)' }}>
-            <a href="#how-it-works" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>How It Works</a>
-            <a href="#categories" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>Use Cases</a>
-            <a href="#pricing" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
-            <a href="#faq" className="nav-link py-1" onClick={() => setMobileMenuOpen(false)}>FAQ</a>
-            {isLoggedIn ? (
-              <>
-                <div className="flex items-center gap-2 py-2">
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
-                    style={{ background: 'var(--brand)' }}
-                  >
-                    {profile?.fullName?.charAt(0)?.toUpperCase() || 'U'}
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold" style={{ color: 'var(--ink)' }}>{profile?.fullName || 'User'}</p>
-                    <p className="text-xs" style={{ color: 'var(--ink-soft)' }}>{profile?.email || ''}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => { setMobileMenuOpen(false); onStart(); }}
-                  className="btn-ghost mt-1 flex items-center gap-2 justify-center"
-                >
-                  <LayoutDashboard size={15} /> My Dashboard
-                </button>
-                <button
-                  onClick={async () => { setMobileMenuOpen(false); await signOut(); }}
-                  className="flex items-center gap-2 justify-center py-2 text-sm font-medium rounded-lg transition-colors hover:bg-red-50"
-                  style={{ color: '#DC2626' }}
-                >
-                  <LogOut size={15} /> Log Out
-                </button>
-              </>
-            ) : (
-              <button onClick={() => { setMobileMenuOpen(false); onStart(); }} className="btn-cta mt-1">
-                Get My Sticker <ArrowRight size={14} />
-              </button>
-            )}
-          </div>
-        )}
-      </nav>
+      <Navbar
+        isLoggedIn={isLoggedIn}
+        fullName={profile?.fullName || ''}
+        email={profile?.email || ''}
+        onStart={onStart}
+        onLogin={onLogin}
+        onSignOut={() => { void signOut(); }}
+      />
 
       {/* ── HERO ────────────────────────────────────────────────────── */}
-      <section className="hero-section relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #0E1117 0%, #1A3A5C 100%)' }}>
-        {/* QR dot grid background */}
-        <div
-          className="qr-dot-bg absolute inset-0 pointer-events-none"
-          aria-hidden="true"
-        />
+      <Hero onStart={onStart} />
 
-        <div className="namo-wrap relative" style={{ zIndex: 10 }}>
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center pb-12">
-
-            {/* Left Column: Plus Jakarta Sans Headline & CTAs */}
-            <div className="lg:col-span-6 text-left">
-              <div className="reveal">
-                <span className="hero-eyebrow">
-                  <Signal size={12} />
-                  Smart Safety Sticker
-                </span>
+      {/* ── BENEFIT STRIP ───────────────────────────────────────────── */}
+      <section className="benefit-strip">
+        <div className="namo-wrap">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-6">
+            {[
+              { icon: Lock, title: 'Private & Secure', body: 'Your number stays hidden — every call and message is masked.' },
+              { icon: Zap, title: 'Lightning Fast', body: 'Scan to alert in seconds, no app or account needed.' },
+              { icon: MapPin, title: 'Live Location', body: 'Share real-time GPS with responders in one tap.' },
+              { icon: CloudRain, title: 'All-Weather Ready', body: 'Weatherproof tags built to last for years, indoors or out.' },
+            ].map(({ icon: Icon, title, body }, i) => (
+              <div key={i} className="reveal" style={{ transitionDelay: `${i * 60}ms` }}>
+                <Icon size={20} style={{ color: 'var(--accent-deep)' }} strokeWidth={1.75} />
+                <div className="text-sm font-bold mt-3" style={{ color: 'var(--ink)' }}>{title}</div>
+                <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--ink-soft)' }}>{body}</p>
               </div>
-
-              <h1 className="display-title text-5xl sm:text-6xl lg:text-6xl reveal delay-1 mb-6" style={{ color: '#FFFFFF' }}>
-                India's #1st 
-                <br />
-                <span style={{ color: 'var(--accent)' }}>Emergency Platform</span>
-              </h1>
-
-              <p className="reveal delay-2 text-base sm:text-lg leading-relaxed mb-8" style={{ color: 'rgba(255,255,255,0.7)', maxWidth: 480 }}>
-                Instant QR safety for your family, vehicles & home. No app needed. Zero subscription.
-              </p>
-
-              <div className="reveal delay-3 flex flex-wrap items-center gap-3 mb-8">
-                <button onClick={onStart} className="btn-cta">
-                  Get My Sticker <ArrowRight size={16} />
-                </button>
-                <a href="#demo" className="btn-ghost" style={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.2)' }}>
-                  See It In Action
-                </a>
-              </div>
-
-              <div className="reveal delay-4 flex items-center gap-4 text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                <div className="flex -space-x-2">
-                  {['RM', 'PS', 'KR', 'AM'].map((av, i) => (
-                    <div key={i} className="w-7 h-7 rounded-full text-white text-[10px] font-bold flex items-center justify-center border-2 border-white" style={{ background: 'var(--brand)' }}>
-                      {av}
-                    </div>
-                  ))}
-                </div>
-                <span>Trusted by 10,000+ vehicle & home owners</span>
-              </div>
-            </div>
-
-            {/* Right Column: Real Physical Sticker + Real Phone Scan View Mockup */}
-            <div className="lg:col-span-6 reveal delay-2">
-              <div className="relative flex items-center justify-center py-4">
-
-                {/* Physical Product Sticker Mockup (Left back - Auto Floating) */}
-                <div className="relative z-10 w-56 sm:w-64 bg-white p-5 rounded-3xl shadow-2xl border border-gray-200 animate-float-tag">
-                  <div className="flex items-center justify-between mb-3 border-b pb-2 border-gray-100">
-                    <div className="flex items-center gap-1.5">
-                      <ShieldAlert size={16} style={{ color: 'var(--accent)' }} />
-                      <div className="text-xs font-extrabold text-gray-900 tracking-wider uppercase">RapiQR Safe Tag</div>
-                    </div>
-                  </div>
-
-                  {/* Real SVG QR Sticker Graphic */}
-                  <div className="bg-gray-950 p-4 rounded-2xl text-center relative overflow-hidden group">
-                    <div className="hero-scan-beam" />
-                    <RealQRCode size={128} className="mx-auto rounded-xl p-2 shadow-inner bg-white" />
-                    <div className="mt-3 text-[10px] font-black text-white tracking-widest uppercase">
-                      SAFETY STICKER
-                    </div>
-                    <div className="text-[9px] text-gray-400 font-mono">KA-01-MJ-9921</div>
-                  </div>
-
-                  <div className="text-[10px] text-gray-500 text-center mt-2.5 font-semibold">
-                    Outdoor Weatherproof Tag
-                  </div>
-                </div>
-
-                {/* Real Phone Scan View Screen Mockup (Right front overlap - Auto Floating) */}
-                <div className="relative z-20 w-64 sm:w-72 bg-gray-950 p-3 rounded-[38px] shadow-2xl border-4 border-gray-800 -ml-14 sm:-ml-16 mt-10 animate-float-phone">
-                  {/* Phone Notch */}
-                  <div className="w-20 h-4 bg-gray-950 rounded-b-xl mx-auto absolute top-3 left-1/2 -translate-x-1/2 z-30" />
-
-                  {/* Phone Screen UI */}
-                  <div className="bg-[#0E1117] text-white p-4 pt-7 rounded-[30px] border border-gray-800 text-left space-y-2.5">
-                    <div className="text-[10px] text-gray-400 text-center font-medium">
-                      📷 Real Scanner Browser View
-                    </div>
-
-                    <div className="p-3 rounded-2xl bg-gray-900/90 border border-gray-800 space-y-1">
-                      <div className="text-xs font-bold text-white flex items-center justify-between">
-                        <span>Car KA-01-MJ-9921</span>
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                      </div>
-                      <div className="text-[10px] text-gray-400">Owner Registered · Private Mode</div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <button className="w-full py-2.5 px-3 rounded-xl bg-amber-500 text-gray-950 font-bold text-xs flex items-center justify-center gap-2 shadow-md">
-                      <Phone size={13} /> Call Owner (Private Proxy)
-                    </button>
-
-                    <button className="w-full py-2 px-3 rounded-xl bg-gray-800 text-white font-semibold text-[11px] flex items-center justify-center gap-2">
-                      <MessageSquare size={12} /> Send Message
-                    </button>
-
-                    <button className="w-full py-2 px-3 rounded-xl bg-gray-800 text-amber-400 font-semibold text-[11px] flex items-center justify-center gap-2">
-                      <MapPin size={12} /> Share GPS Location
-                    </button>
-
-                    <button className="w-full py-2 px-3 rounded-xl bg-red-600 text-white font-bold text-[11px] flex items-center justify-center gap-2">
-                      <AlertTriangle size={12} /> Emergency SOS
-                    </button>
-                  </div>
-                </div>
-
-                {/* Floating Speed Badge */}
-                <div className="hidden sm:flex items-center gap-2 absolute -bottom-2 right-0 bg-white px-3.5 py-2 rounded-xl shadow-xl border border-gray-100 z-30 animate-bounce-slow">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                  <span className="text-xs font-extrabold text-gray-900">⚡ Alert Speed &lt;1.8s</span>
-                </div>
-
-              </div>
-            </div>
-
-          </div>
-
-          {/* Floating Command Bar Stats Dock — Ultra High End UX */}
-          <div className="reveal delay-4 pt-10 pb-2 mt-8">
-            <div className="max-w-5xl mx-auto bg-[#0E1117] text-white rounded-3xl p-4 sm:p-6 shadow-2xl border border-gray-800/80 relative overflow-hidden">
-
-              {/* Ambient Glow Backlight */}
-              <div className="absolute -top-24 left-1/4 w-96 h-96 bg-red-500/10 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute -bottom-24 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 relative z-10">
-
-                {/* Pill 1: 10,000+ Families */}
-                <div className="flex items-center gap-3.5 p-3.5 sm:p-4 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all duration-300 group cursor-default">
-                  <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl flex-shrink-0 group-hover:scale-110 transition-transform">
-                    🛡️
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-2xl sm:text-3xl font-black text-white tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                        <AnimatedCounter end={10000} suffix="+" />
-                      </span>
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    </div>
-                    <div className="text-[11px] font-semibold text-gray-400 tracking-wide uppercase mt-0.5">
-                      Families protected
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pill 2: <3 sec Alert Speed */}
-                <div className="flex items-center gap-3.5 p-3.5 sm:p-4 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all duration-300 group cursor-default">
-                  <div className="w-11 h-11 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center text-xl flex-shrink-0 group-hover:scale-110 transition-transform">
-                    ⚡
-                  </div>
-                  <div>
-                    <div className="text-2xl sm:text-3xl font-black text-[#FF4D4D] tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                      <AnimatedCounter prefix="<" end={3} suffix=" sec" />
-                    </div>
-                    <div className="text-[11px] font-semibold text-gray-400 tracking-wide uppercase mt-0.5">
-                      Alert delivery
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pill 3: 13 Emergency Types */}
-                <div className="flex items-center gap-3.5 p-3.5 sm:p-4 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all duration-300 group cursor-default">
-                  <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-xl flex-shrink-0 group-hover:scale-110 transition-transform">
-                    🚨
-                  </div>
-                  <div>
-                    <div className="text-2xl sm:text-3xl font-black text-sky-300 tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                      <AnimatedCounter end={13} />
-                    </div>
-                    <div className="text-[11px] font-semibold text-gray-400 tracking-wide uppercase mt-0.5">
-                      Emergency types
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>

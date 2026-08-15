@@ -10,7 +10,7 @@ const CATEGORIES = ["Ambulance", "Towing", "Mechanic", "Flat Tire", "Battery", "
 const CATEGORY_META: Record<string, { icon: React.ReactNode; color: string; bg: string; placeholder: string }> = {
   Ambulance:  { icon: <Ambulance size={14} />,    color: "text-red-600",     bg: "bg-red-50",     placeholder: "e.g. City Ambulance Service" },
   Towing:     { icon: <Truck size={14} />,         color: "text-red-500",     bg: "bg-red-50",     placeholder: "e.g. Highway Towing 24x7" },
-  Mechanic:   { icon: <Settings size={14} />,       color: "text-orange-600",  bg: "bg-orange-50",  placeholder: "e.g. Mobile Mechanic Near Me" },
+  Mechanic:   { icon: <Settings size={14} />,       color: "text-yellow-700",  bg: "bg-yellow-50",  placeholder: "e.g. Mobile Mechanic Near Me" },
   "Flat Tire": { icon: <Wrench size={14} />,        color: "text-amber-600",   bg: "bg-amber-50",   placeholder: "e.g. Puncture Repair Service" },
   Battery:    { icon: <Battery size={14} />,         color: "text-yellow-600",  bg: "bg-yellow-50",  placeholder: "e.g. Battery Jumpstart Helpline" },
   Fuel:       { icon: <Truck size={14} />,           color: "text-blue-600",    bg: "bg-blue-50",    placeholder: "e.g. Emergency Fuel Delivery" },
@@ -74,7 +74,7 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
       {/* Add Provider Form */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         <h3 className="font-bold text-gray-900 text-sm mb-5 flex items-center gap-2">
-          <Phone size={15} className="text-orange-500" /> Add Helpline Provider
+          <Phone size={15} className="text-amber-500" /> Add Helpline Provider
         </h3>
         <form onSubmit={handleAdd} className="grid grid-cols-4 gap-3">
           <div>

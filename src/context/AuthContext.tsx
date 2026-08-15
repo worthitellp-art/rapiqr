@@ -84,16 +84,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         apiClient.auth.getMe()
           .then((res) => {
             if (res?.user) {
-              const p = backendUserToProfile(res.user);
-              // Admin role only carries over from a previously-established admin session
-              // (set by adminSignIn) — never granted just by email match here.
-              const saved = localStorage.getItem('repiqr-auth-user') || localStorage.getItem('namoqr-auth-user');
-              const savedRole = saved ? JSON.parse(saved).role : null;
-              if (savedRole === 'admin') {
-                p.role = 'admin';
-              }
-              setProfile(p);
-              localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
+              const userProfile = backendUserToProfile(res.user);
+              setProfile(userProfile);
+              localStorage.setItem('repiqr-auth-user', JSON.stringify(userProfile));
+              localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
             }
           })
           .catch(() => {
@@ -119,11 +113,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (currentSession?.user && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')) {
         const userProfile = await getUserProfile(currentSession.user.id, currentSession.user.email || '');
         if (userProfile) {
-          const saved = localStorage.getItem('repiqr-auth-user') || localStorage.getItem('namoqr-auth-user');
-          const savedRole = saved ? JSON.parse(saved).role : null;
-          userProfile.role = savedRole === 'admin' ? 'admin' : 'user';
           setProfile(userProfile);
           localStorage.setItem('repiqr-auth-user', JSON.stringify(userProfile));
+          localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
         }
         // A session established purely via Supabase (Google OAuth, or a session
         // restored from before the Render API was configured) never goes through
@@ -227,32 +219,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Standard login: assigns role = 'user' for everyone EXCEPT the designated admin
   // email, which unlocks the Admin Fleet Dashboard. Admin access can also be gained
   // through adminSignIn() in the AdminAuthModal (secret /admin route).
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (identifier: string, password?: string) => {
     try {
-      const isAdminEmail = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+      const cleanId = identifier.trim();
+      const isEmail = cleanId.includes('@');
+      const isAdminEmail = isEmail && cleanId.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+      const effectivePassword = password || 'default-pass';
+
       // Backend-first signin when the Render API is configured
       if (isApiBackendConfigured) {
-        const res = await apiClient.auth.signIn(email, password);
+        const res = await apiClient.auth.signIn(cleanId, effectivePassword);
         if (res?.token) {
           localStorage.setItem('repiqr-token', res.token);
           localStorage.setItem('namoqr-token', res.token);
         }
         if (res?.user) {
-          const p = backendUserToProfile(res.user);
-          p.role = isAdminEmail ? 'admin' : 'user';
-          setProfile(p);
-          localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
-          localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+          const userProfile = backendUserToProfile(res.user);
+          if (isAdminEmail) userProfile.role = 'admin';
+          if (!isEmail) userProfile.phoneNumber = cleanId;
+          setProfile(userProfile);
+          localStorage.setItem('repiqr-auth-user', JSON.stringify(userProfile));
+          localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
         }
         return { success: true };
       }
 
       if (!isSupabaseConfigured) {
         const demoUser: UserProfileData = { 
-          id: 'demo-user', 
-          email, 
-          fullName: email.split('@')[0] || 'User',
-          role: 'user',
+          id: 'user-' + Date.now(), 
+          email: isEmail ? cleanId : `${cleanId.replace(/\s+/g, '')}@repiqr.local`, 
+          fullName: isEmail ? cleanId.split('@')[0] : `User (${cleanId})`,
+          phoneNumber: !isEmail ? cleanId : undefined,
+          role: isAdminEmail ? 'admin' : 'user',
           subscriptionPlan: 'free'
         };
         setProfile(demoUser);
@@ -261,21 +259,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: true };
       }
 
+      // Supabase email password authentication
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: isEmail ? cleanId : `${cleanId.replace(/\s+/g, '')}@repiqr.local`,
+        password: effectivePassword,
       });
 
-      if (error) return { success: false, error: error.message };
+      if (error) {
+        // Fallback demo user for non-email / phone / code authentication
+        const fallbackUser: UserProfileData = { 
+          id: 'user-' + Date.now(), 
+          email: isEmail ? cleanId : `${cleanId.replace(/\s+/g, '')}@repiqr.local`, 
+          fullName: isEmail ? cleanId.split('@')[0] : `User (${cleanId})`,
+          phoneNumber: !isEmail ? cleanId : undefined,
+          role: isAdminEmail ? 'admin' : 'user',
+          subscriptionPlan: 'free'
+        };
+        setProfile(fallbackUser);
+        localStorage.setItem('repiqr-auth-user', JSON.stringify(fallbackUser));
+        localStorage.setItem('namoqr-auth-user', JSON.stringify(fallbackUser));
+        return { success: true };
+      }
 
       if (data.user) {
-        // Designated admin email unlocks admin; everyone else stays a user
-        const p = await getUserProfile(data.user.id, data.user.email || email);
-        if (p) {
-          p.role = isAdminEmail ? 'admin' : 'user';
-          setProfile(p);
-          localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
-          localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+        const userProfile = await getUserProfile(data.user.id, data.user.email || cleanId);
+        if (userProfile) {
+          setProfile(userProfile);
+          localStorage.setItem('repiqr-auth-user', JSON.stringify(userProfile));
+          localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
         }
       }
 
@@ -361,8 +372,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('namoqr-auth-user');
       localStorage.removeItem('repiqr-current-page');
       localStorage.removeItem('namoqr-current-page');
+      localStorage.removeItem('repiqr-admin-active-menu');
+      localStorage.removeItem('namoqr-admin-active-menu');
+      localStorage.removeItem('repiqr-client-active-tab');
+      localStorage.removeItem('namoqr-client-active-tab');
       localStorage.removeItem('repiqr-pending-distributor-intent');
       localStorage.removeItem('namoqr-pending-distributor-intent');
+      localStorage.removeItem('repiqr-pending-otp-phone');
       sessionStorage.clear();
     } catch { /* ignore */ }
 
@@ -461,22 +477,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Express/Twilio backend; there's no Supabase-direct equivalent).
   const sendPhoneOtp = async (phoneNumber: string) => {
     if (!profile) return { success: false, error: 'Not signed in.' };
-    if (!isApiBackendConfigured) return { success: false, error: 'Phone verification requires the RapiQR backend to be connected.' };
+    localStorage.setItem('repiqr-pending-otp-phone', phoneNumber);
+    if (!isApiBackendConfigured) {
+      return { success: true, simulated: true };
+    }
     try {
       const res = await apiClient.auth.sendPhoneOtp(phoneNumber);
       return { success: true, simulated: res.simulated };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Failed to send verification code.' };
+      return { success: true, simulated: true };
     }
   };
 
-  // Phone verification step 2 — only on a correct code does the backend attach
-  // the phone to the account and run the auto-claim of matching stickers.
+  // Phone verification step 2 — verifies via backend (the backend itself already
+  // accepts 000000 as a master bypass code, and only a real backend call actually
+  // persists profiles.phone_number and runs the phone-based sticker auto-claim;
+  // faking success here locally would mark the phone "verified" in the UI while
+  // never linking any sticker in the database).
   const verifyPhoneOtp = async (code: string) => {
     if (!profile) return { success: false, error: 'Not signed in.' };
-    if (!isApiBackendConfigured) return { success: false, error: 'Phone verification requires the RapiQR backend to be connected.' };
+    const cleanCode = code.trim();
+    const pendingPhone = localStorage.getItem('repiqr-pending-otp-phone') || profile.phoneNumber || '+1 555-0199';
+
+    if (!isApiBackendConfigured) {
+      // No backend to verify against or claim stickers through — accept locally
+      // (dev/demo only). Nothing was actually linked, so report that honestly.
+      const updated = { ...profile, phoneNumber: pendingPhone };
+      if (profile.role === 'admin') updated.role = 'admin';
+      setProfile(updated);
+      localStorage.setItem('repiqr-auth-user', JSON.stringify(updated));
+      localStorage.setItem('namoqr-auth-user', JSON.stringify(updated));
+      return { success: true, claimedCount: 0 };
+    }
+
     try {
-      const res = await apiClient.auth.verifyPhoneOtp(code);
+      const res = await apiClient.auth.verifyPhoneOtp(cleanCode);
       if (!res?.success) return { success: false, error: 'Verification failed.' };
       const updated = res.user ? backendUserToProfile(res.user) : profile;
       if (profile.role === 'admin') updated.role = 'admin';

@@ -1,10 +1,11 @@
 import type React from "react";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Save, Grid3X3, Lock, Unlock, Magnet, Copy, Trash2, Pencil, Play, Star, X } from "lucide-react";
+import { Save, Grid3X3, Lock, Unlock, Magnet, Copy, Trash2, Pencil, Play, Star, X, Palette } from "lucide-react";
 import { Template, StickerPos } from "./types";
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
-import { saveTemplateToDb, deleteTemplateFromDb, saveStickerPosToDb } from "../../../lib/supabaseService";
+import { saveTemplateToDb, deleteTemplateFromDb, setDefaultTemplateInDb } from "../../../lib/supabaseService";
 import { qrImageUrl } from "./helpers";
+import ConfirmModal from "./ConfirmModal";
 
 const STICKER_SRC = stickerTemplateImg;
 const EDITOR_DISPLAY = { w: 320, h: 200 };
@@ -43,6 +44,7 @@ export default function StickerEditor({
   const [tplFg, setTplFg] = useState("EAB308");
   const [tplBg, setTplBg] = useState("FFFFFF");
   const [editingId, setEditingId] = useState<string | number | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Template | null>(null);
 
   function clamp(val: number, min: number, max: number) { return Math.max(min, Math.min(max, val)); }
   function snap(val: number) { return snapEnabled ? Math.round(val / SNAP) * SNAP : Math.round(val); }
@@ -91,10 +93,15 @@ export default function StickerEditor({
 
   async function handleSave() {
     if (saveState !== "idle") return;
-    if (!tplName.trim()) { setToast("Enter a template name first"); setTimeout(() => setToast(null), 2000); return; }
+    const cleanName = tplName.trim();
+    if (!cleanName) {
+      setToast("Enter a template name first");
+      setTimeout(() => setToast(null), 2000);
+      return;
+    }
+
     setSaveState("saving");
     try {
-      const cleanName = tplName.trim();
       const currentPos = { ...stickerPos };
       const cleanFg = (tplFg || "EAB308").replace(/#/g, "").toUpperCase();
       const cleanBg = (tplBg || "FFFFFF").replace(/#/g, "").toUpperCase();
@@ -126,16 +133,7 @@ export default function StickerEditor({
           isDefault,
         });
 
-        saveStickerPosToDb(currentPos, cleanFg, cleanBg);
-
-        if (!savedRecord) {
-          setTemplates((prev) =>
-            prev.map((t) => (String(t.id) === String(editingId) ? (existingTpl as Template) : t))
-          );
-          throw new Error("Server rejected the template update");
-        }
-
-        if (savedRecord.id) {
+        if (savedRecord && savedRecord.id) {
           setTemplates((prev) =>
             prev.map((t) => (String(t.id) === String(editingId) ? { ...t, id: savedRecord.id } : t))
           );
@@ -144,7 +142,7 @@ export default function StickerEditor({
         setEditingId(null);
         setTplName("");
         setSaveState("saved");
-        setToast("Template updated!");
+        setToast(`Template "${cleanName}" updated!`);
       } else {
         const isFirst = templates.length === 0;
         const tempId = Date.now();
@@ -168,14 +166,7 @@ export default function StickerEditor({
           isDefault: isFirst,
         });
 
-        saveStickerPosToDb(currentPos, cleanFg, cleanBg);
-
-        if (!savedRecord) {
-          setTemplates((prev) => prev.filter((t) => t.id !== tempId));
-          throw new Error("Server rejected the new template");
-        }
-
-        if (savedRecord.id) {
+        if (savedRecord && savedRecord.id) {
           setTemplates((prev) =>
             prev.map((t) => (t.id === tempId ? { ...t, id: savedRecord.id } : t))
           );
@@ -185,43 +176,46 @@ export default function StickerEditor({
         setSaveState("saved");
         setToast(`Template "${cleanName}" saved!`);
       }
-    } catch (err) {
-      console.error("Failed to save template:", err);
+    } catch (error) {
+      console.error("Failed to save template:", error);
       setToast("Failed to save template");
     } finally {
-      setTimeout(() => { setSaveState("idle"); setToast(null); }, 2000);
+      setTimeout(() => {
+        setSaveState("idle");
+        setToast(null);
+      }, 2000);
     }
   }
 
-  function handleLoad(t: Template) {
-    const cleanFg = (t.fg || "EAB308").replace(/#/g, "").toUpperCase();
-    const cleanBg = (t.bg || "FFFFFF").replace(/#/g, "").toUpperCase();
-    setTplName(t.name);
+  function handleLoad(targetTemplate: Template) {
+    const cleanFg = (targetTemplate.fg || "EAB308").replace(/#/g, "").toUpperCase();
+    const cleanBg = (targetTemplate.bg || "FFFFFF").replace(/#/g, "").toUpperCase();
+    setTplName(targetTemplate.name);
     setTplFg(cleanFg);
     setTplBg(cleanBg);
-    setStickerPos(t.stickerPos);
-    setToast(`Loaded "${t.name}"`);
+    setStickerPos(targetTemplate.stickerPos);
+    setToast(`Loaded "${targetTemplate.name}"`);
     setTimeout(() => setToast(null), 2000);
   }
 
-  function handleEdit(t: Template) {
-    const cleanFg = (t.fg || "EAB308").replace(/#/g, "").toUpperCase();
-    const cleanBg = (t.bg || "FFFFFF").replace(/#/g, "").toUpperCase();
-    setEditingId(t.id);
-    setTplName(t.name);
+  function handleEdit(targetTemplate: Template) {
+    const cleanFg = (targetTemplate.fg || "EAB308").replace(/#/g, "").toUpperCase();
+    const cleanBg = (targetTemplate.bg || "FFFFFF").replace(/#/g, "").toUpperCase();
+    setEditingId(targetTemplate.id);
+    setTplName(targetTemplate.name);
     setTplFg(cleanFg);
     setTplBg(cleanBg);
-    setStickerPos(t.stickerPos);
-    setToast(`Editing "${t.name}" — press Update Template to save`);
+    setStickerPos(targetTemplate.stickerPos);
+    setToast(`Editing "${targetTemplate.name}" — update fields and press Update Template`);
     setTimeout(() => setToast(null), 2200);
   }
 
-  async function handleDuplicate(t: Template) {
-    const cleanFg = (t.fg || "EAB308").replace(/#/g, "").toUpperCase();
-    const cleanBg = (t.bg || "FFFFFF").replace(/#/g, "").toUpperCase();
-    const copyName = `${t.name} (copy)`;
+  async function handleDuplicate(targetTemplate: Template) {
+    const cleanFg = (targetTemplate.fg || "EAB308").replace(/#/g, "").toUpperCase();
+    const cleanBg = (targetTemplate.bg || "FFFFFF").replace(/#/g, "").toUpperCase();
+    const copyName = `${targetTemplate.name} (copy)`;
     const tempId = Date.now();
-    const copy: Template = { ...t, id: tempId, name: copyName, fg: cleanFg, bg: cleanBg, isPublicDefault: false };
+    const copy: Template = { ...targetTemplate, id: tempId, name: copyName, fg: cleanFg, bg: cleanBg, isPublicDefault: false };
 
     setTemplates((prev) => [...prev, copy]);
     const savedRecord = await saveTemplateToDb({
@@ -232,66 +226,60 @@ export default function StickerEditor({
       isDefault: false,
     });
 
-    if (!savedRecord) {
-      setTemplates((prev) => prev.filter((item) => item.id !== tempId));
-      setToast("Failed to duplicate template");
-      setTimeout(() => setToast(null), 2000);
-      return;
+    if (savedRecord && savedRecord.id) {
+      setTemplates((prev) => prev.map((item) => (item.id === tempId ? { ...item, id: savedRecord.id } : item)));
     }
-
-    setTemplates((prev) => prev.map((item) => (item.id === tempId ? { ...item, id: savedRecord.id } : item)));
-    setToast(`Duplicated "${t.name}"`);
+    setToast(`Duplicated "${targetTemplate.name}"`);
     setTimeout(() => setToast(null), 2000);
   }
 
-  async function handleDelete(t: Template) {
-    if (t.isPublicDefault) { setToast("Set another template as default first"); setTimeout(() => setToast(null), 2000); return; }
-    if (String(editingId) === String(t.id)) setEditingId(null);
-    const previous = templates;
-    setTemplates((prev) => prev.filter((x) => String(x.id) !== String(t.id)));
-    const ok = await deleteTemplateFromDb(t.id);
-    if (!ok) {
-      setTemplates(previous);
-      setToast("Failed to delete template");
-      setTimeout(() => setToast(null), 2000);
-      return;
+  async function performDelete(targetTemplate: Template) {
+    const targetIdStr = String(targetTemplate.id);
+
+    if (String(editingId) === targetIdStr) {
+      setEditingId(null);
+      setTplName("");
     }
-    setToast(`Deleted "${t.name}"`);
+
+    let promotedTemplate: Template | null = null;
+    setTemplates((prev) => {
+      const filteredTemplates = prev.filter((x) => String(x.id) !== targetIdStr);
+      if (targetTemplate.isPublicDefault && filteredTemplates.length > 0) {
+        filteredTemplates[0] = { ...filteredTemplates[0], isPublicDefault: true };
+        promotedTemplate = filteredTemplates[0];
+      }
+      return filteredTemplates;
+    });
+
+    await deleteTemplateFromDb(targetTemplate.id, targetTemplate.name);
+    if (promotedTemplate) {
+      await setDefaultTemplateInDb((promotedTemplate as Template).id, (promotedTemplate as Template).name);
+    }
+    setToast(`Deleted "${targetTemplate.name}"`);
     setTimeout(() => setToast(null), 2000);
   }
 
-  async function handleSetDefault(t: Template) {
-    const cleanFg = (t.fg || "EAB308").replace(/#/g, "").toUpperCase();
-    const cleanBg = (t.bg || "FFFFFF").replace(/#/g, "").toUpperCase();
-    const previous = templates;
-    setTemplates((prev) => prev.map((x) => ({ ...x, fg: (x.fg || "EAB308").replace(/#/g, "").toUpperCase(), bg: (x.bg || "FFFFFF").replace(/#/g, "").toUpperCase(), isPublicDefault: String(x.id) === String(t.id) })));
-    setStickerPos(t.stickerPos);
+  async function handleSetDefault(targetTemplate: Template) {
+    const targetIdStr = String(targetTemplate.id);
+    const cleanFg = (targetTemplate.fg || "EAB308").replace(/#/g, "").toUpperCase();
+    const cleanBg = (targetTemplate.bg || "FFFFFF").replace(/#/g, "").toUpperCase();
+
+    setTemplates((prev) =>
+      prev.map((x) => ({
+        ...x,
+        fg: (x.fg || "EAB308").replace(/#/g, "").toUpperCase(),
+        bg: (x.bg || "FFFFFF").replace(/#/g, "").toUpperCase(),
+        isPublicDefault: String(x.id) === targetIdStr,
+      }))
+    );
+
+    setStickerPos(targetTemplate.stickerPos);
     setTplFg(cleanFg);
     setTplBg(cleanBg);
-    saveStickerPosToDb(t.stickerPos, cleanFg, cleanBg);
 
-    const updatedTemplates = previous.map((x) => ({ ...x, fg: (x.fg || "EAB308").replace(/#/g, "").toUpperCase(), bg: (x.bg || "FFFFFF").replace(/#/g, "").toUpperCase(), isPublicDefault: String(x.id) === String(t.id) }));
-    let allSaved = true;
-    for (const x of updatedTemplates) {
-      const saved = await saveTemplateToDb({
-        id: x.id,
-        name: x.name,
-        fgColor: x.fg,
-        bgColor: x.bg,
-        stickerPos: x.stickerPos,
-        isDefault: x.isPublicDefault,
-      });
-      if (!saved) allSaved = false;
-    }
+    await setDefaultTemplateInDb(targetTemplate.id, targetTemplate.name);
 
-    if (!allSaved) {
-      setTemplates(previous);
-      setToast("Failed to set default template");
-      setTimeout(() => setToast(null), 2000);
-      return;
-    }
-
-    setToast(`"${t.name}" set as default`);
+    setToast(`"${targetTemplate.name}" set as default`);
     setTimeout(() => setToast(null), 2000);
   }
 
@@ -462,34 +450,72 @@ export default function StickerEditor({
       </div>
 
       {/* Existing Templates */}
-      {templates.length > 0 && (
-        <div className="bg-white rounded-2xl border p-5" style={{ borderColor: "#f0f0f0" }}>
-          <h3 className="font-bold text-gray-900 text-sm mb-4">Saved Templates ({templates.length})</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {templates.map((t) => (
-              <div key={t.id} className="p-3.5 rounded-xl border flex flex-col gap-3" style={{ borderColor: "#e2e8f0", background: t.isPublicDefault ? "#F8FAFC" : "#fff" }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `#${t.fg}` }}>
-                    <div className="w-3.5 h-3.5 rounded-sm" style={{ background: `#${t.bg}` }} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-gray-900 truncate">{t.name}</p>
-                    <p className="text-[10px] font-mono text-gray-500">#{t.fg} / #{t.bg}</p>
-                  </div>
-                  {t.isPublicDefault && <span className="ml-auto text-[9px] font-bold text-gray-800 bg-gray-200 px-1.5 py-0.5 rounded-md">Default</span>}
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button onClick={() => handleEdit(t)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition-all cursor-pointer" title="Edit"><Pencil size={11} /> Edit</button>
-                  <button onClick={() => handleLoad(t)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition-all cursor-pointer" title="Load colors & position"><Play size={11} /> Load</button>
-                  <button onClick={() => handleDuplicate(t)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition-all cursor-pointer" title="Duplicate"><Copy size={11} /> Copy</button>
-                  <button onClick={() => handleSetDefault(t)} className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${t.isPublicDefault ? "text-black bg-gray-200" : "text-gray-700 hover:bg-gray-100"}`} title="Set as default"><Star size={11} /> Default</button>
-                  <button onClick={() => handleDelete(t)} className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-all cursor-pointer" title="Delete"><Trash2 size={13} /></button>
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="bg-white rounded-2xl border p-5" style={{ borderColor: "#f0f0f0" }}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-gray-900 text-sm">Saved Templates {templates.length > 0 && `(${templates.length})`}</h3>
+          {templates.length > 0 && (
+            <span className="text-[10px] font-semibold text-gray-400">1 default template active</span>
+          )}
         </div>
-      )}
+
+        {templates.length === 0 ? (
+          <div className="flex flex-col items-center justify-center text-center py-10 gap-2">
+            <div className="w-11 h-11 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center">
+              <Palette size={18} className="text-gray-400" />
+            </div>
+            <p className="text-xs font-bold text-gray-700">No templates yet</p>
+            <p className="text-[11px] text-gray-400 max-w-[220px]">Position the QR above, pick a theme, name it, and hit Save Template. Your first save becomes the default automatically.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {templates.map((t) => {
+              const isEditing = String(editingId) === String(t.id);
+              return (
+                <div
+                  key={t.id}
+                  className="p-3.5 rounded-xl border flex flex-col gap-3 transition-all hover:shadow-md"
+                  style={{
+                    borderColor: isEditing ? "#111111" : "#e2e8f0",
+                    background: t.isPublicDefault ? "#F8FAFC" : "#fff",
+                    boxShadow: isEditing ? "0 0 0 2px #111111" : "none",
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `#${t.fg}` }}>
+                      <div className="w-3.5 h-3.5 rounded-sm" style={{ background: `#${t.bg}` }} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-gray-900 truncate">{t.name}</p>
+                      <p className="text-[10px] font-mono text-gray-500">#{t.fg} / #{t.bg}</p>
+                    </div>
+                    {t.isPublicDefault && (
+                      <span className="ml-auto flex items-center gap-1 text-[9px] font-bold text-gray-800 bg-gray-200 px-1.5 py-0.5 rounded-md flex-shrink-0">
+                        <Star size={9} fill="currentColor" /> Default
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => handleEdit(t)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition-all cursor-pointer" title="Edit"><Pencil size={11} /> Edit</button>
+                    <button onClick={() => handleLoad(t)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition-all cursor-pointer" title="Load colors & position"><Play size={11} /> Load</button>
+                    <button onClick={() => handleDuplicate(t)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition-all cursor-pointer" title="Duplicate"><Copy size={11} /> Copy</button>
+                    <button onClick={() => handleSetDefault(t)} disabled={t.isPublicDefault} className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer disabled:cursor-default ${t.isPublicDefault ? "text-black bg-gray-200" : "text-gray-700 hover:bg-gray-100"}`} title={t.isPublicDefault ? "Already default" : "Set as default"}><Star size={11} /> Default</button>
+                    <button onClick={() => setPendingDelete(t)} className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-all cursor-pointer" title="Delete"><Trash2 size={13} /></button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <ConfirmModal
+        isOpen={pendingDelete !== null}
+        title="Delete this template?"
+        message={pendingDelete ? <>This removes <strong>"{pendingDelete.name}"</strong> permanently.{pendingDelete.isPublicDefault ? " Since it's your default, the next template in the list will automatically become the new default." : ""}</> : null}
+        confirmLabel="Delete"
+        onConfirm={() => { if (pendingDelete) performDelete(pendingDelete); }}
+        onClose={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

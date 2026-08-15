@@ -11,7 +11,7 @@ import {
 } from "../lib/supabaseService";
 import stickerTemplateImg from "../../assets/template-sticker.jpeg";
 import groupLogo from "../../assets/Group 1000005716.png";
-import groupLogo1 from "../../assets/Group 1000005716-1.png";
+import groupLogo1 from "../../assets/darkbglogo.png";
 import groupLogo2 from "../../assets/Group 1000005716-2.png";
 import {
   LayoutGrid,

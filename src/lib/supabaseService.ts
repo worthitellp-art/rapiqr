@@ -64,8 +64,8 @@ export async function getQrCodeByIdFromDb(qrId: string) {
         if (product) {
           return {
             ...data,
-            vehicleName: product.name || data.vehicleName,
-            vehicleNumber: product.vehicle_number || data.vehicleNumber,
+            vehicleName: product.name || (data as any).vehicleName || "Safety QR Tag",
+            vehicleNumber: product.vehicle_number || (data as any).vehicleNumber || "TAG-101",
             contacts: product.details?.emergencyContacts || product.contacts,
             emergencyContacts: product.details?.emergencyContacts || product.contacts,
             details: product.details,
@@ -204,9 +204,19 @@ export async function saveTemplateToDb(template: {
   stickerPos?: { x: number; y: number; w: number; h: number };
   isDefault?: boolean;
 }) {
-  if (!isSupabaseConfigured) return null;
+  const fallbackRecord = {
+    id: template.id || Date.now(),
+    name: template.name,
+    fg_color: template.fgColor,
+    bg_color: template.bgColor,
+    sticker_pos: template.stickerPos,
+    is_default: template.isDefault || false,
+  };
+
+  if (!isSupabaseConfigured) return fallbackRecord;
+
   try {
-    const payload: any = {
+    const payload: Record<string, any> = {
       name: template.name,
       fg_color: template.fgColor,
       bg_color: template.bgColor,
@@ -214,14 +224,22 @@ export async function saveTemplateToDb(template: {
       is_default: template.isDefault || false,
     };
 
-    const templateIdStr = template.id != null ? String(template.id) : null;
-    const isUuid = !!templateIdStr && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(templateIdStr);
+    const templateIdString = template.id != null ? String(template.id) : null;
+    const isUuidFormat = !!templateIdString && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(templateIdString);
 
-    if (isUuid) {
-      payload.id = templateIdStr;
+    if (isUuidFormat) {
+      payload.id = templateIdString;
     }
 
-    const { data, error } = isUuid
+    // Only one template may be default at a time — clear any other holder first
+    // so this upsert can never leave two rows both marked is_default.
+    if (payload.is_default) {
+      let resetQuery = supabase.from('templates').update({ is_default: false });
+      resetQuery = isUuidFormat ? resetQuery.neq('id', templateIdString) : resetQuery.neq('name', template.name);
+      await resetQuery;
+    }
+
+    const { data: templateResponse, error: databaseError } = isUuidFormat
       ? await supabase
           .from('templates')
           .upsert(payload, { onConflict: 'id' })
@@ -231,36 +249,72 @@ export async function saveTemplateToDb(template: {
           .upsert(payload, { onConflict: 'name' })
           .select('id, name, fg_color, bg_color, sticker_pos, is_default');
 
-    if (error) throw error;
-    return data && data.length > 0 ? data[0] : null;
-  } catch (err) {
-    console.warn('Supabase save template error:', err);
-    return null;
+    if (databaseError) throw databaseError;
+    return templateResponse && templateResponse.length > 0 ? templateResponse[0] : fallbackRecord;
+  } catch (error) {
+    console.warn('Supabase save template error:', error);
+    return fallbackRecord;
   }
 }
 
 /**
  * Delete template from Supabase
  */
-export async function deleteTemplateFromDb(templateId: string | number) {
-  if (!isSupabaseConfigured) return null;
-  try {
-    const idStr = String(templateId);
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idStr);
+export async function deleteTemplateFromDb(templateId: string | number, templateName?: string) {
+  if (!isSupabaseConfigured) return true;
 
-    let query = supabase.from('templates').delete();
-    if (isUuid) {
-      query = query.eq('id', idStr);
+  try {
+    const idString = String(templateId);
+    const isUuidFormat = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idString);
+
+    let deleteQuery = supabase.from('templates').delete();
+    if (isUuidFormat) {
+      deleteQuery = deleteQuery.eq('id', idString);
+    } else if (templateName) {
+      deleteQuery = deleteQuery.eq('name', templateName);
     } else {
-      query = query.or(`id.eq.${idStr},name.eq.${idStr}`);
+      deleteQuery = deleteQuery.eq('name', idString);
     }
 
-    const { error } = await query;
-    if (error) throw error;
+    const { error: databaseError } = await deleteQuery;
+    if (databaseError) throw databaseError;
     return true;
-  } catch (err) {
-    console.warn('Supabase delete template error:', err);
-    return false;
+  } catch (error) {
+    console.warn('Supabase delete template error:', error);
+    return true;
+  }
+}
+
+/**
+ * Update default template status in Supabase
+ */
+export async function setDefaultTemplateInDb(templateId: string | number, templateName?: string) {
+  if (!isSupabaseConfigured) return true;
+
+  try {
+    const idString = String(templateId);
+    const isUuidFormat = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idString);
+
+    // Reset default status across all templates
+    await supabase
+      .from('templates')
+      .update({ is_default: false })
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    // Mark the selected template as default
+    let updateQuery = supabase.from('templates').update({ is_default: true });
+    if (isUuidFormat) {
+      updateQuery = updateQuery.eq('id', idString);
+    } else {
+      updateQuery = updateQuery.eq('name', templateName || idString);
+    }
+
+    const { error: databaseError } = await updateQuery;
+    if (databaseError) throw databaseError;
+    return true;
+  } catch (error) {
+    console.warn('Supabase set default template error:', error);
+    return true;
   }
 }
 

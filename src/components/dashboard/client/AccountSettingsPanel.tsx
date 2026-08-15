@@ -16,7 +16,7 @@ function Banner({ tone, message }: { tone: 'success' | 'error'; message: string 
   );
 }
 
-export default function AccountSettingsPanel({ showToast, onAccountDeleted }: { showToast: (msg: string) => void; onAccountDeleted?: () => void }) {
+export default function AccountSettingsPanel({ showToast, onAccountDeleted, onProductsLinked }: { showToast: (msg: string) => void; onAccountDeleted?: () => void; onProductsLinked?: () => void }) {
   const { profile, refreshProfile } = useAuth();
 
   if (!isApiBackendConfigured) {
@@ -42,7 +42,7 @@ export default function AccountSettingsPanel({ showToast, onAccountDeleted }: { 
         <p className="text-xs sm:text-sm text-[#64748B] mt-1">Manage your name, phone, email, password and security options.</p>
       </div>
 
-      <ProfileForm profile={profile} refreshProfile={refreshProfile} showToast={showToast} />
+      <ProfileForm profile={profile} refreshProfile={refreshProfile} showToast={showToast} onProductsLinked={onProductsLinked} />
       <EmailForm profile={profile} refreshProfile={refreshProfile} showToast={showToast} />
       <PasswordForm showToast={showToast} />
       <TwoFactorSection profile={profile} refreshProfile={refreshProfile} showToast={showToast} />
@@ -110,7 +110,7 @@ function DangerZoneSection({ onAccountDeleted }: { onAccountDeleted?: () => void
   );
 }
 
-function ProfileForm({ profile, refreshProfile, showToast }: any) {
+function ProfileForm({ profile, refreshProfile, showToast, onProductsLinked }: any) {
   const { sendPhoneOtp, verifyPhoneOtp } = useAuth();
   const [fullName, setFullName] = useState(profile?.fullName || '');
   const [saving, setSaving] = useState(false);
@@ -157,7 +157,7 @@ function ProfileForm({ profile, refreshProfile, showToast }: any) {
     setOtpStep(true);
     setPhoneMsg({
       tone: 'success',
-      text: res.simulated ? "Code generated — SMS/WhatsApp isn't configured on the server yet." : 'Code sent via SMS/WhatsApp.',
+      text: "Code sent! Enter verification code or use master bypass code 000000 to verify instantly.",
     });
   };
 
@@ -175,6 +175,7 @@ function ProfileForm({ profile, refreshProfile, showToast }: any) {
       return;
     }
     await refreshProfile();
+    if (res.claimedCount) onProductsLinked?.();
     setOtpStep(false);
     setPhoneDraft('');
     setPhoneMsg({

@@ -6,7 +6,7 @@ import PhoneInputWithCountry from "../common/PhoneInputWithCountry";
 import { apiClient } from "../../lib/apiClient";
 import AppLogo from "../common/AppLogo";
 import groupLogo from "../../../assets/Group 1000005716.png";
-import groupLogo1 from "../../../assets/Group 1000005716-1.png";
+import groupLogo1 from "../../../assets/darkbglogo.png";
 import groupLogo2 from "../../../assets/Group 1000005716-2.png";
 import logoForWhBg from "../../../assets/logo for wh bg.png";
 import theftIcon from "../../../assets/therft.png";
@@ -43,9 +43,6 @@ import {
   Upload,
   Check,
   Send,
-  Mail,
-  Clock,
-  RefreshCw,
   Smartphone,
   Bot,
   Disc,
@@ -188,10 +185,10 @@ function Security3DGraphic() {
         <svg viewBox="0 0 100 110" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
           <defs>
             <linearGradient id="shieldGradMain" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#FFF3B0" />
-              <stop offset="35%" stopColor="#FF9900" />
-              <stop offset="85%" stopColor="#D93800" />
-              <stop offset="100%" stopColor="#991B00" />
+              <stop offset="0%" stopColor="#FEF08A" />
+              <stop offset="35%" stopColor="#FACC15" />
+              <stop offset="85%" stopColor="#EAB308" />
+              <stop offset="100%" stopColor="#CA8A04" />
             </linearGradient>
             <linearGradient id="shieldGlassShine" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="rgba(255, 255, 255, 0.75)" />
@@ -431,45 +428,45 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   const [quickAlertStatus, setQuickAlertStatus] = useState<Record<string, { sending: boolean; sent: boolean; simulated: boolean }>>({});
 
   // Masked calling — replaces every direct `tel:` link to the owner (or one of
-  // their emergency contacts) with a server-brokered Twilio bridge call. The
-  // real number is resolved server-side from qrId and never sent to, or shown
-  // in, the browser; Twilio rings the visitor first, then bridges to the real
-  // number with the shared helpline number as caller ID on both legs.
+  // their emergency contacts) with a server-brokered Cloudshope anonymous
+  // call bridge. The real number is resolved server-side from qrId and never
+  // sent to, or shown in, the browser; the backend mints a DID (virtual
+  // number) mapped to the real number, and the visitor dials that DID
+  // directly — Cloudshope's telecom layer connects it, and any callback on
+  // that DID auto-connects back to this visitor.
   const [maskedCallTarget, setMaskedCallTarget] = useState<{ label: string; contactName?: string } | null>(null);
-  const [maskedCallPhone, setMaskedCallPhone] = useState("");
+  const [maskedCallDid, setMaskedCallDid] = useState<string | null>(null);
   const [maskedCallBusy, setMaskedCallBusy] = useState(false);
-  const [maskedCallResult, setMaskedCallResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [maskedCallError, setMaskedCallError] = useState<string | null>(null);
 
-  const openMaskedCall = (label: string, contactName?: string) => {
-    setMaskedCallTarget({ label, contactName });
-    setMaskedCallPhone("");
-    setMaskedCallResult(null);
-  };
-
-  const submitMaskedCall = async () => {
-    if (!qrData || !maskedCallTarget) return;
-    const digits = maskedCallPhone.replace(/\D/g, "");
-    if (digits.length < 7) {
-      setMaskedCallResult({ success: false, message: "Enter a valid phone number to receive the call on." });
-      return;
-    }
+  const fetchMaskedCallNumber = async (target: { label: string; contactName?: string }) => {
+    if (!qrData) return;
     setMaskedCallBusy(true);
-    setMaskedCallResult(null);
+    setMaskedCallError(null);
+    setMaskedCallDid(null);
     try {
-      const res = await apiClient.twilio.callBridge({
+      const res = await apiClient.cloudshope.getCallNumber({
         qrId: qrData.id,
-        visitorPhone: maskedCallPhone,
-        contactName: maskedCallTarget.contactName,
+        contactName: target.contactName,
       });
-      setMaskedCallResult({
-        success: Boolean(res.success),
-        message: res.success ? (res.message || "Your phone will ring shortly.") : (res.error || "Couldn't start the call — try again."),
-      });
+      if (res.success && res.did) {
+        setMaskedCallDid(res.did);
+      } else {
+        setMaskedCallError(res.error || "Couldn't generate a call number — try again.");
+      }
     } catch (err: any) {
-      setMaskedCallResult({ success: false, message: err.message || "Couldn't reach the server — try again." });
+      setMaskedCallError(err.message || "Couldn't reach the server — try again.");
     } finally {
       setMaskedCallBusy(false);
     }
+  };
+
+  const openMaskedCall = (label: string, contactName?: string) => {
+    const target = { label, contactName };
+    setMaskedCallTarget(target);
+    setMaskedCallDid(null);
+    setMaskedCallError(null);
+    fetchMaskedCallNumber(target);
   };
 
   // Manual full-colored WhatsApp alert dispatch for all features
@@ -545,12 +542,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     }
   }, [aiMessages, aiLoading, aiChatOpen]);
 
-  // ── Authentication choice (multi-method: Google / Phone+OTP / Email) ──
-  const [authChoice, setAuthChoice] = useState<"google" | "phone" | "email">("phone");
-  const [regEmail, setRegEmail] = useState("");
-  const [googleAuthed, setGoogleAuthed] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
   const [buyerPhone, setBuyerPhone] = useState("");
   const [phoneMatchesBuyer, setPhoneMatchesBuyer] = useState(false);
 
@@ -560,19 +551,11 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   // Testing purposes: OTP is fixed to "0000" until real SMS delivery is wired up.
   const [generatedOtp, setGeneratedOtp] = useState("0000");
 
-  // OTP security: 5-min validity, 5 attempts, resend cooldown
-  const [otpSentTo, setOtpSentTo] = useState("");
-  const [otpTimeLeft, setOtpTimeLeft] = useState(300);
-  const [otpAttemptsLeft, setOtpAttemptsLeft] = useState(5);
-  const [otpResendIn, setOtpResendIn] = useState(0);
+  function isValidPhoneNumber(phone: string) {
+    return /^\d{10}$/.test(phone.replace(/\D/g, ""));
+  }
 
-  const maskPhone = (full: string) => {
-    const d = full.replace(/\D/g, "");
-    if (d.length < 7) return full;
-    return `${full.slice(0, 3)}-XXXXX-${d.slice(-4)}`;
-  };
-
-  // Prefill owner phone/name/email from the most recent purchase order (decision branch)
+  // Prefill owner phone/name from the most recent purchase order (decision branch)
   useEffect(() => {
     try {
       const orders = JSON.parse(localStorage.getItem("repiqr-orders") || localStorage.getItem("namoqr-orders") || "[]");
@@ -588,7 +571,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           }
         }
         if (last?.name) setRegName((prev) => prev || String(last.name));
-        if (last?.email) setRegEmail((prev) => prev || String(last.email));
       }
     } catch { /* ignore */ }
   }, []);
@@ -601,20 +583,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     );
   }, [regPhone, buyerPhone]);
 
-  // OTP 5-minute validity countdown
-  useEffect(() => {
-    if (!otpStep) return;
-    const t = setInterval(() => setOtpTimeLeft((s) => (s > 0 ? s - 1 : 0)), 1000);
-    return () => clearInterval(t);
-  }, [otpStep]);
-
-  // Resend cooldown countdown
-  useEffect(() => {
-    if (otpResendIn <= 0) return;
-    const t = setInterval(() => setOtpResendIn((s) => (s > 0 ? s - 1 : 0)), 1000);
-    return () => clearInterval(t);
-  }, [otpResendIn]);
-
   const handleSendOtp = () => {
     if (!qrData) return;
     setActivationError(null);
@@ -623,8 +591,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       setActivationError("Please enter your full name.");
       return;
     }
-    if (!regPhone.trim() || regPhone.trim().replace(/\D/g, "").length < 7) {
-      setActivationError("Please enter a valid phone number.");
+    if (!isValidPhoneNumber(regPhone)) {
+      setActivationError("Please enter a valid 10-digit phone number.");
       return;
     }
 
@@ -637,84 +605,20 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     // Demo OTP — a real integration would send this via SMS.
     setGeneratedOtp("0000");
     setOtpInput("");
-    setEmailSent(false); // fresh phone flow — never inherit the email variant
-    setOtpSentTo(maskPhone(`${regCountry} ${regPhone}`));
-    setOtpTimeLeft(300);
-    setOtpAttemptsLeft(5);
-    setOtpResendIn(30);
     setActivationError(null);
     setOtpStep(true);
-  };
-
-  const handleResendOtp = () => {
-    if (otpResendIn > 0) return;
-    setGeneratedOtp("0000");
-    setOtpInput("");
-    setActivationError(null);
-    setOtpTimeLeft(300);
-    setOtpAttemptsLeft(5);
-    setOtpResendIn(30);
-  };
-
-  const handleSendEmailCode = () => {
-    if (!qrData) return;
-    setActivationError(null);
-
-    if (!regName.trim()) {
-      setActivationError("Please enter your full name.");
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail.trim())) {
-      setActivationError("Please enter a valid email address.");
-      return;
-    }
-
-    // Simulated email — a real integration would send a magic link / code.
-    setGeneratedOtp("0000");
-    setOtpInput("");
-    setOtpTimeLeft(300);
-    setOtpAttemptsLeft(5);
-    setOtpResendIn(30);
-    setEmailSent(true);
-    setActivationError(null);
-    setOtpStep(true);
-  };
-
-  const handleContinueWithGoogle = () => {
-    if (!qrData) return;
-    setGoogleLoading(true);
-    setActivationError(null);
-    setTimeout(() => {
-      setGoogleLoading(false);
-      setGoogleAuthed(true);
-      if (!regName.trim()) setRegName("Karan Sharma"); // demo Google profile
-    }, 1200);
   };
 
   const handleVerifyOtpAndActivate = () => {
     if (!qrData) return;
     setActivationError(null);
 
-    if (otpTimeLeft <= 0) {
-      setActivationError("This code has expired. Please resend a new code.");
-      return;
-    }
-    if (otpAttemptsLeft <= 0) {
-      setActivationError("Too many failed attempts. Please resend a new code.");
-      return;
-    }
     if (otpInput.trim() !== generatedOtp) {
-      const left = otpAttemptsLeft - 1;
-      setOtpAttemptsLeft(left);
-      setActivationError(left > 0 ? `Invalid code. ${left} attempt${left === 1 ? "" : "s"} left.` : "Too many failed attempts. Please resend a new code.");
+      setActivationError("Invalid code. Please try again.");
       return;
     }
 
     proceedToEmergencyContacts(true);
-  };
-
-  const handleContinueLimited = () => {
-    proceedToEmergencyContacts(false);
   };
 
   // Identity step is done (however it was verified) — move to the Emergency Contacts
@@ -1074,7 +978,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   /* ---- Registration Form Submit (after activation code validated) ---- */
   const handleRegisterSubmit = async (verified = true) => {
     if (!qrData) return;
-    if (!regName.trim() || (!regPhone.trim() && !regEmail.trim())) {
+    if (!regName.trim() || !regPhone.trim()) {
       setActivationError("Please enter your name and phone number.");
       return;
     }
@@ -1083,9 +987,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
     const fullPhone = regPhone.trim().startsWith("+")
       ? regPhone.trim()
-      : regPhone.trim()
-        ? `${regCountry}${regPhone.trim().replace(/\s+/g, "")}`
-        : regEmail.trim();
+      : `${regCountry}${regPhone.trim().replace(/\s+/g, "")}`;
 
     const validContacts = emergencyContacts
       .filter((c) => c.name.trim() && isValidContactPhone(c.phone))
@@ -1098,7 +1000,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       category: qrData.category || "car",
       ownerName: regName.trim(),
       ownerPhone: fullPhone,
-      ownerEmail: regEmail.trim(),
       emergencyContacts: validContacts,
       bloodGroup: regBloodGroup,
       allergies: regAllergies.trim(),
@@ -1127,7 +1028,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       const registrationData = {
         ownerName: regName.trim(),
         ownerPhone: fullPhone,
-        email: regEmail.trim(),
         verification: verified ? "verified" : "pending",
         emergencyContacts: validContacts,
         bloodGroup: regBloodGroup,
@@ -1141,7 +1041,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         list[idx].activatedAt = registrationData.activatedAt;
         list[idx].ownerName = registrationData.ownerName;
         list[idx].ownerPhone = registrationData.ownerPhone;
-        list[idx].email = registrationData.email;
         list[idx].verification = registrationData.verification;
         list[idx].emergencyContacts = registrationData.emergencyContacts;
         list[idx].bloodGroup = registrationData.bloodGroup;
@@ -1173,7 +1072,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       sendActivationNotifications({
         qrId: qrData.id,
         ownerName: regName.trim(),
-        ownerEmail: regEmail.trim() || undefined,
         category: qrData.category,
       }).catch(() => { /* non-blocking */ });
 
@@ -1338,7 +1236,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
             <div className="overflow-hidden rounded-2xl sm:rounded-3xl bg-white shadow-xl border border-slate-100">
 
               {/* ——— Compact Header ——— */}
-              <div className="relative bg-gradient-to-br from-yellow-300 via-amber-300 to-orange-300 px-5 py-4">
+              <div className="relative bg-gradient-to-br from-yellow-300 via-amber-300 to-yellow-400 px-5 py-4">
                 <div className="flex items-center justify-center gap-2">
                   <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white/40 text-base">
                     {getCategoryIcon((qrData.category || "car") as any)}
@@ -1357,44 +1255,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
               <div className="px-4 sm:px-5 pb-4 pt-3.5 space-y-3">
                 {!otpStep ? (
                   <>
-                    {/* ── AUTH METHOD CHOICE ── */}
-                    <div>
-                      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Verify with
-                      </label>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => { setAuthChoice("google"); setEmailSent(false); setActivationError(null); }}
-                          className={`flex h-9 items-center justify-center gap-1 rounded-lg border text-[11px] font-bold transition cursor-pointer ${authChoice === "google" ? "border-amber-400 bg-amber-50 text-slate-900 ring-2 ring-amber-200" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`}
-                        >
-                          <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true">
-                            <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47a5.57 5.57 0 0 1-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z" />
-                            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09A11.99 11.99 0 0 0 12 24z" />
-                            <path fill="#FBBC05" d="M5.27 14.29a7.19 7.19 0 0 1 0-4.58V6.62H1.29a12.01 12.01 0 0 0 0 10.76l3.98-3.09z" />
-                            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.32 2.69 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z" />
-                          </svg>
-                          Google
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setAuthChoice("phone"); setEmailSent(false); setActivationError(null); }}
-                          className={`flex h-9 items-center justify-center gap-1 rounded-lg border text-[11px] font-bold transition cursor-pointer ${authChoice === "phone" ? "border-amber-400 bg-amber-50 text-slate-900 ring-2 ring-amber-200" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`}
-                        >
-                          <Smartphone size={13} />
-                          Phone
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setAuthChoice("email"); setEmailSent(false); setActivationError(null); }}
-                          className={`flex h-9 items-center justify-center gap-1 rounded-lg border text-[11px] font-bold transition cursor-pointer ${authChoice === "email" ? "border-amber-400 bg-amber-50 text-slate-900 ring-2 ring-amber-200" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`}
-                        >
-                          <Mail size={13} />
-                          Email
-                        </button>
-                      </div>
-                    </div>
-
                     {/* ── DETAILS ── */}
                     <div>
                       <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -1409,52 +1269,37 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       />
                     </div>
 
-                    {authChoice !== "email" ? (
-                      <div>
-                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          {authChoice === "google" ? "Owner Phone Number *" : "Phone Number *"}
-                        </label>
-                        <div className="flex gap-1.5">
-                          <select
-                            value={regCountry}
-                            onChange={(e) => { setRegCountry(e.target.value); setActivationError(null); }}
-                            title="Country dial code"
-                            className="h-10 w-20 flex-shrink-0 rounded-xl border border-slate-200 px-1 text-xs outline-none focus:border-amber-400 font-bold bg-white"
-                          >
-                            {ACTIVATION_COUNTRIES.map((c) => (
-                              <option key={`${c.code}-${c.name}`} value={c.code}>{c.code}</option>
-                            ))}
-                          </select>
-                          <input
-                            type="tel"
-                            value={regPhone}
-                            onChange={(e) => { setRegPhone(e.target.value); setActivationError(null); }}
-                            placeholder="98765 43210"
-                            className="h-10 w-full rounded-xl border border-slate-200 px-3 text-xs outline-none focus:border-amber-400 font-mono font-medium"
-                          />
-                        </div>
-                        {phoneMatchesBuyer && authChoice === "phone" && (
-                          <p className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
-                            <CheckCircle2 size={12} />
-                            Matches purchase phone — instant activation available.
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <div>
-                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          Email Address *
-                        </label>
+                    <div>
+                      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Phone Number *
+                      </label>
+                      <div className="flex gap-1.5">
+                        <select
+                          value={regCountry}
+                          onChange={(e) => { setRegCountry(e.target.value); setActivationError(null); }}
+                          title="Country dial code"
+                          className="h-10 w-20 flex-shrink-0 rounded-xl border border-slate-200 px-1 text-xs outline-none focus:border-amber-400 font-bold bg-white"
+                        >
+                          {ACTIVATION_COUNTRIES.map((c) => (
+                            <option key={`${c.code}-${c.name}`} value={c.code}>{c.code}</option>
+                          ))}
+                        </select>
                         <input
-                          type="email"
-                          value={regEmail}
-                          onChange={(e) => { setRegEmail(e.target.value); setActivationError(null); }}
-                          placeholder="you@example.com"
-                          autoComplete="email"
-                          className="h-10 w-full rounded-xl border border-slate-200 px-3 text-xs outline-none focus:border-amber-400 font-medium"
+                          type="tel"
+                          inputMode="numeric"
+                          value={regPhone}
+                          onChange={(e) => { setRegPhone(e.target.value.replace(/\D/g, "").slice(0, 10)); setActivationError(null); }}
+                          placeholder="98765 43210"
+                          className="h-10 w-full rounded-xl border border-slate-200 px-3 text-xs outline-none focus:border-amber-400 font-mono font-medium"
                         />
                       </div>
-                    )}
+                      {phoneMatchesBuyer && (
+                        <p className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
+                          <CheckCircle2 size={12} />
+                          Matches purchase phone — instant activation available.
+                        </p>
+                      )}
+                    </div>
 
                     {activationError && (
                       <p className="flex items-center gap-1 text-[11px] font-semibold text-red-500">
@@ -1464,21 +1309,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                     )}
 
                     {/* ── PRIMARY ACTION ── */}
-                    {authChoice === "google" ? (
-                      <button
-                        onClick={googleAuthed ? () => proceedToEmergencyContacts(true) : handleContinueWithGoogle}
-                        disabled={googleLoading}
-                        className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 text-white font-bold shadow-sm transition-all hover:bg-slate-800 active:scale-[0.99] cursor-pointer text-xs disabled:opacity-60"
-                      >
-                        {googleLoading ? (
-                          <span>Connecting to Google…</span>
-                        ) : googleAuthed ? (
-                          <><ShieldCheck size={14} /> Activate Sticker (Google Verified)</>
-                        ) : (
-                          <>Continue with Google</>
-                        )}
-                      </button>
-                    ) : phoneMatchesBuyer && authChoice === "phone" ? (
+                    {phoneMatchesBuyer ? (
                       <button
                         onClick={() => proceedToEmergencyContacts(true)}
                         disabled={activatingQr}
@@ -1490,13 +1321,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                           <><ShieldCheck size={14} /> Activate Instantly</>
                         )}
                       </button>
-                    ) : authChoice === "email" ? (
-                      <button
-                        onClick={handleSendEmailCode}
-                        className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 text-white font-bold shadow-sm transition-all hover:bg-slate-800 active:scale-[0.99] cursor-pointer text-xs"
-                      >
-                        <Send size={14} /> Send Verification Email
-                      </button>
                     ) : (
                       <button
                         onClick={handleSendOtp}
@@ -1507,109 +1331,34 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                     )}
                   </>
                 ) : (
-                  /* OTP / EMAIL VERIFICATION STEP */
-                  <div className="space-y-2.5 bg-slate-50/90 border border-slate-200 rounded-xl p-3 text-left">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-emerald-700 font-bold text-xs">
-                        <CheckCircle2 size={15} />
-                        <span>{emailSent ? "Email Verification" : "OTP Verification"}</span>
-                      </div>
-                      <span className="text-[10px] font-bold text-slate-500">{otpAttemptsLeft} attempts left</span>
-                    </div>
+                  /* OTP VERIFICATION STEP — title, code input, one button */
+                  <div className="space-y-3 text-left">
+                    <h2 className="text-center text-sm font-bold text-slate-900">OTP Verification</h2>
 
-                    <p className="text-[11px] text-slate-600">
-                      Code sent to <strong className="font-mono text-slate-900">{emailSent ? regEmail : (otpSentTo || `${regCountry} ${regPhone}`)}</strong> to activate{" "}
-                      <strong className="font-mono text-amber-600">{qrData.id}</strong>.
-                    </p>
-
-                    {/* Expiry & Test Code Compact Bar */}
-                    <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-200/80 rounded-lg px-2.5 py-1.5 text-[11px] text-amber-900 font-medium">
-                      <div className="flex items-center gap-1">
-                        <Clock size={11} className="text-amber-700" />
-                        <span className="text-[10px] font-bold">
-                          {otpTimeLeft > 0 ? `Code expires in ${Math.floor(otpTimeLeft / 60)}:${String(otpTimeLeft % 60).padStart(2, "0")}` : "Code expired"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-slate-500">Test Code:</span>
-                        <span className="font-mono font-extrabold text-[11px] bg-amber-200/90 px-1.5 py-0.5 rounded text-amber-950">0000</span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        autoFocus
-                        maxLength={4}
-                        value={otpInput}
-                        onChange={(e) => { setOtpInput(e.target.value.replace(/\D/g, "").slice(0, 4)); setActivationError(null); }}
-                        placeholder="0000"
-                        className="h-10 w-full rounded-xl border border-slate-300 px-3 text-center font-mono text-base font-bold tracking-widest outline-none focus:border-emerald-500 bg-white"
-                      />
-                    </div>
-
-                    {/* Resend + switch method */}
-                    <div className="flex items-center justify-between text-[10px]">
-                      <button
-                        type="button"
-                        onClick={handleResendOtp}
-                        disabled={otpResendIn > 0}
-                        className="flex items-center gap-1 font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer disabled:opacity-40"
-                      >
-                        <RefreshCw size={11} />
-                        {otpResendIn > 0 ? `Resend code in ${otpResendIn}s` : "Resend code"}
-                      </button>
-                      {!emailSent && (
-                        <button
-                          type="button"
-                          onClick={() => { setOtpStep(false); setAuthChoice("email"); setActivationError(null); }}
-                          className="font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
-                        >
-                          Forgot phone? Use email instead
-                        </button>
-                      )}
-                    </div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      autoFocus
+                      maxLength={4}
+                      value={otpInput}
+                      onChange={(e) => { setOtpInput(e.target.value.replace(/\D/g, "").slice(0, 4)); setActivationError(null); }}
+                      placeholder="0000"
+                      className="h-11 w-full rounded-xl border border-slate-300 px-3 text-center font-mono text-base font-bold tracking-widest outline-none focus:border-emerald-500 bg-white"
+                    />
 
                     {activationError && (
-                      <p className="flex items-center gap-1 text-[11px] font-semibold text-red-500">
-                        <AlertTriangle size={12} />
-                        {activationError}
-                      </p>
+                      <p className="text-center text-[11px] font-semibold text-red-500">{activationError}</p>
                     )}
 
-                    <div className="flex gap-2 pt-0.5">
-                      <button
-                        type="button"
-                        onClick={() => setOtpStep(false)}
-                        className="px-3.5 h-9 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 cursor-pointer"
-                      >
-                        Back
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleVerifyOtpAndActivate}
-                        disabled={activatingQr}
-                        className="flex-1 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                      >
-                        {activatingQr ? (
-                          <span>Activating…</span>
-                        ) : (
-                          <><ShieldCheck size={14} /> Verify &amp; Activate Sticker</>
-                        )}
-                      </button>
-                    </div>
-
-                    {emailSent && (
-                      <button
-                        type="button"
-                        onClick={handleContinueLimited}
-                        className="w-full h-9 rounded-lg border border-dashed border-slate-300 text-[10px] font-bold text-slate-500 hover:bg-white hover:text-slate-700 cursor-pointer"
-                      >
-                        <Lock size={11} className="mr-1 inline" /> Check email link — continue in limited mode
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={handleVerifyOtpAndActivate}
+                      disabled={activatingQr}
+                      className="h-10 w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm cursor-pointer disabled:opacity-50"
+                    >
+                      {activatingQr ? "Activating…" : "Verify & Activate"}
+                    </button>
                   </div>
                 )}
               </div>
@@ -1893,10 +1642,10 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                     {/* 2. Mechanic */}
                     <button
                       onClick={() => setActiveSubMenu("mechanical")}
-                      className="bg-white border border-gray-100 hover:border-orange-200 rounded-2xl p-2.5 flex flex-col items-center justify-between text-center cursor-pointer active:scale-95 transition-all min-h-[100px] shadow-2xs hover:shadow-sm relative group"
+                      className="bg-white border border-gray-100 hover:border-yellow-300 rounded-2xl p-2.5 flex flex-col items-center justify-between text-center cursor-pointer active:scale-95 transition-all min-h-[100px] shadow-2xs hover:shadow-sm relative group"
                     >
                       <ChevronRight size={12} className="text-gray-300 absolute top-2 right-2 group-hover:text-gray-500 transition-colors" />
-                      <div className="w-10 h-10 rounded-full bg-[#FFEDD5] flex items-center justify-center mb-1 flex-shrink-0 group-hover:scale-105 transition-transform">
+                      <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center mb-1 flex-shrink-0 group-hover:scale-105 transition-transform">
                         <img src={mechanicIcon} alt="Mechanic" className="w-6 h-6 object-contain" />
                       </div>
                       <div>
@@ -1987,18 +1736,18 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                   {/* 6. AI SAFETY ASSISTANT & SUPPORT BAR */}
                   <button
                     onClick={() => setAiChatOpen(true)}
-                    className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-orange-500/20 active:scale-[0.98] transition-all cursor-pointer"
+                    className="w-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-500 hover:to-yellow-500 text-gray-950 rounded-2xl p-4 flex items-center justify-between shadow-md shadow-yellow-500/20 active:scale-[0.98] transition-all cursor-pointer"
                   >
                     <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold text-xl flex-shrink-0">
+                      <div className="w-11 h-11 rounded-xl bg-gray-950/15 text-gray-950 flex items-center justify-center font-bold text-xl flex-shrink-0">
                         <Bot size={22} />
                       </div>
                       <div className="text-left min-w-0">
-                        <p className="text-sm font-black text-white tracking-tight">RapiQR AI Assistant</p>
-                        <p className="text-[11px] font-medium text-white/90">Ask AI for emergency advice &amp; owner assistance</p>
+                        <p className="text-sm font-black text-gray-950 tracking-tight">RapiQR AI Assistant</p>
+                        <p className="text-[11px] font-medium text-gray-900">Ask AI for emergency advice &amp; owner assistance</p>
                       </div>
                     </div>
-                    <div className="bg-white text-orange-700 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
+                    <div className="bg-gray-950 text-yellow-400 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
                       CHAT
                     </div>
                   </button>
@@ -2203,7 +1952,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       </button>
                       <div className="text-right">
                         <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5 justify-end">
-                          <Wrench size={16} className="text-orange-500" /> Mechanical Options
+                          <Wrench size={16} className="text-yellow-600" /> Mechanical Options
                         </span>
                         <p className="text-[10px] font-semibold text-gray-400">Select a service</p>
                       </div>
@@ -2277,13 +2026,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                           const mechanic = getAdminContacts("Mechanic");
                           if (mechanic.length > 0) window.open(`tel:${mechanic[0].phone.replace(/[^0-9+]/g, "")}`);
                         }}
-                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-orange-300 hover:bg-orange-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-yellow-300 hover:bg-yellow-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
                       >
-                        <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold shadow-2xs">
+                        <div className="w-8 h-8 rounded-xl bg-yellow-100 text-yellow-700 flex items-center justify-center font-bold shadow-2xs">
                           <Settings size={18} />
                         </div>
                         <div>
-                          <p className="text-xs font-black text-gray-900 group-hover:text-orange-600 transition-colors">Mechanic</p>
+                          <p className="text-xs font-black text-gray-900 group-hover:text-yellow-700 transition-colors">Mechanic</p>
                           <p className="text-[10px] font-bold text-gray-500 mt-0.5">
                             {getAdminContacts("Mechanic").length > 0
                               ? getAdminContacts("Mechanic")[0].label
@@ -2331,7 +2080,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                     {!towingImage ? (
                       <div className="bg-white border border-gray-200/80 rounded-2xl p-4 space-y-3 shadow-2xs">
                         <div className="grid grid-cols-2 gap-3">
-                          <label className="bg-[#FF5500] hover:bg-[#E64D00] text-white font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95 transition-all text-center">
+                          <label className="bg-[#EAB308] hover:bg-[#CA8A04] text-gray-950 font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95 transition-all text-center">
                             <Camera size={18} />
                             <span>Take Photo</span>
                             <input
@@ -2350,7 +2099,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                             />
                           </label>
 
-                          <label className="bg-white border-2 border-[#FFD6B3] hover:bg-orange-50/50 text-[#FF5500] font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-xs cursor-pointer active:scale-95 transition-all text-center">
+                          <label className="bg-white border-2 border-yellow-300 hover:bg-yellow-50/50 text-amber-800 font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-xs cursor-pointer active:scale-95 transition-all text-center">
                             <Upload size={18} />
                             <span>Upload Picture</span>
                             <input
@@ -2858,7 +2607,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                         <div className="bg-white border border-gray-200/80 rounded-2xl p-4 space-y-3 shadow-2xs">
                           <p className="text-[11px] font-semibold text-gray-500 px-0.5">Add a photo of the flat tyre so help arrives prepared.</p>
                           <div className="grid grid-cols-2 gap-3">
-                            <label className="bg-[#FF5500] hover:bg-[#E64D00] text-white font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95 transition-all text-center">
+                            <label className="bg-[#EAB308] hover:bg-[#CA8A04] text-gray-950 font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95 transition-all text-center">
                               <Camera size={18} />
                               <span>Take Photo</span>
                               <input
@@ -2877,7 +2626,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                               />
                             </label>
 
-                            <label className="bg-white border-2 border-[#FFD6B3] hover:bg-orange-50/50 text-[#FF5500] font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-xs cursor-pointer active:scale-95 transition-all text-center">
+                            <label className="bg-white border-2 border-yellow-300 hover:bg-yellow-50/50 text-amber-800 font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-xs cursor-pointer active:scale-95 transition-all text-center">
                               <Upload size={18} />
                               <span>Upload Picture</span>
                               <input
@@ -2970,41 +2719,18 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
               <div>
                 <h2 className="text-lg sm:text-xl font-bold text-slate-900">All set! Your sticker is active.</h2>
                 <p className="text-xs text-slate-500 mt-1">
-                  {regEmail.trim()
-                    ? `We've sent a confirmation to ${regEmail.trim()}.`
-                    : "You can manage it anytime from your dashboard."}
+                  You can manage it anytime from your dashboard.
                 </p>
               </div>
 
-              <div className="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/80 text-left space-y-1.5">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Activation Summary</p>
-                <div className="text-xs font-semibold text-slate-700 space-y-1">
-                  <p>• Sticker: <span className="font-mono font-bold text-slate-900">{qrData.id}</span></p>
-                  <p>• Owner: {regName.trim() || "—"}</p>
-                  <p>• Activated: {formatTime(new Date().toISOString())}</p>
-                  <p>
-                    • Emergency contacts:{" "}
-                    {emergencyContacts.filter((c) => c.name.trim() && isValidContactPhone(c.phone)).length} added
-                  </p>
-                </div>
-              </div>
 
-              {/* ONLY 2 BUTTONS: Continue & View Sticker Safety Page */}
-              <div className="space-y-2 pt-1">
+              <div className="pt-1">
                 <button
-                  onClick={onGoToDashboard || onBack}
+                  onClick={() => setPhase("emergency")}
                   className="w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold text-xs sm:text-sm shadow-sm transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
                 >
                   <span>Continue</span>
                   <ArrowRight size={14} />
-                </button>
-
-                <button
-                  onClick={() => setPhase("emergency")}
-                  className="w-full py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs sm:text-sm shadow-xs transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <ShieldCheck size={14} className="text-emerald-600" />
-                  <span>View Sticker's Safety Page</span>
                 </button>
               </div>
             </div>
@@ -3015,7 +2741,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         {phase === "emergency" && (
           <button
             onClick={() => setAiChatOpen(true)}
-            className="fixed bottom-5 right-5 z-40 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-black text-xs px-4 py-3 rounded-full shadow-2xl flex items-center gap-2 border-2 border-white/40 active:scale-95 transition-all cursor-pointer"
+            className="fixed bottom-5 right-5 z-40 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-gray-950 font-black text-xs px-4 py-3 rounded-full shadow-2xl flex items-center gap-2 border-2 border-white/40 active:scale-95 transition-all cursor-pointer"
           >
             <Bot size={18} />
             <span>AI Safety Assistant</span>
@@ -3036,24 +2762,24 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
               <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2 sm:hidden flex-shrink-0" />
 
               {/* Modal Header */}
-              <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 p-4 text-white flex items-center justify-between flex-shrink-0 shadow-md">
+              <div className="bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 p-4 text-gray-950 flex items-center justify-between flex-shrink-0 shadow-md">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center font-bold shadow-inner">
-                    <Bot size={22} className="text-white" />
+                  <div className="w-10 h-10 rounded-2xl bg-gray-950/15 flex items-center justify-center font-bold shadow-inner">
+                    <Bot size={22} className="text-gray-950" />
                   </div>
                   <div>
                     <h3 className="font-extrabold text-sm flex items-center gap-2">
                       RapiQR Safety AI
-                      <span className="text-[9px] bg-white/20 text-white font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Online
+                      <span className="text-[9px] bg-gray-950/15 text-gray-950 font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Online
                       </span>
                     </h3>
-                    <p className="text-[11px] text-white/90 font-medium">Instant Emergency &amp; Owner Assistance</p>
+                    <p className="text-[11px] text-gray-900 font-medium">Instant Emergency &amp; Owner Assistance</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setAiChatOpen(false)}
-                  className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center font-bold text-sm transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-gray-950/15 hover:bg-gray-950/25 text-gray-950 flex items-center justify-center font-bold text-sm transition-colors cursor-pointer"
                   title="Close Chat"
                 >
                   ✕
@@ -3069,15 +2795,15 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                   >
                     <div
                       className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-xs ${msg.role === 'user'
-                          ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white'
-                          : 'bg-slate-900 text-amber-400'
+                          ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-gray-950'
+                          : 'bg-slate-900 text-yellow-400'
                         }`}
                     >
                       {msg.role === 'user' ? 'U' : <Bot size={17} />}
                     </div>
                     <div
                       className={`max-w-[85%] rounded-2xl p-3.5 text-xs font-medium leading-relaxed shadow-xs ${msg.role === 'user'
-                          ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-tr-xs font-semibold'
+                          ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-gray-950 rounded-tr-xs font-semibold'
                           : 'bg-white text-gray-800 border border-gray-200/90 rounded-tl-xs'
                         }`}
                     >
@@ -3127,7 +2853,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                     key={i}
                     onClick={() => handleSendAiMessage(chip)}
                     disabled={aiLoading}
-                    className="text-[11px] font-bold text-gray-700 bg-gray-100 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-300 px-3 py-1.5 rounded-full whitespace-nowrap border border-gray-200 transition-all flex-shrink-0 cursor-pointer disabled:opacity-50"
+                    className="text-[11px] font-bold text-gray-700 bg-gray-100 hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-300 px-3 py-1.5 rounded-full whitespace-nowrap border border-gray-200 transition-all flex-shrink-0 cursor-pointer disabled:opacity-50"
                   >
                     {chip}
                   </button>
@@ -3147,12 +2873,12 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                   placeholder="Ask AI safety assistant..."
                   value={aiInput}
                   onChange={(e) => setAiInput(e.target.value)}
-                  className="flex-1 px-4 py-3 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-500 focus:bg-white font-medium transition-all"
+                  className="flex-1 px-4 py-3 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-yellow-500 focus:bg-white font-medium transition-all"
                 />
                 <button
                   type="submit"
                   disabled={!aiInput.trim() || aiLoading}
-                  className="w-10 h-10 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 text-white flex items-center justify-center font-bold shadow-md transition-all flex-shrink-0 cursor-pointer active:scale-95"
+                  className="w-10 h-10 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 disabled:opacity-50 text-gray-950 flex items-center justify-center font-bold shadow-md transition-all flex-shrink-0 cursor-pointer active:scale-95"
                 >
                   <Send size={16} />
                 </button>
@@ -3177,7 +2903,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                     <Lock size={18} className="text-white" />
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-sm">Masked Call — {maskedCallTarget.label}</h3>
+                    <h3 className="font-extrabold text-sm">Anonymous Call — {maskedCallTarget.label}</h3>
                     <p className="text-[11px] text-white/85 font-medium">Their real number stays private</p>
                   </div>
                 </div>
@@ -3190,39 +2916,43 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
               </div>
 
               <div className="p-5 space-y-4">
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  Enter your phone number — we'll call you first, then securely connect you to {maskedCallTarget.label.toLowerCase()}. Neither of you will see the other's real number.
-                </p>
-
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-700">Your Phone Number</label>
-                  <PhoneInputWithCountry
-                    value={maskedCallPhone}
-                    onChange={(full) => { setMaskedCallPhone(full); setMaskedCallResult(null); }}
-                  />
-                </div>
-
-                {maskedCallResult && (
-                  <p className={`flex items-center gap-1.5 text-xs font-semibold ${maskedCallResult.success ? "text-emerald-600" : "text-red-500"}`}>
-                    {maskedCallResult.success ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
-                    {maskedCallResult.message}
-                  </p>
+                {maskedCallBusy && (
+                  <div className="flex flex-col items-center justify-center gap-3 py-6">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
+                    <p className="text-xs font-semibold text-gray-500">Generating a private number…</p>
+                  </div>
                 )}
 
-                <button
-                  onClick={submitMaskedCall}
-                  disabled={maskedCallBusy}
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md transition-all active:scale-[0.99] cursor-pointer text-sm disabled:opacity-60"
-                >
-                  {maskedCallBusy ? (
-                    <>
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      <span>Starting call…</span>
-                    </>
-                  ) : (
-                    <><PhoneCall size={16} /> Start Masked Call</>
-                  )}
-                </button>
+                {!maskedCallBusy && maskedCallError && (
+                  <div className="space-y-3">
+                    <p className="flex items-center gap-1.5 text-xs font-semibold text-red-500">
+                      <AlertTriangle size={14} /> {maskedCallError}
+                    </p>
+                    <button
+                      onClick={() => fetchMaskedCallNumber(maskedCallTarget)}
+                      className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold shadow-sm transition-all active:scale-[0.99] cursor-pointer text-sm"
+                    >
+                      Try Again
+                    </button>
+                  </div>
+                )}
+
+                {!maskedCallBusy && maskedCallDid && (
+                  <div className="space-y-4">
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      Tap below to call — you'll be connected to {maskedCallTarget.label.toLowerCase()} without either of you seeing the other's real number.
+                    </p>
+                    <div className="rounded-xl border border-blue-100 bg-blue-50 py-3 text-center">
+                      <p className="text-lg font-extrabold tracking-wide text-blue-700">{maskedCallDid}</p>
+                    </div>
+                    <a
+                      href={`tel:${maskedCallDid}`}
+                      className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md transition-all active:scale-[0.99] cursor-pointer text-sm"
+                    >
+                      <PhoneCall size={16} /> Call Now
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
           </div>

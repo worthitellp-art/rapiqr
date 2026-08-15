@@ -231,7 +231,7 @@ class AuthController {
 
       logger.info('AUTH_GOOGLE', `Google OAuth verification for: ${email}`);
 
-      const isDefaultAdmin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+      const isDesignatedAdmin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
       let profile = await UserModel.findByEmail(email);
       if (!profile) {
@@ -240,7 +240,16 @@ class AuthController {
           email,
           fullName: fullName || email.split('@')[0],
           avatarUrl,
-          role: isDefaultAdmin ? 'admin' : 'user'
+          role: isDesignatedAdmin ? 'admin' : 'user'
+        });
+      } else if (isDesignatedAdmin && profile.role !== 'admin') {
+        profile = await UserModel.upsertProfile({
+          id: profile.id,
+          email: profile.email,
+          fullName: profile.full_name,
+          avatarUrl: profile.avatar_url,
+          phoneNumber: profile.phone_number,
+          role: 'admin'
         });
       }
 

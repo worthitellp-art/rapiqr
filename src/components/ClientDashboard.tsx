@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { getCategoryIcon, getCategoryLabel } from '../stickerModules';
 import {
   Bell,
+  Search,
   ShieldCheck,
   LogOut,
   Eye,
@@ -22,13 +23,16 @@ import {
   Power,
   RefreshCcw,
   Sparkles,
+  QrCode,
 } from 'lucide-react';
 import type { DashboardSticker } from './dashboard/client/types';
 import { mapProductRow } from './dashboard/client/types';
-import { EditDetailsModal, EditContactsModal, TransferModal, ScanHistoryModal, ConfirmActionModal } from './dashboard/client/StickerModals';
+import { QrCodeModal, EditDetailsModal, EditContactsModal, TransferModal, ScanHistoryModal, ConfirmActionModal } from './dashboard/client/StickerModals';
+import PhoneInputWithCountry from './common/PhoneInputWithCountry';
 import EmergencyContactsPanel from './dashboard/client/EmergencyContactsPanel';
 import AccountSettingsPanel from './dashboard/client/AccountSettingsPanel';
 import SupportLegalPanel from './dashboard/client/SupportLegalPanel';
+import CompleteProfilePopup from './dashboard/client/CompleteProfilePopup';
 import AppLogo from './common/AppLogo';
 import {
   getProductsFromDb,
@@ -63,15 +67,84 @@ type ModalState =
   | { type: 'deactivate'; sticker: DashboardSticker }
   | { type: 'reactivate'; sticker: DashboardSticker }
   | { type: 'delete'; sticker: DashboardSticker }
+  | { type: 'qrCode'; sticker: DashboardSticker }
   | null;
 
 export default function ClientDashboard({ onBack }: ClientDashboardProps) {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, sendPhoneOtp, verifyPhoneOtp, updatePhoneNumber } = useAuth();
+
+  // ─── PHONE NUMBER STICKER LINKING STATE ───
+  const [linkingPhone, setLinkingPhone] = useState(profile?.phoneNumber || '');
+  const [otpStep, setOtpStep] = useState<'input' | 'otp'>('input');
+  const [otpCode, setOtpCode] = useState('');
+  const [linkingLoading, setLinkingLoading] = useState(false);
+  const [linkingMessage, setLinkingMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleSendPhoneVerification = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const digits = linkingPhone.replace(/\D/g, '');
+    if (digits.length < 7) {
+      setLinkingMessage({ type: 'error', text: 'Please enter a valid mobile number.' });
+      return;
+    }
+    setLinkingLoading(true);
+    setLinkingMessage(null);
+    try {
+      const res = await sendPhoneOtp(linkingPhone);
+      setLinkingLoading(false);
+      if (res.success) {
+        setOtpStep('otp');
+        showToast(`Verification code sent to ${linkingPhone}`);
+        setLinkingMessage({ type: 'success', text: `Verification code sent to ${linkingPhone}. Enter OTP to claim your stickers.` });
+      } else {
+        setLinkingMessage({ type: 'error', text: res.error || 'Failed to send OTP.' });
+      }
+    } catch (err: any) {
+      setLinkingLoading(false);
+      setLinkingMessage({ type: 'error', text: err.message || 'Failed to send verification code.' });
+    }
+  };
+
+  const handleConfirmPhoneOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!otpCode.trim()) {
+      setLinkingMessage({ type: 'error', text: 'Please enter the verification code.' });
+      return;
+    }
+    setLinkingLoading(true);
+    setLinkingMessage(null);
+    try {
+      const res = await verifyPhoneOtp(otpCode.trim());
+      setLinkingLoading(false);
+      if (res.success) {
+        await updatePhoneNumber(linkingPhone);
+        const claimed = await loadProducts();
+        setOtpStep('input');
+        setOtpCode('');
+        const count = claimed?.length || res.claimedCount || 0;
+        const msg = `Phone verified! Loaded ${count} safety sticker${count === 1 ? '' : 's'} linked to ${linkingPhone}.`;
+        showToast(msg);
+        setLinkingMessage({ type: 'success', text: msg });
+      } else {
+        setLinkingMessage({ type: 'error', text: res.error || 'Invalid verification code.' });
+      }
+    } catch (err: any) {
+      setLinkingLoading(false);
+      setLinkingMessage({ type: 'error', text: err.message || 'Verification failed.' });
+    }
+  };
 
   const handleSignOut = async () => {
     await signOut();
     onBack();
   };
+
+  // A profile signed in with just an email or just a phone number is only half
+  // set up — stickers auto-link by phone on activation, so both fields matter.
+  const missingPhone = !profile?.phoneNumber;
+  const missingEmail = !profile?.email || profile.email.endsWith('.repiqr.local');
+  const [profilePopupDismissed, setProfilePopupDismissed] = useState(false);
+  const showCompleteProfilePopup = Boolean(profile) && (missingPhone || missingEmail) && !profilePopupDismissed;
 
   // Load Google Fraunces Font dynamically for title rendering
   useEffect(() => {
@@ -100,6 +173,7 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
 
   // Mobile sidebar toggle
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // ─── PRODUCTS (backed by the real /api/products fleet) ───
   const [products, setProducts] = useState<DashboardSticker[]>([]);
@@ -252,93 +326,120 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
   const totalContacts = products.reduce((s, p) => s + (p.contacts?.length || 0), 0);
 
   return (
-    <div className="flex flex-col h-screen bg-[#F5F6FA] text-[#1A1D26] font-sans antialiased overflow-hidden">
+    <div className="h-screen w-full flex overflow-hidden text-gray-900 bg-[#F5F6FA]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
 
-      {/* ─── APP HEADER ─── */}
-      <header className="h-[72px] flex-shrink-0 bg-white border-b border-[#E8ECF4] flex items-center justify-between px-6 sm:px-8 z-20">
-        <div className="flex items-center gap-3.5">
-          <button
-            onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-            className="md:hidden w-9.5 h-9.5 rounded-xl bg-[#F5F6FA] border border-gray-200 flex items-center justify-center text-gray-700 cursor-pointer"
-          >
-            <Menu size={20} />
-          </button>
-          <button onClick={onBack} className="flex items-center cursor-pointer">
-            <AppLogo variant="light" className="h-7 w-auto object-contain" />
-          </button>
-        </div>
+      {/* ─── SIDEBAR (Full Height h-screen) ─── */}
+      <aside
+        className={`w-[240px] flex-shrink-0 flex flex-col h-full py-5 px-3.5 z-30 transition-all duration-300 md:static fixed inset-y-0 left-0 overflow-y-auto custom-scrollbar ${
+          isMobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
+        }`}
+        style={{ background: "#14161C", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+      >
+        {/* Logo */}
+        <button onClick={onBack} className="flex items-center gap-3 px-2 mb-7 flex-shrink-0 cursor-pointer group">
+          <AppLogo variant="dark" className="h-7 w-auto object-contain transition-transform group-hover:scale-105" />
+        </button>
 
-        <div className="flex items-center gap-3.5">
-          <div className="hidden sm:flex items-center gap-2 bg-[#DCFCE7] text-[#16A34A] px-3.5 py-1.5 rounded-full text-xs font-extrabold">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#16A34A] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#16A34A]"></span>
-            </span>
-            <span>{activeCount} Active Tags</span>
-          </div>
+        {/* Nav */}
+        <nav className="flex-1 space-y-1.5">
+          {NAV_ITEMS.map((item) => {
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => { setActiveTab(item.id); setIsMobileSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-white text-[#111111] shadow-[0_4px_16px_rgba(0,0,0,0.25)] font-bold scale-[1.02]'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <item.icon size={18} className={isActive ? 'text-[#EAB308]' : ''} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
 
-          <button
-            onClick={() => {
-              setNotifBadgeVisible(false);
-              showToast('Notifications are shown in Emergency History');
-            }}
-            className="relative w-10 h-10 rounded-xl bg-[#F5F6FA] border border-[#E8ECF4] flex items-center justify-center text-[#1A1D26] hover:bg-[#E2E8F0] transition-colors cursor-pointer"
-          >
-            <Bell size={18} />
-            {notifBadgeVisible && (
-              <span className="absolute -top-1 -right-1 bg-[#111111] text-white text-[10px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center">
-                !
-              </span>
-            )}
-          </button>
-
-          <div className="flex items-center gap-2.5 pl-3 border-l border-[#E8ECF4]">
+        {/* Profile + Sign Out */}
+        <div className="flex-shrink-0 pt-3 space-y-1" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          <div className="flex items-center gap-3 px-2.5 py-2.5 rounded-xl bg-white/5 border border-white/10">
             <img
               src={profile?.avatarUrl || "https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&q=80&w=100"}
               alt="User Avatar"
-              className="w-9 h-9 rounded-full object-cover border-2 border-[#111111]"
+              className="w-8.5 h-8.5 rounded-full object-cover flex-shrink-0 bg-white/10 p-0.5"
+              style={{ border: "2px solid rgba(234,179,8,0.6)" }}
             />
-
-            <button onClick={handleSignOut} title="Sign Out" className="text-gray-400 hover:text-red-600 transition-colors ml-1 cursor-pointer">
-              <LogOut size={16} />
-            </button>
+            <div className="min-w-0 flex-1">
+              <p className="text-[12px] font-bold text-white truncate leading-tight">{profile?.fullName || 'My Account'}</p>
+              <p className="text-[10px] font-bold mt-0.5 text-[#EAB308] truncate uppercase tracking-wider">Client Account</p>
+            </div>
           </div>
+          <button
+            onClick={handleSignOut}
+            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] font-semibold text-red-400 hover:bg-white/10 transition-all cursor-pointer mt-1"
+          >
+            <LogOut size={17} />
+            <span>Sign Out</span>
+          </button>
         </div>
-      </header>
+      </aside>
 
-      {/* ─── APP BODY LAYOUT ─── */}
-      <div className="flex-1 flex overflow-hidden relative">
-
-        {/* ─── SIDEBAR ─── */}
-        <aside className={`w-[236px] flex-shrink-0 bg-white border-r border-[#E8ECF4] flex flex-col justify-between p-5 z-30 transition-all duration-300 md:static fixed inset-y-0 left-0 overflow-y-auto ${
-          isMobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
-        }`}>
-          <div className="space-y-4">
-            <nav className="space-y-1">
-              {NAV_ITEMS.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => { setActiveTab(item.id); setIsMobileSidebarOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    activeTab === item.id ? 'bg-[#F1F5F9] text-[#111111]' : 'text-[#64748B] hover:bg-[#F1F5F9]'
-                  }`}
-                >
-                  <item.icon size={17} />
-                  <span>{item.label}</span>
-                </button>
-              ))}
-            </nav>
-          </div>
-
-          <div className="space-y-3">
+      {/* ─── RIGHT CONTENT CONTAINER ─── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#F5F6FA]">
+        {/* Top Header Row (60px) */}
+        <header className="h-[60px] flex-shrink-0 bg-white border-b border-[#E8ECF4] flex items-center justify-between px-6 sm:px-8 z-20">
+          {/* Left Greeting */}
+          <div className="flex items-center gap-4">
             <button
-              onClick={handleSignOut}
-              className="w-full flex items-center justify-center gap-2 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 py-3 rounded-xl transition-all cursor-pointer"
+              onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+              className="md:hidden w-9 h-9 rounded-xl bg-[#F5F6FA] border border-[#E8ECF4] flex items-center justify-center text-gray-700 cursor-pointer"
             >
-              <LogOut size={15} /> Sign Out
+              <Menu size={18} />
             </button>
+
+            <p className="text-[13.5px] font-medium text-[#475569]">
+              Hello <span className="font-extrabold text-[#0F172A]">{profile?.fullName || 'Client'}</span>
+            </p>
           </div>
-        </aside>
+
+          {/* Right Search & Profile */}
+          <div className="flex items-center gap-3">
+            {/* Search Input */}
+            <div className="relative hidden md:block">
+              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search stickers or contacts..."
+                className="pl-9 pr-12 py-1.5 text-[12px] rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] text-[#1E293B] outline-none w-[220px] transition-all font-medium focus:w-[280px] focus:bg-white focus:border-[#D97706] focus:ring-2 focus:ring-[#D97706]/15"
+              />
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold px-1.5 py-0.5 rounded bg-white text-[#64748B] border border-[#E2E8F0]">
+                ⌘K
+              </span>
+            </div>
+
+            <button
+              onClick={() => {
+                setNotifBadgeVisible(false);
+                showToast('Notifications are shown in Alert History');
+              }}
+              title="Notifications"
+              className="relative w-9 h-9 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center text-[#64748B] hover:text-[#0F172A] hover:bg-white transition-colors cursor-pointer"
+            >
+              <Bell size={16} />
+              {notifBadgeVisible && (
+                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white" />
+              )}
+            </button>
+
+            <img
+              src={profile?.avatarUrl || "https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&q=80&w=100"}
+              alt="User Avatar"
+              className="w-9 h-9 rounded-xl object-cover bg-[#F1F5F9] border border-[#E2E8F0] cursor-pointer"
+            />
+          </div>
+        </header>
 
         {/* ─── MAIN CONTENT VIEW PANEL ─── */}
         <main className="flex-1 overflow-y-auto p-6 sm:p-9 space-y-6">
@@ -355,103 +456,191 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                 </p>
               </div>
 
+              {/* ── Phone Verification & Sticker Linking Panel ── */}
+              <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-xs relative overflow-hidden">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-1 max-w-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#D97706]" />
+                      <h3 className="text-sm font-extrabold text-[#0F172A]">Verify Phone &amp; Load Associated Stickers</h3>
+                    </div>
+                    <p className="text-xs text-[#64748B] font-medium leading-relaxed">
+                      Enter your mobile number to verify ownership and load all safety QR tags associated with this phone.
+                    </p>
+                  </div>
+
+                  {otpStep === 'input' ? (
+                    <form onSubmit={handleSendPhoneVerification} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 min-w-[300px]">
+                      <div className="flex-1">
+                        <PhoneInputWithCountry
+                          value={linkingPhone}
+                          onChange={(fullPhone) => setLinkingPhone(fullPhone)}
+                          placeholder="10-digit mobile number"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={linkingLoading}
+                        className="px-4 py-2.5 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-xs font-bold text-white transition-all disabled:opacity-60 cursor-pointer flex items-center justify-center gap-2 flex-shrink-0"
+                      >
+                        {linkingLoading ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <>Verify &amp; Load Stickers</>
+                        )}
+                      </button>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleConfirmPhoneOtp} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 min-w-[300px]">
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value)}
+                        placeholder="Enter OTP (e.g. 000000)"
+                        className="px-3.5 py-2.5 text-xs font-mono font-extrabold tracking-widest text-center bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl outline-none focus:border-[#D97706] focus:ring-2 focus:ring-[#D97706]/15"
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="submit"
+                          disabled={linkingLoading}
+                          className="px-4 py-2.5 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-xs font-bold text-white transition-all disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          {linkingLoading ? <Loader2 size={14} className="animate-spin" /> : 'Confirm Code'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setOtpStep('input'); setLinkingMessage(null); }}
+                          className="px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#64748B] transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+
+                {linkingMessage && (
+                  <div className={`mt-3 p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between gap-2 ${
+                    linkingMessage.type === 'success' ? 'bg-[#DCFCE7] text-[#15803D] border border-[#BBF7D0]' : 'bg-[#FEE2E2] text-[#DC2626] border border-[#FCA5A5]'
+                  }`}>
+                    <span>{linkingMessage.text}</span>
+                    <button onClick={() => setLinkingMessage(null)} className="text-xs hover:opacity-75 cursor-pointer">✕</button>
+                  </div>
+                )}
+              </div>
+
               {/* Stat Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white border border-[#E8ECF4] rounded-2xl p-5 shadow-2xs flex flex-col gap-2">
-                  <div className="w-9 h-9 rounded-xl bg-[#F1F5F9] text-[#111111] flex items-center justify-center font-bold">
-                    <ShieldCheck size={18} />
+                <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-xs flex flex-col gap-2.5 hover:shadow-md transition-all">
+                  <div className="w-10 h-10 rounded-xl bg-[#DCFCE7] text-[#16A34A] flex items-center justify-center font-bold">
+                    <ShieldCheck size={20} />
                   </div>
-                  <div className="text-2xl font-bold text-[#1A1D26]">{activeCount}</div>
+                  <div className="text-2xl font-extrabold text-[#0F172A] leading-none">{activeCount}</div>
                   <div className="text-xs font-semibold text-[#64748B]">Active Tags</div>
                 </div>
 
-                <div className="bg-white border border-[#E8ECF4] rounded-2xl p-5 shadow-2xs flex flex-col gap-2">
-                  <div className="w-9 h-9 rounded-xl bg-[#DBEAFE] text-[#2563EB] flex items-center justify-center font-bold">
-                    <Eye size={18} />
+                <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-xs flex flex-col gap-2.5 hover:shadow-md transition-all">
+                  <div className="w-10 h-10 rounded-xl bg-[#DBEAFE] text-[#2563EB] flex items-center justify-center font-bold">
+                    <Eye size={20} />
                   </div>
-                  <div className="text-2xl font-bold text-[#1A1D26]">{totalScans}</div>
+                  <div className="text-2xl font-extrabold text-[#0F172A] leading-none">{totalScans}</div>
                   <div className="text-xs font-semibold text-[#64748B]">Total Scans Received</div>
                 </div>
 
-                <div className="bg-white border border-[#E8ECF4] rounded-2xl p-5 shadow-2xs flex flex-col gap-2">
-                  <div className="w-9 h-9 rounded-xl bg-[#FEE2E2] text-[#DC2626] flex items-center justify-center font-bold">
-                    <Users size={18} />
+                <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-xs flex flex-col gap-2.5 hover:shadow-md transition-all">
+                  <div className="w-10 h-10 rounded-xl bg-[#FEE2E2] text-[#DC2626] flex items-center justify-center font-bold">
+                    <Users size={20} />
                   </div>
-                  <div className="text-2xl font-bold text-[#1A1D26]">{totalContacts}</div>
+                  <div className="text-2xl font-extrabold text-[#0F172A] leading-none">{totalContacts}</div>
                   <div className="text-xs font-semibold text-[#64748B]">Emergency Contacts</div>
                 </div>
 
-                <div className="bg-white border border-[#E8ECF4] rounded-2xl p-5 shadow-2xs flex flex-col gap-2">
-                  <div className="w-9 h-9 rounded-xl bg-[#DCFCE7] text-[#16A34A] flex items-center justify-center font-bold">
-                    <Grid size={18} />
+                <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-xs flex flex-col gap-2.5 hover:shadow-md transition-all">
+                  <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center font-bold">
+                    <Grid size={20} />
                   </div>
-                  <div className="text-2xl font-bold text-[#1A1D26]">{products.length}</div>
+                  <div className="text-2xl font-extrabold text-[#0F172A] leading-none">{products.length}</div>
                   <div className="text-xs font-semibold text-[#64748B]">Total Connected Tags</div>
                 </div>
               </div>
 
               {/* Product Grid OR Empty / Loading State */}
               {productsLoading ? (
-                <div className="bg-white border border-[#E8ECF4] rounded-3xl p-16 text-center shadow-sm flex flex-col items-center gap-3">
+                <div className="bg-white border border-[#E2E8F0] rounded-2xl p-16 text-center shadow-xs flex flex-col items-center gap-3">
                   <Loader2 size={24} className="animate-spin text-[#64748B]" />
                   <p className="text-xs font-semibold text-[#64748B]">Loading your stickers…</p>
                 </div>
               ) : products.length === 0 ? (
-                <div className="bg-white border border-[#E8ECF4] rounded-3xl p-12 text-center space-y-3 shadow-sm max-w-md mx-auto">
-                  <div className="w-14 h-14 rounded-full bg-[#F1F5F9] flex items-center justify-center mx-auto text-2xl">🛡️</div>
-                  <h3 className="text-lg font-bold text-[#1A1D26]">No QR Tags Found</h3>
-                  <p className="text-xs text-[#64748B] leading-relaxed">
+                <div className="bg-white border border-[#E2E8F0] rounded-2xl p-12 text-center space-y-3 shadow-xs max-w-md mx-auto">
+                  <div className="w-14 h-14 rounded-2xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mx-auto text-2xl shadow-inner">🛡️</div>
+                  <h3 className="text-lg font-extrabold text-[#0F172A]">No QR Tags Found</h3>
+                  <p className="text-xs text-[#64748B] leading-relaxed font-medium">
                     Scan the QR code on your physical safety sticker to activate it and connect it to your account.
                   </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {products.map(p => (
+                  {products
+                    .filter((p) => {
+                      if (!searchQuery.trim()) return true;
+                      const q = searchQuery.toLowerCase();
+                      return (
+                        p.nickname?.toLowerCase().includes(q) ||
+                        p.code?.toLowerCase().includes(q) ||
+                        p.category?.toLowerCase().includes(q) ||
+                        p.vehicleDetails?.licensePlate?.toLowerCase().includes(q)
+                      );
+                    })
+                    .map((p) => (
                     <div
                       key={p.id}
-                      className="bg-white border border-[#E8ECF4] rounded-2xl p-5 shadow-2xs hover:shadow-lg hover:-translate-y-1 transition-all relative overflow-hidden flex flex-col justify-between"
+                      className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all relative overflow-hidden flex flex-col justify-between"
                     >
-                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#111111] to-[#3B3B3B]" />
-                      <div className="absolute top-0 right-0 w-6.5 h-6.5 bg-[#F5F6FA] rounded-bl-xl" />
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#EAB308] to-[#D97706]" />
 
                       <div>
                         {/* Top Header */}
                         <div className="flex items-start justify-between gap-2 mb-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10.5 h-10.5 rounded-xl bg-[#F1F5F9] flex items-center justify-center text-xl flex-shrink-0">
+                            <div
+                              onClick={() => setModal({ type: 'qrCode', sticker: p })}
+                              title="Click to view QR Code"
+                              className="w-11 h-11 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] flex items-center justify-center text-xl flex-shrink-0 cursor-pointer hover:scale-105 transition-transform"
+                            >
                               {getCategoryIcon(p.category as any) || '🏷️'}
                             </div>
                             <div>
-                              <h3 className="font-bold text-base text-[#1A1D26] leading-tight">{p.nickname}</h3>
+                              <h3 className="font-bold text-base text-[#0F172A] leading-tight">{p.nickname}</h3>
                               <p className="text-[11px] font-semibold text-[#94A3B8]">{getCategoryLabel(p.category as any) || p.code}</p>
                             </div>
                           </div>
 
-                          <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full ${
-                            p.status === 'Active' ? 'bg-[#DCFCE7] text-[#16A34A]' :
-                            p.status === 'Lost' ? 'bg-[#FEE2E2] text-[#DC2626]' :
-                            p.status === 'Replaced' ? 'bg-[#DBEAFE] text-[#2563EB]' :
-                            'bg-[#FEF3C7] text-[#B45309]'
+                          <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full border ${
+                            p.status === 'Active' ? 'bg-[#DCFCE7] text-[#16A34A] border-[#BBF7D0]' :
+                            p.status === 'Lost' ? 'bg-[#FEE2E2] text-[#DC2626] border-[#FCA5A5]' :
+                            p.status === 'Replaced' ? 'bg-[#DBEAFE] text-[#2563EB] border-[#93C5FD]' :
+                            'bg-[#FEF3C7] text-[#B45309] border-[#FDE68A]'
                           }`}>
                             {p.status}
                           </span>
                         </div>
 
                         {/* Meta List */}
-                        <div className="space-y-1.5 my-3 text-xs border-y border-dashed border-[#E8ECF4] py-2.5">
+                        <div className="space-y-2 my-3 text-xs border-y border-dashed border-[#E8ECF4] py-3">
                           {p.meta?.map((m, idx) => (
                             <div key={idx} className="flex justify-between">
-                              <span className="text-[#94A3B8]">{m[0]}</span>
-                              <span className="font-semibold text-[#1A1D26]">{m[1]}</span>
+                              <span className="text-[#94A3B8] font-medium">{m[0]}</span>
+                              <span className="font-semibold text-[#1E293B]">{m[1]}</span>
                             </div>
                           ))}
                           <div className="flex justify-between">
-                            <span className="text-[#94A3B8]">Total Scans</span>
-                            <span className="font-semibold text-[#1A1D26]">{p.scans || 0}</span>
+                            <span className="text-[#94A3B8] font-medium">Total Scans</span>
+                            <span className="font-bold text-[#0F172A]">{p.scans || 0}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-[#94A3B8]">Last Scan</span>
-                            <span className="font-semibold text-[#1A1D26]">{p.lastScan || 'Never'}</span>
+                            <span className="text-[#94A3B8] font-medium">Last Scan</span>
+                            <span className="font-semibold text-[#1E293B]">{p.lastScan || 'Never'}</span>
                           </div>
                         </div>
                       </div>
@@ -460,14 +649,22 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                       <div className="pt-3 border-t border-[#E8ECF4] flex items-center gap-2">
                         <button
                           onClick={() => setDrawerProductId(p.id)}
-                          className="flex-1 py-2.5 rounded-xl bg-[#111111] hover:bg-black text-xs font-bold text-white transition-colors cursor-pointer"
+                          className="flex-1 py-2.5 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-xs font-bold text-white transition-colors cursor-pointer"
                         >
                           Manage Tag
                         </button>
                         <button
+                          onClick={() => setModal({ type: 'qrCode', sticker: p })}
+                          title="View & Scan QR Code"
+                          className="py-2.5 px-3 rounded-xl bg-[#FEF3C7] text-[#D97706] hover:bg-[#FDE68A] text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 flex-shrink-0"
+                        >
+                          <QrCode size={14} />
+                          <span>QR</span>
+                        </button>
+                        <button
                           onClick={() => setModal({ type: 'delete', sticker: p })}
                           title="Delete sticker"
-                          className="w-10 h-10 rounded-xl bg-[#FEE2E2] text-[#DC2626] hover:bg-[#FECACA] flex items-center justify-center transition-colors cursor-pointer"
+                          className="w-10 h-10 rounded-xl bg-[#FEE2E2] text-[#DC2626] hover:bg-[#FECACA] flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
                         >
                           <Trash2 size={15} />
                         </button>
@@ -530,7 +727,7 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
 
           {/* ════ VIEW 6: ACCOUNT SETTINGS ════ */}
           {activeTab === 'settings' && (
-            <AccountSettingsPanel showToast={showToast} onAccountDeleted={handleSignOut} />
+            <AccountSettingsPanel showToast={showToast} onAccountDeleted={handleSignOut} onProductsLinked={loadProducts} />
           )}
 
           {/* ════ VIEW 7: SUPPORT & LEGAL ════ */}
@@ -750,6 +947,23 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
           busy={modalBusy}
           onCancel={() => setModal(null)}
           onConfirm={() => handleConfirmDelete(modal.sticker)}
+        />
+      )}
+      {modal?.type === 'qrCode' && (
+        <QrCodeModal
+          sticker={modal.sticker}
+          onClose={() => setModal(null)}
+          onShowToast={showToast}
+        />
+      )}
+
+      {/* ─── COMPLETE PROFILE POPUP (missing phone and/or email) ─── */}
+      {showCompleteProfilePopup && (
+        <CompleteProfilePopup
+          missingPhone={missingPhone}
+          missingEmail={missingEmail}
+          onDismiss={() => setProfilePopupDismissed(true)}
+          onGoToSettings={() => { setActiveTab('settings'); setProfilePopupDismissed(true); }}
         />
       )}
 

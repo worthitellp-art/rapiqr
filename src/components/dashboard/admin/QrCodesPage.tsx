@@ -65,15 +65,18 @@ export default function QrCodesPage({
     };
   }
 
-  async function handleGenerateSingle() {
+  function handleGenerateSingle() {
     const rec = buildQrRecord(selectedCategory);
     rec.qrUrl = qrFullUrl(rec.id);
 
-    const stickerPos = activeTemplate?.stickerPos || { x: 110, y: 40, w: 100, h: 100 };
-    await saveGeneratedSticker(rec, stickerPos);
-
     setQrList((prev) => [rec, ...prev]);
-    saveQrCodeToDb(rec);
+    saveQrCodeToDb({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, category: rec.category, fgColor: rec.fg, bgColor: rec.bg });
+
+    // Sticker image composite + upload runs in the background — it involves a remote
+    // QR image fetch, canvas encoding, and a Supabase Storage upload, so awaiting it
+    // here made the "Generate" button hang instead of updating the list immediately.
+    const stickerPos = activeTemplate?.stickerPos || { x: 110, y: 40, w: 100, h: 100 };
+    saveGeneratedSticker(rec, stickerPos);
 
     setToast(`Generated 1 ${rec.category || "Car"} Sticker`);
     setTimeout(() => setToast(null), 3000);

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { X, AlertTriangle, Plus, Trash2, ArrowRightLeft, History, Loader2 } from 'lucide-react';
+import { X, AlertTriangle, Plus, Trash2, ArrowRightLeft, History, Loader2, ExternalLink, Download, Copy, Check, QrCode } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import type { DashboardSticker, EmergencyContact } from './types';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
+import { getCategoryIcon } from '../../../stickerModules';
 
 function ModalShell({
   onClose,
@@ -354,6 +356,118 @@ export function ConfirmActionModal({
         >
           {busy && <Loader2 size={13} className="animate-spin" />} {confirmLabel}
         </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+/* ─── STICKER QR CODE DISPLAY & SCAN MODAL ─── */
+export function QrCodeModal({
+  sticker,
+  onClose,
+  onShowToast,
+}: {
+  sticker: DashboardSticker;
+  onClose: () => void;
+  onShowToast: (msg: string) => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const scanUrl = `${window.location.origin}/${sticker.code || sticker.qrCodeId}`;
+
+  const handleCopyScanLink = () => {
+    navigator.clipboard.writeText(scanUrl);
+    setCopied(true);
+    onShowToast('Scan link copied to clipboard');
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleDownloadQrCode = () => {
+    const svgElement = document.getElementById(`qr-code-svg-${sticker.id}`);
+    if (!svgElement) return;
+
+    const svgData = new XMLSerializer().serializeToString(svgElement);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+
+    img.onload = () => {
+      canvas.width = 500;
+      canvas.height = 500;
+      if (ctx) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 25, 25, 450, 450);
+        const pngUrl = canvas.toDataURL('image/png');
+        const downloadLink = document.createElement('a');
+        downloadLink.href = pngUrl;
+        downloadLink.download = `${(sticker.nickname || 'Sticker').replace(/\s+/g, '_')}_QR.png`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        onShowToast('QR code image downloaded');
+      }
+    };
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+  };
+
+  return (
+    <ModalShell onClose={onClose} maxWidth="max-w-sm">
+      <ModalHeader title="Sticker QR Code" onClose={onClose} />
+
+      <div className="flex flex-col items-center text-center space-y-4">
+        {/* Category & Nickname Badge */}
+        <div className="flex items-center gap-2 bg-[#F8FAFC] border border-[#E2E8F0] px-3.5 py-1.5 rounded-full">
+          <span className="text-sm">{getCategoryIcon(sticker.category as any) || '🏷️'}</span>
+          <span className="font-bold text-xs text-[#0F172A]">{sticker.nickname}</span>
+          <span className="text-[10px] font-bold text-[#D97706] bg-[#FEF3C7] px-2 py-0.5 rounded-full">
+            {sticker.code || sticker.qrCodeId}
+          </span>
+        </div>
+
+        {/* QR Code Container */}
+        <div className="p-5 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm flex flex-col items-center justify-center">
+          <QRCodeSVG
+            id={`qr-code-svg-${sticker.id}`}
+            value={scanUrl}
+            size={190}
+            level="H"
+            includeMargin={true}
+          />
+          <p className="text-[10px] font-extrabold text-[#64748B] mt-2 tracking-widest uppercase">RepiQR Safety Tag</p>
+        </div>
+
+        <p className="text-xs text-[#64748B] max-w-xs font-medium leading-relaxed">
+          Scan this QR code with any smartphone camera to launch the emergency contact alert interface.
+        </p>
+
+        {/* Action Buttons */}
+        <div className="w-full space-y-2 pt-2">
+          <a
+            href={scanUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-2.5 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-xs font-bold text-white flex items-center justify-center gap-2 transition-all shadow-sm"
+          >
+            <ExternalLink size={14} /> Open &amp; Test Scan Page
+          </a>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={handleCopyScanLink}
+              className="py-2.5 px-3 rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#1E293B] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+              {copied ? 'Copied!' : 'Copy Link'}
+            </button>
+
+            <button
+              onClick={handleDownloadQrCode}
+              className="py-2.5 px-3 rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#1E293B] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Download size={14} /> Download PNG
+            </button>
+          </div>
+        </div>
       </div>
     </ModalShell>
   );

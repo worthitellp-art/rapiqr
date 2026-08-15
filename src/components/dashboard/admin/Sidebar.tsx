@@ -1,13 +1,64 @@
+import type React from "react";
 import { LogOut, HelpCircle } from "lucide-react";
 import { NAV_ITEMS } from "./constants";
 import { avatarUrl } from "./helpers";
 import AppLogo from "../../common/AppLogo";
 
-export default function Sidebar({
-  page, setPage, admin, onBack, onSignOut, unreadAlerts,
+function SideItem({
+  active,
+  danger,
+  label,
+  badge,
+  onClick,
+  children,
 }: {
-  page: string; setPage: (p: string) => void;
-  admin: { name: string; email?: string; role?: string }; onBack: () => void; onSignOut: () => void;
+  key?: string;
+  active?: boolean;
+  danger?: boolean;
+  label: string;
+  badge?: number;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
+        active
+          ? "bg-white text-[#111111] shadow-[0_4px_16px_rgba(0,0,0,0.25)] font-bold scale-[1.02]"
+          : danger
+          ? "text-red-400 hover:bg-white/10"
+          : "text-white/70 hover:bg-white/10 hover:text-white"
+      }`}
+    >
+      {children}
+      <span className="flex-1 text-left tracking-wide">{label}</span>
+      {!!badge && badge > 0 && (
+        <span
+          className="min-w-[20px] h-[20px] px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center shadow-sm"
+          style={{ background: "#EF4444", color: "#fff" }}
+        >
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+}
+
+export default function Sidebar({
+  page,
+  setPage,
+  admin,
+  onBack,
+  onSignOut,
+  unreadAlerts,
+}: {
+  page: string;
+  setPage: (p: string) => void;
+  admin: { name: string; email?: string; role?: string };
+  onBack: () => void;
+  onSignOut: () => void;
   unreadAlerts?: number;
 }) {
   const isClientUser = admin.role === "Client Account";
@@ -20,97 +71,71 @@ export default function Sidebar({
     : NAV_ITEMS;
 
   return (
-    <aside className="w-[256px] flex-shrink-0 flex flex-col h-full bg-white border-r" style={{ borderColor: "#E8ECF4" }}>
+    <aside
+      className="w-[240px] flex-shrink-0 flex flex-col h-full py-5 px-3.5 shadow-2xl relative z-20"
+      style={{ background: "#14161C", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+    >
       {/* ── Logo ─────────────────────────── */}
-      <div className="px-5 h-[64px] flex items-center flex-shrink-0">
-        <a
-          href="/"
-          className="flex items-center cursor-pointer"
-          onClick={e => { e.preventDefault(); onBack(); }}
-        >
-          <AppLogo variant="light" className="h-7 w-auto object-contain" />
-        </a>
-      </div>
+      <a
+        href="/"
+        className="flex items-center gap-3 px-2 mb-7 cursor-pointer flex-shrink-0 group"
+        onClick={(e) => {
+          e.preventDefault();
+          onBack();
+        }}
+        aria-label="RapiQR home"
+      >
+        <AppLogo variant="dark" className="h-7 w-auto object-contain transition-transform group-hover:scale-105" />
+      </a>
 
       {/* ── Main Navigation ──────────────── */}
-      <div className="flex-1 px-3 pt-2 overflow-y-auto custom-scrollbar">
-        <nav className="space-y-[2px]">
-          {mainNav.map(item => {
-            const Icon = item.icon;
-            const isActive = page === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setPage(item.id)}
-                className="w-full flex items-center gap-3 px-3 py-[10px] rounded-xl text-[13px] font-semibold transition-all duration-200 cursor-pointer relative"
-                style={{
-                  background: isActive ? "#FEF3C7" : "transparent",
-                  color: isActive ? "#0F172A" : "#64748B",
-                }}
-                onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = "#F1F5F9"; e.currentTarget.style.color = "#1E293B"; } }}
-                onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#64748B"; } }}
-              >
-                {isActive && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[60%] rounded-full" style={{ background: "#D97706" }} />
-                )}
-                <Icon size={18} strokeWidth={isActive ? 2.2 : 1.7} style={{ color: isActive ? "#D97706" : undefined }} />
-                <span>{item.label}</span>
-                {item.id === "alerts" && (unreadAlerts ?? 0) > 0 && (
-                  <span
-                    className="ml-auto text-[10px] font-bold px-[7px] py-[2px] rounded-full"
-                    style={{
-                      background: isActive ? "rgba(217,119,6,0.18)" : "#FEE2E2",
-                      color: isActive ? "#92400E" : "#DC2626",
-                    }}
-                  >
-                    {unreadAlerts}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
+      <nav className="flex-1 space-y-1.5 overflow-y-auto custom-scrollbar">
+        {mainNav.map((item) => {
+          const Icon = item.icon;
+          const isActive = page === item.id;
+          return (
+            <SideItem
+              key={item.id}
+              active={isActive}
+              label={item.label}
+              badge={item.id === "alerts" ? unreadAlerts : undefined}
+              onClick={() => setPage(item.id)}
+            >
+              <Icon size={19} strokeWidth={isActive ? 2.3 : 1.8} className={isActive ? "text-[#EAB308]" : ""} />
+            </SideItem>
+          );
+        })}
+      </nav>
 
-        <div className="my-4 mx-2 h-px" style={{ background: "#F1F5F9" }} />
+      {/* ── Bottom: Help, Sign Out, Avatar ── */}
+      <div className="flex-shrink-0 pt-3 space-y-1" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+        <SideItem label="Help & Support" onClick={() => {}}>
+          <HelpCircle size={18} strokeWidth={1.8} />
+        </SideItem>
 
-        {/* ── Settings Section ────────────── */}
-        <nav className="space-y-[2px]">
-          <button
-            className="w-full flex items-center gap-3 px-3 py-[10px] rounded-xl text-[13px] font-semibold text-[#64748B] hover:bg-[#F1F5F9] hover:text-[#1E293B] transition-all cursor-pointer"
-          >
-            <HelpCircle size={18} strokeWidth={1.7} />
-            <span>Help & Support</span>
-          </button>
-        </nav>
-      </div>
-
-      {/* ── Bottom: Sign Out + Profile ───── */}
-      <div className="px-3 pb-4 flex-shrink-0 space-y-2">
-        <div className="mx-2 h-px" style={{ background: "#F1F5F9" }} />
-
-        <button
-          onClick={() => { onSignOut(); onBack(); }}
-          className="w-full flex items-center gap-3 px-3 py-[10px] rounded-xl text-[13px] font-semibold transition-all cursor-pointer"
-          style={{ color: "#EF4444" }}
-          onMouseEnter={e => { e.currentTarget.style.background = "#FEF2F2"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+        <SideItem
+          danger
+          label="Sign Out"
+          onClick={() => {
+            onSignOut();
+            onBack();
+          }}
         >
-          <LogOut size={18} strokeWidth={1.7} />
-          <span>Sign Out</span>
-        </button>
+          <LogOut size={18} strokeWidth={1.8} />
+        </SideItem>
 
-        <div className="mx-2 h-px" style={{ background: "#F1F5F9" }} />
-
-        <div className="flex items-center gap-3 px-2.5 py-2.5 rounded-xl" style={{ background: "#F8FAFC" }}>
+        <div className="flex items-center gap-3 px-2.5 py-2.5 mt-2 rounded-xl bg-white/5 border border-white/10">
           <img
             src={avatarUrl(admin.name)}
             alt={admin.name}
-            className="w-[36px] h-[36px] rounded-[10px] object-cover"
-            style={{ background: "#E2E8F0" }}
+            className="w-9 h-9 rounded-full object-cover flex-shrink-0 bg-white/10 p-0.5"
+            style={{ border: "2px solid rgba(234,179,8,0.6)" }}
           />
           <div className="min-w-0 flex-1">
-            <p className="text-[12px] font-bold text-[#1A1D26] truncate leading-tight">{admin.name}</p>
-            <p className="text-[10px] font-medium mt-0.5" style={{ color: "#94A3B8" }}>{admin.role || "Client"}</p>
+            <p className="text-[12px] font-bold text-white truncate leading-tight">{admin.name}</p>
+            <p className="text-[10px] font-bold mt-0.5 text-[#EAB308] truncate uppercase tracking-wider">
+              {admin.role || "Client"}
+            </p>
           </div>
         </div>
       </div>

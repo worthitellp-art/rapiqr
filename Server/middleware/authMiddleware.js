@@ -32,10 +32,26 @@ async function verifyToken(req, res, next) {
         return res.status(401).json({ success: false, error: 'Unauthorized: Invalid or expired session' });
       }
 
+      const isDesignatedAdmin = user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+      let role = isDesignatedAdmin ? 'admin' : 'user';
+
+      if (!isDesignatedAdmin) {
+        try {
+          const { data: profile } = await supabaseAdmin
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle();
+          if (profile?.role === 'admin') {
+            role = 'admin';
+          }
+        } catch { /* proceed with default role */ }
+      }
+
       req.user = {
         id: user.id,
         email: user.email,
-        role: user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() ? 'admin' : 'user'
+        role: role
       };
       return next();
     }
@@ -61,10 +77,22 @@ async function optionalAuth(req, res, next) {
     try {
       const { data: { user } } = await supabaseAdmin.auth.getUser(token);
       if (user) {
+        const isDesignatedAdmin = user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+        let role = isDesignatedAdmin ? 'admin' : 'user';
+        if (!isDesignatedAdmin) {
+          try {
+            const { data: profile } = await supabaseAdmin
+              .from('profiles')
+              .select('role')
+              .eq('id', user.id)
+              .maybeSingle();
+            if (profile?.role === 'admin') role = 'admin';
+          } catch { /* proceed with default role */ }
+        }
         req.user = {
           id: user.id,
           email: user.email,
-          role: user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() ? 'admin' : 'user'
+          role: role
         };
       }
     } catch { /* invalid/expired token — proceed as guest */ }

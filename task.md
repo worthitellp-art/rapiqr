@@ -1,14 +1,10 @@
-hide owners number owner nymber will hide in scan page everywhere insted use word owner but call on owner anonymusly using mask call , implement mask call feature using twilio that i added in env file 
+only implmenet produts that in admin pannel add edit delete tha show in landing page  only 
 
 
-
-
-
-❯ https://handler.twilio.com/twiml/EHb6bf5fdc345fd41755069b1689966dde this is url from TwiML bin can possible mask calling i selected
-  now test it using scripts
-
- 
-
-
-
-  
+10 tasks (3 done, 1 in progress, 6 open)
+  ◼ Add apiClient.ts shopProducts + shiprocket namespaces
+  ◻ Build admin ProductsPage.tsx (CRUD UI)
+  ◻ Build admin ShiprocketPage.tsx (dashboard overview)
+  ◻ Wire nav + routing for Products and Shipping pages
+  ◻ Add Create Shipment UI to OrdersPage.tsx
+   … +2 pending, 3 completed

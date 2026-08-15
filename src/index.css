@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", Helvetica, Arial, sans-serif;
+  --font-sans: "Plus Jakarta Sans", "Inter", Helvetica, Arial, sans-serif;
   --font-serif: "Fraunces", Georgia, serif;
 
   --color-cream: #F6F1E7;
@@ -10,9 +10,12 @@
   --color-ink: #201C15;
   --color-ink-soft: #6E6759;
   --color-ink-faint: #A79E8B;
+  --color-yellow: #EAB308;
+  --color-yellow-deep: #CA8A04;
+  --color-yellow-deeper: #A16207;
   --color-orange: #EAB308;
-  --color-orange-deep: #B84418;
-  --color-orange-deeper: #A33A14;
+  --color-orange-deep: #CA8A04;
+  --color-orange-deeper: #A16207;
   --color-green: #2F6B4F;
   --color-green-soft: #E4EFE8;
   --color-line: rgba(32,28,21,0.11);

@@ -124,78 +124,27 @@
   }
 }
 
-/* ── Navbar (Glassy Black) ── */
-.namo-nav {
-  position: fixed;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 200;
-  width: calc(100% - 32px);
-  max-width: 1320px;
-  padding: 10px 28px;
-  background: rgba(14, 17, 23, 0.82);
-  backdrop-filter: blur(24px) saturate(1.8);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
-  transition: background 0.3s ease, box-shadow 0.3s ease, top 0.3s ease, border-color 0.3s ease, transform 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.35s ease;
-}
-
-.namo-nav.nav-hidden {
-  transform: translateX(-50%) translateY(-120%);
-  opacity: 0;
-  pointer-events: none;
-}
-
-.namo-nav.scrolled {
-  background: rgba(10, 12, 18, 0.92);
-  border-color: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 16px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
-  top: 12px;
-}
-
-@media (max-width: 640px) {
-  .namo-nav {
-    width: calc(100% - 24px);
-    top: 10px;
-    padding: 9px 16px;
-    border-radius: 999px;
-  }
-  .namo-nav.scrolled { top: 8px; }
-}
-
+/* ── Navbar link (Navbar.tsx / nav/*.tsx own the rest of the navbar's
+   layout and chrome via Tailwind + inline styles) ── */
 .nav-link {
   font-size: 14px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--ink-soft);
   text-decoration: none;
   position: relative;
-  padding-bottom: 3px;
-  transition: color 0.25s ease;
-}
-
-.nav-link::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: -2px;
-  width: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--accent), #FFD166);
-  border-radius: 4px;
-  transform: translateX(-50%);
-  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
-  box-shadow: 0 0 6px rgba(240, 165, 0, 0.4);
+  padding: 8px 14px;
+  border-radius: var(--r-full);
+  display: inline-block;
+  transition: color 0.25s ease, background 0.25s ease, transform 0.15s ease;
 }
 
 .nav-link:hover {
-  color: #ffffff;
+  color: var(--ink);
+  background: var(--paper);
 }
 
-.nav-link:hover::after {
-  width: 100%;
+.nav-link:active {
+  transform: scale(0.96);
 }
 
 /* ── Buttons ── */
@@ -266,6 +215,69 @@
   background: var(--accent-deep);
   transform: translateY(-2px);
   box-shadow: 0 20px 45px rgba(240,165,0,0.35);
+}
+
+/* ── Navbar CTA (scoped — restrained proportions, no glow/pill/bounce) ── */
+.nav-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: var(--ink);
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 9px 18px;
+  border-radius: 9px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.nav-cta:hover { background: #262b36; }
+.nav-cta:active { background: var(--ink); }
+
+/* ── Hero CTAs (scoped to hero only — precise, restrained, no glow/pill) ── */
+.hero-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--ink);
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 13px 22px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.hero-btn-primary:hover { background: #262b36; }
+.hero-btn-primary:active { background: var(--ink); }
+.hero-btn-primary svg { transition: transform 0.15s ease; }
+.hero-btn-primary:hover svg { transform: translateX(2px); }
+
+.hero-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--ink);
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.hero-btn-secondary:hover {
+  border-color: var(--ink-faint);
+  background: var(--paper);
 }
 
 /* ── Floating Cart Button (bottom-right) ── */
@@ -349,71 +361,12 @@
   }
 }
 
-/* ── Hero Section ── */
-.hero-section {
-  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-  padding: 120px 0 60px;
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, #0E1117 0%, #1A3A5C 100%);
-}
-
-.hero-section .display-title {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-}
-
-.hero-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  border-radius: var(--r-full);
-  background: var(--brand-light);
-  border: 1px solid rgba(26,58,92,0.15);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--brand);
-  margin-bottom: 28px;
-}
-
-/* ── Hero Showcase Card ── */
-.hero-tag-card {
-  background: #FFFFFF;
-  border-radius: var(--r-xl);
-  padding: 28px;
-  border: 1px solid rgba(14,17,23,0.09);
-  box-shadow: 0 20px 60px rgba(14,17,23,0.08), 0 1px 0 rgba(255,255,255,0.8) inset;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-.hero-tag-card:hover {
-  box-shadow: 0 28px 70px rgba(14,17,23,0.12);
-}
-
-.hero-scan-beam {
-  position: absolute;
-  top: -100%;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(to bottom, transparent, rgba(240,165,0,0.35), transparent);
-  animation: scanBeam 2.5s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes scanBeam {
-  0% { top: -100%; }
-  50% { top: 100%; }
-  100% { top: -100%; }
-}
-
-@keyframes bounceSlow {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-}
-.animate-bounce-slow {
-  animation: bounceSlow 4s ease-in-out infinite;
+/* ── Benefit Strip ── */
+.benefit-strip {
+  padding: 44px 0 56px;
+  background: var(--paper-warm);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 /* ── Stat Strip ── */

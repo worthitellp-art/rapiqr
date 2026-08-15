@@ -325,6 +325,62 @@ export const apiClient = {
     },
   },
 
+  // Shop catalog (public storefront listing + admin CRUD) shown on the landing page
+  shopProducts: {
+    async list() {
+      return request<{ success: boolean; data: any[] }>('/shop-products', {
+        method: 'GET',
+      });
+    },
+
+    async listAdmin() {
+      return request<{ success: boolean; data: any[] }>('/shop-products/admin', {
+        method: 'GET',
+      });
+    },
+
+    async create(product: Record<string, any>) {
+      return request<{ success: boolean; data: any }>('/shop-products', {
+        method: 'POST',
+        body: JSON.stringify(product),
+      });
+    },
+
+    async update(id: string, updates: Record<string, any>) {
+      return request<{ success: boolean; data: any }>(`/shop-products/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates),
+      });
+    },
+
+    async remove(id: string) {
+      return request<{ success: boolean }>(`/shop-products/${id}`, {
+        method: 'DELETE',
+      });
+    },
+  },
+
+  // Shiprocket shipping (admin only) — order fulfillment via a real courier partner
+  shiprocket: {
+    async dashboard() {
+      return request<{ success: boolean; data: { walletBalance: number | null; pickupLocations: any[] } }>('/shiprocket/dashboard', {
+        method: 'GET',
+      });
+    },
+
+    async createShipment(orderId: string) {
+      return request<{ success: boolean; data: any; error?: string }>(`/shiprocket/orders/${encodeURIComponent(orderId)}/ship`, {
+        method: 'POST',
+      });
+    },
+
+    async track(orderId: string) {
+      return request<{ success: boolean; data: any }>(`/shiprocket/orders/${encodeURIComponent(orderId)}/track`, {
+        method: 'GET',
+      });
+    },
+  },
+
   // Distributor / Partner Applications (backed by Supabase via the Express server — see task.md #3)
   distributors: {
     async apply(appData: { userName: string; userEmail: string; phone: string; city: string; business: string; tier: string }) {
@@ -434,6 +490,31 @@ export const apiClient = {
   twilio: {
     async callBridge(opts: { qrId: string; visitorPhone: string; contactName?: string }) {
       return request<{ success: boolean; message?: string; error?: string; callSid?: string; maskedHelplineNumber?: string }>('/twilio/call-bridge', {
+        method: 'POST',
+        body: JSON.stringify(opts),
+      });
+    },
+  },
+
+  // Exotel Masked Call Proxy Service — superseded by the Cloudshope bridge
+  // below, left here unused rather than deleted in case of rollback.
+  exotel: {
+    async callBridge(opts: { qrId: string; visitorPhone: string; contactName?: string }) {
+      return request<{ success: boolean; message?: string; error?: string; callSid?: string; maskedHelplineNumber?: string }>('/exotel/call-bridge', {
+        method: 'POST',
+        body: JSON.stringify(opts),
+      });
+    },
+  },
+
+  // Cloudshope Anonymous QR Calling Bridge — active masked-calling backend.
+  // Unlike the Twilio/Exotel bridges, no phone number is collected from the
+  // visitor: the server returns a DID to dial directly, and Cloudshope's
+  // telecom layer connects it to the real number (resolved server-side from
+  // qrId, never sent from or echoed back to the browser).
+  cloudshope: {
+    async getCallNumber(opts: { qrId: string; contactName?: string }) {
+      return request<{ success: boolean; did?: string; label?: string; message?: string; error?: string }>('/cloudshope/call-bridge', {
         method: 'POST',
         body: JSON.stringify(opts),
       });

@@ -1,5 +1,5 @@
 import logoLightBg from "../../../assets/logo for wh bg.png";
-import logoDarkBg from "../../../assets/Group 1000005716-1.png";
+import logoDarkBg from "../../../assets/darkbglogo.png";
 import logoYellowBg from "../../../assets/Group 1000005716-2.png";
 import logoDefault from "../../../assets/Group 1000005716.png";
 
