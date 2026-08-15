@@ -1,9 +1,10 @@
 import type React from "react";
 import { useState, useEffect } from "react";
 import { useAuth } from "../../../context/AuthContext";
-import { getTemplatesFromDb, getReportsFromDb } from "../../../lib/supabaseService";
+import { getTemplatesFromDb, getReportsFromDb, getQrCodesFromDb } from "../../../lib/supabaseService";
 import { useLocalStorage } from "./useLocalStorage";
 import { QrRecord, Template, StickerPos } from "./types";
+import { qrFullUrl } from "./helpers";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
 import QuickLookModal from "./QuickLookModal";
@@ -59,6 +60,42 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
       window.removeEventListener("repiqr-reports-updated", onUpdated);
       clearInterval(interval);
     };
+  }, [isAdmin]);
+
+  // Sync the fleet list with the real database — previously qrList was purely a
+  // localStorage cache of QR codes generated in THIS browser, so a sticker a
+  // client activated (and its owner phone) from their own device never showed
+  // up here. Backend rows are the source of truth for anything already synced;
+  // local-only rows (e.g. freshly generated, not yet round-tripped) are kept.
+  useEffect(() => {
+    if (!isAdmin) return;
+    const sync = () => {
+      getQrCodesFromDb(500).then((rows) => {
+        if (!rows) return;
+        const mapped: QrRecord[] = rows.map((r: any) => ({
+          id: r.id,
+          qrUrl: qrFullUrl(r.id),
+          clientId: r.client_id,
+          createdAt: r.created_at,
+          scans: r.scans_count || 0,
+          status: r.status || "inactive",
+          template: r.template_name || "Default",
+          category: r.category || "car",
+          fg: r.fg_color || "D9581F",
+          bg: r.bg_color || "FFFFFF",
+          ownerPhone: r.owner_phone || undefined,
+          ownerName: r.owner_name || undefined,
+        }));
+        setQrList((prev) => {
+          const backendIds = new Set(mapped.map((r) => r.id));
+          const localOnly = prev.filter((r) => !backendIds.has(r.id));
+          return [...mapped, ...localOnly];
+        });
+      });
+    };
+    sync();
+    const interval = setInterval(sync, 15000);
+    return () => clearInterval(interval);
   }, [isAdmin]);
 
   const admin = {

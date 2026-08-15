@@ -6,14 +6,28 @@ class QrModel {
    */
   static async getAll(limit = 100) {
     try {
+      // Embeds the linked products row (via the qr_code_id FK) so the admin
+      // fleet view can show the owner phone/name a client registered on
+      // activation — previously this only selected qr_codes columns, so the
+      // admin dashboard could never see who a sticker belonged to.
       const { data, error } = await supabaseAdmin
         .from('qr_codes')
-        .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, category, created_at')
+        .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, category, created_at, products(name, assigned_to, status, details)')
         .order('created_at', { ascending: false })
         .limit(limit);
 
       if (error) throw error;
-      return data || [];
+      return (data || []).map((row) => {
+        const product = Array.isArray(row.products) ? row.products[0] : row.products;
+        const { products, ...rest } = row;
+        return {
+          ...rest,
+          owner_phone: product?.details?.ownerPhone || null,
+          owner_email: product?.details?.ownerEmail || null,
+          owner_name: product?.name || product?.assigned_to || null,
+          product_status: product?.status || null,
+        };
+      });
     } catch (err) {
       console.error('QrModel.getAll Error:', err);
       return [];
