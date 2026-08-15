@@ -1612,6 +1612,27 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
                 </div>
 
+                {/* Direct Call Vehicle Owner — Masked call, resolved server-side from
+                    qrId regardless of local cache, so it works for a genuinely
+                    first-time/anonymous visitor (not gated behind ownerContact). */}
+                <button
+                  onClick={() => openMaskedCall("Vehicle Owner")}
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-blue-600/20 active:scale-[0.98] transition-all cursor-pointer"
+                >
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center flex-shrink-0">
+                      <Lock size={20} />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <p className="text-sm font-black text-white tracking-tight">Call Vehicle Owner</p>
+                      <p className="text-[11px] font-medium text-white/80">Number hidden — masked call</p>
+                    </div>
+                  </div>
+                  <div className="bg-white text-blue-700 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
+                    <PhoneCall size={14} /> CALL
+                  </div>
+                </button>
+
                 {/* 3. QUICK ACTIONS SECTION */}
                 <div className="bg-white rounded-3xl p-3.5 sm:p-4 border border-gray-100 shadow-sm space-y-2.5">
                   <div className="flex items-center justify-between">
