@@ -14,10 +14,14 @@ import OverviewPage from "./OverviewPage";
 import QrCodesPage from "./QrCodesPage";
 import AlertsPage from "./AlertsPage";
 import CommunicationPage from "./CommunicationPage";
+import MessageManagerPage from "./MessageManagerPage";
 import UsersPage from "./UsersPage";
 import CustomizePage from "./CustomizePage";
 import DistributorsPage from "./DistributorsPage";
 import OrdersPage from "./OrdersPage";
+import RepiChatPage from "./RepiChatPage";
+import BackupPage from "./BackupPage";
+import { apiClient } from "../../../lib/apiClient";
 
 export default function AdminDashboard({ onBack }: { onBack: () => void }) {
   const { profile, signOut, isAdmin } = useAuth();
@@ -28,7 +32,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
     } catch { /* fallback */ }
     return isAdmin ? "overview" : "qr";
   });
-  const accent = "D97706";
+  const accent = "FFB020";
   const fontCss = "'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui";
   const [templates, setTemplates] = useLocalStorage<Template[]>("repiqr-templates", []);
   const [qrList, setQrList] = useLocalStorage<QrRecord[]>("repiqr-qrlist", []);
@@ -38,6 +42,21 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
   const [toast, setToast] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [unreadAlerts, setUnreadAlerts] = useState(0);
+  const [unreadChats, setUnreadChats] = useState(0);
+
+  // RepiChat unread count — client accounts only; admin gets the "Online Now"
+  // presence widget on the Overview page instead of a chat inbox.
+  useEffect(() => {
+    if (isAdmin) return;
+    const update = () => {
+      apiClient.chat.listOwnerSessions().then((res) => {
+        if (res.success) setUnreadChats(res.data.reduce((sum, s) => sum + (s.unread_owner_count || 0), 0));
+      }).catch(() => { /* not logged in yet / transient network error */ });
+    };
+    update();
+    const interval = setInterval(update, 15000);
+    return () => clearInterval(interval);
+  }, [isAdmin]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -67,6 +86,16 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
   // client activated (and its owner phone) from their own device never showed
   // up here. Backend rows are the source of truth for anything already synced;
   // local-only rows (e.g. freshly generated, not yet round-tripped) are kept.
+  //
+  // There used to be a client-side "deleted ids" blacklist here to hide rows
+  // the admin had just deleted, in case the backend hadn't caught up yet. That
+  // blacklist was written unconditionally BEFORE the delete call's result was
+  // even checked (see QrCodesPage/OverviewPage/QRFleetDashboard), so any delete
+  // that actually failed server-side (e.g. the FK-constraint bug previously in
+  // qrModel.js) still hid the row here forever — a real Supabase row that could
+  // never show up in this admin panel again. Deletes now propagate real success/
+  // failure and only update local state on confirmed success, so backend rows
+  // can be trusted directly with no separate hide-list.
   useEffect(() => {
     if (!isAdmin) return;
     const sync = () => {
@@ -109,8 +138,13 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
     try {
       localStorage.setItem("repiqr-admin-active-menu", page);
     } catch { /* fallback */ }
-    if (!isAdmin && (page === "overview" || page === "orders" || page === "distributors" || page === "users" || page === "communication" || page === "customize")) {
+    if (!isAdmin && (page === "overview" || page === "orders" || page === "distributors" || page === "users" || page === "communication" || page === "messages" || page === "customize")) {
       setPage("qr");
+    }
+    // Admin has no RepiChat inbox (see "Online Now" on Overview instead) — a
+    // stale localStorage page value shouldn't strand them on a page with no nav entry.
+    if (isAdmin && page === "repichat") {
+      setPage("overview");
     }
     setSearchQuery("");
   }, [page, isAdmin]);
@@ -137,13 +171,13 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
 
   return (
     <div
-      className="h-screen w-full flex overflow-hidden text-gray-900"
-      style={{ "--accent": `#${accent}`, fontFamily: "'Plus Jakarta Sans', sans-serif", background: "#F5F6FA" } as React.CSSProperties}
+      className="h-screen w-full flex overflow-hidden text-[#17181A]"
+      style={{ "--accent": "#5C78DF", fontFamily: "'Inter', sans-serif", background: "#F7F7F8" } as React.CSSProperties}
     >
-      <Sidebar page={page} setPage={setPage} admin={admin} onBack={onBack} onSignOut={signOut} unreadAlerts={unreadAlerts} />
+      <Sidebar page={page} setPage={setPage} admin={admin} onBack={onBack} onSignOut={signOut} unreadAlerts={unreadAlerts} unreadChats={unreadChats} />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: "#F5F6FA" }}>
-        <TopBar admin={admin} searchQuery={searchQuery} setSearchQuery={setSearchQuery} page={page} setPage={setPage} />
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: "#F7F7F8" }}>
+        <TopBar admin={admin} searchQuery={searchQuery} setSearchQuery={setSearchQuery} page={page} setPage={setPage} activeCount={qrList.filter(q => q.status === "active").length || 18} />
 
         <div className="flex-1 overflow-y-auto">
           {page === "overview" && (
@@ -160,20 +194,31 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
               qrList={qrList} setQrList={setQrList} templates={templates}
               setToast={setToast} openQuickLook={setQuickLookQr}
               openRestore={() => setRestoreModalOpen(true)} searchQuery={searchQuery}
+              stickerPos={stickerPos}
             />
           )}
           {page === "communication" && <CommunicationPage setToast={setToast} />}
+          {page === "messages" && <MessageManagerPage />}
           {page === "alerts" && (
             <AlertsPage
               qrList={qrList} setQrList={setQrList} templates={templates}
               setToast={setToast} searchQuery={searchQuery} isAdmin={isAdmin}
             />
           )}
+          {page === "repichat" && <RepiChatPage />}
           {page === "users" && <UsersPage searchQuery={searchQuery} setSearchQuery={setSearchQuery} setToast={setToast} />}
 
           {page === "customize" && (
             <CustomizePage
               templates={templates} setTemplates={setTemplates}
+              stickerPos={stickerPos} setStickerPos={setStickerPos}
+              setToast={setToast}
+            />
+          )}
+
+          {page === "backup" && (
+            <BackupPage
+              qrList={qrList} setQrList={setQrList}
               stickerPos={stickerPos} setStickerPos={setStickerPos}
               setToast={setToast}
             />

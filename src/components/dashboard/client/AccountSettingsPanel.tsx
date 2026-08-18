@@ -16,7 +16,7 @@ function Banner({ tone, message }: { tone: 'success' | 'error'; message: string 
   );
 }
 
-export default function AccountSettingsPanel({ showToast, onAccountDeleted, onProductsLinked }: { showToast: (msg: string) => void; onAccountDeleted?: () => void; onProductsLinked?: () => void }) {
+export default function AccountSettingsPanel({ showToast, onAccountDeleted, onProductsLinked }: { showToast: (msg: string) => void; onAccountDeleted?: () => void; onProductsLinked?: () => Promise<any> | void }) {
   const { profile, refreshProfile } = useAuth();
 
   if (!isApiBackendConfigured) {
@@ -139,6 +139,14 @@ function ProfileForm({ profile, refreshProfile, showToast, onProductsLinked }: a
   const [otpCode, setOtpCode] = useState('');
   const [phoneBusy, setPhoneBusy] = useState(false);
   const [phoneMsg, setPhoneMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const [loadingStickers, setLoadingStickers] = useState(false);
+
+  const handleLoadStickers = async () => {
+    setLoadingStickers(true);
+    await onProductsLinked?.();
+    setLoadingStickers(false);
+    showToast('Stickers linked to your phone number are up to date');
+  };
 
   const handleSendOtp = async () => {
     if (!phoneDraft.trim()) {
@@ -205,16 +213,27 @@ function ProfileForm({ profile, refreshProfile, showToast, onProductsLinked }: a
       <div className="pt-4 border-t border-[#E8ECF4] space-y-3">
         <div className="flex items-center justify-between">
           <label className={`${labelCls} mb-0`}>Phone Number <span className="text-[#DC2626]">*</span></label>
-          {profile?.phoneNumber ? (
+          {profile?.phoneNumber && profile?.isPhoneVerified ? (
             <span className="text-[10px] font-black uppercase tracking-wider text-[#16A34A] flex items-center gap-1">
               <Check size={11} /> Verified
             </span>
           ) : (
-            <span className="text-[10px] font-black uppercase tracking-wider text-[#DC2626]">Required</span>
+            <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 font-bold flex items-center gap-1">
+              ⚠ Unverified (OTP Required)
+            </span>
           )}
         </div>
         {profile?.phoneNumber && !otpStep && (
-          <p className="text-sm font-mono font-bold text-[#1A1D26]">{profile.phoneNumber}</p>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm font-mono font-bold text-[#1A1D26]">{profile.phoneNumber}</p>
+            <button
+              onClick={handleLoadStickers}
+              disabled={loadingStickers}
+              className="px-3.5 py-2 rounded-xl bg-[#F5F6FA] border border-[#E8ECF4] text-xs font-bold text-[#1A1D26] hover:bg-[#E2E8F0] disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
+            >
+              {loadingStickers ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />} Load Stickers
+            </button>
+          </div>
         )}
         {!profile?.phoneNumber && (
           <p className="text-xs text-[#64748B]">

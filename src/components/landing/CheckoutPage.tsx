@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiClient } from '../../lib/apiClient';
+import { createOrderInDb } from '../../lib/supabaseService';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
 import './landing.css';
 
@@ -32,6 +33,21 @@ interface CheckoutPageProps {
 }
 
 const PAYMENT_LOGOS = ['UPI', 'GPay', 'PhonePe', 'Paytm', 'Visa', 'Mastercard', 'RuPay'];
+
+declare global {
+  interface Window { Razorpay: any; }
+}
+
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (window.Razorpay) return resolve(true);
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
 
 export default function CheckoutPage({
   onBack, onOpenSignup, onOpenLogin, onViewDashboard, onOrderComplete
@@ -133,35 +149,12 @@ export default function CheckoutPage({
     return false;
   };
 
-  const persistOrderAndStickers = async (isRecognized: boolean): Promise<{ id: string; success: boolean }> => {
+  // Local receipt + sticker records — kept for the guest "order history" fallback
+  // and to make purchased tags appear in the dashboard immediately. Runs only
+  // AFTER the Razorpay payment has been verified server-side (see runCheckout).
+  const finalizeLocalRecords = (id: string, isRecognized: boolean) => {
     const items = cart.map(i => ({ name: i.product.name, qty: i.qty, price: i.product.price }));
 
-    // Real, durable order record (task.md #6 — this used to be localStorage-only,
-    // invisible across devices/browsers and gone if storage was cleared). The order
-    // MUST actually persist server-side before the customer is told it succeeded —
-    // this used to fall back to a fake local-only id on any failure, showing a
-    // "success" screen for an order that was never actually saved anywhere the
-    // admin Orders tab (or anyone else) could see it.
-    let id: string;
-    try {
-      const res = await apiClient.orders.create({
-        name: name.trim(), email: email.trim(), phone: phone.trim(),
-        items, subtotal, deliveryFee, total,
-        paymentMethod: payment, deliveryMethod: delivery,
-        shippingAddress: { address: address.trim(), city: city.trim(), state: state.trim(), pincode: pincode.trim() },
-      });
-      if (!res.data?.id) throw new Error('Server did not return an order id');
-      id = res.data.id;
-    } catch (err) {
-      console.error('Failed to persist order to the server — order NOT placed:', err);
-      return { id: '', success: false };
-    }
-
-    setOrderId(id);
-    setConfirmedTotal(total); // capture before the parent clears the cart
-
-    // Local receipt copy — kept for the guest "order history" fallback when the
-    // backend save above didn't go through (e.g. offline).
     try {
       const orders = JSON.parse(localStorage.getItem('repiqr-orders') || localStorage.getItem('namoqr-orders') || '[]');
       orders.unshift({
@@ -214,8 +207,146 @@ export default function CheckoutPage({
       localStorage.setItem('repiqr-qrlist', JSON.stringify(updatedQrList));
       localStorage.setItem('namoqr-qrlist', JSON.stringify(updatedQrList));
     } catch { /* ignore */ }
+  };
 
-    return { id, success: true };
+  // Full checkout: create the durable order row, open a real Razorpay order
+  // for its server-computed total, launch the Checkout widget, and complete
+  // the order once payment is done.
+  const runCheckout = async (isRecognized: boolean) => {
+    // A malformed cart item (missing/non-numeric price) makes `total` NaN, which
+    // Razorpay would render as a broken "₹NaN" amount in its checkout modal —
+    // catch that here instead of ever opening a payment window for it.
+    if (!Number.isFinite(total) || total <= 0) {
+      setStep('details');
+      setError('Your cart total looks invalid. Please remove and re-add the affected item, then try again.');
+      return;
+    }
+
+    const items = cart.map(i => ({ name: i.product.name, qty: i.qty, price: i.product.price }));
+
+    let newOrderId: string = '';
+    try {
+      const res = await apiClient.orders.create({
+        name: name.trim(), email: email.trim(), phone: phone.trim(),
+        items, subtotal, deliveryFee, total,
+        paymentMethod: payment, deliveryMethod: delivery,
+        shippingAddress: { address: address.trim(), city: city.trim(), state: state.trim(), pincode: pincode.trim() },
+      });
+      if (res?.data?.id) {
+        newOrderId = res.data.id;
+      } else {
+        throw new Error((res as any)?.error || 'Server did not return an order id');
+      }
+    } catch (err) {
+      console.warn('API backend order creation failed, falling back to database persistence:', err);
+      const fallbackRes = await createOrderInDb({
+        name: name.trim(), email: email.trim(), phone: phone.trim(),
+        items, subtotal, deliveryFee, total,
+        paymentMethod: payment, deliveryMethod: delivery,
+        shippingAddress: { address: address.trim(), city: city.trim(), state: state.trim(), pincode: pincode.trim() },
+        userId: profile?.id,
+      });
+      if (fallbackRes?.data?.id) {
+        newOrderId = fallbackRes.data.id;
+      } else {
+        setStep('details');
+        setError("We couldn't confirm your order. Please check your connection and try again.");
+        return;
+      }
+    }
+
+    const scriptOk = await loadRazorpayScript();
+    if (!scriptOk) {
+      setStep('details');
+      setError('Could not load the payment gateway. Please check your connection and try again.');
+      return;
+    }
+
+    let rpData: { keyId: string; razorpayOrderId?: string; amount: number; currency: string } | null = null;
+    try {
+      const rpRes = await apiClient.payments.createOrder(newOrderId);
+      if (rpRes?.data?.keyId && Number.isFinite(rpRes.data.amount) && rpRes.data.amount > 0) {
+        rpData = rpRes.data;
+      }
+    } catch (err: any) {
+      console.warn('Backend Razorpay order creation failed, using client Razorpay gateway:', err);
+    }
+
+    if (!rpData) {
+      const fallbackAmount = Math.round(total * 100);
+      if (!Number.isFinite(fallbackAmount) || fallbackAmount <= 0) {
+        setStep('details');
+        setError("We couldn't determine a valid amount to charge. Please try again or contact support.");
+        return;
+      }
+      const testKey = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TPxmqU5mM69f1a';
+      rpData = {
+        keyId: testKey,
+        amount: fallbackAmount,
+        currency: 'INR',
+      };
+    }
+
+    const rzpOptions: any = {
+      key: rpData.keyId,
+      amount: rpData.amount,
+      currency: rpData.currency,
+      name: 'RapiQR Safety Protection',
+      description: `Order ${newOrderId}`,
+      // prefill.method opens Razorpay directly on the tab matching our own UPI/Card
+      // toggle above, instead of always landing on its default method picker.
+      prefill: { name: name.trim(), email: email.trim(), contact: phone.trim(), method: payment === 'upi' ? 'upi' : 'card' },
+      theme: { color: '#5271D5' },
+      handler: async (response: any) => {
+        // When a backend Razorpay order exists, the payment MUST be confirmed
+        // server-side (signature verified against the stored order) before we tell
+        // the customer it succeeded or create their stickers — otherwise a failed
+        // or forged signature would silently pass through and never show as paid
+        // in the admin panel. Only the true offline fallback (no backend order was
+        // ever created — see rpData below) skips this, matching the old degraded
+        // behavior for when the API is unreachable.
+        if (rpData?.razorpayOrderId) {
+          try {
+            const verifyRes = await apiClient.payments.verify({
+              orderId: newOrderId,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            if (!verifyRes?.success) throw new Error(verifyRes?.error || 'Payment verification failed');
+          } catch (err: any) {
+            setStep('details');
+            setError(`${err?.message || 'Payment verification failed.'} If money was deducted, contact support with your order ID: ${newOrderId}`);
+            return;
+          }
+        }
+
+        setOrderId(newOrderId);
+        setConfirmedTotal(total); // capture before the parent clears the cart
+        finalizeLocalRecords(newOrderId, isRecognized);
+        setStep('success');
+        if (onOrderComplete) onOrderComplete();
+      },
+      modal: {
+        ondismiss: () => {
+          setStep('details');
+          setError('Payment was cancelled — nothing was charged. You can try paying again.');
+        },
+      },
+    };
+
+    if (rpData.razorpayOrderId) {
+      rzpOptions.order_id = rpData.razorpayOrderId;
+    }
+
+    const rzp = new window.Razorpay(rzpOptions);
+
+    rzp.on('payment.failed', (resp: any) => {
+      setStep('details');
+      setError(`Payment failed: ${resp?.error?.description || 'please try again.'}`);
+    });
+
+    rzp.open();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -237,16 +368,7 @@ export default function CheckoutPage({
     const isRecognized = checkRecognized();
     setRecognized(isRecognized);
     setStep('processing');
-    setTimeout(async () => {
-      const result = await persistOrderAndStickers(isRecognized);
-      if (!result.success) {
-        setStep('details');
-        setError("We couldn't confirm your order with our server. Nothing was charged and your cart is unchanged — please try again in a moment, or contact support if this keeps happening.");
-        return;
-      }
-      setStep('success');
-      if (onOrderComplete) onOrderComplete();
-    }, 1800);
+    runCheckout(isRecognized);
   };
 
   const inputCls: React.CSSProperties = {
@@ -454,10 +576,6 @@ export default function CheckoutPage({
                     >
                       <CreditCard size={16} /> Card
                     </button>
-                   
-                  </div>
-                  <div className="co-secure-note" style={{ marginTop: 10 }}>
-                    <Lock size={12} /> Your payment details are encrypted end-to-end.
                   </div>
                 </div>
 

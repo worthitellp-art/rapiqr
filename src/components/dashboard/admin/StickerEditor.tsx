@@ -1,34 +1,24 @@
 import type React from "react";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Save, Grid3X3, Lock, Unlock, Magnet, Copy, Trash2, Pencil, Play, Star, X, Palette } from "lucide-react";
-import { Template, StickerPos } from "./types";
+import { Save, Grid3X3, Lock, Unlock, Magnet, Check, ShieldCheck } from "lucide-react";
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
-import { saveTemplateToDb, deleteTemplateFromDb, setDefaultTemplateInDb } from "../../../lib/supabaseService";
 import { qrImageUrl } from "./helpers";
-import ConfirmModal from "./ConfirmModal";
+import { StickerPos } from "./types";
+import { saveTemplateToDb } from "../../../lib/supabaseService";
 
 const STICKER_SRC = stickerTemplateImg;
 const EDITOR_DISPLAY = { w: 320, h: 200 };
-const MIN_SIZE = 16;
-const MAX_SIZE = 300;
+const MIN_SIZE = 20;
+const MAX_SIZE = 280;
 const SNAP = 4;
 
-const PRESETS: { name: string; fg: string; bg: string }[] = [
-  { name: "Midnight", fg: "111111", bg: "FFFFFF" },
-  { name: "Amber", fg: "EAB308", bg: "FFFFFF" },
-  { name: "Indigo", fg: "6366F1", bg: "FFFFFF" },
-  { name: "Violet", fg: "8B5CF6", bg: "FFFFFF" },
-  { name: "Sky", fg: "0EA5E9", bg: "FFFFFF" },
-  { name: "Emerald", fg: "10B981", bg: "FFFFFF" },
-  { name: "Rose", fg: "F43F5E", bg: "FFFFFF" },
-  { name: "Ink", fg: "0F172A", bg: "FFFFFF" },
-];
-
 export default function StickerEditor({
-  stickerPos, setStickerPos, templates, setTemplates, setToast,
+  stickerPos,
+  setStickerPos,
+  setToast,
 }: {
-  stickerPos: StickerPos; setStickerPos: (p: StickerPos) => void;
-  templates: Template[]; setTemplates: React.Dispatch<React.SetStateAction<Template[]>>;
+  stickerPos: StickerPos;
+  setStickerPos: (p: StickerPos) => void;
   setToast: (msg: string | null) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -36,32 +26,40 @@ export default function StickerEditor({
   const [resizing, setResizing] = useState<"se" | "sw" | "ne" | "nw" | null>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
   const startPos = useRef({ x: 0, y: 0, w: 0, h: 0 });
+
   const [showGrid, setShowGrid] = useState(false);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [lockAspect, setLockAspect] = useState(true);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
-  const [tplName, setTplName] = useState("");
-  const [tplFg, setTplFg] = useState("EAB308");
-  const [tplBg, setTplBg] = useState("FFFFFF");
-  const [editingId, setEditingId] = useState<string | number | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<Template | null>(null);
 
-  function clamp(val: number, min: number, max: number) { return Math.max(min, Math.min(max, val)); }
-  function snap(val: number) { return snapEnabled ? Math.round(val / SNAP) * SNAP : Math.round(val); }
+  function clamp(val: number, min: number, max: number) {
+    return Math.max(min, Math.min(max, val));
+  }
+  function snap(val: number) {
+    return snapEnabled ? Math.round(val / SNAP) * SNAP : Math.round(val);
+  }
 
-  const handleDragDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault(); e.stopPropagation();
-    setDragging(true);
-    dragOffset.current = { x: e.clientX, y: e.clientY };
-    startPos.current = { x: stickerPos.x, y: stickerPos.y, w: stickerPos.w, h: stickerPos.h };
-  }, [stickerPos]);
+  const handleDragDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragging(true);
+      dragOffset.current = { x: e.clientX, y: e.clientY };
+      startPos.current = { x: stickerPos.x, y: stickerPos.y, w: stickerPos.w, h: stickerPos.h };
+    },
+    [stickerPos]
+  );
 
-  const handleResizeDown = useCallback((dir: "se" | "sw" | "ne" | "nw") => (e: React.MouseEvent) => {
-    e.preventDefault(); e.stopPropagation();
-    setResizing(dir);
-    dragOffset.current = { x: e.clientX, y: e.clientY };
-    startPos.current = { x: stickerPos.x, y: stickerPos.y, w: stickerPos.w, h: stickerPos.h };
-  }, [stickerPos]);
+  const handleResizeDown = useCallback(
+    (dir: "se" | "sw" | "ne" | "nw") => (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setResizing(dir);
+      dragOffset.current = { x: e.clientX, y: e.clientY };
+      startPos.current = { x: stickerPos.x, y: stickerPos.y, w: stickerPos.w, h: stickerPos.h };
+    },
+    [stickerPos]
+  );
 
   useEffect(() => {
     if (!dragging && !resizing) return;
@@ -71,257 +69,170 @@ export default function StickerEditor({
       const rect = container.getBoundingClientRect();
       const dx = e.clientX - dragOffset.current.x;
       const dy = e.clientY - dragOffset.current.y;
+
       if (dragging) {
-        setStickerPos({ ...stickerPos, x: snap(clamp(startPos.current.x + dx, 0, rect.width - stickerPos.w)), y: snap(clamp(startPos.current.y + dy, 0, rect.height - stickerPos.h)) });
+        setStickerPos({
+          ...stickerPos,
+          x: snap(clamp(startPos.current.x + dx, 0, rect.width - stickerPos.w)),
+          y: snap(clamp(startPos.current.y + dy, 0, rect.height - stickerPos.h)),
+        });
       }
       if (resizing) {
         const s = startPos.current;
-        let nw = s.w, nh = s.h, nx = s.x, ny = s.y;
-        if (resizing === "se") { nw = clamp(s.w + dx, MIN_SIZE, MAX_SIZE); nh = lockAspect ? nw : clamp(s.h + dy, MIN_SIZE, MAX_SIZE); }
-        else if (resizing === "sw") { nw = clamp(s.w - dx, MIN_SIZE, MAX_SIZE); nh = lockAspect ? nw : clamp(s.h + dy, MIN_SIZE, MAX_SIZE); nx = s.x + s.w - nw; }
-        else if (resizing === "ne") { nw = clamp(s.w + dx, MIN_SIZE, MAX_SIZE); nh = lockAspect ? nw : clamp(s.h - dy, MIN_SIZE, MAX_SIZE); ny = s.y + s.h - nh; }
-        else if (resizing === "nw") { nw = clamp(s.w - dx, MIN_SIZE, MAX_SIZE); nh = lockAspect ? nw : clamp(s.h - dy, MIN_SIZE, MAX_SIZE); nx = s.x + s.w - nw; ny = s.y + s.h - nh; }
-        nx = snap(clamp(nx, 0, rect.width - nw)); ny = snap(clamp(ny, 0, rect.height - nh));
-        nw = snap(clamp(nw, MIN_SIZE, rect.width - nx)); nh = snap(clamp(nh, MIN_SIZE, rect.height - ny));
+        let nw = s.w,
+          nh = s.h,
+          nx = s.x,
+          ny = s.y;
+        if (resizing === "se") {
+          nw = clamp(s.w + dx, MIN_SIZE, MAX_SIZE);
+          nh = lockAspect ? nw : clamp(s.h + dy, MIN_SIZE, MAX_SIZE);
+        } else if (resizing === "sw") {
+          nw = clamp(s.w - dx, MIN_SIZE, MAX_SIZE);
+          nh = lockAspect ? nw : clamp(s.h + dy, MIN_SIZE, MAX_SIZE);
+          nx = s.x + s.w - nw;
+        } else if (resizing === "ne") {
+          nw = clamp(s.w + dx, MIN_SIZE, MAX_SIZE);
+          nh = lockAspect ? nw : clamp(s.h - dy, MIN_SIZE, MAX_SIZE);
+          ny = s.y + s.h - nh;
+        } else if (resizing === "nw") {
+          nw = clamp(s.w - dx, MIN_SIZE, MAX_SIZE);
+          nh = lockAspect ? nw : clamp(s.h - dy, MIN_SIZE, MAX_SIZE);
+          nx = s.x + s.w - nw;
+          ny = s.y + s.h - nh;
+        }
+        nx = snap(clamp(nx, 0, rect.width - nw));
+        ny = snap(clamp(ny, 0, rect.height - nh));
+        nw = snap(clamp(nw, MIN_SIZE, rect.width - nx));
+        nh = snap(clamp(nh, MIN_SIZE, rect.height - ny));
         setStickerPos({ x: nx, y: ny, w: nw, h: nh });
       }
     };
-    const handleUp = () => { setDragging(false); setResizing(null); };
-    window.addEventListener("mousemove", handleMove); window.addEventListener("mouseup", handleUp);
-    return () => { window.removeEventListener("mousemove", handleMove); window.removeEventListener("mouseup", handleUp); };
+    const handleUp = () => {
+      setDragging(false);
+      setResizing(null);
+    };
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
   }, [dragging, resizing, stickerPos, setStickerPos, lockAspect, snapEnabled]);
 
-  async function handleSave() {
+  async function handleSaveDefaultPosition() {
     if (saveState !== "idle") return;
-    const cleanName = tplName.trim();
-    if (!cleanName) {
-      setToast("Enter a template name first");
-      setTimeout(() => setToast(null), 2000);
-      return;
-    }
-
     setSaveState("saving");
     try {
       const currentPos = { ...stickerPos };
-      const cleanFg = (tplFg || "EAB308").replace(/#/g, "").toUpperCase();
-      const cleanBg = (tplBg || "FFFFFF").replace(/#/g, "").toUpperCase();
-
-      if (editingId !== null) {
-        const existingTpl = templates.find((x) => String(x.id) === String(editingId));
-        const isDefault = existingTpl?.isPublicDefault || false;
-
-        const updatedTpl: Template = {
-          id: editingId,
-          name: cleanName,
-          fg: cleanFg,
-          bg: cleanBg,
-          logo: null,
-          stickerPos: currentPos,
-          isPublicDefault: isDefault,
-        };
-
-        setTemplates((prev) =>
-          prev.map((t) => (String(t.id) === String(editingId) ? updatedTpl : t))
-        );
-
-        const savedRecord = await saveTemplateToDb({
-          id: editingId,
-          name: cleanName,
-          fgColor: cleanFg,
-          bgColor: cleanBg,
-          stickerPos: currentPos,
-          isDefault,
-        });
-
-        if (savedRecord && savedRecord.id) {
-          setTemplates((prev) =>
-            prev.map((t) => (String(t.id) === String(editingId) ? { ...t, id: savedRecord.id } : t))
-          );
-        }
-
-        setEditingId(null);
-        setTplName("");
-        setSaveState("saved");
-        setToast(`Template "${cleanName}" updated!`);
-      } else {
-        const isFirst = templates.length === 0;
-        const tempId = Date.now();
-        const newTpl: Template = {
-          id: tempId,
-          name: cleanName,
-          fg: cleanFg,
-          bg: cleanBg,
-          logo: null,
-          stickerPos: currentPos,
-          isPublicDefault: isFirst,
-        };
-
-        setTemplates((prev) => [...prev, newTpl]);
-
-        const savedRecord = await saveTemplateToDb({
-          name: cleanName,
-          fgColor: cleanFg,
-          bgColor: cleanBg,
-          stickerPos: currentPos,
-          isDefault: isFirst,
-        });
-
-        if (savedRecord && savedRecord.id) {
-          setTemplates((prev) =>
-            prev.map((t) => (t.id === tempId ? { ...t, id: savedRecord.id } : t))
-          );
-        }
-
-        setTplName("");
-        setSaveState("saved");
-        setToast(`Template "${cleanName}" saved!`);
+      try {
+        localStorage.setItem("repiqr-sticker-pos", JSON.stringify(currentPos));
+      } catch {
+        /* ignore */
       }
+
+      await saveTemplateToDb({
+        name: "Default Sticker Layout",
+        fgColor: "000000",
+        bgColor: "FFFFFF",
+        stickerPos: currentPos,
+        isDefault: true,
+      });
+
+      setSaveState("saved");
+      setToast("Default sticker position saved!");
     } catch (error) {
-      console.error("Failed to save template:", error);
-      setToast("Failed to save template");
+      console.error("Failed to save position:", error);
+      setToast("Position updated locally");
     } finally {
       setTimeout(() => {
         setSaveState("idle");
         setToast(null);
-      }, 2000);
+      }, 2200);
     }
   }
 
-  function handleLoad(targetTemplate: Template) {
-    const cleanFg = (targetTemplate.fg || "EAB308").replace(/#/g, "").toUpperCase();
-    const cleanBg = (targetTemplate.bg || "FFFFFF").replace(/#/g, "").toUpperCase();
-    setTplName(targetTemplate.name);
-    setTplFg(cleanFg);
-    setTplBg(cleanBg);
-    setStickerPos(targetTemplate.stickerPos);
-    setToast(`Loaded "${targetTemplate.name}"`);
-    setTimeout(() => setToast(null), 2000);
-  }
-
-  function handleEdit(targetTemplate: Template) {
-    const cleanFg = (targetTemplate.fg || "EAB308").replace(/#/g, "").toUpperCase();
-    const cleanBg = (targetTemplate.bg || "FFFFFF").replace(/#/g, "").toUpperCase();
-    setEditingId(targetTemplate.id);
-    setTplName(targetTemplate.name);
-    setTplFg(cleanFg);
-    setTplBg(cleanBg);
-    setStickerPos(targetTemplate.stickerPos);
-    setToast(`Editing "${targetTemplate.name}" — update fields and press Update Template`);
-    setTimeout(() => setToast(null), 2200);
-  }
-
-  async function handleDuplicate(targetTemplate: Template) {
-    const cleanFg = (targetTemplate.fg || "EAB308").replace(/#/g, "").toUpperCase();
-    const cleanBg = (targetTemplate.bg || "FFFFFF").replace(/#/g, "").toUpperCase();
-    const copyName = `${targetTemplate.name} (copy)`;
-    const tempId = Date.now();
-    const copy: Template = { ...targetTemplate, id: tempId, name: copyName, fg: cleanFg, bg: cleanBg, isPublicDefault: false };
-
-    setTemplates((prev) => [...prev, copy]);
-    const savedRecord = await saveTemplateToDb({
-      name: copyName,
-      fgColor: cleanFg,
-      bgColor: cleanBg,
-      stickerPos: copy.stickerPos,
-      isDefault: false,
-    });
-
-    if (savedRecord && savedRecord.id) {
-      setTemplates((prev) => prev.map((item) => (item.id === tempId ? { ...item, id: savedRecord.id } : item)));
-    }
-    setToast(`Duplicated "${targetTemplate.name}"`);
-    setTimeout(() => setToast(null), 2000);
-  }
-
-  async function performDelete(targetTemplate: Template) {
-    const targetIdStr = String(targetTemplate.id);
-
-    if (String(editingId) === targetIdStr) {
-      setEditingId(null);
-      setTplName("");
-    }
-
-    let promotedTemplate: Template | null = null;
-    setTemplates((prev) => {
-      const filteredTemplates = prev.filter((x) => String(x.id) !== targetIdStr);
-      if (targetTemplate.isPublicDefault && filteredTemplates.length > 0) {
-        filteredTemplates[0] = { ...filteredTemplates[0], isPublicDefault: true };
-        promotedTemplate = filteredTemplates[0];
-      }
-      return filteredTemplates;
-    });
-
-    await deleteTemplateFromDb(targetTemplate.id, targetTemplate.name);
-    if (promotedTemplate) {
-      await setDefaultTemplateInDb((promotedTemplate as Template).id, (promotedTemplate as Template).name);
-    }
-    setToast(`Deleted "${targetTemplate.name}"`);
-    setTimeout(() => setToast(null), 2000);
-  }
-
-  async function handleSetDefault(targetTemplate: Template) {
-    const targetIdStr = String(targetTemplate.id);
-    const cleanFg = (targetTemplate.fg || "EAB308").replace(/#/g, "").toUpperCase();
-    const cleanBg = (targetTemplate.bg || "FFFFFF").replace(/#/g, "").toUpperCase();
-
-    setTemplates((prev) =>
-      prev.map((x) => ({
-        ...x,
-        fg: (x.fg || "EAB308").replace(/#/g, "").toUpperCase(),
-        bg: (x.bg || "FFFFFF").replace(/#/g, "").toUpperCase(),
-        isPublicDefault: String(x.id) === targetIdStr,
-      }))
-    );
-
-    setStickerPos(targetTemplate.stickerPos);
-    setTplFg(cleanFg);
-    setTplBg(cleanBg);
-
-    await setDefaultTemplateInDb(targetTemplate.id, targetTemplate.name);
-
-    setToast(`"${targetTemplate.name}" set as default`);
-    setTimeout(() => setToast(null), 2000);
-  }
-
-  const previewSize = 320;
+  const previewSize = 360;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Editor Canvas */}
-        <div className="flex-1 bg-white rounded-2xl border p-5" style={{ borderColor: "#f0f0f0" }}>
+    <div className="space-y-6 text-[#17181A] font-body">
+      {/* Top Header */}
+      <div className="flex items-baseline justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="font-display text-[22px] font-semibold text-[#17181A]">
+            Sticker QR Placement
+          </h1>
+          <p className="text-[13.5px] text-[#777B80] mt-1">
+            Adjust and save the default QR code position for all generated stickers
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left: Interactive Canvas Box */}
+        <div className="lg:col-span-7 bg-white border border-[#E5E5E7] p-5.5 shadow-[0_1px_4px_rgba(0,0,0,0.03)] flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-gray-900 text-sm">Sticker QR Position</h3>
+            <h3 className="font-display text-[13px] font-semibold text-[#17181A]">
+              Sticker Canvas & Placement
+            </h3>
             <div className="flex items-center gap-2">
-              <button onClick={() => setShowGrid(!showGrid)} className={`p-1.5 rounded-lg border transition-all cursor-pointer ${showGrid ? "bg-gray-100 border-gray-300" : "border-gray-200"}`} title="Toggle grid">
-                <Grid3X3 size={14} className={showGrid ? "text-gray-900" : "text-gray-400"} />
+              <button
+                onClick={() => setShowGrid(!showGrid)}
+                className={`p-2 rounded-[4px] border transition-all cursor-pointer ${
+                  showGrid ? "bg-[#5C78DF] text-white border-[#5C78DF]" : "bg-[#F3F3F4] border-[#E5E5E7] text-[#9CA0A6] hover:text-[#17181A]"
+                }`}
+                title="Toggle grid overlay"
+              >
+                <Grid3X3 size={14} />
               </button>
-              <button onClick={() => setSnapEnabled(!snapEnabled)} className={`p-1.5 rounded-lg border transition-all cursor-pointer ${snapEnabled ? "bg-gray-100 border-gray-300" : "border-gray-200"}`} title={`Snap to ${SNAP}px grid`}>
-                <Magnet size={14} className={snapEnabled ? "text-gray-900" : "text-gray-400"} />
+              <button
+                onClick={() => setSnapEnabled(!snapEnabled)}
+                className={`p-2 rounded-[4px] border transition-all cursor-pointer ${
+                  snapEnabled ? "bg-[#5C78DF] text-white border-[#5C78DF]" : "bg-[#F3F3F4] border-[#E5E5E7] text-[#9CA0A6] hover:text-[#17181A]"
+                }`}
+                title={`Snap to ${SNAP}px grid`}
+              >
+                <Magnet size={14} />
               </button>
-              <button onClick={() => setLockAspect(!lockAspect)} className={`p-1.5 rounded-lg border transition-all cursor-pointer ${lockAspect ? "bg-gray-100 border-gray-300" : "border-gray-200"}`} title="Lock aspect ratio">
-                {lockAspect ? <Lock size={14} className="text-gray-900" /> : <Unlock size={14} className="text-gray-400" />}
+              <button
+                onClick={() => setLockAspect(!lockAspect)}
+                className={`p-2 rounded-[4px] border transition-all cursor-pointer ${
+                  lockAspect ? "bg-[#5C78DF] text-white border-[#5C78DF]" : "bg-[#F3F3F4] border-[#E5E5E7] text-[#9CA0A6] hover:text-[#17181A]"
+                }`}
+                title="Lock aspect ratio"
+              >
+                {lockAspect ? <Lock size={14} /> : <Unlock size={14} />}
               </button>
-              <span className="text-[10px] text-gray-500 font-semibold">{stickerPos.w}×{stickerPos.h} @ {stickerPos.x},{stickerPos.y}</span>
+              <span className="font-mono text-[11px] font-bold text-[#5271D5] bg-[#E8EDFF] px-2.5 py-1 rounded-[4px]">
+                {stickerPos.w}×{stickerPos.h} @ {stickerPos.x},{stickerPos.y}
+              </span>
             </div>
           </div>
 
+          {/* Interactive Canvas */}
           <div
             ref={containerRef}
-            className="relative mx-auto overflow-hidden select-none"
+            className="relative mx-auto overflow-hidden select-none border-2 border-[#17181A] rounded-[4px] shadow-[0_1px_4px_rgba(0,0,0,0.05)] bg-[#F3F3F4]"
             style={{
-              width: previewSize, height: Math.round(previewSize * (EDITOR_DISPLAY.h / EDITOR_DISPLAY.w)),
-              borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
-              backgroundImage: showGrid ? "linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px)" : undefined,
+              width: previewSize,
+              height: Math.round(previewSize * (EDITOR_DISPLAY.h / EDITOR_DISPLAY.w)),
+              backgroundImage: showGrid
+                ? "linear-gradient(rgba(92,120,223,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(92,120,223,0.2) 1px, transparent 1px)"
+                : undefined,
               backgroundSize: showGrid ? "20px 20px" : undefined,
             }}
           >
-            <img src={STICKER_SRC} draggable={false} style={{ width: "100%", height: "100%", objectFit: "fill", pointerEvents: "none" }} alt="Sticker" />
+            {/* Sticker Graphic */}
+            <img
+              src={STICKER_SRC}
+              draggable={false}
+              className="w-full h-full object-fill pointer-events-none"
+              alt="Sticker Layout"
+            />
 
-            {/* QR overlay */}
+            {/* Draggable & Resizable QR Placement Overlay */}
             <div
               onMouseDown={handleDragDown}
-              className="absolute cursor-move border-2 border-amber-500 rounded-lg shadow-lg flex items-center justify-center bg-white/40 backdrop-blur-[1px] group"
+              className="absolute cursor-move border-2 border-[#17181A] rounded-[4px] shadow-[0_4px_10px_rgba(0,0,0,0.15)] flex items-center justify-center bg-white p-1"
               style={{
                 left: Math.round(stickerPos.x * (previewSize / EDITOR_DISPLAY.w)),
                 top: Math.round(stickerPos.y * (previewSize * (EDITOR_DISPLAY.h / EDITOR_DISPLAY.w) / EDITOR_DISPLAY.h)),
@@ -330,192 +241,103 @@ export default function StickerEditor({
               }}
             >
               <img
-                src={qrImageUrl("https://repiqr.com/demo", (tplFg || "EAB308").replace(/#/g, ""), (tplBg || "FFFFFF").replace(/#/g, ""), 128)}
+                src={qrImageUrl("https://repiqr.com/demo", "000000", "FFFFFF", 128)}
                 className="w-full h-full object-contain pointer-events-none"
-                alt="QR"
+                alt="Black QR Code"
               />
 
-              {/* Resize handles */}
+              {/* Corner Resize Handles */}
               {(["nw", "ne", "sw", "se"] as const).map((dir) => (
                 <div
                   key={dir}
                   onMouseDown={handleResizeDown(dir)}
-                  className={`absolute w-3 h-3 bg-amber-500 border border-white rounded-full transition-transform hover:scale-125 cursor-${dir}-resize ${
-                    dir === "nw" ? "-top-1.5 -left-1.5" : dir === "ne" ? "-top-1.5 -right-1.5" : dir === "sw" ? "-bottom-1.5 -left-1.5" : "-bottom-1.5 -right-1.5"
+                  className={`absolute w-3.5 h-3.5 bg-[#5C78DF] border-2 border-[#17181A] rounded-full transition-transform hover:scale-125 cursor-${dir}-resize ${
+                    dir === "nw" ? "-top-2 -left-2" : dir === "ne" ? "-top-2 -right-2" : dir === "sw" ? "-bottom-2 -left-2" : "-bottom-2 -right-2"
                   }`}
                 />
               ))}
             </div>
           </div>
+
+          <div className="mt-4 pt-3 border-t border-[#E5E5E7] text-[11.5px] text-[#9CA0A6] flex items-center justify-between">
+            <span>Click & drag box to move placement</span>
+            <span>Drag corner dots to scale box</span>
+          </div>
         </div>
 
-        {/* Template Controls */}
-        <div className="w-full lg:w-72 bg-white rounded-2xl border p-5 space-y-4" style={{ borderColor: "#f0f0f0" }}>
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-gray-900 text-sm">{editingId !== null ? "Edit Template" : "Save as Template"}</h3>
-            {editingId !== null && (
-              <button
-                onClick={() => { setEditingId(null); setTplName(""); }}
-                className="flex items-center gap-1 text-[10px] font-bold text-gray-500 hover:text-gray-900 transition-all cursor-pointer"
-              >
-                <X size={12} /> Cancel
-              </button>
-            )}
-          </div>
-
+        {/* Right: Controls & Single Save Panel */}
+        <div className="lg:col-span-5 bg-white border border-[#E5E5E7] p-5.5 shadow-[0_1px_4px_rgba(0,0,0,0.03)] space-y-4 flex flex-col justify-between">
           <div>
-            <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Template Name</label>
-            <input value={tplName} onChange={(e) => setTplName(e.target.value)} placeholder="e.g. Midnight Classic" className="w-full px-3.5 py-2.5 text-sm rounded-xl border bg-gray-50 outline-none focus:bg-white focus:border-gray-400 transition-all font-semibold text-gray-900" style={{ borderColor: "#e2e8f0" }} />
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1.5">Theme Presets</label>
-            <div className="grid grid-cols-8 gap-1.5">
-              {PRESETS.map((p) => {
-                const pFg = p.fg.replace(/#/g, "").toUpperCase();
-                const pBg = p.bg.replace(/#/g, "").toUpperCase();
-                const curFg = (tplFg || "EAB308").replace(/#/g, "").toUpperCase();
-                const curBg = (tplBg || "FFFFFF").replace(/#/g, "").toUpperCase();
-                const isSelected = curFg === pFg && curBg === pBg;
-
-                return (
-                  <button
-                    key={p.name}
-                    title={p.name}
-                    onClick={() => {
-                      setTplFg(pFg);
-                      setTplBg(pBg);
-                      if (!tplName.trim()) setTplName(p.name);
-                    }}
-                    className="w-6 h-6 rounded-lg border transition-transform hover:scale-110 cursor-pointer"
-                    style={{
-                      background: `#${pFg}`,
-                      borderColor: pFg === "FFFFFF" ? "#e2e8f0" : "#e2e8f0",
-                      boxShadow: isSelected ? "0 0 0 2px #111111" : "none"
-                    }}
-                  />
-                );
-              })}
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-[4px] bg-[#E8EDFF] text-[#5271D5] flex items-center justify-center">
+                <ShieldCheck size={18} />
+              </div>
+              <h3 className="font-display text-[13px] font-semibold text-[#17181A]">
+                Placement Controls
+              </h3>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">QR Color</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={`#${(tplFg || "EAB308").replace(/#/g, "")}`}
-                  onChange={(e) => setTplFg(e.target.value.replace(/#/g, "").toUpperCase())}
-                  className="w-8 h-8 rounded-lg border cursor-pointer"
-                  style={{ borderColor: "#e2e8f0" }}
-                />
-                <span className="text-[11px] font-mono font-bold text-gray-700">#{(tplFg || "EAB308").replace(/#/g, "").toUpperCase()}</span>
+            <p className="text-[13.5px] text-[#777B80] leading-relaxed mb-4">
+              Position the QR code overlay box on your sticker template. When saved, this single position applies as the default for all sticker views and batch prints.
+            </p>
+
+            {/* Position Readout */}
+            <div className="bg-[#F7F7F8] border border-[#E5E5E7] rounded-[4px] p-3.5 space-y-2 mb-4">
+              <p className="text-[11px] font-body font-semibold text-[#777B80] uppercase tracking-wider">
+                Live Coordinates & Dimensions
+              </p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2 font-mono text-[13px] font-bold text-[#17181A]">
+                <div className="flex items-center justify-between bg-white p-2 rounded-[4px] border border-[#E5E5E7]">
+                  <span className="text-[#777B80]">X:</span>
+                  <span className="text-[#17181A]">{stickerPos.x}px</span>
+                </div>
+                <div className="flex items-center justify-between bg-white p-2 rounded-[4px] border border-[#E5E5E7]">
+                  <span className="text-[#777B80]">Y:</span>
+                  <span className="text-[#17181A]">{stickerPos.y}px</span>
+                </div>
+                <div className="flex items-center justify-between bg-white p-2 rounded-[4px] border border-[#E5E5E7]">
+                  <span className="text-[#777B80]">Width:</span>
+                  <span className="text-[#17181A]">{stickerPos.w}px</span>
+                </div>
+                <div className="flex items-center justify-between bg-white p-2 rounded-[4px] border border-[#E5E5E7]">
+                  <span className="text-[#777B80]">Height:</span>
+                  <span className="text-[#17181A]">{stickerPos.h}px</span>
+                </div>
               </div>
             </div>
-            <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">BG Color</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={`#${(tplBg || "FFFFFF").replace(/#/g, "")}`}
-                  onChange={(e) => setTplBg(e.target.value.replace(/#/g, "").toUpperCase())}
-                  className="w-8 h-8 rounded-lg border cursor-pointer"
-                  style={{ borderColor: "#e2e8f0" }}
-                />
-                <span className="text-[11px] font-mono font-bold text-gray-700">#{(tplBg || "FFFFFF").replace(/#/g, "").toUpperCase()}</span>
+
+            <div className="p-3.5 rounded-[4px] bg-[#F3F3F4] border border-[#E5E5E7] font-mono text-[12px] text-[#17181A] space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[#777B80]">QR Color:</span>
+                <span className="font-bold">#000000 (Pure Black)</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[#777B80]">Mode:</span>
+                <span className="font-bold text-[#2E9E5B]">Single Default Layout</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Current Position</p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs font-semibold text-gray-800">
-              <span>X: {stickerPos.x}px</span>
-              <span>Y: {stickerPos.y}px</span>
-              <span>W: {stickerPos.w}px</span>
-              <span>H: {stickerPos.h}px</span>
-            </div>
-          </div>
-
+          {/* Single Save Action Button */}
           <button
-            onClick={handleSave}
+            onClick={handleSaveDefaultPosition}
             disabled={saveState !== "idle"}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-60 cursor-pointer shadow-sm"
-            style={{ background: "#111111" }}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-[4px] bg-[#17181A] text-white font-semibold text-[14.5px] hover:bg-[#2A2B2E] active:scale-95 disabled:opacity-60 transition-all cursor-pointer"
           >
-            {saveState === "saving" ? "Saving..." : saveState === "saved" ? "Saved!" : <><Save size={14} /> {editingId !== null ? "Update Template" : "Save Template"}</>}
+            {saveState === "saving" ? (
+              "Saving Position..."
+            ) : saveState === "saved" ? (
+              <>
+                <Check size={16} strokeWidth={2.5} /> Position Saved!
+              </>
+            ) : (
+              <>
+                <Save size={16} strokeWidth={2.4} /> Save Default Position
+              </>
+            )}
           </button>
         </div>
       </div>
-
-      {/* Existing Templates */}
-      <div className="bg-white rounded-2xl border p-5" style={{ borderColor: "#f0f0f0" }}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-gray-900 text-sm">Saved Templates {templates.length > 0 && `(${templates.length})`}</h3>
-          {templates.length > 0 && (
-            <span className="text-[10px] font-semibold text-gray-400">1 default template active</span>
-          )}
-        </div>
-
-        {templates.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-center py-10 gap-2">
-            <div className="w-11 h-11 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center">
-              <Palette size={18} className="text-gray-400" />
-            </div>
-            <p className="text-xs font-bold text-gray-700">No templates yet</p>
-            <p className="text-[11px] text-gray-400 max-w-[220px]">Position the QR above, pick a theme, name it, and hit Save Template. Your first save becomes the default automatically.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {templates.map((t) => {
-              const isEditing = String(editingId) === String(t.id);
-              return (
-                <div
-                  key={t.id}
-                  className="p-3.5 rounded-xl border flex flex-col gap-3 transition-all hover:shadow-md"
-                  style={{
-                    borderColor: isEditing ? "#111111" : "#e2e8f0",
-                    background: t.isPublicDefault ? "#F8FAFC" : "#fff",
-                    boxShadow: isEditing ? "0 0 0 2px #111111" : "none",
-                  }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `#${t.fg}` }}>
-                      <div className="w-3.5 h-3.5 rounded-sm" style={{ background: `#${t.bg}` }} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-gray-900 truncate">{t.name}</p>
-                      <p className="text-[10px] font-mono text-gray-500">#{t.fg} / #{t.bg}</p>
-                    </div>
-                    {t.isPublicDefault && (
-                      <span className="ml-auto flex items-center gap-1 text-[9px] font-bold text-gray-800 bg-gray-200 px-1.5 py-0.5 rounded-md flex-shrink-0">
-                        <Star size={9} fill="currentColor" /> Default
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => handleEdit(t)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition-all cursor-pointer" title="Edit"><Pencil size={11} /> Edit</button>
-                    <button onClick={() => handleLoad(t)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition-all cursor-pointer" title="Load colors & position"><Play size={11} /> Load</button>
-                    <button onClick={() => handleDuplicate(t)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition-all cursor-pointer" title="Duplicate"><Copy size={11} /> Copy</button>
-                    <button onClick={() => handleSetDefault(t)} disabled={t.isPublicDefault} className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer disabled:cursor-default ${t.isPublicDefault ? "text-black bg-gray-200" : "text-gray-700 hover:bg-gray-100"}`} title={t.isPublicDefault ? "Already default" : "Set as default"}><Star size={11} /> Default</button>
-                    <button onClick={() => setPendingDelete(t)} className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-all cursor-pointer" title="Delete"><Trash2 size={13} /></button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <ConfirmModal
-        isOpen={pendingDelete !== null}
-        title="Delete this template?"
-        message={pendingDelete ? <>This removes <strong>"{pendingDelete.name}"</strong> permanently.{pendingDelete.isPublicDefault ? " Since it's your default, the next template in the list will automatically become the new default." : ""}</> : null}
-        confirmLabel="Delete"
-        onConfirm={() => { if (pendingDelete) performDelete(pendingDelete); }}
-        onClose={() => setPendingDelete(null)}
-      />
     </div>
   );
 }

@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
+const http = require('http');
 const { requestLogger, logger } = require('./middleware/loggerMiddleware');
 
 // Single project-wide env file lives at the repo root (shared with Vite) —
@@ -17,12 +18,16 @@ const productRoutes = require('./routes/productRoutes');
 const twilioRoutes = require('./routes/twilioRoutes');
 const exotelRoutes = require('./routes/exotelRoutes');
 const cloudshopeRoutes = require('./routes/cloudshopeRoutes');
+const helplineRoutes = require('./routes/helplineRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const distributorRoutes = require('./routes/distributorRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 const shopProductRoutes = require('./routes/shopProductRoutes');
 const shiprocketRoutes = require('./routes/shiprocketRoutes');
+const chatRoutes = require('./routes/chatRoutes');
+const { initChatSocket } = require('./sockets/chatSocket');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -63,12 +68,15 @@ app.use('/api/products', productRoutes);
 app.use('/api/twilio', twilioRoutes);
 app.use('/api/exotel', exotelRoutes);
 app.use('/api/cloudshope', cloudshopeRoutes);
+app.use('/api/helplines', helplineRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/distributors', distributorRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api/shop-products', shopProductRoutes);
 app.use('/api/shiprocket', shiprocketRoutes);
+app.use('/api/chat', chatRoutes);
 
 
 // Global 404 Route Handler
@@ -86,13 +94,19 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start Express Server
-app.listen(PORT, () => {
+// Wrap Express in a plain HTTP server so Socket.io (RepiChat) can attach to
+// the same port via the WebSocket upgrade handshake.
+const httpServer = http.createServer(app);
+initChatSocket(httpServer, ALLOWED_ORIGINS);
+
+// Start Server
+httpServer.listen(PORT, () => {
   console.log('\n==================================================');
   logger.event('SERVER', '🚀', `RapiQR Backend Server running securely on port ${PORT}`);
   logger.event('SERVER', '🌐', `Expected Frontend Origin: ${FRONTEND_ORIGIN}`);
   logger.event('SERVER', '📡', `Health Check URL: http://localhost:${PORT}/api/health${process.env.APP_URL ? ` (production: ${process.env.APP_URL}/api/health)` : ''}`);
   logger.event('SERVER', '📊', 'Live Console Request & Event Logging ENABLED');
+  logger.event('SERVER', '💬', 'RepiChat (Socket.io) ENABLED');
   logger.event('SERVER', '🔍', 'Waiting for frontend connection... a 🎉 FRONTEND_CONNECTED log will appear when the site reaches this API');
   console.log('==================================================\n');
 });

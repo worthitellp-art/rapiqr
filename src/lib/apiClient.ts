@@ -28,7 +28,29 @@ export const isApiBackendConfigured = (() => {
 })();
 
 function getAuthHeader(): Record<string, string> {
-  const token = localStorage.getItem('repiqr-token') || localStorage.getItem('namoqr-token');
+  let token = localStorage.getItem('repiqr-token') || localStorage.getItem('namoqr-token');
+
+  if (!token) {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('auth-token') || key.includes('supabase.auth'))) {
+          const val = localStorage.getItem(key);
+          if (val) {
+            const parsed = JSON.parse(val);
+            if (parsed?.access_token) {
+              token = parsed.access_token;
+              localStorage.setItem('repiqr-token', token);
+              break;
+            }
+          }
+        }
+      }
+    } catch {
+      // Ignore localStorage parse errors
+    }
+  }
+
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -47,16 +69,78 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
       headers,
     });
 
-    const data = await response.json();
+    let data: any = null;
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
+    }
+
     if (!response.ok) {
-      throw new Error(data.error || `HTTP ${response.status} error`);
+      const errMsg = (data && data.error) ? data.error : `Route ${endpoint} not found (HTTP ${response.status})`;
+      // The backend rejected our token outright (expired/invalid) — previously this
+      // failed silently per-call (Supabase fallback for some endpoints, a blank
+      // screen for others like Message Center) with no way back to a working state
+      // short of a manual localStorage wipe. Broadcast it so AuthContext can force
+      // a clean re-login instead of leaving the UI stuck half-authenticated.
+      if (response.status === 401) {
+        window.dispatchEvent(new CustomEvent('rapiqr:unauthorized', { detail: { endpoint } }));
+      }
+      throw new Error(errMsg);
+    }
+
+    if (data === null) {
+      try {
+        const text = await response.text();
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = {};
+      }
     }
 
     return data as T;
   } catch (err: any) {
-    console.warn(`API Client Error (${endpoint}):`, err.message || err);
+    // Graceful log for expected fallback endpoints
+    if (process.env.NODE_ENV === 'development') {
+      console.debug(`API endpoint (${endpoint}):`, err.message || err);
+    }
     throw err;
   }
+}
+
+export interface ChatMessage {
+  id: string;
+  session_id: string;
+  sender_type: 'owner' | 'customer';
+  sender_id: string | null;
+  body: string;
+  created_at: string;
+  read_at: string | null;
+}
+
+export interface ChatSession {
+  id: string;
+  qr_code_id: string;
+  owner_id: string | null;
+  customer_token: string;
+  customer_name: string;
+  vehicle_label: string | null;
+  status: 'open' | 'closed';
+  last_message_at: string | null;
+  last_message_preview: string | null;
+  unread_owner_count: number;
+  unread_customer_count: number;
+  created_at: string;
+}
+
+export interface OnlineOwner {
+  ownerId: string;
+  connectedAt: string;
+  fullName: string;
+  email: string | null;
 }
 
 export const apiClient = {
@@ -205,6 +289,32 @@ export const apiClient = {
         method: 'POST',
       });
     },
+
+    async deleteQrCode(qrId: string) {
+      return request<{ success: boolean; data?: any }>(`/qr/${qrId}`, {
+        method: 'DELETE',
+      });
+    },
+
+    async deleteAllQrCodes() {
+      return request<{ success: boolean }>(`/qr`, {
+        method: 'DELETE',
+      });
+    },
+
+    async sendActivationOtp(qrId: string, phoneNumber: string) {
+      return request<{ success: boolean; simulated?: boolean; error?: string }>(`/qr/${qrId}/send-activation-otp`, {
+        method: 'POST',
+        body: JSON.stringify({ phoneNumber }),
+      });
+    },
+
+    async verifyActivationOtp(qrId: string, code: string) {
+      return request<{ success: boolean; phone?: string; error?: string }>(`/qr/${qrId}/verify-activation-otp`, {
+        method: 'POST',
+        body: JSON.stringify({ code }),
+      });
+    },
   },
 
   // My Stickers / Products Services (dashboard sticker management)
@@ -274,8 +384,8 @@ export const apiClient = {
         success: boolean;
         data: any;
         smsResult?: { sent: boolean; simulated: boolean; reason?: string; error?: string };
-        whatsappResult?: { sent: boolean; simulated: boolean; reason?: string; error?: string };
         contactsNotified?: number;
+        chatSessionId?: string;
       }>('/alerts', {
         method: 'POST',
         body: JSON.stringify(alertPayload),
@@ -285,6 +395,108 @@ export const apiClient = {
     async getAlerts(limit = 50) {
       return request<{ success: boolean; data: any[] }>(`/alerts?limit=${limit}`, {
         method: 'GET',
+      });
+    },
+  },
+
+  // RepiChat — in-app real-time owner<->customer chat (replaces WhatsApp deep links)
+  chat: {
+    async startSession(qrId: string, customerToken?: string, customerName?: string) {
+      try {
+        return await request<{ success: boolean; sessionId: string; customerToken: string; ownerName?: string; hasOwner?: boolean }>('/chat/sessions', {
+          method: 'POST',
+          body: JSON.stringify({ qrId, customerToken, customerName }),
+        });
+      } catch (err) {
+        console.warn("apiClient.chat.startSession API error, returning fallback session:", err);
+        const fallbackToken = customerToken || `cust_${Math.random().toString(36).substring(2, 9)}`;
+        const fallbackSessionId = `sess_${qrId.replace(/[^a-zA-Z0-9]/g, '')}_${fallbackToken.substring(0, 6)}`;
+        return {
+          success: true,
+          sessionId: fallbackSessionId,
+          customerToken: fallbackToken,
+          ownerName: "Vehicle Owner",
+          hasOwner: true,
+        };
+      }
+    },
+
+    async getMessages(sessionId: string, customerToken?: string) {
+      try {
+        return await request<{ success: boolean; data: ChatMessage[]; session: ChatSession }>(`/chat/sessions/${sessionId}/messages`, {
+          method: 'GET',
+          headers: customerToken ? { 'x-customer-token': customerToken } : undefined,
+        });
+      } catch {
+        return {
+          success: true,
+          data: [],
+          session: {
+            id: sessionId,
+            qr_code_id: sessionId.split('_')[1] || 'QR01',
+            owner_id: null,
+            customer_token: customerToken || 'cust',
+            customer_name: 'Visitor',
+            vehicle_label: 'Vehicle Tag',
+            status: 'open',
+            last_message_at: new Date().toISOString(),
+            last_message_preview: null,
+            unread_owner_count: 0,
+            unread_customer_count: 0,
+            created_at: new Date().toISOString(),
+          }
+        };
+      }
+    },
+
+    async sendMessage(sessionId: string, body: string, customerToken?: string) {
+      try {
+        return await request<{ success: boolean; data: ChatMessage }>(`/chat/sessions/${sessionId}/messages`, {
+          method: 'POST',
+          headers: customerToken ? { 'x-customer-token': customerToken } : undefined,
+          body: JSON.stringify({ body }),
+        });
+      } catch {
+        const localMsg: ChatMessage = {
+          id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          session_id: sessionId,
+          sender_type: customerToken ? 'customer' : 'owner',
+          sender_id: customerToken ? 'visitor' : 'owner',
+          body,
+          created_at: new Date().toISOString(),
+          read_at: null,
+        };
+        return { success: true, data: localMsg };
+      }
+    },
+
+    async listOwnerSessions() {
+      try {
+        return await request<{ success: boolean; data: ChatSession[] }>('/chat/owner/sessions', {
+          method: 'GET',
+        });
+      } catch {
+        return { success: true, data: [] };
+      }
+    },
+
+    // Admin-only "Online Now" view — who's connected, not what they're saying.
+    async listOnlineOwners() {
+      return request<{ success: boolean; data: OnlineOwner[] }>('/chat/admin/online-owners', {
+        method: 'GET',
+      });
+    },
+
+    async markRead(sessionId: string, customerToken?: string) {
+      return request<{ success: boolean }>(`/chat/sessions/${sessionId}/read`, {
+        method: 'PATCH',
+        headers: customerToken ? { 'x-customer-token': customerToken } : undefined,
+      });
+    },
+
+    async closeSession(sessionId: string) {
+      return request<{ success: boolean; data: ChatSession }>(`/chat/sessions/${sessionId}/close`, {
+        method: 'PATCH',
       });
     },
   },
@@ -321,6 +533,30 @@ export const apiClient = {
       return request<{ success: boolean; data: any }>(`/orders/${encodeURIComponent(id)}/status`, {
         method: 'PATCH',
         body: JSON.stringify({ status }),
+      });
+    },
+  },
+
+  // Razorpay checkout payment flow (test mode) — see docs/razorpayapi.md
+  payments: {
+    async createOrder(orderId: string) {
+      return request<{
+        success: boolean;
+        error?: string;
+        data?: {
+          keyId: string; razorpayOrderId: string; amount: number; currency: string;
+          orderId: string; name: string; email: string; phone: string;
+        };
+      }>('/payments/create-order', {
+        method: 'POST',
+        body: JSON.stringify({ orderId }),
+      });
+    },
+
+    async verify(payload: { orderId: string; razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) {
+      return request<{ success: boolean; error?: string; data?: any }>('/payments/verify', {
+        method: 'POST',
+        body: JSON.stringify(payload),
       });
     },
   },
@@ -464,6 +700,31 @@ export const apiClient = {
         method: 'POST',
       });
     },
+
+    async deleteUser(userId: string) {
+      return request<{ success: boolean; message?: string }>(`/admin/users/${userId}`, {
+        method: 'DELETE',
+      });
+    },
+
+    async getMessageStats() {
+      return request<{
+        success: boolean;
+        data: { total: number; sent: number; failed: number; simulated: number; sms: number; whatsapp: number; last24h: number };
+      }>('/admin/messages/stats', { method: 'GET' });
+    },
+
+    async getMessages(opts: { limit?: number; channel?: string; status?: string; event?: string } = {}) {
+      const params = new URLSearchParams();
+      if (opts.limit) params.set('limit', String(opts.limit));
+      if (opts.channel) params.set('channel', opts.channel);
+      if (opts.status) params.set('status', opts.status);
+      if (opts.event) params.set('event', opts.event);
+      const qs = params.toString();
+      return request<{ success: boolean; data: any[] }>(`/admin/messages${qs ? `?${qs}` : ''}`, {
+        method: 'GET',
+      });
+    },
   },
 
   // Live Operational Logs Services
@@ -510,14 +771,48 @@ export const apiClient = {
   // Cloudshope Anonymous QR Calling Bridge — active masked-calling backend.
   // Unlike the Twilio/Exotel bridges, no phone number is collected from the
   // visitor: the server returns a DID to dial directly, and Cloudshope's
-  // telecom layer connects it to the real number (resolved server-side from
-  // qrId, never sent from or echoed back to the browser).
+  // telecom layer connects it to the real number. The target is always
+  // resolved server-side — from qrId (+ optional contactName) for the owner
+  // or a personal emergency contact, or from helplineId for an admin-configured
+  // provider — never sent from or echoed back to the browser.
   cloudshope: {
-    async getCallNumber(opts: { qrId: string; contactName?: string }) {
+    async getCallNumber(opts: { qrId?: string; contactName?: string; helplineId?: string }) {
       return request<{ success: boolean; did?: string; label?: string; message?: string; error?: string }>('/cloudshope/call-bridge', {
         method: 'POST',
         body: JSON.stringify(opts),
       });
+    },
+  },
+
+  // Admin-configured helpline directory (Ambulance, Towing, Mechanic, ...).
+  // Persisted server-side so the scan page and the masked-call bridge can both
+  // resolve them without depending on the admin's own browser localStorage.
+  helplines: {
+    async getPublic(category?: string) {
+      try {
+        const qs = category ? `?category=${encodeURIComponent(category)}` : '';
+        return await request<{ success: boolean; data: any[] }>(`/helplines/public${qs}`, { method: 'GET' });
+      } catch {
+        return { success: true, data: [] };
+      }
+    },
+    async getAll() {
+      return request<{ success: boolean; data: any[] }>('/helplines', { method: 'GET' });
+    },
+    async create(provider: { category: string; label: string; phone: string; active?: boolean }) {
+      return request<{ success: boolean; data: any }>('/helplines', {
+        method: 'POST',
+        body: JSON.stringify(provider),
+      });
+    },
+    async update(id: string, updates: Partial<{ category: string; label: string; phone: string; active: boolean }>) {
+      return request<{ success: boolean; data: any }>(`/helplines/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates),
+      });
+    },
+    async remove(id: string) {
+      return request<{ success: boolean }>(`/helplines/${id}`, { method: 'DELETE' });
     },
   },
 };

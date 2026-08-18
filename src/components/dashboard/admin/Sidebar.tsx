@@ -1,7 +1,6 @@
 import type React from "react";
-import { LogOut, HelpCircle } from "lucide-react";
-import { NAV_ITEMS } from "./constants";
-import { avatarUrl } from "./helpers";
+import { LogOut, Tag, ShieldCheck, ChevronRight, HelpCircle, Settings as SettingsIcon } from "lucide-react";
+import { NAV_ITEMS, REPICHAT_NAV_ITEM } from "./constants";
 import AppLogo from "../../common/AppLogo";
 
 function SideItem({
@@ -12,32 +11,33 @@ function SideItem({
   onClick,
   children,
 }: {
-  key?: string;
   active?: boolean;
   danger?: boolean;
   label: string;
   badge?: number;
   onClick: () => void;
   children: React.ReactNode;
+  key?: string;
 }) {
   return (
     <button
       onClick={onClick}
       aria-label={label}
-      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
+      className={`w-full flex items-center gap-2.5 h-[34px] px-2.5 rounded-[5px] text-sm transition-all cursor-pointer relative group ${
         active
-          ? "bg-white text-[#111111] shadow-[0_4px_16px_rgba(0,0,0,0.25)] font-bold scale-[1.02]"
+          ? "bg-[#303235] text-white"
           : danger
-          ? "text-red-400 hover:bg-white/10"
-          : "text-white/70 hover:bg-white/10 hover:text-white"
+          ? "text-[#C9CACC] hover:bg-[#DC2626]/10 hover:text-[#DC2626]"
+          : "text-[#C9CACC] hover:bg-[#303235] hover:text-white"
       }`}
     >
-      {children}
-      <span className="flex-1 text-left tracking-wide">{label}</span>
+      <span className="text-inherit">{children}</span>
+      <span className="flex-1 text-left font-body">{label}</span>
       {!!badge && badge > 0 && (
         <span
-          className="min-w-[20px] h-[20px] px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center shadow-sm"
-          style={{ background: "#EF4444", color: "#fff" }}
+          className={`ml-auto font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded-[4px] ${
+            active ? "bg-[#5C78DF] text-white" : "bg-white/10 text-[#9CA0A6]"
+          }`}
         >
           {badge}
         </span>
@@ -53,6 +53,7 @@ export default function Sidebar({
   onBack,
   onSignOut,
   unreadAlerts,
+  unreadChats,
 }: {
   page: string;
   setPage: (p: string) => void;
@@ -60,83 +61,90 @@ export default function Sidebar({
   onBack: () => void;
   onSignOut: () => void;
   unreadAlerts?: number;
+  unreadChats?: number;
 }) {
   const isClientUser = admin.role === "Client Account";
 
   const mainNav = isClientUser
     ? [
-        { id: "qr", label: "Your Code", icon: NAV_ITEMS[1].icon },
-        { id: "alerts", label: "Alerts", icon: NAV_ITEMS[3].icon },
+        { id: "qr", label: "Your Codes", icon: NAV_ITEMS.find((i) => i.id === "qr")!.icon },
+        { id: "alerts", label: "Alerts", icon: NAV_ITEMS.find((i) => i.id === "alerts")!.icon },
+        REPICHAT_NAV_ITEM,
       ]
     : NAV_ITEMS;
 
   return (
     <aside
-      className="w-[240px] flex-shrink-0 flex flex-col h-full py-5 px-3.5 shadow-2xl relative z-20"
-      style={{ background: "#14161C", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+      className="w-[220px] flex-shrink-0 flex flex-col h-full py-[18px] px-3 sticky top-0 z-20"
+      style={{ background: "#111315", fontFamily: "'Inter', sans-serif" }}
     >
-      {/* ── Logo ─────────────────────────── */}
+      {/* ── Brand Header ────────────────────── */}
       <a
         href="/"
-        className="flex items-center gap-3 px-2 mb-7 cursor-pointer flex-shrink-0 group"
+        className="flex items-center px-2 mb-5 cursor-pointer flex-shrink-0 group"
         onClick={(e) => {
           e.preventDefault();
           onBack();
         }}
-        aria-label="RapiQR home"
+        aria-label="RapiQR Console home"
       >
-        <AppLogo variant="dark" className="h-7 w-auto object-contain transition-transform group-hover:scale-105" />
+        <AppLogo variant="dark" className="h-8 w-auto object-contain transition-transform group-hover:scale-105" />
       </a>
 
+      {/* ── Setup Progress Card Widget ─────────────── */}
+      <div className="mx-0.5 mb-[9px] border border-[#414347] rounded-[7px] p-3 text-white">
+        <div className="flex items-center justify-between text-xs mb-[9px]">
+          <span className="text-white">Set up your fleet</span>
+          <ChevronRight size={14} className="text-[#C9CACC]" />
+        </div>
+        <div className="w-full bg-[#3D4142] rounded-[5px] h-[5px] overflow-hidden">
+          <div className="h-full bg-[#4FC47A] rounded-[5px]" style={{ width: "88%" }} />
+        </div>
+        <div className="text-[11px] mt-[7px] text-[#ddd]">6/7 completed</div>
+      </div>
+
+      {/* ── Section Label ──────────────── */}
+      <div className="px-2.5 pb-2 font-body text-[11px] font-semibold tracking-normal text-[#777B80]">
+        Fleet Operations
+      </div>
+
       {/* ── Main Navigation ──────────────── */}
-      <nav className="flex-1 space-y-1.5 overflow-y-auto custom-scrollbar">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto custom-scrollbar pr-0.5">
         {mainNav.map((item) => {
           const Icon = item.icon;
           const isActive = page === item.id;
+          const badge = item.id === "alerts" ? unreadAlerts : item.id === "repichat" ? unreadChats : undefined;
+
           return (
-            <SideItem
-              key={item.id}
-              active={isActive}
-              label={item.label}
-              badge={item.id === "alerts" ? unreadAlerts : undefined}
-              onClick={() => setPage(item.id)}
-            >
-              <Icon size={19} strokeWidth={isActive ? 2.3 : 1.8} className={isActive ? "text-[#EAB308]" : ""} />
+            <SideItem key={item.id} active={isActive} label={item.label} badge={badge} onClick={() => setPage(item.id)}>
+              <Icon size={15} strokeWidth={2} />
             </SideItem>
           );
         })}
       </nav>
 
-      {/* ── Bottom: Help, Sign Out, Avatar ── */}
-      <div className="flex-shrink-0 pt-3 space-y-1" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-        <SideItem label="Help & Support" onClick={() => {}}>
-          <HelpCircle size={18} strokeWidth={1.8} />
-        </SideItem>
-
-        <SideItem
-          danger
-          label="Sign Out"
-          onClick={() => {
-            onSignOut();
-            onBack();
-          }}
+      {/* ── Bottom Fixed Utilities ──────────────── */}
+      <div className="pt-3 border-t border-[#292B2E] space-y-1">
+        <button
+          onClick={() => setPage("customize")}
+          className="w-full flex items-center gap-2.5 h-[34px] px-2.5 rounded-[5px] text-sm text-[#C9CACC] hover:text-white hover:bg-[#303235] transition-all cursor-pointer"
         >
-          <LogOut size={18} strokeWidth={1.8} />
-        </SideItem>
+          <SettingsIcon size={15} />
+          <span>Settings</span>
+        </button>
 
-        <div className="flex items-center gap-3 px-2.5 py-2.5 mt-2 rounded-xl bg-white/5 border border-white/10">
-          <img
-            src={avatarUrl(admin.name)}
-            alt={admin.name}
-            className="w-9 h-9 rounded-full object-cover flex-shrink-0 bg-white/10 p-0.5"
-            style={{ border: "2px solid rgba(234,179,8,0.6)" }}
-          />
+        <div className="flex items-center justify-between p-2.5 rounded-[7px] bg-[#292B2E] border border-[#414347] mt-2">
           <div className="min-w-0 flex-1">
             <p className="text-[12px] font-bold text-white truncate leading-tight">{admin.name}</p>
-            <p className="text-[10px] font-bold mt-0.5 text-[#EAB308] truncate uppercase tracking-wider">
-              {admin.role || "Client"}
-            </p>
+            <p className="text-[10px] font-medium text-[#5C78DF] truncate tracking-normal capitalize">{admin.role || "Admin"}</p>
           </div>
+          <button
+            onClick={onSignOut}
+            className="p-1.5 rounded-[4px] text-[#C9CACC] hover:text-[#DC2626] hover:bg-[#DC2626]/10 transition-all cursor-pointer"
+            title="Sign Out"
+          >
+            <LogOut size={15} />
+          </button>
         </div>
       </div>
     </aside>

@@ -42,27 +42,27 @@ class UserModel {
 
   /**
    * Update the owner's own name / phone (used by Account Settings).
+   * Intentionally does not catch-and-return-null like the other methods here:
+   * a swallowed error previously surfaced to the client as a hardcoded, useless
+   * "Failed to update profile" no matter what actually went wrong (bad row id,
+   * constraint violation, connectivity) — real failures must propagate so the
+   * controller (and the user) can see the real reason.
    */
   static async updateProfile(userId, updates) {
-    try {
-      const payload = {};
-      if (updates.fullName !== undefined) payload.full_name = updates.fullName;
-      if (updates.phoneNumber !== undefined) payload.phone_number = updates.phoneNumber;
-      if (Object.keys(payload).length === 0) return this.findById(userId);
+    const payload = {};
+    if (updates.fullName !== undefined) payload.full_name = updates.fullName;
+    if (updates.phoneNumber !== undefined) payload.phone_number = updates.phoneNumber;
+    if (Object.keys(payload).length === 0) return this.findById(userId);
 
-      const { data, error } = await supabaseAdmin
-        .from('profiles')
-        .update(payload)
-        .eq('id', userId)
-        .select('id, email, full_name, phone_number, avatar_url, role, subscription_plan, is_subscribed, metadata')
-        .single();
+    const { data, error } = await supabaseAdmin
+      .from('profiles')
+      .update(payload)
+      .eq('id', userId)
+      .select('id, email, full_name, phone_number, avatar_url, role, subscription_plan, is_subscribed, metadata')
+      .single();
 
-      if (error) throw error;
-      return data;
-    } catch (err) {
-      console.error('UserModel.updateProfile Error:', err);
-      return null;
-    }
+    if (error) throw error;
+    return data;
   }
 
   /**

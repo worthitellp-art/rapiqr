@@ -17,6 +17,7 @@ function toApi(row) {
     status: row.status,
     shippingAddress: row.shipping_address,
     shiprocket: row.shiprocket || null,
+    payment: row.payment || null,
     createdAt: row.created_at,
   };
 }
@@ -89,6 +90,19 @@ class OrderModel {
       .select('*')
       .eq('id', id)
       .maybeSingle();
+
+    if (error) throw error;
+    return toApi(data);
+  }
+
+  /** Persist the Razorpay order/payment result on an order (see paymentController) */
+  static async attachPaymentInfo(id, paymentData) {
+    const { data, error } = await supabaseAdmin
+      .from('orders')
+      .update({ payment: paymentData })
+      .eq('id', id)
+      .select()
+      .single();
 
     if (error) throw error;
     return toApi(data);

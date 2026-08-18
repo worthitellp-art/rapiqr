@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Store, CheckCircle2, Clock, XCircle, Search, MapPin, 
-  Phone, Mail, Briefcase, Zap, ShieldCheck, Filter, ChevronRight 
+import {
+  Store, CheckCircle2, Clock, XCircle, Search, MapPin,
+  Phone, Mail, Briefcase, Zap, ShieldCheck, Filter, ChevronRight
 } from 'lucide-react';
-import { 
-  getDistributorApplications, 
-  updateDistributorApplicationStatus, 
-  DistributorApplication 
+import {
+  getDistributorApplications,
+  updateDistributorApplicationStatus,
+  DistributorApplication
 } from '../../../lib/distributorService';
 
 export default function DistributorsPage({ setToast }: { setToast: (msg: string) => void }) {
@@ -32,8 +32,8 @@ export default function DistributorsPage({ setToast }: { setToast: (msg: string)
         setSelectedApp(updated);
       }
       setToast(
-        status === 'approved' 
-          ? `✓ Application ${appId} Verified & Approved! Distributor dashboard access granted.` 
+        status === 'approved'
+          ? `✓ Application ${appId} Verified & Approved! Distributor dashboard access granted.`
           : `Application ${appId} rejected.`
       );
     }
@@ -41,7 +41,7 @@ export default function DistributorsPage({ setToast }: { setToast: (msg: string)
 
   const filteredApps = apps.filter(app => {
     const matchesFilter = filter === 'all' || app.status === filter;
-    const matchesSearch = 
+    const matchesSearch =
       app.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       app.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
       app.phone.includes(searchQuery) ||
@@ -55,255 +55,259 @@ export default function DistributorsPage({ setToast }: { setToast: (msg: string)
   const totalCount = apps.length;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 text-gray-900">
+    <div className="px-8 pt-7 pb-16 space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 flex items-center gap-2">
-            <Store className="text-amber-500" size={26} />
+          <h1 className="font-display text-[21px] font-semibold text-[#17181A] flex items-center gap-2">
+            <Store className="text-[#5C78DF]" size={22} />
             Distributor & Partner Applications
           </h1>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-[13px] text-[#777B80] mt-0.5">
             Review B2B franchise requests, verify partner credentials, and unlock Distributor Dashboards.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="px-3.5 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold flex items-center gap-2">
-            <Clock size={16} className="text-amber-600 animate-pulse" />
-            <span>{pendingCount} Pending Verification</span>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[4px] bg-[#FBF3E4] text-[#B8863F] text-[12px] font-semibold">
+            <Clock size={14} className="animate-pulse" />
+            <span className="font-mono font-bold">{pendingCount}</span> Pending Verification
           </div>
-          <div className="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center gap-2">
-            <CheckCircle2 size={16} className="text-emerald-600" />
-            <span>{approvedCount} Active Partners</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[4px] bg-[#E9F9EF] text-[#2E9E5B] text-[12px] font-semibold">
+            <CheckCircle2 size={14} />
+            <span className="font-mono font-bold">{approvedCount}</span> Active Partners
           </div>
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
-          {(['all', 'pending', 'approved', 'rejected'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setFilter(tab)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all capitalize whitespace-nowrap cursor-pointer ${
-                filter === tab
-                  ? 'bg-[#111111] text-white shadow-sm'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {tab === 'all' ? `All (${totalCount})` : tab === 'pending' ? `Pending (${pendingCount})` : tab}
-            </button>
-          ))}
+      <div className="max-w-7xl mx-auto space-y-7">
+        {/* Filter and Search Bar */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 border border-[#E5E5E7] shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
+          <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
+            {(['all', 'pending', 'approved', 'rejected'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setFilter(tab)}
+                className={`px-3.5 py-1.5 rounded-[4px] text-[12px] font-semibold transition-all capitalize whitespace-nowrap cursor-pointer ${
+                  filter === tab
+                    ? 'bg-[#17181A] text-white'
+                    : 'text-[#777B80] hover:bg-[#F3F3F4]'
+                }`}
+              >
+                {tab === 'all' ? `All (${totalCount})` : tab === 'pending' ? `Pending (${pendingCount})` : tab}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative w-full sm:w-72">
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9CA0A6]" />
+            <input
+              type="text"
+              placeholder="Search by name, city, phone..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-[12.5px] rounded-full border-0 bg-[#EFEFF0] text-[#17181A] placeholder-[#9CA0A6] outline-none transition-all focus:ring-2 focus:ring-[#5C78DF]/25"
+            />
+          </div>
         </div>
 
-        <div className="relative w-full sm:w-72">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by name, city, phone..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-amber-500"
-          />
-        </div>
-      </div>
+        {/* Applications Grid / Table */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-8 space-y-3">
+            {filteredApps.length === 0 ? (
+              <div className="bg-white p-12 text-center border border-[#E5E5E7] shadow-[0_1px_4px_rgba(0,0,0,0.03)] space-y-2">
+                <div className="w-12 h-12 rounded-full bg-[#E8EDFF] text-[#5271D5] flex items-center justify-center mx-auto">
+                  <Store size={22} />
+                </div>
+                <p className="font-bold text-[14px] text-[#17181A]">No distributor applications found.</p>
+                <p className="text-[12px] text-[#777B80]">Applications submitted by users on the landing page will appear here for verification.</p>
+              </div>
+            ) : (
+              filteredApps.map(app => {
+                const isPending = app.status === 'pending';
+                const isApproved = app.status === 'approved';
 
-      {/* Applications Grid / Table */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <div className="lg:col-span-8 space-y-3">
-          {filteredApps.length === 0 ? (
-            <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 text-gray-500">
-              <Store size={40} className="mx-auto text-gray-300 mb-3" />
-              <p className="font-bold text-sm">No distributor applications found.</p>
-              <p className="text-xs text-gray-400 mt-1">Applications submitted by users on the landing page will appear here for verification.</p>
-            </div>
-          ) : (
-            filteredApps.map(app => {
-              const isPending = app.status === 'pending';
-              const isApproved = app.status === 'approved';
+                return (
+                  <div
+                    key={app.id}
+                    onClick={() => setSelectedApp(app)}
+                    className={`bg-white p-5 border transition-all cursor-pointer hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] ${
+                      selectedApp?.id === app.id ? 'border-[#5C78DF] ring-2 ring-[#5C78DF]/15' : 'border-[#E5E5E7]'
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-[14px] ${
+                          isApproved ? 'bg-[#E9F9EF] text-[#2E9E5B]' : isPending ? 'bg-[#FBF3E4] text-[#B8863F]' : 'bg-[#FDEAEA] text-[#DC2626]'
+                        }`}>
+                          {app.userName.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-display font-semibold text-[14px] text-[#17181A]">{app.userName}</h3>
+                            <span className="text-[10px] font-mono font-bold text-[#9CA0A6]">#{app.id}</span>
+                          </div>
+                          <p className="text-[12px] text-[#777B80] flex items-center gap-1.5 mt-0.5">
+                            <MapPin size={12} className="text-[#5C78DF]" />
+                            {app.city}
+                          </p>
+                        </div>
+                      </div>
 
-              return (
-                <div
-                  key={app.id}
-                  onClick={() => setSelectedApp(app)}
-                  className={`bg-white rounded-2xl p-5 border transition-all cursor-pointer hover:shadow-md ${
-                    selectedApp?.id === app.id ? 'border-amber-500 ring-2 ring-amber-500/20' : 'border-gray-200'
-                  }`}
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm ${
-                        isApproved ? 'bg-emerald-100 text-emerald-800' : isPending ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-700'
-                      }`}>
-                        {app.userName.charAt(0).toUpperCase()}
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2.5 py-1 rounded-[4px] text-[11px] font-bold uppercase tracking-wide flex items-center gap-1.5 w-fit ${
+                          isApproved
+                            ? 'bg-[#E9F9EF] text-[#2E9E5B]'
+                            : isPending
+                            ? 'bg-[#FBF3E4] text-[#B8863F] animate-pulse'
+                            : 'bg-[#FDEAEA] text-[#DC2626]'
+                        }`}>
+                          {isApproved && <CheckCircle2 size={12} />}
+                          {isPending && <Clock size={12} />}
+                          {app.status === 'rejected' && <XCircle size={12} />}
+                          {app.status === 'pending' ? 'Pending Verification' : app.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 py-3 border-t border-[#F3F3F4] text-[12px]">
+                      <div>
+                        <span className="text-[#9CA0A6] block text-[10px] font-semibold uppercase tracking-wide">Business Type</span>
+                        <span className="font-semibold text-[#17181A] flex items-center gap-1 mt-0.5">
+                          <Briefcase size={12} className="text-[#9CA0A6]" />
+                          {app.business}
+                        </span>
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-sm text-gray-900">{app.userName}</h3>
-                          <span className="text-[10px] font-mono font-bold text-gray-400">#{app.id}</span>
-                        </div>
-                        <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5">
-                          <MapPin size={12} className="text-amber-500" />
-                          {app.city}
-                        </p>
+                        <span className="text-[#9CA0A6] block text-[10px] font-semibold uppercase tracking-wide">Requested Package</span>
+                        <span className="font-bold text-[#B8863F] flex items-center gap-1 mt-0.5">
+                          <Zap size={12} />
+                          {app.tier}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[#9CA0A6] block text-[10px] font-semibold uppercase tracking-wide">Contact</span>
+                        <span className="font-semibold text-[#17181A] flex items-center gap-1 mt-0.5 font-mono">
+                          <Phone size={12} className="text-[#9CA0A6]" />
+                          {app.phone}
+                        </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wide flex items-center gap-1.5 ${
-                        isApproved
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : isPending
-                          ? 'bg-amber-100 text-amber-900 border border-amber-300 animate-pulse'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {isApproved && <CheckCircle2 size={12} />}
-                        {isPending && <Clock size={12} />}
-                        {app.status === 'rejected' && <XCircle size={12} />}
-                        {app.status === 'pending' ? 'Pending Verification' : app.status}
+                    {/* Actions Bar */}
+                    <div className="flex items-center justify-between pt-3 border-t border-[#F3F3F4] mt-1">
+                      <span className="text-[10px] font-mono text-[#9CA0A6]">
+                        Applied: {new Date(app.createdAt).toLocaleDateString()} at {new Date(app.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
+
+                      <div className="flex items-center gap-2">
+                        {isPending && (
+                          <>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleStatusChange(app.id, 'rejected'); }}
+                              className="px-3 py-1.5 rounded-[4px] text-[12px] font-semibold text-[#DC2626] hover:bg-[#FDEAEA] transition-colors cursor-pointer"
+                            >
+                              Reject
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleStatusChange(app.id, 'approved'); }}
+                              className="px-3.5 py-1.5 rounded-[4px] text-[12px] font-bold bg-[#17181A] text-white hover:bg-[#2A2B2E] transition-all cursor-pointer flex items-center gap-1.5"
+                            >
+                              <ShieldCheck size={14} /> Verify & Approve Partner
+                            </button>
+                          </>
+                        )}
+                        {isApproved && (
+                          <span className="text-[12px] font-bold text-[#2E9E5B] flex items-center gap-1">
+                            <CheckCircle2 size={14} /> Verified Distributor Active
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
+                );
+              })
+            )}
+          </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 py-3 border-t border-gray-100 text-xs">
-                    <div>
-                      <span className="text-gray-400 block text-[10px]">Business Type</span>
-                      <span className="font-semibold text-gray-800 flex items-center gap-1 mt-0.5">
-                        <Briefcase size={12} className="text-gray-400" />
-                        {app.business}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 block text-[10px]">Requested Package</span>
-                      <span className="font-bold text-amber-600 flex items-center gap-1 mt-0.5">
-                        <Zap size={12} />
-                        {app.tier}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 block text-[10px]">Contact</span>
-                      <span className="font-semibold text-gray-800 flex items-center gap-1 mt-0.5">
-                        <Phone size={12} className="text-gray-400" />
-                        {app.phone}
-                      </span>
-                    </div>
-                  </div>
+          {/* Details Inspection Sidebar */}
+          <div className="lg:col-span-4 bg-white p-6 border border-[#E5E5E7] shadow-[0_1px_4px_rgba(0,0,0,0.03)] sticky top-6">
+            <h3 className="font-display font-semibold text-[14px] text-[#17181A] mb-4 pb-3 border-b border-[#F3F3F4] flex items-center justify-between">
+              <span>Application Inspector</span>
+              {selectedApp && <span className="text-[12px] font-mono font-bold text-[#5C78DF]">#{selectedApp.id}</span>}
+            </h3>
 
-                  {/* Actions Bar */}
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-1">
-                    <span className="text-[10px] text-gray-400">
-                      Applied: {new Date(app.createdAt).toLocaleDateString()} at {new Date(app.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-
-                    <div className="flex items-center gap-2">
-                      {isPending && (
-                        <>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleStatusChange(app.id, 'rejected'); }}
-                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                          >
-                            Reject
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleStatusChange(app.id, 'approved'); }}
-                            className="px-3.5 py-1.5 rounded-lg text-xs font-black bg-[#111111] text-white hover:bg-gray-800 transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
-                          >
-                            <ShieldCheck size={14} /> Verify & Approve Partner
-                          </button>
-                        </>
-                      )}
-                      {isApproved && (
-                        <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                          <CheckCircle2 size={14} /> Verified Distributor Active
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* Details Inspection Sidebar */}
-        <div className="lg:col-span-4 bg-white rounded-2xl p-6 border border-gray-200 shadow-sm sticky top-6">
-          <h3 className="font-extrabold text-base text-gray-900 mb-4 pb-3 border-b border-gray-100 flex items-center justify-between">
-            <span>Application Inspector</span>
-            {selectedApp && <span className="text-xs font-mono font-bold text-amber-600">#{selectedApp.id}</span>}
-          </h3>
-
-          {selectedApp ? (
-            <div className="space-y-4 text-xs">
-              <div>
-                <label className="text-gray-400 font-medium block mb-1">Company / Partner Name</label>
-                <div className="font-bold text-sm text-gray-900 bg-gray-50 p-2.5 rounded-xl border border-gray-100">
-                  {selectedApp.userName}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+            {selectedApp ? (
+              <div className="space-y-4 text-[12px]">
                 <div>
-                  <label className="text-gray-400 font-medium block mb-1">Phone / WhatsApp</label>
-                  <div className="font-bold text-gray-900 bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex items-center gap-1.5">
-                    <Phone size={13} className="text-amber-500" />
-                    {selectedApp.phone}
+                  <label className="text-[11px] font-semibold text-[#777B80] uppercase tracking-wide block mb-1">Company / Partner Name</label>
+                  <div className="font-bold text-[13.5px] text-[#17181A] bg-[#F7F7F8] border border-[#E5E5E7] p-2.5 rounded-[4px]">
+                    {selectedApp.userName}
                   </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-[#777B80] uppercase tracking-wide block mb-1">Phone / WhatsApp</label>
+                    <div className="font-bold text-[#17181A] bg-[#F7F7F8] border border-[#E5E5E7] p-2.5 rounded-[4px] flex items-center gap-1.5 font-mono">
+                      <Phone size={13} className="text-[#5C78DF]" />
+                      {selectedApp.phone}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-[#777B80] uppercase tracking-wide block mb-1">City / Region</label>
+                    <div className="font-bold text-[#17181A] bg-[#F7F7F8] border border-[#E5E5E7] p-2.5 rounded-[4px] flex items-center gap-1.5">
+                      <MapPin size={13} className="text-[#5C78DF]" />
+                      {selectedApp.city}
+                    </div>
+                  </div>
+                </div>
+
                 <div>
-                  <label className="text-gray-400 font-medium block mb-1">City / Region</label>
-                  <div className="font-bold text-gray-900 bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex items-center gap-1.5">
-                    <MapPin size={13} className="text-amber-500" />
-                    {selectedApp.city}
+                  <label className="text-[11px] font-semibold text-[#777B80] uppercase tracking-wide block mb-1">Account Email</label>
+                  <div className="font-medium text-[#17181A] bg-[#F7F7F8] border border-[#E5E5E7] p-2.5 rounded-[4px] flex items-center gap-1.5">
+                    <Mail size={13} className="text-[#9CA0A6]" />
+                    {selectedApp.userEmail}
                   </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="text-gray-400 font-medium block mb-1">Account Email</label>
-                <div className="font-medium text-gray-800 bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex items-center gap-1.5">
-                  <Mail size={13} className="text-gray-400" />
-                  {selectedApp.userEmail}
+                <div>
+                  <label className="text-[11px] font-semibold text-[#777B80] uppercase tracking-wide block mb-1">Interested Partner Tier</label>
+                  <div className="font-black text-[#B8863F] bg-[#FBF3E4] p-3 rounded-[4px]">
+                    {selectedApp.tier}
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-[#F3F3F4] space-y-2">
+                  <label className="text-[11px] font-semibold text-[#777B80] uppercase tracking-wide block">Admin Verification Action</label>
+                  {selectedApp.status === 'pending' ? (
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => handleStatusChange(selectedApp.id, 'approved')}
+                        className="w-full py-3 rounded-[4px] font-bold bg-[#17181A] text-white hover:bg-[#2A2B2E] transition-all text-[12.5px] flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <ShieldCheck size={16} /> Approve & Grant Distributor Access
+                      </button>
+                      <button
+                        onClick={() => handleStatusChange(selectedApp.id, 'rejected')}
+                        className="w-full py-2.5 rounded-[4px] font-semibold text-[#DC2626] hover:bg-[#FDEAEA] transition-all text-[12.5px] flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        Reject Application
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-[4px] bg-[#E9F9EF] text-[#2E9E5B] font-bold text-center">
+                      ✓ Verified on {selectedApp.approvedAt ? new Date(selectedApp.approvedAt).toLocaleDateString() : 'Today'}
+                    </div>
+                  )}
                 </div>
               </div>
-
-              <div>
-                <label className="text-gray-400 font-medium block mb-1">Interested Partner Tier</label>
-                <div className="font-black text-amber-900 bg-amber-50 p-3 rounded-xl border border-amber-200">
-                  {selectedApp.tier}
-                </div>
+            ) : (
+              <div className="py-12 text-center text-[#9CA0A6] text-[12.5px]">
+                Select any application card on the left to inspect applicant details and verify rights.
               </div>
-
-              <div className="pt-4 border-t border-gray-100 space-y-2">
-                <label className="text-gray-400 font-medium block">Admin Verification Action</label>
-                {selectedApp.status === 'pending' ? (
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => handleStatusChange(selectedApp.id, 'approved')}
-                      className="w-full py-3 rounded-xl font-extrabold bg-[#111111] text-white hover:bg-gray-800 transition-all text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer"
-                    >
-                      <ShieldCheck size={16} /> Approve & Grant Distributor Access
-                    </button>
-                    <button
-                      onClick={() => handleStatusChange(selectedApp.id, 'rejected')}
-                      className="w-full py-2.5 rounded-xl font-bold bg-gray-100 text-gray-700 hover:bg-red-50 hover:text-red-700 transition-all text-xs flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      Reject Application
-                    </button>
-                  </div>
-                ) : (
-                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 font-bold text-center">
-                    ✓ Verified on {selectedApp.approvedAt ? new Date(selectedApp.approvedAt).toLocaleDateString() : 'Today'}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="py-12 text-center text-gray-400">
-              Select any application card on the left to inspect applicant details and verify rights.
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>

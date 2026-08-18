@@ -16,11 +16,13 @@ export default function CompleteProfilePopup({
   missingEmail,
   onDismiss,
   onGoToSettings,
+  onProductsLinked,
 }: {
   missingPhone: boolean;
   missingEmail: boolean;
   onDismiss: () => void;
   onGoToSettings: () => void;
+  onProductsLinked?: () => Promise<any> | void;
 }) {
   const { profile, sendPhoneOtp, verifyPhoneOtp, refreshProfile } = useAuth();
 
@@ -63,6 +65,7 @@ export default function CompleteProfilePopup({
       return;
     }
     await refreshProfile();
+    await onProductsLinked?.();
     if (!missingEmail) {
       setDone(true);
       setTimeout(onDismiss, 1200);
@@ -87,10 +90,13 @@ export default function CompleteProfilePopup({
         <div className="w-12 h-12 rounded-2xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mb-4">
           <ShieldCheck size={22} />
         </div>
-        <h3 className="font-bold text-lg text-[#1A1D26]">Finish setting up your account</h3>
+        <h3 className="font-bold text-lg text-[#1A1D26]">
+          {missingPhone && !missingEmail ? 'Enter your phone number to get your stickers' : 'Finish setting up your account'}
+        </h3>
         <p className="text-xs text-[#64748B] mt-1 mb-5">
-          You signed in with just {missingPhone && !missingEmail ? 'an email' : missingEmail && !missingPhone ? 'a phone number' : 'one contact method'} — add
-          {missingPhone && missingEmail ? ' both a phone number and an email' : missingPhone ? ' a phone number' : ' an email'} so stickers can auto-link and emergency contacts can reach you.
+          {missingPhone && !missingEmail
+            ? "Stickers auto-link to your account by phone number — add and verify yours to see everything registered under it."
+            : `You signed in with just ${missingPhone && !missingEmail ? 'an email' : missingEmail && !missingPhone ? 'a phone number' : 'one contact method'} — add${missingPhone && missingEmail ? ' both a phone number and an email' : missingPhone ? ' a phone number' : ' an email'} so stickers can auto-link and emergency contacts can reach you.`}
         </p>
 
         {done ? (

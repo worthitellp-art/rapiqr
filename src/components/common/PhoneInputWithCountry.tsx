@@ -1,18 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export const COUNTRY_CODES = [
-  { code: '+91', flag: '🇮🇳', name: 'India' },
-  { code: '+1', flag: '🇺🇸', name: 'US / Canada' },
-  { code: '+44', flag: '🇬🇧', name: 'UK' },
-  { code: '+971', flag: '🇦🇪', name: 'UAE' },
-  { code: '+966', flag: '🇸🇦', name: 'Saudi Arabia' },
-  { code: '+65', flag: '🇸🇬', name: 'Singapore' },
-  { code: '+61', flag: '🇦🇺', name: 'Australia' },
-  { code: '+49', flag: '🇩🇪', name: 'Germany' },
-  { code: '+92', flag: '🇵🇰', name: 'Pakistan' },
-  { code: '+94', flag: '🇱🇰', name: 'Sri Lanka' },
-  { code: '+977', flag: '🇳🇵', name: 'Nepal' },
+  { code: '+91', iso: 'in', name: 'India' },
+  { code: '+1', iso: 'us', name: 'US / Canada' },
+  { code: '+44', iso: 'gb', name: 'UK' },
+  { code: '+971', iso: 'ae', name: 'UAE' },
+  { code: '+966', iso: 'sa', name: 'Saudi Arabia' },
+  { code: '+65', iso: 'sg', name: 'Singapore' },
+  { code: '+61', iso: 'au', name: 'Australia' },
+  { code: '+49', iso: 'de', name: 'Germany' },
+  { code: '+92', iso: 'pk', name: 'Pakistan' },
+  { code: '+94', iso: 'lk', name: 'Sri Lanka' },
+  { code: '+977', iso: 'np', name: 'Nepal' },
 ];
+
+function FlagIcon({ iso, className = '' }: { iso: string; className?: string }) {
+  return (
+    <img
+      src={`https://flagcdn.com/w40/${iso}.png`}
+      srcSet={`https://flagcdn.com/w80/${iso}.png 2x`}
+      alt=""
+      className={`inline-block w-4 h-3 object-cover rounded-[2px] flex-shrink-0 ${className}`}
+    />
+  );
+}
 
 export function parsePhoneNumber(val: string): { countryCode: string; digits: string } {
   if (!val) return { countryCode: '+91', digits: '' };
@@ -52,6 +63,8 @@ export default function PhoneInputWithCountry({
   const parsed = parsePhoneNumber(value);
   const [selectedCountry, setSelectedCountry] = useState(parsed.countryCode);
   const [phoneDigits, setPhoneDigits] = useState(parsed.digits);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const updated = parsePhoneNumber(value);
@@ -59,9 +72,21 @@ export default function PhoneInputWithCountry({
     setPhoneDigits(updated.digits);
   }, [value]);
 
-  const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newCode = e.target.value;
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedCountryInfo = COUNTRY_CODES.find((c) => c.code === selectedCountry) ?? COUNTRY_CODES[0];
+
+  const handleCountrySelect = (newCode: string) => {
     setSelectedCountry(newCode);
+    setDropdownOpen(false);
     const full = phoneDigits ? `${newCode} ${phoneDigits}` : '';
     onChange(full, phoneDigits, newCode);
   };
@@ -77,20 +102,37 @@ export default function PhoneInputWithCountry({
 
   return (
     <div className="flex flex-col w-full">
-      <div className={`flex items-center gap-1 bg-[#F5F6FA] border border-[#E8ECF4] rounded-xl overflow-hidden focus-within:border-[#111111] ${disabled ? 'opacity-60 cursor-not-allowed' : ''} ${className}`}>
-        {/* Country Code Select */}
-        <select
-          value={selectedCountry}
-          onChange={handleCountryChange}
-          disabled={disabled}
-          className="bg-transparent text-xs font-bold text-gray-800 py-2.5 pl-2.5 pr-1 outline-none border-r border-[#E8ECF4] cursor-pointer hover:bg-gray-100/50"
-        >
-          {COUNTRY_CODES.map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.flag} {c.code}
-            </option>
-          ))}
-        </select>
+      <div className={`flex items-center gap-1 bg-[#F5F6FA] border border-[#E8ECF4] rounded-xl overflow-visible focus-within:border-[#111111] ${disabled ? 'opacity-60 cursor-not-allowed' : ''} ${className}`}>
+        {/* Country Code Dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => setDropdownOpen((o) => !o)}
+            className="flex items-center gap-1 bg-transparent text-xs font-bold text-gray-800 py-2.5 pl-2.5 pr-1 outline-none border-r border-[#E8ECF4] cursor-pointer hover:bg-gray-100/50"
+          >
+            <FlagIcon iso={selectedCountryInfo.iso} />
+            <span>{selectedCountryInfo.code}</span>
+          </button>
+
+          {dropdownOpen && (
+            <ul className="absolute z-20 top-full left-0 mt-1 w-48 max-h-64 overflow-y-auto bg-white border border-[#E8ECF4] rounded-lg shadow-lg py-1">
+              {COUNTRY_CODES.map((c) => (
+                <li key={c.code}>
+                  <button
+                    type="button"
+                    onClick={() => handleCountrySelect(c.code)}
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left hover:bg-gray-100 ${c.code === selectedCountry ? 'bg-gray-50 font-bold' : ''}`}
+                  >
+                    <FlagIcon iso={c.iso} />
+                    <span className="font-mono">{c.code}</span>
+                    <span className="text-gray-500 truncate">{c.name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {/* 10-Digit Phone Input */}
         <input

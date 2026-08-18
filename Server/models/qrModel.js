@@ -181,6 +181,92 @@ class QrModel {
       return null;
     }
   }
+
+  /**
+   * Delete QR Code record and everything that references it.
+   * chat_sessions/chat_messages and reports (alerts) hold a qr_code_id FK with no
+   * ON DELETE CASCADE, so deleting qr_codes first throws a foreign-key violation —
+   * this used to be caught and swallowed (returning null), which let the controller
+   * report success:true while the row was never actually removed from Supabase.
+   * Errors here now propagate so the caller gets a real failure instead of a lie.
+   */
+  static async delete(qrId) {
+    const { data: sessions, error: sessionsFetchError } = await supabaseAdmin
+      .from('chat_sessions')
+      .select('id')
+      .eq('qr_code_id', qrId);
+    if (sessionsFetchError) throw sessionsFetchError;
+
+    const sessionIds = (sessions || []).map((s) => s.id);
+    if (sessionIds.length > 0) {
+      const { error: messagesError } = await supabaseAdmin.from('chat_messages').delete().in('session_id', sessionIds);
+      if (messagesError) throw messagesError;
+      const { error: sessionsError } = await supabaseAdmin.from('chat_sessions').delete().eq('qr_code_id', qrId);
+      if (sessionsError) throw sessionsError;
+    }
+
+    const { error: reportsError } = await supabaseAdmin.from('reports').delete().eq('qr_code_id', qrId);
+    if (reportsError) throw reportsError;
+
+    const { error: productsError } = await supabaseAdmin.from('products').delete().eq('qr_code_id', qrId);
+    if (productsError) throw productsError;
+
+    const { data, error } = await supabaseAdmin
+      .from('qr_codes')
+      .delete()
+      .eq('id', qrId)
+      .select()
+      .maybeSingle();
+
+    if (error) throw error;
+
+    // Best-effort: also drop the uploaded sticker image so a deleted QR doesn't
+    // leave an orphaned file behind in the "Stickers" bucket forever. Matches the
+    // upload naming convention in qrController.saveStickerImage (stickers/<id>.<ext>);
+    // removing a key that doesn't exist is a silent no-op, so both extensions are
+    // safe to try without knowing which one (if any) was actually uploaded.
+    try {
+      await supabaseAdmin.storage.from('Stickers').remove([`stickers/${qrId}.png`, `stickers/${qrId}.avif`]);
+    } catch (err) {
+      console.warn(`QrModel.delete (${qrId}): sticker image cleanup failed:`, err);
+    }
+
+    return data;
+  }
+
+  /**
+   * Delete all QR Code records and their dependents (see delete() above for why
+   * this cannot swallow errors).
+   */
+  static async deleteAll() {
+    const { error: messagesError } = await supabaseAdmin.from('chat_messages').delete().not('id', 'is', null);
+    if (messagesError) throw messagesError;
+
+    const { error: sessionsError } = await supabaseAdmin.from('chat_sessions').delete().not('id', 'is', null);
+    if (sessionsError) throw sessionsError;
+
+    const { error: reportsError } = await supabaseAdmin.from('reports').delete().not('id', 'is', null);
+    if (reportsError) throw reportsError;
+
+    const { error: productsError } = await supabaseAdmin.from('products').delete().not('id', 'is', null);
+    if (productsError) throw productsError;
+
+    const { error } = await supabaseAdmin.from('qr_codes').delete().not('id', 'is', null);
+    if (error) throw error;
+
+    // Best-effort: clear every uploaded sticker image too, so "Clear all" doesn't
+    // leave the whole bucket full of orphaned files with no QR record left to own them.
+    try {
+      const { data: files } = await supabaseAdmin.storage.from('Stickers').list('stickers');
+      if (files && files.length > 0) {
+        await supabaseAdmin.storage.from('Stickers').remove(files.map((f) => `stickers/${f.name}`));
+      }
+    } catch (err) {
+      console.warn('QrModel.deleteAll: sticker image cleanup failed:', err);
+    }
+
+    return true;
+  }
 }
 
 module.exports = QrModel;

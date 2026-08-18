@@ -32,9 +32,17 @@ class ProductController {
   static async getMyProducts(req, res) {
     try {
       const profile = await UserModel.findById(req.user.id);
-      if (profile?.phone_number) {
+      const userPhone = profile?.phone_number ||
+        req.user.phone ||
+        req.user.phoneNumber ||
+        req.user.user_metadata?.phone_number ||
+        req.user.user_metadata?.phoneNumber ||
+        req.user.user_metadata?.phone;
+
+      if (userPhone) {
         try {
-          const claimed = await ProductModel.autoClaimByPhone(req.user.id, profile.full_name, profile.phone_number);
+          const userName = profile?.full_name || req.user.user_metadata?.full_name || req.user.user_metadata?.name;
+          const claimed = await ProductModel.autoClaimByPhone(req.user.id, userName, userPhone);
           if (claimed.length > 0) {
             logger.rowUpdated('products', 'auto-claim', { userId: req.user.id, count: claimed.length });
           }

@@ -101,42 +101,78 @@ class ProductModel {
   }
 
   /**
-   * Auto-link every unclaimed product (activated on the public scan page, no
-   * account attached yet) whose registered owner phone matches this user's
-   * account phone number — no activation code needed, purely phone-based
-   * (replaces the old manual code+phone claim flow).
+   * Auto-link every unclaimed or phone-assigned product whose registered owner phone
+   * matches this user's account phone number — robust matching across all phone fields.
    */
   static async autoClaimByPhone(userId, userName, phone) {
     const suppliedPhone = String(phone || '').replace(/\D/g, '');
     if (!suppliedPhone) return [];
 
-    const { data, error } = await supabaseAdmin
-      .from('products')
-      .select(LIST_SELECT)
-      .is('user_id', null);
+    const isPhoneMatch = (p1, p2) => {
+      if (!p1 || !p2) return false;
+      const d1 = String(p1).replace(/\D/g, '');
+      const d2 = String(p2).replace(/\D/g, '');
+      if (!d1 || !d2) return false;
+      if (d1 === d2) return true;
+      const last10_1 = d1.length >= 10 ? d1.slice(-10) : d1;
+      const last10_2 = d2.length >= 10 ? d2.slice(-10) : d2;
+      if (last10_1.length >= 7 && last10_1 === last10_2) return true;
+      return d1.includes(d2) || d2.includes(d1);
+    };
 
-    if (error) throw error;
-
-    const matches = (data || []).filter((p) => {
-      const registeredPhone = String(p.details?.ownerPhone || '').replace(/\D/g, '');
-      return registeredPhone && (registeredPhone.includes(suppliedPhone) || suppliedPhone.includes(registeredPhone));
-    });
-
-    const claimed = [];
-    for (const p of matches) {
-      const { data: updated, error: claimError } = await supabaseAdmin
-        .from('products')
-        .update({ user_id: userId, assigned_to: userName || 'Self' })
-        .eq('id', p.id)
-        .select(LIST_SELECT)
-        .single();
-      if (claimError) {
-        console.error(`ProductModel.autoClaimByPhone: failed to claim ${p.id}`, claimError);
-        continue;
+    try {
+      // Query products that either have no user_id or have a user_id different from this user
+      let query = supabaseAdmin.from('products').select(LIST_SELECT);
+      if (userId) {
+        query = query.or(`user_id.is.null,user_id.neq.${userId}`);
+      } else {
+        query = query.is('user_id', null);
       }
-      claimed.push(updated);
+
+      let { data, error } = await query;
+      if (error) {
+        // Fallback query if PostgREST OR syntax fails
+        const res = await supabaseAdmin.from('products').select(LIST_SELECT).is('user_id', null);
+        data = res.data || [];
+      }
+
+      const matches = (data || []).filter((p) => {
+        const candidatePhones = [
+          p.details?.ownerPhone,
+          p.details?.phone,
+          p.details?.phoneNumber,
+          p.details?.owner_phone,
+          p.assigned_to,
+          p.vehicle_number,
+        ].filter(Boolean);
+        if (Array.isArray(p.details?.emergencyContacts)) {
+          for (const c of p.details.emergencyContacts) {
+            if (c?.phone) candidatePhones.push(c.phone);
+          }
+        }
+        return candidatePhones.some((cp) => isPhoneMatch(cp, suppliedPhone));
+      });
+
+      const claimed = [];
+      for (const p of matches) {
+        const newAssigned = (userName && userName !== 'Self') ? userName : (p.assigned_to && p.assigned_to !== 'Self' ? p.assigned_to : 'Self');
+        const { data: updated, error: claimError } = await supabaseAdmin
+          .from('products')
+          .update({ user_id: userId, assigned_to: newAssigned })
+          .eq('id', p.id)
+          .select(LIST_SELECT)
+          .single();
+        if (claimError) {
+          console.error(`ProductModel.autoClaimByPhone: failed to claim ${p.id}`, claimError);
+          continue;
+        }
+        claimed.push(updated);
+      }
+      return claimed;
+    } catch (err) {
+      console.error('ProductModel.autoClaimByPhone Error:', err);
+      return [];
     }
-    return claimed;
   }
 
   static async getById(productId) {

@@ -1,26 +1,23 @@
 import type React from "react";
 import { useState, useEffect } from "react";
-import { Plus, Sparkles, Download, Trash2, RefreshCw, Eye, UserPlus, Tag, Phone } from "lucide-react";
+import { Plus, Sparkles, Download, Trash2, RefreshCw, Tag, Phone, ChevronLeft, ChevronRight } from "lucide-react";
 import StatusPill from "./StatusPill";
-import IdBadge from "./ActCode";
-import CopyLinkButton from "./CopyLinkButton";
 import StickerThumb from "./StickerThumb";
-import { QrRecord, Template } from "./types";
+import { QrRecord, Template, StickerPos } from "./types";
 import { uid, qrFullUrl, fmtDate, dispatchActivationToUserDashboard, saveGeneratedSticker } from "./helpers";
-import { saveQrCodeToDb, bulkSaveQrCodesToDb } from "../../../lib/supabaseService";
+import { saveQrCodeToDb, bulkSaveQrCodesToDb, deleteQrCodeFromDb, deleteAllQrCodesFromDb } from "../../../lib/supabaseService";
 import { STICKER_CATEGORIES, getCategoryIcon, getCategoryLabel } from "../../../stickerModules";
 import ConfirmModal from "./ConfirmModal";
+import QrRowActions from "./QrRowActions";
 
 export default function QrCodesPage({
-  qrList, setQrList, templates, setToast, openQuickLook, openRestore, searchQuery,
+  qrList, setQrList, templates, setToast, openQuickLook, openRestore, searchQuery, stickerPos,
 }: {
   qrList: QrRecord[]; setQrList: React.Dispatch<React.SetStateAction<QrRecord[]>>;
   templates: Template[]; setToast: (msg: string | null) => void;
   openQuickLook: (q: QrRecord) => void; openRestore: () => void; searchQuery: string;
+  stickerPos: StickerPos;
 }) {
-  const [templateId, setTemplateId] = useState(
-    templates.find((t) => t.isPublicDefault)?.id?.toString() || templates[0]?.id?.toString() || ""
-  );
   const [selectedCategory, setSelectedCategory] = useState<string>("car");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [tab, setTab] = useState("single");
@@ -28,15 +25,8 @@ export default function QrCodesPage({
   const [bulkProgress, setBulkProgress] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<QrRecord | null>(null);
   const [clearAllOpen, setClearAllOpen] = useState(false);
-
-  useEffect(() => {
-    if (templates.length > 0 && !templates.find((t) => t.id.toString() === templateId)) {
-      const def = templates.find((t) => t.isPublicDefault) || templates[0];
-      setTemplateId(def.id.toString());
-    }
-  }, [templates]);
-
-  const activeTemplate = templates.find((t) => t.id.toString() === templateId) || templates[0];
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
 
   const filtered = qrList.filter((q) => {
     const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
@@ -44,10 +34,23 @@ export default function QrCodesPage({
       q.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       phoneNum.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (q.category || "").toLowerCase().includes(searchQuery.toLowerCase());
-      
+
     const matchesCategory = categoryFilter === "all" || (q.category || "car") === categoryFilter;
     return matchesSearch && matchesCategory;
   });
+
+  // Reset to page 1 whenever the visible set changes shape (new search/filter,
+  // or the current page was deleted out from under the list) — otherwise the
+  // table can land on a page past the end and render nothing.
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, categoryFilter]);
+
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   function buildQrRecord(targetCategory: string): QrRecord {
     const codeId = uid();
@@ -58,10 +61,10 @@ export default function QrCodesPage({
       createdAt: new Date().toISOString(),
       scans: 0,
       status: "inactive",
-      template: activeTemplate?.name || "Default",
+      template: "Standard Tag",
       category: targetCategory,
-      fg: activeTemplate?.fg || "EAB308",
-      bg: activeTemplate?.bg || "FFFFFF",
+      fg: "000000",
+      bg: "FFFFFF",
     };
   }
 
@@ -72,13 +75,12 @@ export default function QrCodesPage({
     setQrList((prev) => [rec, ...prev]);
     saveQrCodeToDb({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, category: rec.category, fgColor: rec.fg, bgColor: rec.bg });
 
-    // Sticker image composite + upload runs in the background — it involves a remote
-    // QR image fetch, canvas encoding, and a Supabase Storage upload, so awaiting it
-    // here made the "Generate" button hang instead of updating the list immediately.
-    const stickerPos = activeTemplate?.stickerPos || { x: 110, y: 40, w: 100, h: 100 };
+    // Uses the admin's actual saved placement (Customize > Sticker Placement) instead
+    // of a hardcoded box — otherwise the image uploaded to the bucket never matched
+    // whatever position/size the admin had customized and saved there.
     saveGeneratedSticker(rec, stickerPos);
 
-    setToast(`Generated 1 ${rec.category || "Car"} Sticker`);
+    setToast(`Generated 1 ${rec.category || "Car"} Tag`);
     setTimeout(() => setToast(null), 3000);
   }
 
@@ -103,118 +105,101 @@ export default function QrCodesPage({
 
     batch.forEach((item) => dispatchActivationToUserDashboard(item));
     setBulkProgress(null);
-    setToast(`${count} QR codes generated & sent to User Dashboard`);
+    setToast(`${count} QR codes generated & synced`);
     setTimeout(() => setToast(null), 3000);
   }
 
   function downloadCsv() {
     const rows = [
-      ["QR ID", "Phone Number", "Category", "Status", "Template", "Created"],
+      ["QR ID", "Phone Number", "Category", "Status", "Created"],
       ...qrList.map((q) => {
         const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
         const isActivated = Boolean(phoneNum && phoneNum.trim());
         const computedStatus = isActivated ? "active" : q.status;
-        return [q.id, phoneNum || "N/A", q.category || "car", computedStatus, q.template, fmtDate(q.createdAt)];
+        return [q.id, phoneNum || "N/A", q.category || "car", computedStatus, fmtDate(q.createdAt)];
       }),
     ];
     const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "repiqr-export.csv";
+    a.download = "tagyard-fleet-export.csv";
     a.click();
   }
 
-  const inputCls = "w-full px-3.5 py-2.5 text-sm rounded-xl border bg-gray-50 outline-none focus:bg-white focus:border-gray-400 transition-all font-semibold text-gray-900";
+  const inputCls = "w-full px-3 py-2.5 text-[13.5px] rounded-[4px] border border-[#E5E5E7] bg-white text-[#17181A] outline-none focus:border-[#5C78DF] focus:ring-2 focus:ring-[#5C78DF]/25 transition-all font-body";
 
   return (
-    <div className="px-8 pt-7 pb-10 space-y-6 text-gray-900">
-      {/* Generate card */}
-      <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: "#f0f0f0" }}>
-        <div className="flex items-center gap-1 px-6 pt-5 pb-0">
-          {[{ id: "single", label: "Single QR" }, { id: "bulk", label: "Bulk Generate" }].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className="px-4 py-1.5 text-xs font-bold rounded-full mr-1 transition-all cursor-pointer"
-              style={
-                tab === t.id
-                  ? { background: "var(--accent)", color: "#fff" }
-                  : { background: "#f3f4f6", color: "#64748b" }
-              }
-            >
-              {t.label}
-            </button>
-          ))}
+    <div className="px-8 pt-7 pb-16 space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
+      {/* ── Section Header ────────────────────────────────────────── */}
+      <div className="flex items-baseline justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="font-display text-[28px] font-bold text-[#17181A] leading-tight tracking-[-0.8px]">
+            Tag generator
+          </h1>
+          <p className="text-[13px] text-[#777B80] mt-0.5">
+            Stamp a new tag for a single asset, or run a full sheet
+          </p>
         </div>
+      </div>
 
-        {tab === "single" ? (
-          <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">
-                Sticker Category
-              </label>
-              <select 
-                value={selectedCategory} 
-                onChange={(e) => setSelectedCategory(e.target.value)} 
-                className={inputCls} 
-                style={{ borderColor: "#e2e8f0" }}
-              >
-                {STICKER_CATEGORIES.map((cat) => (
-                  <option key={cat.value} value={cat.value}>
-                    {cat.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">
-                Template
-              </label>
-              <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className={inputCls} style={{ borderColor: "#e2e8f0" }}>
-                {templates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.isPublicDefault ? " (default)" : ""}</option>)}
-              </select>
-            </div>
-            <div className="flex items-end">
+      {/* ── Generator Console Card ───────────────────────────────── */}
+      <div className="bg-white border border-[#E5E5E7] shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-6 overflow-hidden">
+        <div className="flex flex-wrap items-end gap-6">
+          {/* Mode Switcher */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-body font-semibold uppercase tracking-[1px] text-[#777B80]">
+              Mode
+            </label>
+            <div className="flex bg-[#F7F7F8] border border-[#E5E5E7] rounded-[4px] p-1">
               <button
-                onClick={handleGenerateSingle}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-all hover:opacity-90 active:scale-95 cursor-pointer shadow-sm"
-                style={{ background: "var(--accent)" }}
+                type="button"
+                onClick={() => setTab("single")}
+                className={`px-4 py-2 text-[13px] font-semibold rounded-[4px] transition-all cursor-pointer ${
+                  tab === "single"
+                    ? "bg-white text-[#17181A] font-bold shadow-[0_1px_4px_rgba(0,0,0,0.03)]"
+                    : "text-[#777B80] hover:text-[#17181A]"
+                }`}
               >
-                <Plus size={14} /> Generate Sticker
+                Single tag
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("bulk")}
+                className={`px-4 py-2 text-[13px] font-semibold rounded-[4px] transition-all cursor-pointer ${
+                  tab === "bulk"
+                    ? "bg-white text-[#17181A] font-bold shadow-[0_1px_4px_rgba(0,0,0,0.03)]"
+                    : "text-[#777B80] hover:text-[#17181A]"
+                }`}
+              >
+                Bulk sheet
               </button>
             </div>
           </div>
-        ) : (
-          <div className="p-6 grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">
-                Sticker Category
-              </label>
-              <select 
-                value={selectedCategory} 
-                onChange={(e) => setSelectedCategory(e.target.value)} 
-                className={inputCls} 
-                style={{ borderColor: "#e2e8f0" }}
-              >
-                {STICKER_CATEGORIES.map((cat) => (
-                  <option key={cat.value} value={cat.value}>
-                    {cat.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">
-                Template
-              </label>
-              <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className={inputCls} style={{ borderColor: "#e2e8f0" }}>
-                {templates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.isPublicDefault ? " (default)" : ""}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 mb-1.5 uppercase tracking-wider">
-                Quantity (1–200)
+
+          {/* Category Dropdown */}
+          <div className="flex-1 min-w-[200px] flex flex-col gap-1.5">
+            <label className="text-[11px] font-body font-semibold uppercase tracking-[1px] text-[#777B80]">
+              Sticker category
+            </label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className={inputCls}
+            >
+              {STICKER_CATEGORIES.map((cat) => (
+                <option key={cat.value} value={cat.value}>
+                  {cat.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Quantity Selector (if bulk) */}
+          {tab === "bulk" && (
+            <div className="w-[120px] flex flex-col gap-1.5">
+              <label className="text-[11px] font-body font-semibold uppercase tracking-[1px] text-[#777B80]">
+                Quantity
               </label>
               <input
                 type="number"
@@ -223,153 +208,200 @@ export default function QrCodesPage({
                 value={bulkCount}
                 onChange={(e) => setBulkCount(parseInt(e.target.value) || 1)}
                 className={inputCls}
-                style={{ borderColor: "#e2e8f0" }}
               />
             </div>
-            <div className="flex items-end">
+          )}
+
+          {/* Generate Button */}
+          <div className="ml-auto sm:ml-0">
+            {tab === "single" ? (
+              <button
+                onClick={handleGenerateSingle}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[4px] bg-[#5C78DF] text-white font-semibold text-[13px] hover:bg-[#4A63C0] active:scale-95 transition-all cursor-pointer"
+              >
+                <Plus size={16} strokeWidth={2.4} /> Generate tag
+              </button>
+            ) : (
               <button
                 onClick={handleGenerateBulk}
                 disabled={bulkProgress !== null}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm"
-                style={{ background: "var(--accent)" }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[4px] bg-[#5C78DF] text-white font-semibold text-[13px] hover:bg-[#4A63C0] active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
               >
-                <Sparkles size={14} /> Generate {bulkCount} Stickers
+                <Sparkles size={16} strokeWidth={2.4} /> Generate {bulkCount} tags
               </button>
-            </div>
-          </div>
-        )}
-        {bulkProgress !== null && (
-          <div className="px-6 pb-4">
-            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-              <div className="h-full transition-all duration-200" style={{ width: `${bulkProgress}%`, background: "var(--accent)" }} />
-            </div>
-            <p className="text-xs text-gray-600 mt-1 font-semibold text-right">{bulkProgress}% saved to cloud DB...</p>
-          </div>
-        )}
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: "#f0f0f0" }}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 py-4 border-b gap-3" style={{ borderColor: "#f7f7f7" }}>
-          <div className="flex items-center gap-3">
-            <h3 className="font-bold text-gray-900 text-sm">
-              All QR Codes <span className="text-gray-500 font-normal">· {filtered.length}</span>
-            </h3>
-            
-            {/* Category Filter Pills */}
-            <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200">
-              <Tag size={12} className="text-gray-400 ml-1.5" />
-              <select 
-                value={categoryFilter} 
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer pr-1"
-              >
-                <option value="all">All Categories</option>
-                {STICKER_CATEGORIES.map((cat) => (
-                  <option key={cat.value} value={cat.value}>
-                    {cat.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button onClick={openRestore} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition-all hover:bg-yellow-50 cursor-pointer" style={{ color: "var(--accent)", borderColor: "rgba(234,179,8,0.3)" }}>
-              <RefreshCw size={12} /> Restore
-            </button>
-            <button onClick={downloadCsv} disabled={qrList.length === 0} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all disabled:opacity-40 cursor-pointer">
-              <Download size={12} /> Export CSV
-            </button>
-            <button onClick={() => setClearAllOpen(true)} disabled={qrList.length === 0} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 transition-all disabled:opacity-40 cursor-pointer">
-              <Trash2 size={12} /> Clear all
-            </button>
+            )}
           </div>
         </div>
 
-        {filtered.length === 0 ? (
-          <div className="px-6 py-14 text-center">
-            <p className="text-sm font-semibold text-gray-700">{searchQuery || categoryFilter !== "all" ? "No results match your search or filter." : "No QR codes yet — generate one above."}</p>
-            {(searchQuery || categoryFilter !== "all") && <p className="text-xs text-gray-500 mt-1 font-medium">Try adjusting your category filter or search query.</p>}
+        {bulkProgress !== null && (
+          <div className="mt-4 pt-3 border-t border-[#E5E5E7]">
+            <div className="w-full bg-[#F3F3F4] rounded-[4px] h-2 overflow-hidden border border-[#E5E5E7]">
+              <div
+                className="h-full bg-[#5C78DF] transition-all duration-200"
+                style={{ width: `${bulkProgress}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-[#777B80] mt-1 text-right font-bold">
+              {bulkProgress}% synced to fleet database...
+            </p>
           </div>
-        ) : (
-          <>
-            <table className="w-full text-sm text-gray-900">
-              <thead>
-                <tr className="text-left text-[11px] text-gray-500 font-bold uppercase tracking-wider border-b" style={{ borderColor: "#f7f7f7" }}>
-                  <th className="px-6 py-3">QR</th>
-                  <th className="px-2 py-3">PHONE NUMBER</th>
-                  <th className="px-2 py-3">Category</th>
-                  <th className="px-2 py-3">Created</th>
-                  <th className="px-2 py-3">Status</th>
-                  <th className="px-6 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.slice(0, 60).map((q) => {
-                  const catKey = (q.category || "car") as any;
-                  const icon = getCategoryIcon(catKey);
-                  const label = getCategoryLabel(catKey);
-                  const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
-                  const isActivated = Boolean(phoneNum && phoneNum.trim());
-                  const computedStatus = isActivated ? "active" : q.status;
-
-                  return (
-                    <tr key={q.id} className="border-b last:border-0 hover:bg-gray-50/60 transition-colors" style={{ borderColor: "#f7f7f7" }}>
-                      <td className="px-6 py-3">
-                        <button onClick={() => openQuickLook(q)} className="hover:opacity-80 transition-opacity cursor-pointer">
-                          <StickerThumb qr={q} templates={templates} size={36} />
-                        </button>
-                      </td>
-                      <td className="px-2 py-3">
-                        {isActivated ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-950 border border-amber-200/80 shadow-2xs">
-                            <Phone size={12} className="text-amber-600 flex-shrink-0" />
-                            <span>{phoneNum}</span>
-                          </span>
-                        ) : (
-                          <span className="text-gray-300 font-medium text-xs">—</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-3">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-800 border border-gray-200">
-                          <span>{icon}</span>
-                          <span>{label}</span>
-                        </span>
-                      </td>
-                      <td className="px-2 py-3 text-[11px] text-gray-600 font-semibold">{fmtDate(q.createdAt)}</td>
-                      <td className="px-2 py-3"><StatusPill status={computedStatus} /></td>
-                      <td className="px-6 py-3">
-                        <div className="flex items-center justify-end gap-0.5">
-                          <button
-                            onClick={() => { dispatchActivationToUserDashboard(q); setToast(`${q.id} dispatched`); setTimeout(() => setToast(null), 2000); }}
-                            className="w-7 h-7 rounded-lg hover:bg-yellow-50 hover:text-yellow-600 flex items-center justify-center text-gray-500 transition-all cursor-pointer"
-                            title="Dispatch to user"
-                          >
-                            <UserPlus size={13} />
-                          </button>
-                          <CopyLinkButton qrId={q.id} compact />
-                          <button onClick={() => openQuickLook(q)} className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 transition-all cursor-pointer" title="Quick look">
-                            <Eye size={13} />
-                          </button>
-                          <button onClick={() => setDeleteTarget(q)} className="w-7 h-7 rounded-lg hover:bg-red-50 hover:text-red-500 flex items-center justify-center text-gray-400 transition-all cursor-pointer" title="Delete QR">
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {filtered.length > 60 && (
-              <div className="px-6 py-3 text-xs text-gray-500 font-medium border-t" style={{ borderColor: "#f7f7f7" }}>
-                Showing latest 60 of {filtered.length} — export CSV for the full list.
-              </div>
-            )}
-          </>
         )}
       </div>
+
+      {/* ── Toolbar Header ────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-baseline gap-3">
+          <h2 className="font-display text-[14px] font-semibold text-[#17181A]">
+            All tags
+          </h2>
+          <span className="text-[12px] text-[#777B80]">
+            · {filtered.length}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Category Filter */}
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="bg-white border border-[#E5E5E7] rounded-[4px] px-3 py-2 text-[13px] text-[#17181A] outline-none cursor-pointer focus:border-[#5C78DF]"
+          >
+            <option value="all">All categories</option>
+            {STICKER_CATEGORIES.map((cat) => (
+              <option key={cat.value} value={cat.value}>
+                {cat.label}
+              </option>
+            ))}
+          </select>
+
+          <button
+            onClick={openRestore}
+            className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-2 rounded-[4px] border border-[#E5E5E7] bg-white text-[#17181A] hover:bg-[#F7F7F8] transition-all cursor-pointer"
+          >
+            <RefreshCw size={12} /> Restore Tag
+          </button>
+
+          <button
+            onClick={downloadCsv}
+            disabled={qrList.length === 0}
+            className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-2 rounded-[4px] border border-[#E5E5E7] bg-white text-[#17181A] hover:bg-[#F7F7F8] transition-all disabled:opacity-40 cursor-pointer"
+          >
+            <Download size={12} /> Export CSV
+          </button>
+
+          <button
+            onClick={() => setClearAllOpen(true)}
+            disabled={qrList.length === 0}
+            className="inline-flex items-center gap-1.5 text-[12px] font-bold px-3 py-2 rounded-[4px] border border-[#DC2626]/20 text-[#DC2626] hover:bg-[#FDEAEA] transition-all disabled:opacity-40 cursor-pointer"
+          >
+            <Trash2 size={12} /> Clear all
+          </button>
+        </div>
+      </div>
+
+      {/* ── Table View ────────────────────────────────────────────── */}
+      {filtered.length === 0 ? (
+        <div className="bg-white border border-[#E5E5E7] p-16 text-center space-y-2">
+          <div className="w-12 h-12 rounded-[4px] bg-[#E8EDFF] text-[#5271D5] flex items-center justify-center mx-auto">
+            <Tag size={22} />
+          </div>
+          <p className="text-[14px] text-[#17181A] font-semibold">
+            {searchQuery || categoryFilter !== "all"
+              ? "No tags match that filter or search."
+              : "No QR codes yet — generate one using the console above."}
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white border border-[#E5E5E7] shadow-[0_1px_4px_rgba(0,0,0,0.03)] overflow-hidden">
+          <table className="w-full text-sm text-[#17181A]">
+            <thead>
+              <tr className="text-left font-display text-[12px] font-semibold text-[#777B80] tracking-normal bg-[#F7F7F8] border-b border-[#E5E5E7]">
+                <th className="px-6 py-3">QR Plate</th>
+                <th className="px-2 py-3">Phone number</th>
+                <th className="px-2 py-3">Category</th>
+                <th className="px-2 py-3">Created</th>
+                <th className="px-2 py-3">Status</th>
+                <th className="px-6 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E5E5E7]">
+              {paginated.map((q) => {
+                const catKey = (q.category || "car") as any;
+                const icon = getCategoryIcon(catKey);
+                const label = getCategoryLabel(catKey);
+                const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
+                const isActivated = Boolean(phoneNum && phoneNum.trim());
+                const computedStatus = isActivated ? "active" : q.status;
+
+                return (
+                  <tr key={q.id} className="hover:bg-[#F3F3F4] transition-colors">
+                    <td className="px-6 py-3">
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => openQuickLook(q)} className="hover:opacity-80 transition-opacity cursor-pointer">
+                          <StickerThumb qr={q} size={34} />
+                        </button>
+                        <span className="font-display font-semibold text-[15px] text-[#17181A]">
+                          {q.id}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-2 py-3">
+                      {isActivated ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-[#E9F9EF] text-[#2E9E5B] font-semibold text-xs">
+                          <Phone size={12} className="text-[#2E9E5B]" />
+                          <span>{phoneNum}</span>
+                        </span>
+                      ) : (
+                        <span className="text-[#9CA0A6] font-normal text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-3">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-[#E8EDFF] text-[#5271D5] font-semibold text-xs">
+                        <span>{icon}</span>
+                        <span>{label}</span>
+                      </span>
+                    </td>
+                    <td className="px-2 py-3 text-[11px] text-[#777B80]">{fmtDate(q.createdAt)}</td>
+                    <td className="px-2 py-3"><StatusPill status={computedStatus} /></td>
+                    <td className="px-6 py-3 text-right">
+                      <QrRowActions qr={q} openQuickLook={openQuickLook} setDeleteTarget={setDeleteTarget} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* ── Pagination ────────────────────────────────────────── */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-4 px-6 py-3 border-t border-[#E5E5E7] bg-[#F7F7F8]">
+              <p className="text-[12px] text-[#777B80]">
+                Showing <span className="font-semibold text-[#17181A]">{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)}</span> of{" "}
+                <span className="font-semibold text-[#17181A]">{filtered.length}</span>
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="inline-flex items-center gap-1 text-[12px] font-semibold px-3 py-1.5 rounded-[4px] border border-[#E5E5E7] bg-white text-[#17181A] hover:bg-[#F3F3F4] disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                >
+                  <ChevronLeft size={14} /> Prev
+                </button>
+                <span className="text-[12px] text-[#777B80] font-semibold px-1">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="inline-flex items-center gap-1 text-[12px] font-semibold px-3 py-1.5 rounded-[4px] border border-[#E5E5E7] bg-white text-[#17181A] hover:bg-[#F3F3F4] disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                >
+                  Next <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Delete confirmations */}
       <ConfirmModal
@@ -377,14 +409,29 @@ export default function QrCodesPage({
         title="Delete QR Sticker?"
         message={
           <>
-            Are you sure you want to delete <span className="font-bold text-gray-900">{deleteTarget?.id}</span>?
+            Are you sure you want to delete <span className="font-bold text-[#17181A]">{deleteTarget?.id}</span>?
             This cannot be undone.
           </>
         }
-        onConfirm={() => {
+        onConfirm={async () => {
           if (deleteTarget) {
-            setQrList((prev) => prev.filter((x) => x.id !== deleteTarget.id));
-            setToast("QR deleted");
+            const targetId = deleteTarget.id;
+            setDeleteTarget(null);
+            const deleted = await deleteQrCodeFromDb(targetId);
+            if (!deleted) {
+              setToast(`Failed to delete ${targetId} — it still exists in the database. Please try again.`);
+              setTimeout(() => setToast(null), 3000);
+              return;
+            }
+            setQrList((prev) => {
+              const updated = prev.filter((x) => x.id !== targetId);
+              try {
+                localStorage.setItem("repiqr-qrlist", JSON.stringify(updated));
+                localStorage.setItem("namoqr-qrlist", JSON.stringify(updated));
+              } catch { /* ignore */ }
+              return updated;
+            });
+            setToast("QR deleted from database");
             setTimeout(() => setToast(null), 1500);
           }
         }}
@@ -395,14 +442,25 @@ export default function QrCodesPage({
         title="Clear all QR stickers?"
         message={
           <>
-            Are you sure you want to delete all <span className="font-bold text-gray-900">{qrList.length}</span> QR codes?
+            Are you sure you want to delete all <span className="font-bold text-[#17181A]">{qrList.length}</span> QR codes?
             This cannot be undone.
           </>
         }
         confirmLabel="Clear All"
-        onConfirm={() => {
+        onConfirm={async () => {
+          setClearAllOpen(false);
+          const deleted = await deleteAllQrCodesFromDb();
+          if (!deleted) {
+            setToast("Failed to clear QR codes from the database. Please try again.");
+            setTimeout(() => setToast(null), 3000);
+            return;
+          }
           setQrList([]);
-          setToast("All QR codes cleared");
+          try {
+            localStorage.removeItem("repiqr-qrlist");
+            localStorage.removeItem("namoqr-qrlist");
+          } catch { /* ignore */ }
+          setToast("All QR codes cleared from database");
           setTimeout(() => setToast(null), 1500);
         }}
         onClose={() => setClearAllOpen(false)}

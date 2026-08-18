@@ -3,14 +3,14 @@ export default function StatusPill({ status }: { status: string }) {
   const isUnread = status === "unread" || status === "pending";
   return (
     <span
-      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide"
+      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-[4px] text-[11px] font-semibold tracking-normal capitalize"
       style={{
-        background: active ? "rgba(15,118,110,0.12)" : isUnread ? "rgba(220,38,38,0.12)" : "rgba(107,114,128,0.12)",
-        color: active ? "#0f766e" : isUnread ? "#b91c1c" : "#374151",
+        background: active ? "#E9F9EF" : isUnread ? "#FDEAEA" : "#F1F1F2",
+        color: active ? "#2E9E5B" : isUnread ? "#DC2626" : "#777B80",
       }}
     >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? "#0f766e" : isUnread ? "#dc2626" : "#6b7280" }} />
-      {status.toUpperCase()}
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? "#4FC47A" : isUnread ? "#DC2626" : "#9CA0A6" }} />
+      {status}
     </span>
   );
 }

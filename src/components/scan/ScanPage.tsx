@@ -53,14 +53,10 @@ import {
   Trash2,
   Cpu,
   Loader2,
-  BellRing
+  BellRing,
+  MessageCircle
 } from "lucide-react";
-
-const WhatsAppIcon = ({ className = "w-5 h-5 fill-current" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24">
-    <path fill="currentColor" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.096 3.2 5.077 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.99c-.002 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-  </svg>
-);
+import RepiChat, { customerTokenKey } from "../chat/RepiChat";
 
 /* ---------------------------------------------------------------------- */
 /*  Types                                                                   */
@@ -439,42 +435,57 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   const [qrData, setQrData] = useState<QrData | null>(null);
   const [location, setLocation] = useState<GeoLocation | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
-  const [alertSent, setAlertSent] = useState(false);
   const [visitorName, setVisitorName] = useState("");
   const [visitorMessage, setVisitorMessage] = useState("");
+  const [notifySms, setNotifySms] = useState(true);
+  const [notifyWhatsapp, setNotifyWhatsapp] = useState(true);
+  const [sentReceipt, setSentReceipt] = useState<{
+    sms: boolean;
+    whatsapp: boolean;
+    ownerNotified: boolean;
+    timestamp: string;
+  } | null>(null);
   const [activatingQr, setActivatingQr] = useState(false);
   const [activationError, setActivationError] = useState<string | null>(null);
   const [activeSubMenu, setActiveSubMenu] = useState<"none" | "emergency-main" | "mechanical" | "medical" | "towing" | "family" | "parking" | "headlights" | "theft" | "flat-tire">("none");
   const [towingImage, setTowingImage] = useState<string | null>(null);
   const [flatTireImage, setFlatTireImage] = useState<string | null>(null);
 
-  // Quick-issue WhatsApp/SMS dispatch (Parking / Headlights / Theft) — fired automatically
+  // Quick-issue SMS dispatch (Parking / Headlights / Theft) — fired automatically
   // the moment the visitor taps the quick-action tile, using the real backend alert route
   // (same one the "Message Vehicle Owner" box uses) so the owner is actually notified,
   // instead of the old fake localStorage + alert() popup.
   const [quickAlertStatus, setQuickAlertStatus] = useState<Record<string, { sending: boolean; sent: boolean; simulated: boolean }>>({});
 
-  // Masked calling — replaces every direct `tel:` link to the owner (or one of
-  // their emergency contacts) with a server-brokered Cloudshope anonymous
-  // call bridge. The real number is resolved server-side from qrId and never
-  // sent to, or shown in, the browser; the backend mints a DID (virtual
-  // number) mapped to the real number, and the visitor dials that DID
-  // directly — Cloudshope's telecom layer connects it, and any callback on
-  // that DID auto-connects back to this visitor.
-  const [maskedCallTarget, setMaskedCallTarget] = useState<{ label: string; contactName?: string } | null>(null);
+  // RepiChat — in-app real-time chat with the sticker owner, replacing WhatsApp deep links.
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>(undefined);
+
+  // Masked calling — replaces every direct `tel:` link, whether to the owner,
+  // one of their emergency contacts, or an admin-configured helpline provider
+  // (Ambulance, Towing, Mechanic, ...), with a server-brokered Cloudshope
+  // anonymous call bridge. The real number is resolved server-side — from
+  // qrId (+ optional contactName) or from helplineId — and never sent to, or
+  // shown in, the browser; the backend mints a DID (virtual number) mapped to
+  // the real number, and the visitor dials that DID directly — Cloudshope's
+  // telecom layer connects it, and any callback on that DID auto-connects
+  // back to this visitor. This also hides the visitor's own number from
+  // whoever they're calling, business helplines included.
+  const [maskedCallTarget, setMaskedCallTarget] = useState<{ label: string; contactName?: string; helplineId?: string } | null>(null);
   const [maskedCallDid, setMaskedCallDid] = useState<string | null>(null);
   const [maskedCallBusy, setMaskedCallBusy] = useState(false);
   const [maskedCallError, setMaskedCallError] = useState<string | null>(null);
 
-  const fetchMaskedCallNumber = async (target: { label: string; contactName?: string }) => {
-    if (!qrData) return;
+  const fetchMaskedCallNumber = async (target: { label: string; contactName?: string; helplineId?: string }) => {
+    if (!qrData && !target.helplineId) return;
     setMaskedCallBusy(true);
     setMaskedCallError(null);
     setMaskedCallDid(null);
     try {
       const res = await apiClient.cloudshope.getCallNumber({
-        qrId: qrData.id,
+        qrId: qrData?.id,
         contactName: target.contactName,
+        helplineId: target.helplineId,
       });
       if (res.success && res.did) {
         setMaskedCallDid(res.did);
@@ -488,22 +499,57 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     }
   };
 
-  const openMaskedCall = (label: string, contactName?: string) => {
-    const target = { label, contactName };
+  const openMaskedCall = (label: string, contactName?: string, helplineId?: string) => {
+    const target = { label, contactName, helplineId };
     setMaskedCallTarget(target);
     setMaskedCallDid(null);
     setMaskedCallError(null);
     fetchMaskedCallNumber(target);
   };
 
-  // Manual full-colored WhatsApp alert dispatch for all features
-  const sendWhatsAppAlertManually = async (alertType: string, defaultMessage: string, targetPhone?: string) => {
-    if (!qrData) return;
-    const phoneToUse = targetPhone || (qrData as any).ownerPhone || (qrData as any).phone || (getTowingContacts().find((c) => c.primary)?.phone) || (getTowingContacts()[0]?.phone) || "";
-    const locationText = location ? `\n📍 Location: https://www.google.com/maps?q=${location.lat},${location.lng}` : "";
-    const fullMessage = `*RapiQR Alert: ${alertType}*\n🚗 Vehicle: ${qrData.vehicleName} (${qrData.vehicleNumber})\n\n💬 Message: ${defaultMessage}${locationText}`;
+  // Admin-configured helplines (Ambulance, Towing, Mechanic, ...), fetched from
+  // the backend so they work for a genuine first-time visitor — the old
+  // localStorage-only read (namoqr-helplines) only ever had data on the admin's
+  // own browser. Seeded from localStorage for an instant first paint, then
+  // replaced by the real fetch.
+  const [helplines, setHelplines] = useState<any[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("repiqr-helplines") || localStorage.getItem("namoqr-helplines") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    apiClient.helplines.getPublic().then((res) => {
+      if (res.success && Array.isArray(res.data)) setHelplines(res.data);
+    }).catch(() => { /* keep the localStorage-seeded list on failure */ });
+  }, []);
 
-    // Send backend log
+  // The customer side of RepiChat has no account — it's identified by an opaque
+  // token held in localStorage per QR id, the same one <RepiChat/> bootstraps
+  // with. Resolving/minting it here lets a quick-issue alert land in the exact
+  // same thread the visitor sees when the chat panel opens.
+  const getChatCustomerToken = useCallback(() => {
+    if (!qrData) return undefined;
+    const key = customerTokenKey(qrData.id);
+    let token = localStorage.getItem(key);
+    if (!token) {
+      token = crypto.randomUUID();
+      localStorage.setItem(key, token);
+    }
+    return token;
+  }, [qrData]);
+
+  // Quick-issue alert dispatch (Towing / Parking / Headlights / Theft / Flat Tyre):
+  // still SMS-blasts the owner + emergency contacts via the backend alert route
+  // (safety-critical, works even if the owner is offline), and now also lands
+  // the alert as a message in the visitor's RepiChat thread instead of opening
+  // a WhatsApp deep link.
+  const sendQuickIssueAlert = async (alertType: string, defaultMessage: string) => {
+    if (!qrData) return;
+    const locationText = location ? `\n📍 Location: https://www.google.com/maps?q=${location.lat},${location.lng}` : "";
+    const fullMessage = `RapiQR Alert: ${alertType}\nVehicle: ${qrData.vehicleName} (${qrData.vehicleNumber})\n\n${defaultMessage}${locationText}`;
+
     try {
       await apiClient.alerts.createAlert({
         qrId: qrData.id,
@@ -516,17 +562,27 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         message: fullMessage,
         vehicleName: qrData.vehicleName,
         vehicleNumber: qrData.vehicleNumber,
+        customerToken: getChatCustomerToken(),
+        // Roadside-assistance tiles (towing/parking/headlights/theft/flat tyre) are
+        // real reports but NOT the SOS/accident signal — tagged distinctly so the
+        // admin Alerts feed doesn't conflate them with true emergencies.
+        type: alertType.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""),
       });
     } catch {
       /* ignore non-critical backend logger failure */
     }
 
-    // Launch WhatsApp
-    const cleanPhone = phoneToUse.replace(/[^0-9]/g, "");
-    const url = cleanPhone
-      ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(fullMessage)}`
-      : `https://api.whatsapp.com/send?text=${encodeURIComponent(fullMessage)}`;
-    window.open(url, "_blank");
+    setChatInitialMessage(undefined);
+    setChatOpen(true);
+  };
+
+  // "Message Vehicle Owner" free-text card — opens RepiChat and sends the
+  // typed message directly, no SMS fan-out (that's reserved for the
+  // safety-critical quick-issue tiles above).
+  const openChatWithMessage = (message: string) => {
+    if (!qrData) return;
+    setChatInitialMessage(message);
+    setChatOpen(true);
   };
 
   // Registration form fields (after activation code is validated)
@@ -572,11 +628,16 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   const [buyerPhone, setBuyerPhone] = useState("");
   const [phoneMatchesBuyer, setPhoneMatchesBuyer] = useState(false);
 
-  // OTP verification step state (two-step activation flow)
+  // OTP verification step state (two-step activation flow) — sends a real
+  // Twilio SMS via the backend (POST /api/qr/:id/send-activation-otp) instead
+  // of the old hardcoded "0000". On a Twilio trial account, delivery only
+  // succeeds to Caller-ID-verified numbers; "000000" is the master bypass
+  // code (Server/services/phoneVerificationService.js) for testing when a
+  // number isn't verified or Twilio credentials aren't configured.
   const [otpStep, setOtpStep] = useState(false);
   const [otpInput, setOtpInput] = useState("");
-  // Testing purposes: OTP is fixed to "0000" until real SMS delivery is wired up.
-  const [generatedOtp, setGeneratedOtp] = useState("0000");
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpSimulated, setOtpSimulated] = useState(false);
 
   function isValidPhoneNumber(phone: string) {
     return /^\d{10}$/.test(phone.replace(/\D/g, ""));
@@ -610,8 +671,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     );
   }, [regPhone, buyerPhone]);
 
-  const handleSendOtp = () => {
-    if (!qrData) return;
+  const handleSendOtp = async () => {
+    if (!qrData || otpSending) return;
     setActivationError(null);
 
     if (!regName.trim()) {
@@ -629,23 +690,43 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       return;
     }
 
-    // Demo OTP — a real integration would send this via SMS.
-    setGeneratedOtp("0000");
-    setOtpInput("");
-    setActivationError(null);
-    setOtpStep(true);
+    const fullPhone = `${regCountry}${regPhone.trim().replace(/\s+/g, "")}`;
+
+    setOtpSending(true);
+    try {
+      const res = await apiClient.qr.sendActivationOtp(qrData.id, fullPhone);
+      if (!res.success) {
+        setActivationError(res.error || "Couldn't send the verification code — try again.");
+        return;
+      }
+      setOtpSimulated(Boolean(res.simulated));
+      setOtpInput("");
+      setActivationError(null);
+      setOtpStep(true);
+    } catch (err: any) {
+      setActivationError(err?.message || "Couldn't reach the server — try again.");
+    } finally {
+      setOtpSending(false);
+    }
   };
 
-  const handleVerifyOtpAndActivate = () => {
-    if (!qrData) return;
+  const handleVerifyOtpAndActivate = async () => {
+    if (!qrData || activatingQr) return;
     setActivationError(null);
 
-    if (otpInput.trim() !== generatedOtp) {
-      setActivationError("Invalid code. Please try again.");
-      return;
+    setActivatingQr(true);
+    try {
+      const res = await apiClient.qr.verifyActivationOtp(qrData.id, otpInput.trim());
+      if (!res.success) {
+        setActivationError(res.error || "Invalid code. Please try again.");
+        return;
+      }
+      proceedToEmergencyContacts(true);
+    } catch (err: any) {
+      setActivationError(err?.message || "Couldn't reach the server — try again.");
+    } finally {
+      setActivatingQr(false);
     }
-
-    proceedToEmergencyContacts(true);
   };
 
   // Identity step is done (however it was verified) — move to the Emergency Contacts
@@ -706,6 +787,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           message: textToSend,
           vehicleName: qrData.vehicleName,
           vehicleNumber: qrData.vehicleNumber,
+          // Free-text chat message to the owner — not an emergency signal.
+          type: "contact_owner",
         };
 
         // 1. Save alert locally
@@ -763,8 +846,12 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         message: `EMERGENCY GPS LOCATION: ${mapsUrl}`,
         vehicleName: qrData.vehicleName,
         vehicleNumber: qrData.vehicleNumber,
+        customerToken: getChatCustomerToken(),
+        // Sent only from the red SOS/accident screen sharing live GPS — this IS
+        // the true emergency signal the admin Alerts feed should surface first.
+        type: "emergency",
       });
-      const notifiedOwner = Boolean(res.smsResult?.sent || res.whatsappResult?.sent);
+      const notifiedOwner = Boolean(res.smsResult?.sent);
       const contactsNotified = res.contactsNotified || 0;
       if (notifiedOwner || contactsNotified > 0) {
         setLocationShareBanner(`Location sent — owner${contactsNotified > 0 ? ` & ${contactsNotified} emergency contact${contactsNotified === 1 ? "" : "s"}` : ""} notified.`);
@@ -867,12 +954,10 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
   /* ---- Get ONLY Admin Communication Page Contacts ---- */
   const getAdminContacts = (filterCategory?: string) => {
-    const adminHelplines = JSON.parse(localStorage.getItem("namoqr-helplines") || "[]");
-    const active = adminHelplines.filter((p: any) => p.active !== false);
-    if (!filterCategory) return active.map((p: any) => ({ label: p.label, phone: p.phone, role: p.category, category: p.category }));
-    return active
-      .filter((p: any) => p.category === filterCategory)
-      .map((p: any) => ({ label: p.label, phone: p.phone, role: p.category, category: p.category }));
+    const active = helplines.filter((p: any) => p.active !== false);
+    const toContact = (p: any) => ({ id: p.id, label: p.label, phone: p.phone, role: p.category, category: p.category });
+    if (!filterCategory) return active.map(toContact);
+    return active.filter((p: any) => p.category === filterCategory).map(toContact);
   };
   const [pingsSent, setPingsSent] = useState(0);
   const maxPings = 7;
@@ -1263,7 +1348,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
             <div className="overflow-hidden rounded-2xl sm:rounded-3xl bg-white shadow-xl border border-slate-100">
 
               {/* ——— Compact Header ——— */}
-              <div className="relative bg-gradient-to-br from-yellow-300 via-amber-300 to-yellow-400 px-5 py-4">
+              <div className="relative bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 px-5 py-5">
                 <div className="flex items-center justify-center gap-2">
                   <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white/40 text-base">
                     {getCategoryIcon((qrData.category || "car") as any)}
@@ -1272,7 +1357,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                     Activate {getStickerCategoryLabel(qrData.category) || getCategoryLabel((qrData.category || "car") as any) || "Sticker"}
                   </h1>
                 </div>
-                <p className="mt-0.5 text-center text-[11px] sm:text-xs text-slate-800 font-medium">
+                <p className="mt-0.5 text-center text-[11px] sm:text-xs text-slate-900/70 font-medium">
                   Enter your details to activate this QR tag
                 </p>
                 <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/15 pointer-events-none" />
@@ -1321,7 +1406,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                         />
                       </div>
                       {phoneMatchesBuyer && (
-                        <p className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
+                        <p className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1 text-[10px] font-bold text-amber-800">
                           <CheckCircle2 size={12} />
                           Matches purchase phone — instant activation available.
                         </p>
@@ -1340,7 +1425,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       <button
                         onClick={() => proceedToEmergencyContacts(true)}
                         disabled={activatingQr}
-                        className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm transition-all active:scale-[0.99] cursor-pointer text-xs disabled:opacity-60"
+                        className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-900 font-bold shadow-sm shadow-yellow-500/20 transition-all active:scale-[0.99] cursor-pointer text-xs disabled:opacity-60"
                       >
                         {activatingQr ? (
                           <span>Activating…</span>
@@ -1351,9 +1436,10 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                     ) : (
                       <button
                         onClick={handleSendOtp}
-                        className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 text-white font-bold shadow-sm transition-all hover:bg-slate-800 active:scale-[0.99] cursor-pointer text-xs"
+                        disabled={otpSending}
+                        className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-900 font-bold shadow-sm shadow-yellow-500/20 transition-all active:scale-[0.99] cursor-pointer text-xs disabled:opacity-60"
                       >
-                        <Send size={14} /> Send OTP &amp; Verify
+                        {otpSending ? <span>Sending…</span> : <><Send size={14} /> Send OTP &amp; Verify</>}
                       </button>
                     )}
                   </>
@@ -1361,17 +1447,22 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                   /* OTP VERIFICATION STEP — title, code input, one button */
                   <div className="space-y-3 text-left">
                     <h2 className="text-center text-sm font-bold text-slate-900">OTP Verification</h2>
+                    <p className="text-center text-[10px] text-slate-400">
+                      {otpSimulated
+                        ? "SMS not configured — this code was simulated. Enter 000000 to continue."
+                        : "Enter the 6-digit code sent to your phone."}
+                    </p>
 
                     <input
                       type="text"
                       inputMode="numeric"
                       autoComplete="one-time-code"
                       autoFocus
-                      maxLength={4}
+                      maxLength={6}
                       value={otpInput}
-                      onChange={(e) => { setOtpInput(e.target.value.replace(/\D/g, "").slice(0, 4)); setActivationError(null); }}
-                      placeholder="0000"
-                      className="h-11 w-full rounded-xl border border-slate-300 px-3 text-center font-mono text-base font-bold tracking-widest outline-none focus:border-emerald-500 bg-white"
+                      onChange={(e) => { setOtpInput(e.target.value.replace(/\D/g, "").slice(0, 6)); setActivationError(null); }}
+                      placeholder="000000"
+                      className="h-11 w-full rounded-xl border border-slate-300 px-3 text-center font-mono text-base font-bold tracking-widest outline-none focus:border-amber-400 bg-white"
                     />
 
                     {activationError && (
@@ -1382,7 +1473,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       type="button"
                       onClick={handleVerifyOtpAndActivate}
                       disabled={activatingQr}
-                      className="h-10 w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm cursor-pointer disabled:opacity-50"
+                      className="h-10 w-full rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-900 font-bold text-xs shadow-sm shadow-yellow-500/20 cursor-pointer disabled:opacity-50"
                     >
                       {activatingQr ? "Activating…" : "Verify & Activate"}
                     </button>
@@ -1398,11 +1489,11 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           <div className="w-full max-w-sm sm:max-w-md mx-auto animate-fade-in">
             <div className="overflow-hidden rounded-2xl sm:rounded-3xl bg-white shadow-xl border border-slate-100">
               {/* — Compact Header — */}
-              <div className="relative bg-gradient-to-br from-amber-400 via-amber-300 to-yellow-300 px-5 py-4 text-center">
+              <div className="relative bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 px-5 py-5 text-center">
                 <h1 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
-                  Emergency Contacts
+                  Family &amp; Emergency Contacts
                 </h1>
-                <p className="mt-0.5 text-[11px] sm:text-xs text-slate-800 font-medium">
+                <p className="mt-0.5 text-[11px] sm:text-xs text-slate-900/70 font-medium">
                   Alerted first during an emergency or scan event
                 </p>
                 <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/15 pointer-events-none" />
@@ -1502,7 +1593,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                   type="button"
                   onClick={handleFinishEmergencyContacts}
                   disabled={activatingQr}
-                  className="w-full h-10.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold shadow-sm transition-all active:scale-[0.99] cursor-pointer text-xs disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  className="w-full h-10.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-900 font-extrabold shadow-sm shadow-yellow-500/20 transition-all active:scale-[0.99] cursor-pointer text-xs disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
                   {activatingQr ? (
                     <span>Activating…</span>
@@ -1639,26 +1730,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
                 </div>
 
-                {/* Direct Call Vehicle Owner — Masked call, resolved server-side from
-                    qrId regardless of local cache, so it works for a genuinely
-                    first-time/anonymous visitor (not gated behind ownerContact). */}
-                <button
-                  onClick={() => openMaskedCall("Vehicle Owner")}
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-blue-600/20 active:scale-[0.98] transition-all cursor-pointer"
-                >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center flex-shrink-0">
-                      <Lock size={20} />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <p className="text-sm font-black text-white tracking-tight">Call Vehicle Owner</p>
-                      <p className="text-[11px] font-medium text-white/80">Number hidden — masked call</p>
-                    </div>
-                  </div>
-                  <div className="bg-white text-blue-700 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
-                    <PhoneCall size={14} /> CALL
-                  </div>
-                </button>
 
                 {/* 3. QUICK ACTIONS SECTION */}
                 <div className="bg-white rounded-3xl p-3.5 sm:p-4 border border-gray-100 shadow-sm space-y-2.5">
@@ -1801,42 +1872,31 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                   </button>
                 </div>
 
-                {/* 5. MESSAGE VEHICLE OWNER CARD WITH FULL-COLORED WHATSAPP BUTTON */}
-                <div className="bg-white rounded-3xl p-4 border border-gray-100 shadow-sm space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-[#DCFCE7] text-[#16A34A] flex items-center justify-center flex-shrink-0 font-bold">
-                      <MessageSquare size={20} />
+                {/* 5. MESSAGE VEHICLE OWNER CARD — Big button opens popup & auto-sends SMS alert to owner */}
+                <div className="bg-white rounded-3xl p-4 sm:p-5 border border-gray-100 shadow-sm space-y-3.5">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0 font-bold">
+                      <MessageSquare size={22} />
                     </div>
-                    <div>
-                      <h4 className="text-xs sm:text-sm font-bold text-gray-900 leading-tight">
+                    <div className="text-left min-w-0">
+                      <h4 className="text-sm font-bold text-gray-900 leading-tight">
                         Message Vehicle Owner
                       </h4>
-                      <p className="text-[11px] text-gray-400 font-medium mt-0.5">
-                        Send a direct alert via WhatsApp
+                      <p className="text-[11.5px] text-gray-400 font-medium mt-0.5">
+                        Start a private chat. The owner receives an SMS alert automatically.
                       </p>
                     </div>
                   </div>
-                  <input
-                    type="text"
-                    value={visitorMessage}
-                    onChange={(e) => setVisitorMessage(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && visitorMessage.trim()) {
-                        sendWhatsAppAlertManually("Visitor Message", visitorMessage.trim());
-                      }
-                    }}
-                    placeholder="Type your message here..."
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 placeholder-gray-400 outline-none focus:border-emerald-500 font-normal transition-colors"
-                  />
+
                   <button
                     onClick={() => {
-                      const msg = visitorMessage.trim() || "Hi, I scanned your vehicle's RapiQR code and need to contact you.";
-                      sendWhatsAppAlertManually("Visitor Message", msg);
+                      const msg = "Hi, I scanned your vehicle's RapiQR code and need to contact you.";
+                      openChatWithMessage(msg);
                     }}
-                    className="w-full py-3.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer"
+                    className="w-full py-4 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer"
                   >
-                    <WhatsAppIcon className="w-5 h-5 fill-white" />
-                    <span>Send Message via WhatsApp</span>
+                    <MessageCircle className="w-5 h-5" />
+                    <span>Message Owner</span>
                   </button>
                 </div>
 
@@ -1897,24 +1957,23 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       {/* Button 1: Request Ambulance (from Admin Communication Page) */}
                       {getAdminContacts("Ambulance").length > 0 ? (
                         getAdminContacts("Ambulance").map((amb, i) => (
-                          <button
+                          <div
                             key={`amb-${i}`}
-                            onClick={() => window.open(`tel:${amb.phone.replace(/[^0-9+]/g, "")}`)}
-                            className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-red-600/20 active:scale-[0.98] transition-all cursor-pointer"
+                            className="w-full bg-gray-100 text-gray-400 rounded-2xl p-4 flex items-center justify-between shadow-2xs"
                           >
                             <div className="flex items-center gap-3.5 min-w-0">
-                              <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold flex-shrink-0">
+                              <div className="w-11 h-11 rounded-xl bg-gray-200 text-gray-400 flex items-center justify-center font-bold flex-shrink-0">
                                 <Stethoscope size={22} />
                               </div>
                               <div className="text-left min-w-0">
-                                <p className="text-sm font-black text-white tracking-tight">Request Ambulance</p>
-                                <p className="text-[11px] font-medium text-white/80 truncate">{amb.label}</p>
+                                <p className="text-sm font-black text-gray-500 tracking-tight">Request Ambulance</p>
+                                <p className="text-[11px] font-medium text-gray-400 truncate">{amb.label}</p>
                               </div>
                             </div>
-                            <div className="bg-white text-red-600 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
-                              <PhoneCall size={12} /> CALL
+                            <div className="bg-white text-gray-400 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
+                              <Lock size={12} /> Soon
                             </div>
-                          </button>
+                          </div>
                         ))
                       ) : (
                         <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
@@ -2049,11 +2108,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
                       {/* Fuel & Battery */}
                       <button
-                        onClick={() => {
-                          const battery = getAdminContacts("Battery");
-                          if (battery.length > 0) window.open(`tel:${battery[0].phone.replace(/[^0-9+]/g, "")}`);
-                        }}
-                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-yellow-300 hover:bg-yellow-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                        disabled
+                        className="bg-gray-50 border border-gray-200 rounded-2xl p-3 text-left shadow-2xs flex flex-col justify-between h-26 cursor-not-allowed opacity-60"
                       >
                         <div className="w-8 h-8 rounded-xl bg-yellow-100 text-yellow-600 flex items-center justify-center font-bold shadow-2xs">
                           <Battery size={18} />
@@ -2070,11 +2126,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
                       {/* Mechanic */}
                       <button
-                        onClick={() => {
-                          const mechanic = getAdminContacts("Mechanic");
-                          if (mechanic.length > 0) window.open(`tel:${mechanic[0].phone.replace(/[^0-9+]/g, "")}`);
-                        }}
-                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-yellow-300 hover:bg-yellow-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                        disabled
+                        className="bg-gray-50 border border-gray-200 rounded-2xl p-3 text-left shadow-2xs flex flex-col justify-between h-26 cursor-not-allowed opacity-60"
                       >
                         <div className="w-8 h-8 rounded-xl bg-yellow-100 text-yellow-700 flex items-center justify-center font-bold shadow-2xs">
                           <Settings size={18} />
@@ -2112,16 +2165,16 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       </div>
                     </div>
 
-                    {/* Manual Full-Colored WhatsApp Action Card */}
+                    {/* Manual Full-Colored RepiChat Action Card */}
                     <div className="bg-red-50/60 border border-red-100 rounded-2xl p-4 text-center space-y-2">
                       <p className="text-xs font-bold text-gray-900">Towing / Breakdown Recovery?</p>
-                      <p className="text-[11px] text-gray-500 font-medium">Send a WhatsApp alert to request towing assistance for this vehicle.</p>
+                      <p className="text-[11px] text-gray-500 font-medium">Alert the owner via RepiChat to request towing assistance for this vehicle.</p>
                       <button
-                        onClick={() => sendWhatsAppAlertManually("Towing Service Needed", "Roadside breakdown / towing assistance requested for your vehicle.")}
-                        className="w-full py-3.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
+                        onClick={() => sendQuickIssueAlert("Towing Service Needed", "Roadside breakdown / towing assistance requested for your vehicle.")}
+                        className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
                       >
-                        <WhatsAppIcon className="w-5 h-5 fill-white" />
-                        <span>Send WhatsApp Alert to Owner</span>
+                        <MessageCircle className="w-5 h-5" />
+                        <span>Alert Owner via RepiChat</span>
                       </button>
                     </div>
 
@@ -2217,10 +2270,10 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                                   )}
                                 </div>
                                 <button
-                                  onClick={() => window.open(`tel:${c.phone.replace(/[^0-9+]/g, "")}`)}
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer"
+                                  disabled
+                                  className="bg-gray-100 text-gray-400 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 cursor-not-allowed"
                                 >
-                                  <PhoneCall size={14} /> CALL
+                                  <Lock size={14} /> Soon
                                 </button>
                               </div>
                             ))
@@ -2252,24 +2305,23 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                     <div className="space-y-2">
                       {getAdminContacts("Ambulance").length > 0 ? (
                         getAdminContacts("Ambulance").map((amb, i) => (
-                          <button
+                          <div
                             key={`med-amb-${i}`}
-                            onClick={() => window.open(`tel:${amb.phone.replace(/[^0-9+]/g, "")}`)}
-                            className="w-full bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-2xl p-3 text-left hover:opacity-95 transition-all active:scale-[0.98] shadow-md shadow-green-500/20 flex items-center justify-between cursor-pointer"
+                            className="w-full bg-gray-100 text-gray-400 rounded-2xl p-3 text-left shadow-2xs flex items-center justify-between"
                           >
                             <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-white text-emerald-700 flex items-center justify-center font-bold shadow-2xs">
+                              <div className="w-9 h-9 rounded-xl bg-white text-gray-400 flex items-center justify-center font-bold shadow-2xs">
                                 <Stethoscope size={18} />
                               </div>
                               <div>
-                                <p className="text-xs font-black text-white">{amb.label}</p>
-                                <p className="text-[10px] font-bold text-emerald-100">{amb.phone}</p>
+                                <p className="text-xs font-black text-gray-500">{amb.label}</p>
+                                <p className="text-[10px] font-bold text-gray-400">{amb.phone}</p>
                               </div>
                             </div>
-                            <div className="bg-white text-emerald-700 font-black text-[10px] px-3 py-1 rounded-lg">
-                              CALL
+                            <div className="bg-white text-gray-400 font-black text-[10px] px-3 py-1 rounded-lg">
+                              Soon
                             </div>
-                          </button>
+                          </div>
                         ))
                       ) : (
                         <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
@@ -2374,31 +2426,10 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                               </div>
                             </div>
                             <button
-                              onClick={() => {
-                                // Trigger automated alert dispatch & initiate call bridge
-                                if (qrData && location) {
-                                  const payload = {
-                                    qrId: qrData.id,
-                                    qrUrl: qrData.qrUrl,
-                                    latitude: location.lat,
-                                    longitude: location.lng,
-                                    accuracy: location.accuracy,
-                                    deviceId: navigator.userAgent.slice(0, 40),
-                                    timestamp: new Date().toISOString(),
-                                    message: `EMERGENCY CALL REQUEST for ${contact.label}`,
-                                    vehicleName: qrData.vehicleName,
-                                    vehicleNumber: qrData.vehicleNumber,
-                                  };
-                                  const alerts = JSON.parse(localStorage.getItem("repiqr-alerts") || localStorage.getItem("namoqr-alerts") || "[]");
-                                  alerts.unshift({ ...payload, id: Date.now(), status: "sent" });
-                                  localStorage.setItem("repiqr-alerts", JSON.stringify(alerts));
-                                  localStorage.setItem("namoqr-alerts", JSON.stringify(alerts));
-                                }
-                                openMaskedCall(contact.label, contact.name);
-                              }}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer"
+                              disabled
+                              className="bg-gray-100 text-gray-400 font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 cursor-not-allowed"
                             >
-                              <PhoneCall size={14} /> CALL
+                              <Lock size={14} /> Soon
                             </button>
                           </div>
                         ))}
@@ -2434,10 +2465,10 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                               </div>
                             </div>
                             <button
-                              onClick={() => window.open(`tel:${contact.phone.replace(/[^0-9+]/g, "")}`)}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer"
+                              disabled
+                              className="bg-gray-100 text-gray-400 font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 cursor-not-allowed"
                             >
-                              <PhoneCall size={14} /> CALL
+                              <Lock size={14} /> Soon
                             </button>
                           </div>
                         ))}
@@ -2461,16 +2492,16 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                         </span>
                       </div>
 
-                      {/* Manual Full-Colored WhatsApp Action Card */}
+                      {/* Manual Full-Colored RepiChat Action Card */}
                       <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-4 text-center space-y-2">
                         <p className="text-xs font-bold text-gray-900">Vehicle Blocking Path?</p>
-                        <p className="text-[11px] text-gray-500 font-medium">Send a direct WhatsApp notification to the owner to request moving their vehicle.</p>
+                        <p className="text-[11px] text-gray-500 font-medium">Send a direct RepiChat notification to the owner to request moving their vehicle.</p>
                         <button
-                          onClick={() => sendWhatsAppAlertManually("Parking Issue", "Hi, your vehicle is blocking a path/driveway. Please move it as soon as possible.", ownerContact?.phone)}
-                          className="w-full py-3.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
+                          onClick={() => sendQuickIssueAlert("Parking Issue", "Hi, your vehicle is blocking a path/driveway. Please move it as soon as possible.")}
+                          className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
                         >
-                          <WhatsAppIcon className="w-5 h-5 fill-white" />
-                          <span>Send WhatsApp Alert to Owner</span>
+                          <MessageCircle className="w-5 h-5" />
+                          <span>Alert Owner via RepiChat</span>
                         </button>
                       </div>
 
@@ -2480,8 +2511,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                             <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Vehicle Owner Call</p>
                             <p className="text-xs font-bold text-gray-500 mt-1 flex items-center gap-1"><Lock size={11} /> Number hidden — masked call</p>
                           </div>
-                          <button onClick={() => openMaskedCall("Vehicle Owner")} className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer">
-                            <PhoneCall size={14} /> CALL
+                          <button disabled className="bg-gray-100 text-gray-400 font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 cursor-not-allowed">
+                            <Lock size={14} /> Soon
                           </button>
                         </div>
                       ) : null}
@@ -2495,8 +2526,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                                 <p className="text-xs font-bold text-gray-900 leading-tight">{c.label}</p>
                                 <p className="text-sm font-mono font-bold text-gray-700 mt-1">{c.phone}</p>
                               </div>
-                              <button onClick={() => window.open(`tel:${c.phone.replace(/[^0-9+]/g, "")}`)} className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer">
-                                <PhoneCall size={14} /> CALL
+                              <button disabled className="bg-gray-100 text-gray-400 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 cursor-not-allowed">
+                                <Lock size={14} /> Soon
                               </button>
                             </div>
                           ))}
@@ -2520,16 +2551,16 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                         </span>
                       </div>
 
-                      {/* Manual Full-Colored WhatsApp Action Card */}
+                      {/* Manual Full-Colored RepiChat Action Card */}
                       <div className="bg-amber-50/60 border border-amber-100 rounded-2xl p-4 text-center space-y-2">
                         <p className="text-xs font-bold text-gray-900">Headlights Left On?</p>
-                        <p className="text-[11px] text-gray-500 font-medium">Alert the owner immediately via WhatsApp so their vehicle battery doesn't drain.</p>
+                        <p className="text-[11px] text-gray-500 font-medium">Alert the owner immediately via RepiChat so their vehicle battery doesn't drain.</p>
                         <button
-                          onClick={() => sendWhatsAppAlertManually("Headlights On", "Hi, your vehicle's headlights are left turned on. Please check them.", ownerContact?.phone)}
-                          className="w-full py-3.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
+                          onClick={() => sendQuickIssueAlert("Headlights On", "Hi, your vehicle's headlights are left turned on. Please check them.")}
+                          className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
                         >
-                          <WhatsAppIcon className="w-5 h-5 fill-white" />
-                          <span>Send WhatsApp Alert to Owner</span>
+                          <MessageCircle className="w-5 h-5" />
+                          <span>Alert Owner via RepiChat</span>
                         </button>
                       </div>
 
@@ -2539,8 +2570,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                             <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Vehicle Owner Call</p>
                             <p className="text-xs font-bold text-gray-500 mt-1 flex items-center gap-1"><Lock size={11} /> Number hidden — masked call</p>
                           </div>
-                          <button onClick={() => openMaskedCall("Vehicle Owner")} className="bg-amber-500 hover:bg-amber-600 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer">
-                            <PhoneCall size={14} /> CALL
+                          <button disabled className="bg-gray-100 text-gray-400 font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 cursor-not-allowed">
+                            <Lock size={14} /> Soon
                           </button>
                         </div>
                       ) : null}
@@ -2554,8 +2585,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                                 <p className="text-xs font-bold text-gray-900 leading-tight">{c.label}</p>
                                 <p className="text-sm font-mono font-bold text-gray-700 mt-1">{c.phone}</p>
                               </div>
-                              <button onClick={() => window.open(`tel:${c.phone.replace(/[^0-9+]/g, "")}`)} className="bg-amber-500 hover:bg-amber-600 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer">
-                                <PhoneCall size={14} /> CALL
+                              <button disabled className="bg-gray-100 text-gray-400 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 cursor-not-allowed">
+                                <Lock size={14} /> Soon
                               </button>
                             </div>
                           ))}
@@ -2579,16 +2610,16 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                         </span>
                       </div>
 
-                      {/* Manual Full-Colored WhatsApp Action Card */}
+                      {/* Manual Full-Colored RepiChat Action Card */}
                       <div className="bg-rose-50/60 border border-rose-100 rounded-2xl p-4 text-center space-y-2">
                         <p className="text-xs font-bold text-gray-900">Suspicious Activity / Tampering?</p>
-                        <p className="text-[11px] text-gray-500 font-medium">Send an emergency alert directly to the owner via WhatsApp.</p>
+                        <p className="text-[11px] text-gray-500 font-medium">Send an emergency alert directly to the owner via RepiChat.</p>
                         <button
-                          onClick={() => sendWhatsAppAlertManually("Theft Alert", "EMERGENCY: Someone reported suspicious activity or potential theft regarding your vehicle.", ownerContact?.phone)}
-                          className="w-full py-3.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
+                          onClick={() => sendQuickIssueAlert("Theft Alert", "EMERGENCY: Someone reported suspicious activity or potential theft regarding your vehicle.")}
+                          className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
                         >
-                          <WhatsAppIcon className="w-5 h-5 fill-white" />
-                          <span>Send Emergency WhatsApp Alert</span>
+                          <MessageCircle className="w-5 h-5" />
+                          <span>Send Emergency RepiChat Alert</span>
                         </button>
                       </div>
 
@@ -2598,8 +2629,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                             <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Vehicle Owner Call</p>
                             <p className="text-xs font-bold text-gray-500 mt-1 flex items-center gap-1"><Lock size={11} /> Number hidden — masked call</p>
                           </div>
-                          <button onClick={() => openMaskedCall("Vehicle Owner")} className="bg-rose-600 hover:bg-rose-700 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer">
-                            <PhoneCall size={14} /> CALL
+                          <button disabled className="bg-gray-100 text-gray-400 font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 cursor-not-allowed">
+                            <Lock size={14} /> Soon
                           </button>
                         </div>
                       ) : null}
@@ -2613,8 +2644,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                                 <p className="text-xs font-bold text-gray-900 leading-tight">{c.label}</p>
                                 <p className="text-sm font-mono font-bold text-gray-700 mt-1">{c.phone}</p>
                               </div>
-                              <button onClick={() => window.open(`tel:${c.phone.replace(/[^0-9+]/g, "")}`)} className="bg-rose-600 hover:bg-rose-700 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer">
-                                <PhoneCall size={14} /> CALL
+                              <button disabled className="bg-gray-100 text-gray-400 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 cursor-not-allowed">
+                                <Lock size={14} /> Soon
                               </button>
                             </div>
                           ))}
@@ -2638,16 +2669,16 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                         </span>
                       </div>
 
-                      {/* Manual Full-Colored WhatsApp Action Card */}
+                      {/* Manual Full-Colored RepiChat Action Card */}
                       <div className="bg-purple-50/60 border border-purple-100 rounded-2xl p-4 text-center space-y-2">
                         <p className="text-xs font-bold text-gray-900">Flat Tyre Detected?</p>
-                        <p className="text-[11px] text-gray-500 font-medium">Send a WhatsApp alert to the vehicle owner.</p>
+                        <p className="text-[11px] text-gray-500 font-medium">Send a RepiChat alert to the vehicle owner.</p>
                         <button
-                          onClick={() => sendWhatsAppAlertManually("Flat Tyre", "Hi, noticed a flat tyre on your vehicle. Please check it.", ownerContact?.phone)}
-                          className="w-full py-3.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
+                          onClick={() => sendQuickIssueAlert("Flat Tyre", "Hi, noticed a flat tyre on your vehicle. Please check it.")}
+                          className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
                         >
-                          <WhatsAppIcon className="w-5 h-5 fill-white" />
-                          <span>Send WhatsApp Alert to Owner</span>
+                          <MessageCircle className="w-5 h-5" />
+                          <span>Alert Owner via RepiChat</span>
                         </button>
                       </div>
 
@@ -2726,8 +2757,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                             <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Vehicle Owner Call</p>
                             <p className="text-xs font-bold text-gray-500 mt-1 flex items-center gap-1"><Lock size={11} /> Number hidden — masked call</p>
                           </div>
-                          <button onClick={() => openMaskedCall("Vehicle Owner")} className="bg-purple-600 hover:bg-purple-700 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer">
-                            <PhoneCall size={14} /> CALL
+                          <button disabled className="bg-gray-100 text-gray-400 font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 cursor-not-allowed">
+                            <Lock size={14} /> Soon
                           </button>
                         </div>
                       ) : null}
@@ -2741,8 +2772,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                                 <p className="text-xs font-bold text-gray-900 leading-tight">{c.label}</p>
                                 <p className="text-sm font-mono font-bold text-gray-700 mt-1">{c.phone}</p>
                               </div>
-                              <button onClick={() => window.open(`tel:${c.phone.replace(/[^0-9+]/g, "")}`)} className="bg-purple-600 hover:bg-purple-700 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all cursor-pointer">
-                                <PhoneCall size={14} /> CALL
+                              <button disabled className="bg-gray-100 text-gray-400 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 cursor-not-allowed">
+                                <Lock size={14} /> Soon
                               </button>
                             </div>
                           ))}
@@ -3006,6 +3037,25 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           </div>
         )}
       </main>
+
+      {/* RepiChat — real-time in-app chat with the sticker owner (replaces WhatsApp deep links) */}
+      {chatOpen && qrData && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="w-full sm:max-w-sm h-screen sm:h-[36rem] sm:rounded-3xl sm:shadow-2xl sm:border sm:border-gray-200 overflow-hidden">
+            <RepiChat
+              mode="customer"
+              qrId={qrData.id}
+              customerName={visitorName || undefined}
+              initialMessage={chatInitialMessage}
+              subtitle={`${qrData.vehicleName || "Vehicle"}${qrData.vehicleNumber ? ` · ${qrData.vehicleNumber}` : ""}`}
+              onClose={() => {
+                setChatOpen(false);
+                setChatInitialMessage(undefined);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

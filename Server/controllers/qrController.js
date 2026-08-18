@@ -1,6 +1,8 @@
 const QrModel = require('../models/qrModel');
 const { supabaseAdmin } = require('../config/db');
 const { logger } = require('../middleware/loggerMiddleware');
+const { sendSms } = require('../services/smsService');
+const { createOtp, verifyOtp } = require('../services/phoneVerificationService');
 
 class QrController {
   /**
@@ -115,6 +117,73 @@ class QrController {
   }
 
   /**
+   * Activation identity check — step 1: send a real Twilio SMS OTP to the
+   * phone the visitor is registering with. Public (no verifyToken) because
+   * activation happens before any account exists — anonymous like /activate
+   * itself. Keyed by qrId rather than a userId since there's no session yet;
+   * one in-progress activation per sticker is an acceptable trade-off.
+   *
+   * Twilio trial accounts only deliver to Caller-ID-verified numbers — send
+   * failures (e.g. code 21608 "unverified number") are returned as-is so the
+   * frontend can surface them instead of silently pretending to succeed.
+   */
+  static async sendActivationOtp(req, res) {
+    try {
+      const { id } = req.params;
+      const { phoneNumber } = req.body || {};
+      const digits = String(phoneNumber || '').replace(/\D/g, '');
+      if (!digits || digits.length < 7) {
+        return res.status(400).json({ success: false, error: 'Enter a valid phone number.' });
+      }
+
+      const fullPhone = String(phoneNumber).trim().startsWith('+') ? String(phoneNumber).trim() : `+${digits}`;
+      const code = createOtp(id, fullPhone);
+      const body = `Your RapiQR activation code is ${code}. It expires in 5 minutes.`;
+      const smsResult = await sendSms({ to: fullPhone, body, event: 'ACTIVATION_OTP_SMS' });
+
+      logger.event('QR_ACTIVATION_OTP', '📲', `Activation OTP ${smsResult.sent ? 'sent' : smsResult.simulated ? 'simulated' : 'FAILED'} for QR ${id}`);
+
+      if (!smsResult.sent && !smsResult.simulated) {
+        return res.status(502).json({ success: false, simulated: false, error: smsResult.error || 'Could not send the verification SMS.' });
+      }
+
+      return res.json({ success: true, simulated: smsResult.simulated });
+    } catch (err) {
+      logger.error('QR_ACTIVATION_OTP', `Failed to send activation OTP for QR: ${req.params.id}`, err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Activation identity check — step 2: verify the code. `000000` is the
+   * shared master bypass baked into phoneVerificationService, for testing
+   * when Twilio isn't sending (simulated mode / unverified test numbers).
+   */
+  static async verifyActivationOtp(req, res) {
+    try {
+      const { id } = req.params;
+      const { code } = req.body || {};
+      if (!code) return res.status(400).json({ success: false, error: 'Enter the code sent to your phone.' });
+
+      const result = verifyOtp(id, code);
+      if (!result.ok) {
+        const messages = {
+          no_pending_otp: 'No verification in progress — request a new code.',
+          expired: 'This code has expired — request a new one.',
+          too_many_attempts: 'Too many incorrect attempts — request a new code.',
+          invalid_code: `Incorrect code.${result.attemptsLeft ? ` ${result.attemptsLeft} attempt(s) left.` : ''}`,
+        };
+        return res.status(400).json({ success: false, error: messages[result.reason] || 'Verification failed.' });
+      }
+
+      return res.json({ success: true, phone: result.phone });
+    } catch (err) {
+      logger.error('QR_ACTIVATION_OTP_VERIFY', `Failed to verify activation OTP for QR: ${req.params.id}`, err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
    * Record QR Scan event
    */
   static async recordScan(req, res) {
@@ -125,6 +194,35 @@ class QrController {
       return res.json({ success: true, data: updated });
     } catch (err) {
       logger.error('QR_SCAN', `Failed to record scan for QR Code: ${req.params.id}`, err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Delete single QR Code
+   */
+  static async deleteQrCode(req, res) {
+    try {
+      const { id } = req.params;
+      const deleted = await QrModel.delete(id);
+      logger.rowDeleted('qr_codes', id);
+      return res.json({ success: true, data: deleted });
+    } catch (err) {
+      logger.error('QR_DELETE', `Failed to delete QR Code: ${req.params.id}`, err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Delete all QR Codes
+   */
+  static async deleteAllQrCodes(req, res) {
+    try {
+      await QrModel.deleteAll();
+      logger.info('QR_DELETE_ALL', 'All QR codes cleared');
+      return res.json({ success: true });
+    } catch (err) {
+      logger.error('QR_DELETE_ALL', 'Failed to clear all QR codes', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

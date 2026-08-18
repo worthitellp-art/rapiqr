@@ -1,6 +1,8 @@
 const AlertModel = require('../models/alertModel');
 const ProductModel = require('../models/productModel');
-const { sendSms, sendWhatsApp } = require('../services/smsService');
+const ChatModel = require('../models/chatModel');
+const { sendSms } = require('../services/smsService');
+const { getIo } = require('../sockets/chatSocket');
 const { logger } = require('../middleware/loggerMiddleware');
 
 class AlertController {
@@ -25,15 +27,16 @@ class AlertController {
       const result = await AlertModel.createAlert(alertPayload);
       logger.success('ALERT_EMERGENCY', `Alert dispatched successfully: ${result.id || 'ok'}`);
 
-      // Best-effort SMS + WhatsApp to the sticker owner AND their registered
-      // emergency/family contacts — real sends via Twilio (task.md #5/#18/#19),
-      // honestly reported back so the frontend never claims "dispatched" on a
-      // channel that wasn't actually sent. Emergency contacts are the "Emergency
-      // Panel" the owner configured in their dashboard — a location share or
-      // alert should reach them the same way it reaches the owner.
+      // Best-effort SMS to the sticker owner AND their registered emergency/family
+      // contacts — real sends via Twilio, honestly reported back so the frontend
+      // never claims "dispatched" on a channel that wasn't actually sent.
+      // Emergency contacts are the "Emergency Panel" the owner configured in
+      // their dashboard — a location share or alert should reach them the same
+      // way it reaches the owner. The owner additionally gets this alert as a
+      // real-time RepiChat message (replaces the old WhatsApp deep-link send).
       let smsResult = { sent: false, simulated: false, reason: 'no_owner_phone' };
-      let whatsappResult = { sent: false, simulated: false, reason: 'no_owner_phone' };
       let contactsNotified = 0;
+      let chatSessionId = null;
 
       if (product) {
         const ownerPhone = product.details?.ownerPhone;
@@ -43,27 +46,36 @@ class AlertController {
           : `RapiQR Alert: someone scanned and reported an issue with ${label}. Open the app for details.`;
 
         if (ownerPhone) {
-          [smsResult, whatsappResult] = await Promise.all([
-            sendSms({ to: ownerPhone, body: text, event: 'ALERT_SMS' }),
-            sendWhatsApp({ to: ownerPhone, body: text, event: 'ALERT_WHATSAPP' }),
-          ]);
+          smsResult = await sendSms({ to: ownerPhone, body: text, event: 'ALERT_SMS' });
         }
 
         const emergencyContacts = Array.isArray(product.details?.emergencyContacts) ? product.details.emergencyContacts : [];
         const contactResults = await Promise.all(
           emergencyContacts
             .filter((c) => c?.phone)
-            .map((c) =>
-              Promise.all([
-                sendSms({ to: c.phone, body: text, event: 'ALERT_SMS_CONTACT' }),
-                sendWhatsApp({ to: c.phone, body: text, event: 'ALERT_WHATSAPP_CONTACT' }),
-              ])
-            )
+            .map((c) => sendSms({ to: c.phone, body: text, event: 'ALERT_SMS_CONTACT' }))
         );
-        contactsNotified = contactResults.filter(([sms, wa]) => sms?.sent || wa?.sent).length;
+        contactsNotified = contactResults.filter((sms) => sms?.sent).length;
+
+        // Seed/continue the visitor's RepiChat thread with this alert so it
+        // shows up in the owner's chat inbox in real time.
+        if (alertPayload.customerToken) {
+          const { session } = await ChatModel.findOrCreateOpenSession({
+            qrCodeId: qrId,
+            customerToken: alertPayload.customerToken,
+            customerName: alertPayload.customerName || 'Visitor',
+            ownerId: product.user_id || null,
+            vehicleLabel: `${product.name || 'Vehicle'}${product.vehicle_number ? ` (${product.vehicle_number})` : ''}`,
+          });
+          if (session) {
+            chatSessionId = session.id;
+            const chatMessage = await ChatModel.insertMessage({ sessionId: session.id, senderType: 'customer', senderId: null, body: text });
+            if (chatMessage) getIo()?.to(`session:${session.id}`).emit('new_message', chatMessage);
+          }
+        }
       }
 
-      return res.json({ success: true, data: result, smsResult, whatsappResult, contactsNotified, message: 'Alert dispatched successfully' });
+      return res.json({ success: true, data: result, smsResult, contactsNotified, chatSessionId, message: 'Alert dispatched successfully' });
     } catch (err) {
       logger.error('ALERT_EMERGENCY', 'Failed to dispatch alert', err);
       return res.status(500).json({ success: false, error: err.message });

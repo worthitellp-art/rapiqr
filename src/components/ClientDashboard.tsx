@@ -24,8 +24,18 @@ import {
   RefreshCcw,
   Sparkles,
   QrCode,
+  Tag,
+  Plus,
+  AlertTriangle,
+  Smartphone,
+  CheckCircle2,
+  ArrowRight,
+  MessageSquare,
+  MessageCircle,
+  Package
 } from 'lucide-react';
 import type { DashboardSticker } from './dashboard/client/types';
+import PhoneVerificationCard from './auth/PhoneVerificationCard';
 import { mapProductRow } from './dashboard/client/types';
 import { QrCodeModal, EditDetailsModal, EditContactsModal, TransferModal, ScanHistoryModal, ConfirmActionModal } from './dashboard/client/StickerModals';
 import PhoneInputWithCountry from './common/PhoneInputWithCountry';
@@ -34,6 +44,8 @@ import AccountSettingsPanel from './dashboard/client/AccountSettingsPanel';
 import SupportLegalPanel from './dashboard/client/SupportLegalPanel';
 import CompleteProfilePopup from './dashboard/client/CompleteProfilePopup';
 import AppLogo from './common/AppLogo';
+import RepiChat from './chat/RepiChat';
+import { apiClient, ChatSession } from '../lib/apiClient';
 import {
   getProductsFromDb,
   updateProductDetailsInDb,
@@ -49,10 +61,13 @@ interface ClientDashboardProps {
   switchToDistributor?: () => void;
 }
 
-type TabId = 'overview' | 'contacts' | 'history' | 'settings' | 'support';
+type TabId = 'setup' | 'overview' | 'products' | 'chat' | 'contacts' | 'history' | 'settings' | 'support';
 
 const NAV_ITEMS: { id: TabId; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
-  { id: 'overview', label: 'My Stickers', icon: Grid },
+  { id: 'setup', label: 'Setup Guide', icon: Sparkles },
+  { id: 'overview', label: 'Home Overview', icon: Grid },
+  { id: 'products', label: 'Products', icon: ShoppingBag },
+  { id: 'chat', label: 'Live Visitor Chat', icon: MessageSquare },
   { id: 'contacts', label: 'Emergency Contacts', icon: Users },
   { id: 'history', label: 'Alert History', icon: History },
   { id: 'settings', label: 'Account Settings', icon: Settings },
@@ -72,6 +87,16 @@ type ModalState =
 
 export default function ClientDashboard({ onBack }: ClientDashboardProps) {
   const { profile, signOut, sendPhoneOtp, verifyPhoneOtp, updatePhoneNumber } = useAuth();
+
+  // ─── DASHBOARD PREPARATION SPLASH ANIMATION ───
+  const [isPreparing, setIsPreparing] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsPreparing(false);
+    }, 1600);
+    return () => clearTimeout(timer);
+  }, []);
 
   // ─── PHONE NUMBER STICKER LINKING STATE ───
   const [linkingPhone, setLinkingPhone] = useState(profile?.phoneNumber || '');
@@ -117,6 +142,7 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
       const res = await verifyPhoneOtp(otpCode.trim());
       setLinkingLoading(false);
       if (res.success) {
+        setIsPreparing(true);
         await updatePhoneNumber(linkingPhone);
         const claimed = await loadProducts();
         setOtpStep('input');
@@ -125,6 +151,7 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
         const msg = `Phone verified! Loaded ${count} safety sticker${count === 1 ? '' : 's'} linked to ${linkingPhone}.`;
         showToast(msg);
         setLinkingMessage({ type: 'success', text: msg });
+        setTimeout(() => setIsPreparing(false), 1600);
       } else {
         setLinkingMessage({ type: 'error', text: res.error || 'Invalid verification code.' });
       }
@@ -139,26 +166,22 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
     onBack();
   };
 
-  // A profile signed in with just an email or just a phone number is only half
-  // set up — stickers auto-link by phone on activation, so both fields matter.
   const missingPhone = !profile?.phoneNumber;
   const missingEmail = !profile?.email || profile.email.endsWith('.repiqr.local');
   const [profilePopupDismissed, setProfilePopupDismissed] = useState(false);
   const showCompleteProfilePopup = Boolean(profile) && (missingPhone || missingEmail) && !profilePopupDismissed;
 
-  // Load Google Fraunces Font dynamically for title rendering
   useEffect(() => {
     const link = document.createElement('link');
-    link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap';
+    link.href = 'https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap';
     link.rel = 'stylesheet';
     document.head.appendChild(link);
   }, []);
 
-  // Active navigation view tab
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     try {
       const saved = localStorage.getItem('repiqr-client-active-tab') || localStorage.getItem('namoqr-client-active-tab');
-      if (saved && ['overview', 'activate', 'catalog', 'contacts', 'history', 'settings', 'support'].includes(saved)) {
+      if (saved && ['overview', 'contacts', 'history', 'settings', 'support'].includes(saved)) {
         return saved as TabId;
       }
     } catch { /* fallback */ }
@@ -171,31 +194,64 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
     } catch { /* fallback */ }
   }, [activeTab]);
 
-  // Mobile sidebar toggle
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // ─── PRODUCTS (backed by the real /api/products fleet) ───
   const [products, setProducts] = useState<DashboardSticker[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
+
+  // Stickers that used to be in the list and silently disappeared — deletion
+  // is a hard DELETE server-side (no soft-delete/tombstone), so the only
+  // signal a client has that "this was removed by the owner" (vs. never
+  // existing) is noticing it vanished between loads. Tracked per-account in
+  // localStorage so a refresh doesn't lose the "previously seen" baseline.
+  const [removedStickers, setRemovedStickers] = useState<{ id: string; qrCodeId: string; nickname: string }[]>([]);
 
   const loadProducts = useCallback(async () => {
     setProductsLoading(true);
     try {
-      const rows = await getProductsFromDb(profile?.id);
+      const rows = await getProductsFromDb(profile?.id, profile?.phoneNumber);
       const mapped = Array.isArray(rows) ? rows.map(mapProductRow) : [];
+
+      if (profile?.id) {
+        const seenKey = `repiqr-client-seen-stickers-${profile.id}`;
+        try {
+          const prevSeen: { id: string; qrCodeId: string; nickname: string }[] = JSON.parse(localStorage.getItem(seenKey) || '[]');
+          const currentIds = new Set(mapped.map((p) => p.id));
+          const vanished = prevSeen.filter((s) => !currentIds.has(s.id));
+          if (vanished.length > 0 && prevSeen.length > 0) {
+            setRemovedStickers((prev) => {
+              const known = new Set(prev.map((s) => s.id));
+              const additions = vanished.filter((s) => !known.has(s.id));
+              return additions.length ? [...prev, ...additions] : prev;
+            });
+          }
+          localStorage.setItem(seenKey, JSON.stringify(mapped.map((p) => ({ id: p.id, qrCodeId: p.qrCodeId, nickname: p.nickname }))));
+        } catch { /* ignore storage errors */ }
+      }
+
       setProducts(mapped);
       return mapped;
     } finally {
       setProductsLoading(false);
     }
-  }, [profile?.id]);
+  }, [profile?.id, profile?.phoneNumber]);
+
+  const dismissRemovedSticker = (id: string) => {
+    setRemovedStickers((prev) => prev.filter((s) => s.id !== id));
+  };
 
   useEffect(() => {
-    if (profile) loadProducts();
-  }, [profile?.id, loadProducts]);
+    if (!profile) return;
+    loadProducts();
+    // Admin fleet deletions are hard deletes with no push notification to the
+    // client — without a periodic re-fetch, a sticker admin removed keeps
+    // showing here until the client happens to manually refresh or reload the
+    // page. Poll so a deletion (or any other admin-side change) syncs on its own.
+    const interval = setInterval(loadProducts, 15000);
+    return () => clearInterval(interval);
+  }, [profile?.id, profile?.phoneNumber, loadProducts]);
 
-  // Drawer & Toast State
   const [drawerProductId, setDrawerProductId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -210,79 +266,95 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // ─── SHARE PROFILE ───
   const handleShareProfile = (code: string) => {
     const url = `${window.location.origin}/verify/${code}`;
     navigator.clipboard.writeText(url);
     showToast(`Safety link copied: ${url}`);
   };
 
-  // ─── EDIT DETAILS ───
+  // A 404 from any per-sticker action means the admin deleted it out from under
+  // the client (products are hard-deleted, see QrModel.delete) — surface that
+  // distinctly instead of a generic failure toast.
+  const describeError = (sticker: DashboardSticker, error?: string) => {
+    if (error && /not found/i.test(error)) {
+      flagRemoved(sticker);
+      return `"${sticker.nickname}" was removed by the owner.`;
+    }
+    return error || 'Something went wrong — please try again.';
+  };
+
+  const flagRemoved = (sticker: DashboardSticker) => {
+    setProducts((prev) => prev.filter((p) => p.id !== sticker.id));
+    setRemovedStickers((prev) => (prev.some((s) => s.id === sticker.id) ? prev : [...prev, { id: sticker.id, qrCodeId: sticker.qrCodeId, nickname: sticker.nickname }]));
+  };
+
   const handleSaveDetails = async (productId: string, updates: Record<string, any>) => {
-    const updated = await updateProductDetailsInDb(productId, updates);
-    if (updated) {
-      setProducts((prev) => prev.map((p) => (p.id === productId ? mapProductRow(updated) : p)));
+    const sticker = products.find((p) => p.id === productId);
+    const res = await updateProductDetailsInDb(productId, updates);
+    if (res.success && res.data) {
+      setProducts((prev) => prev.map((p) => (p.id === productId ? mapProductRow(res.data) : p)));
       showToast('Sticker details updated');
       setModal(null);
     } else {
-      showToast('Failed to update sticker details');
+      showToast(sticker ? describeError(sticker, res.error) : (res.error || 'Failed to update sticker details'));
     }
   };
 
-  // ─── EDIT CONTACTS (shared by the drawer modal and the Emergency Contacts tab) ───
   const handleSaveContacts = async (productId: string, contacts: { name: string; phone: string }[]) => {
-    const updated = await updateProductContactsInDb(productId, contacts);
-    if (updated) {
-      setProducts((prev) => prev.map((p) => (p.id === productId ? mapProductRow(updated) : p)));
+    const sticker = products.find((p) => p.id === productId);
+    const res = await updateProductContactsInDb(productId, contacts);
+    if (res.success && res.data) {
+      setProducts((prev) => prev.map((p) => (p.id === productId ? mapProductRow(res.data) : p)));
       showToast('Emergency contacts saved');
       setModal((m) => (m && m.type === 'editContacts' && m.sticker.id === productId ? null : m));
     } else {
-      showToast('Failed to save contacts');
+      showToast(sticker ? describeError(sticker, res.error) : (res.error || 'Failed to save contacts'));
     }
   };
 
-  // ─── DEACTIVATE / REACTIVATE ───
   const handleSetStatus = async (sticker: DashboardSticker, active: boolean) => {
     setModalBusy(true);
-    const updated = await setProductStatusInDb(sticker.id, active, sticker.qrCodeId);
+    const res = await setProductStatusInDb(sticker.id, active, sticker.qrCodeId);
     setModalBusy(false);
-    if (updated) {
-      setProducts((prev) => prev.map((p) => (p.id === sticker.id ? mapProductRow(updated) : p)));
+    if (res.success && res.data) {
+      setProducts((prev) => prev.map((p) => (p.id === sticker.id ? mapProductRow(res.data) : p)));
       showToast(active ? 'Sticker reactivated' : 'Sticker deactivated');
       setModal(null);
     } else {
-      showToast('Failed to update sticker status');
+      showToast(describeError(sticker, res.error));
     }
   };
 
-  // ─── TRANSFER ───
-  const handleTransfer = async (productId: string, targetEmail: string) => {
-    const res = await transferProductInDb(productId, targetEmail);
+  const handleConfirmTransfer = async (sticker: DashboardSticker, newPhone: string) => {
+    setModalBusy(true);
+    const res = await transferProductInDb(sticker.id, newPhone);
+    setModalBusy(false);
     if (res.success) {
-      showToast('Sticker transferred successfully');
-      setModal(null);
+      setProducts((prev) => prev.filter((p) => p.id !== sticker.id));
       setDrawerProductId(null);
-      await loadProducts();
+      setModal(null);
+      showToast(`Sticker transferred to ${newPhone}`);
+    } else {
+      showToast(`Transfer failed: ${res.error || 'Unknown error'}`);
     }
-    return res;
   };
 
-  // ─── DELETE ───
   const handleConfirmDelete = async (sticker: DashboardSticker) => {
     setModalBusy(true);
-    const ok = await deleteProductFromDb(sticker.id, sticker.qrCodeId);
+    const res = await deleteProductFromDb(sticker.id, sticker.qrCodeId);
     setModalBusy(false);
-    if (ok) {
+    if (res.success) {
       setProducts((prev) => prev.filter((p) => p.id !== sticker.id));
       setDrawerProductId(null);
       setModal(null);
       showToast('Sticker removed from dashboard');
     } else {
-      showToast('Failed to delete sticker');
+      showToast(describeError(sticker, res.error));
+      setDrawerProductId(null);
+      setModal(null);
     }
   };
 
-  // ─── SCAN / ALERT HISTORY (single sticker, opened from the drawer) ───
   const handleOpenHistory = async (sticker: DashboardSticker) => {
     setModal({ type: 'history', sticker });
     setHistoryLoading(true);
@@ -291,9 +363,53 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
     setHistoryLoading(false);
   };
 
-  // ─── EMERGENCY HISTORY TAB (aggregated across every sticker, fetched on demand) ───
   const [allHistory, setAllHistory] = useState<any[]>([]);
   const [allHistoryLoading, setAllHistoryLoading] = useState(false);
+
+  // ─── PRODUCTS TAB: PURCHASE / ORDER HISTORY (checkout orders, not stickers) ───
+  const [myOrders, setMyOrders] = useState<any[]>([]);
+  const [myOrdersLoading, setMyOrdersLoading] = useState(false);
+  const [myOrdersError, setMyOrdersError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeTab !== 'products') return;
+    let cancelled = false;
+    (async () => {
+      setMyOrdersLoading(true);
+      setMyOrdersError(null);
+      try {
+        const res = await apiClient.orders.mine();
+        if (!cancelled) setMyOrders(res?.data || []);
+      } catch (err: any) {
+        if (!cancelled) setMyOrdersError(err?.message || 'Failed to load your orders.');
+      } finally {
+        if (!cancelled) setMyOrdersLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab]);
+
+  // ─── LIVE VISITOR CHAT SESSIONS STATE ───
+  const [ownerSessions, setOwnerSessions] = useState<ChatSession[]>([]);
+  const [ownerSessionsLoading, setOwnerSessionsLoading] = useState(false);
+  const [selectedChatSession, setSelectedChatSession] = useState<ChatSession | null>(null);
+
+  const totalUnreadChats = ownerSessions.reduce((sum, s) => sum + (s.unread_owner_count || 0), 0);
+
+  const loadOwnerSessions = useCallback(async () => {
+    setOwnerSessionsLoading(true);
+    const res = await apiClient.chat.listOwnerSessions().catch(() => null);
+    setOwnerSessionsLoading(false);
+    if (res?.success && Array.isArray(res.data)) {
+      setOwnerSessions(res.data);
+    } else {
+      setOwnerSessions([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadOwnerSessions();
+  }, [loadOwnerSessions]);
 
   useEffect(() => {
     if (activeTab !== 'history' || products.length === 0) {
@@ -318,575 +434,722 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, products.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab, products.length]);
 
   const activeProduct = drawerProductId ? products.find((p) => p.id === drawerProductId) || null : null;
   const activeCount = products.filter((p) => p.status === 'Active').length;
   const totalScans = products.reduce((s, p) => s + (p.scans || 0), 0);
   const totalContacts = products.reduce((s, p) => s + (p.contacts?.length || 0), 0);
 
-  return (
-    <div className="h-screen w-full flex overflow-hidden text-gray-900 bg-[#F5F6FA]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-
-      {/* ─── SIDEBAR (Full Height h-screen) ─── */}
-      <aside
-        className={`w-[240px] flex-shrink-0 flex flex-col h-full py-5 px-3.5 z-30 transition-all duration-300 md:static fixed inset-y-0 left-0 overflow-y-auto custom-scrollbar ${
-          isMobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
-        }`}
-        style={{ background: "#14161C", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-      >
-        {/* Logo */}
-        <button onClick={onBack} className="flex items-center gap-3 px-2 mb-7 flex-shrink-0 cursor-pointer group">
-          <AppLogo variant="dark" className="h-7 w-auto object-contain transition-transform group-hover:scale-105" />
-        </button>
-
-        {/* Nav */}
-        <nav className="flex-1 space-y-1.5">
-          {NAV_ITEMS.map((item) => {
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => { setActiveTab(item.id); setIsMobileSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-white text-[#111111] shadow-[0_4px_16px_rgba(0,0,0,0.25)] font-bold scale-[1.02]'
-                    : 'text-white/70 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                <item.icon size={18} className={isActive ? 'text-[#EAB308]' : ''} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Profile + Sign Out */}
-        <div className="flex-shrink-0 pt-3 space-y-1" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-          <div className="flex items-center gap-3 px-2.5 py-2.5 rounded-xl bg-white/5 border border-white/10">
-            <img
-              src={profile?.avatarUrl || "https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&q=80&w=100"}
-              alt="User Avatar"
-              className="w-8.5 h-8.5 rounded-full object-cover flex-shrink-0 bg-white/10 p-0.5"
-              style={{ border: "2px solid rgba(234,179,8,0.6)" }}
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-[12px] font-bold text-white truncate leading-tight">{profile?.fullName || 'My Account'}</p>
-              <p className="text-[10px] font-bold mt-0.5 text-[#EAB308] truncate uppercase tracking-wider">Client Account</p>
-            </div>
-          </div>
-          <button
-            onClick={handleSignOut}
-            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] font-semibold text-red-400 hover:bg-white/10 transition-all cursor-pointer mt-1"
-          >
-            <LogOut size={17} />
-            <span>Sign Out</span>
-          </button>
+  // ─── DASHBOARD PREPARATION SPLASH LOADING ANIMATION ───
+  if (isPreparing) {
+    return (
+      <div className="fixed inset-0 bg-[#0F172A] z-50 flex flex-col items-center justify-center font-body p-6 text-center animate-fade-in">
+        <div className="mb-6 relative">
+          <AppLogo variant="dark" className="h-10 w-auto mx-auto object-contain" />
         </div>
-      </aside>
 
-      {/* ─── RIGHT CONTENT CONTAINER ─── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#F5F6FA]">
-        {/* Top Header Row (60px) */}
-        <header className="h-[60px] flex-shrink-0 bg-white border-b border-[#E8ECF4] flex items-center justify-between px-6 sm:px-8 z-20">
-          {/* Left Greeting */}
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-              className="md:hidden w-9 h-9 rounded-xl bg-[#F5F6FA] border border-[#E8ECF4] flex items-center justify-center text-gray-700 cursor-pointer"
-            >
-              <Menu size={18} />
+        <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mb-2">
+          Preparing your dashboard
+        </h2>
+        <p className="text-xs sm:text-sm text-slate-400 max-w-sm font-medium leading-relaxed">
+          Synchronizing safety stickers, emergency contacts, and protection settings...
+        </p>
+
+        <div className="w-48 h-1 bg-slate-800 rounded-full overflow-hidden mt-7">
+          <div className="h-full bg-amber-400 rounded-full animate-pulse w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen w-full flex flex-col overflow-x-hidden text-[#17181A] bg-[#F7F7F8] font-body pb-16">
+
+      <div className="flex flex-1 min-h-screen">
+        {/* ─── SIDEBAR (HoneyBook Dark Style from design.html) ─── */}
+        <aside
+          className={`w-[213px] flex-shrink-0 flex flex-col h-screen fixed left-0 top-0 bottom-0 py-3.5 px-2 bg-[#111315] text-[#DDD] z-30 transition-all duration-300 ${
+            isMobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
+          }`}
+        >
+          {/* Logo */}
+          <div className="flex items-center justify-between px-2 mb-3.5 flex-shrink-0">
+            <button onClick={onBack} className="flex items-center gap-2 cursor-pointer group">
+              <AppLogo variant="dark" className="h-8 w-auto object-contain transition-transform group-hover:scale-105" />
             </button>
-
-            <p className="text-[13.5px] font-medium text-[#475569]">
-              Hello <span className="font-extrabold text-[#0F172A]">{profile?.fullName || 'Client'}</span>
-            </p>
           </div>
 
-          {/* Right Search & Profile */}
-          <div className="flex items-center gap-3">
-            {/* Search Input */}
-            <div className="relative hidden md:block">
-              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search stickers or contacts..."
-                className="pl-9 pr-12 py-1.5 text-[12px] rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] text-[#1E293B] outline-none w-[220px] transition-all font-medium focus:w-[280px] focus:bg-white focus:border-[#D97706] focus:ring-2 focus:ring-[#D97706]/15"
-              />
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold px-1.5 py-0.5 rounded bg-white text-[#64748B] border border-[#E2E8F0]">
-                ⌘K
-              </span>
+          {/* Setup Box Widget */}
+          <div
+            onClick={() => setActiveTab('setup')}
+            className="border border-[#414347] rounded-[7px] p-2.5 mb-2.5 bg-[#292B2E]/60 hover:bg-[#292B2E] transition-colors cursor-pointer"
+          >
+            <div className="flex justify-between items-center text-[12px] text-white font-semibold mb-2">
+              <span>Set up your account</span>
+              <span className="text-[#4FC47A] font-bold">›</span>
             </div>
-
-            <button
-              onClick={() => {
-                setNotifBadgeVisible(false);
-                showToast('Notifications are shown in Alert History');
-              }}
-              title="Notifications"
-              className="relative w-9 h-9 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center text-[#64748B] hover:text-[#0F172A] hover:bg-white transition-colors cursor-pointer"
-            >
-              <Bell size={16} />
-              {notifBadgeVisible && (
-                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white" />
-              )}
-            </button>
-
-            <img
-              src={profile?.avatarUrl || "https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&q=80&w=100"}
-              alt="User Avatar"
-              className="w-9 h-9 rounded-xl object-cover bg-[#F1F5F9] border border-[#E2E8F0] cursor-pointer"
-            />
+            <div className="h-[5px] bg-[#3D4142] rounded-full overflow-hidden">
+              <div className="h-full bg-[#4FC47A] rounded-full w-[88%]" />
+            </div>
+            <div className="text-[11px] text-[#DDD] mt-1.5">6/7 completed</div>
           </div>
-        </header>
 
-        {/* ─── MAIN CONTENT VIEW PANEL ─── */}
-        <main className="flex-1 overflow-y-auto p-6 sm:p-9 space-y-6">
+          {/* Nav */}
+          <nav className="flex-1 space-y-0.5 overflow-y-auto custom-scrollbar">
+            {NAV_ITEMS.map((item) => {
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => { setActiveTab(item.id); setIsMobileSidebarOpen(false); }}
+                  className={`w-full h-[34px] rounded-[5px] flex items-center gap-2.5 px-2.5 text-[13px] transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-[#303235] text-white font-semibold'
+                      : 'text-[#C9CACC] hover:bg-[#303235]/60 hover:text-white'
+                  }`}
+                >
+                  <item.icon size={15} className={isActive ? 'text-[#5C78DF]' : 'text-[#888]'} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
 
-          {/* ════ VIEW 1: MY PRODUCTS / OVERVIEW ════ */}
-          {activeTab === 'overview' && (
-            <div className="space-y-6 animate-fade-in">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1D26]">
-                  My Safety Stickers
-                </h1>
-                <p className="text-xs sm:text-sm text-[#64748B] mt-1">
-                  Manage your active QR tags, emergency contacts, and protection settings.
+          {/* Bottom Nav Profile */}
+          <div className="pt-2 border-t border-[#292B2E] space-y-1">
+            <div className="flex items-center gap-2.5 p-2 rounded-[6px] bg-[#292B2E]">
+              <img
+                src={profile?.avatarUrl || "https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&q=80&w=100"}
+                alt="User Avatar"
+                className="w-7 h-7 rounded-full object-cover bg-white p-0.5"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-[12px] font-semibold text-white truncate leading-tight">{profile?.fullName || 'Client'}</p>
+                <p className={`text-[10px] truncate font-mono font-medium ${profile?.isPhoneVerified ? 'text-[#4FC47A]' : 'text-amber-400'}`}>
+                  {profile?.isPhoneVerified ? '✓ Phone Verified' : '⚠ Phone Unverified'}
                 </p>
               </div>
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-[5px] text-[12px] text-[#DC2626] hover:bg-[#DC2626]/10 transition-all cursor-pointer"
+            >
+              <LogOut size={14} />
+              <span>Sign Out</span>
+            </button>
+          </div>
+        </aside>
 
-              {/* ── Phone Verification & Sticker Linking Panel ── */}
-              <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-xs relative overflow-hidden">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="space-y-1 max-w-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#D97706]" />
-                      <h3 className="text-sm font-extrabold text-[#0F172A]">Verify Phone &amp; Load Associated Stickers</h3>
-                    </div>
-                    <p className="text-xs text-[#64748B] font-medium leading-relaxed">
-                      Enter your mobile number to verify ownership and load all safety QR tags associated with this phone.
+        {/* ─── RIGHT MAIN CONTENT CANVAS (margin-left: 213px) ─── */}
+        <div className="flex-1 md:ml-[213px] min-h-screen flex flex-col min-w-0">
+          
+          {/* Top Bar */}
+          <header className="h-[57px] flex-shrink-0 bg-[#F7F7F8] border-b border-[#E5E5E7] flex items-center justify-between px-6 sm:px-12 z-20">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+                className="md:hidden w-8 h-8 rounded-full bg-white border border-[#E5E5E7] flex items-center justify-center text-[#17181A] cursor-pointer"
+              >
+                <Menu size={16} />
+              </button>
+
+              <div className="bg-[#EFEFF0] rounded-full h-[31px] w-[140px] sm:w-[180px] flex items-center gap-2 px-3 text-[#6F7377] text-xs">
+                <Search size={13} />
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search..."
+                  className="bg-transparent border-none outline-none w-full text-xs text-[#17181A] placeholder-[#6F7377]"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 text-xs">
+              <span className="font-semibold text-[#477486] hidden sm:inline-flex items-center gap-1">
+                ◆ Pro Protection
+              </span>
+              <button
+                onClick={() => setActiveTab('chat')}
+                className="relative text-[#777] hover:text-[#17181A] cursor-pointer transition-colors"
+                title={totalUnreadChats > 0 ? `${totalUnreadChats} unread message(s)` : 'Live Chat Notifications'}
+              >
+                <Bell size={17} />
+                {totalUnreadChats > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-[#5579DC] text-white rounded-full text-[9px] px-1 font-bold animate-pulse">
+                    {totalUnreadChats}
+                  </span>
+                )}
+              </button>
+              <span className="bg-[#EEE9FF] text-[#7259D9] rounded px-1.5 py-1 text-xs font-bold">✦</span>
+            </div>
+          </header>
+
+          {/* Page Container (max-width: 1014px) */}
+          <main className="max-w-[1014px] w-full mx-auto p-4 sm:p-8 space-y-6">
+
+            {/* ── MANDATORY PHONE VERIFICATION ALERT BANNER ── */}
+            {(!profile?.isPhoneVerified && (!profile?.phoneNumber || profile?.isPhoneVerified === false)) && (
+              <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-fade-in">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-700 flex-shrink-0 mt-0.5 sm:mt-0">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+                      <span>{profile?.phoneNumber ? 'Action Required: Phone Verification Pending' : 'Action Required: Add & Verify Mobile Number'}</span>
+                      <span className="text-[10px] uppercase tracking-wider bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-bold">Unverified</span>
+                    </h4>
+                    <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                      {profile?.phoneNumber
+                        ? `Complete 6-digit OTP verification for ${profile.phoneNumber} to auto-claim safety stickers and enable emergency SMS alerts.`
+                        : 'Add and verify your mobile phone number via OTP to link safety stickers to your dashboard and enable instant emergency call bridges.'
+                      }
                     </p>
                   </div>
-
-                  {otpStep === 'input' ? (
-                    <form onSubmit={handleSendPhoneVerification} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 min-w-[300px]">
-                      <div className="flex-1">
-                        <PhoneInputWithCountry
-                          value={linkingPhone}
-                          onChange={(fullPhone) => setLinkingPhone(fullPhone)}
-                          placeholder="10-digit mobile number"
-                        />
-                      </div>
-                      <button
-                        type="submit"
-                        disabled={linkingLoading}
-                        className="px-4 py-2.5 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-xs font-bold text-white transition-all disabled:opacity-60 cursor-pointer flex items-center justify-center gap-2 flex-shrink-0"
-                      >
-                        {linkingLoading ? (
-                          <Loader2 size={14} className="animate-spin" />
-                        ) : (
-                          <>Verify &amp; Load Stickers</>
-                        )}
-                      </button>
-                    </form>
-                  ) : (
-                    <form onSubmit={handleConfirmPhoneOtp} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 min-w-[300px]">
-                      <input
-                        type="text"
-                        maxLength={6}
-                        value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value)}
-                        placeholder="Enter OTP (e.g. 000000)"
-                        className="px-3.5 py-2.5 text-xs font-mono font-extrabold tracking-widest text-center bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl outline-none focus:border-[#D97706] focus:ring-2 focus:ring-[#D97706]/15"
-                      />
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="submit"
-                          disabled={linkingLoading}
-                          className="px-4 py-2.5 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-xs font-bold text-white transition-all disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5"
-                        >
-                          {linkingLoading ? <Loader2 size={14} className="animate-spin" /> : 'Confirm Code'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setOtpStep('input'); setLinkingMessage(null); }}
-                          className="px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#64748B] transition-colors cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  )}
                 </div>
-
-                {linkingMessage && (
-                  <div className={`mt-3 p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between gap-2 ${
-                    linkingMessage.type === 'success' ? 'bg-[#DCFCE7] text-[#15803D] border border-[#BBF7D0]' : 'bg-[#FEE2E2] text-[#DC2626] border border-[#FCA5A5]'
-                  }`}>
-                    <span>{linkingMessage.text}</span>
-                    <button onClick={() => setLinkingMessage(null)} className="text-xs hover:opacity-75 cursor-pointer">✕</button>
-                  </div>
-                )}
-              </div>
-
-              {/* Stat Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-xs flex flex-col gap-2.5 hover:shadow-md transition-all">
-                  <div className="w-10 h-10 rounded-xl bg-[#DCFCE7] text-[#16A34A] flex items-center justify-center font-bold">
-                    <ShieldCheck size={20} />
-                  </div>
-                  <div className="text-2xl font-extrabold text-[#0F172A] leading-none">{activeCount}</div>
-                  <div className="text-xs font-semibold text-[#64748B]">Active Tags</div>
-                </div>
-
-                <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-xs flex flex-col gap-2.5 hover:shadow-md transition-all">
-                  <div className="w-10 h-10 rounded-xl bg-[#DBEAFE] text-[#2563EB] flex items-center justify-center font-bold">
-                    <Eye size={20} />
-                  </div>
-                  <div className="text-2xl font-extrabold text-[#0F172A] leading-none">{totalScans}</div>
-                  <div className="text-xs font-semibold text-[#64748B]">Total Scans Received</div>
-                </div>
-
-                <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-xs flex flex-col gap-2.5 hover:shadow-md transition-all">
-                  <div className="w-10 h-10 rounded-xl bg-[#FEE2E2] text-[#DC2626] flex items-center justify-center font-bold">
-                    <Users size={20} />
-                  </div>
-                  <div className="text-2xl font-extrabold text-[#0F172A] leading-none">{totalContacts}</div>
-                  <div className="text-xs font-semibold text-[#64748B]">Emergency Contacts</div>
-                </div>
-
-                <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-xs flex flex-col gap-2.5 hover:shadow-md transition-all">
-                  <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center font-bold">
-                    <Grid size={20} />
-                  </div>
-                  <div className="text-2xl font-extrabold text-[#0F172A] leading-none">{products.length}</div>
-                  <div className="text-xs font-semibold text-[#64748B]">Total Connected Tags</div>
-                </div>
-              </div>
-
-              {/* Product Grid OR Empty / Loading State */}
-              {productsLoading ? (
-                <div className="bg-white border border-[#E2E8F0] rounded-2xl p-16 text-center shadow-xs flex flex-col items-center gap-3">
-                  <Loader2 size={24} className="animate-spin text-[#64748B]" />
-                  <p className="text-xs font-semibold text-[#64748B]">Loading your stickers…</p>
-                </div>
-              ) : products.length === 0 ? (
-                <div className="bg-white border border-[#E2E8F0] rounded-2xl p-12 text-center space-y-3 shadow-xs max-w-md mx-auto">
-                  <div className="w-14 h-14 rounded-2xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mx-auto text-2xl shadow-inner">🛡️</div>
-                  <h3 className="text-lg font-extrabold text-[#0F172A]">No QR Tags Found</h3>
-                  <p className="text-xs text-[#64748B] leading-relaxed font-medium">
-                    Scan the QR code on your physical safety sticker to activate it and connect it to your account.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {products
-                    .filter((p) => {
-                      if (!searchQuery.trim()) return true;
-                      const q = searchQuery.toLowerCase();
-                      return (
-                        p.nickname?.toLowerCase().includes(q) ||
-                        p.code?.toLowerCase().includes(q) ||
-                        p.category?.toLowerCase().includes(q) ||
-                        p.vehicleDetails?.licensePlate?.toLowerCase().includes(q)
-                      );
-                    })
-                    .map((p) => (
-                    <div
-                      key={p.id}
-                      className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all relative overflow-hidden flex flex-col justify-between"
-                    >
-                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#EAB308] to-[#D97706]" />
-
-                      <div>
-                        {/* Top Header */}
-                        <div className="flex items-start justify-between gap-2 mb-4">
-                          <div className="flex items-center gap-3">
-                            <div
-                              onClick={() => setModal({ type: 'qrCode', sticker: p })}
-                              title="Click to view QR Code"
-                              className="w-11 h-11 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] flex items-center justify-center text-xl flex-shrink-0 cursor-pointer hover:scale-105 transition-transform"
-                            >
-                              {getCategoryIcon(p.category as any) || '🏷️'}
-                            </div>
-                            <div>
-                              <h3 className="font-bold text-base text-[#0F172A] leading-tight">{p.nickname}</h3>
-                              <p className="text-[11px] font-semibold text-[#94A3B8]">{getCategoryLabel(p.category as any) || p.code}</p>
-                            </div>
-                          </div>
-
-                          <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full border ${
-                            p.status === 'Active' ? 'bg-[#DCFCE7] text-[#16A34A] border-[#BBF7D0]' :
-                            p.status === 'Lost' ? 'bg-[#FEE2E2] text-[#DC2626] border-[#FCA5A5]' :
-                            p.status === 'Replaced' ? 'bg-[#DBEAFE] text-[#2563EB] border-[#93C5FD]' :
-                            'bg-[#FEF3C7] text-[#B45309] border-[#FDE68A]'
-                          }`}>
-                            {p.status}
-                          </span>
-                        </div>
-
-                        {/* Meta List */}
-                        <div className="space-y-2 my-3 text-xs border-y border-dashed border-[#E8ECF4] py-3">
-                          {p.meta?.map((m, idx) => (
-                            <div key={idx} className="flex justify-between">
-                              <span className="text-[#94A3B8] font-medium">{m[0]}</span>
-                              <span className="font-semibold text-[#1E293B]">{m[1]}</span>
-                            </div>
-                          ))}
-                          <div className="flex justify-between">
-                            <span className="text-[#94A3B8] font-medium">Total Scans</span>
-                            <span className="font-bold text-[#0F172A]">{p.scans || 0}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-[#94A3B8] font-medium">Last Scan</span>
-                            <span className="font-semibold text-[#1E293B]">{p.lastScan || 'Never'}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="pt-3 border-t border-[#E8ECF4] flex items-center gap-2">
-                        <button
-                          onClick={() => setDrawerProductId(p.id)}
-                          className="flex-1 py-2.5 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-xs font-bold text-white transition-colors cursor-pointer"
-                        >
-                          Manage Tag
-                        </button>
-                        <button
-                          onClick={() => setModal({ type: 'qrCode', sticker: p })}
-                          title="View & Scan QR Code"
-                          className="py-2.5 px-3 rounded-xl bg-[#FEF3C7] text-[#D97706] hover:bg-[#FDE68A] text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 flex-shrink-0"
-                        >
-                          <QrCode size={14} />
-                          <span>QR</span>
-                        </button>
-                        <button
-                          onClick={() => setModal({ type: 'delete', sticker: p })}
-                          title="Delete sticker"
-                          className="w-10 h-10 rounded-xl bg-[#FEE2E2] text-[#DC2626] hover:bg-[#FECACA] flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ════ VIEW 4: EMERGENCY CONTACTS ════ */}
-          {activeTab === 'contacts' && (
-            <EmergencyContactsPanel products={products} onSaveContacts={handleSaveContacts} />
-          )}
-
-          {/* ════ VIEW 5: EMERGENCY HISTORY (all stickers) ════ */}
-          {activeTab === 'history' && (
-            <div className="space-y-6 animate-fade-in">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1D26]">Emergency &amp; Activity History</h1>
-                <p className="text-xs sm:text-sm text-[#64748B] mt-1">Every scan and alert, across all your tags.</p>
-              </div>
-
-              <div className="bg-white border border-[#E8ECF4] rounded-3xl p-6 sm:p-8 max-w-3xl space-y-4 shadow-sm">
-                {allHistoryLoading ? (
-                  <div className="text-center py-12 flex flex-col items-center gap-3">
-                    <Loader2 size={22} className="animate-spin text-[#64748B]" />
-                    <p className="text-xs font-semibold text-[#64748B]">Loading activity…</p>
-                  </div>
-                ) : allHistory.length === 0 ? (
-                  <div className="text-center py-12 space-y-2">
-                    <div className="text-4xl mb-2">🛡️</div>
-                    <h3 className="font-bold text-lg text-[#1A1D26]">All clear</h3>
-                    <p className="text-xs text-[#64748B] max-w-xs mx-auto">No security logs recorded yet. Your family's network is quiet.</p>
-                  </div>
-                ) : (
-                  allHistory.map((log: any, i: number) => (
-                    <div key={log.id || i} className="flex gap-4 relative pb-4 last:pb-0">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 z-10 ${
-                        log.status === 'unread' ? 'bg-[#FEE2E2] text-[#DC2626]' :
-                        log.status === 'acknowledged' ? 'bg-[#FEF3C7] text-[#B45309]' :
-                        'bg-[#DCFCE7] text-[#16A34A]'
-                      }`}>
-                        {log.status === 'unread' ? '⚠️' : '🛡️'}
-                      </div>
-                      <div className="flex-1 bg-[#F5F6FA] rounded-xl p-3.5 border border-[#E8ECF4]">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="font-bold text-xs text-[#1A1D26] capitalize">{log.stickerNickname} — {String(log.type || 'event').replace(/_/g, ' ')}</span>
-                          <span className="text-[10px] text-[#94A3B8]">{log.created_at ? new Date(log.created_at).toLocaleString() : ''}</span>
-                        </div>
-                        <p className="text-xs text-[#64748B]">{log.message} <span className="font-mono text-[10px] text-[#94A3B8]">[{log.stickerCode}]</span></p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ════ VIEW 6: ACCOUNT SETTINGS ════ */}
-          {activeTab === 'settings' && (
-            <AccountSettingsPanel showToast={showToast} onAccountDeleted={handleSignOut} onProductsLinked={loadProducts} />
-          )}
-
-          {/* ════ VIEW 7: SUPPORT & LEGAL ════ */}
-          {activeTab === 'support' && (
-            <SupportLegalPanel showToast={showToast} />
-          )}
-
-        </main>
-      </div>
-
-      {/* ─── SLIDE-OVER DRAWER ─── */}
-      <div
-        className={`fixed inset-0 bg-[#111111]/40 z-40 transition-opacity duration-300 ${
-          activeProduct ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={() => setDrawerProductId(null)}
-      />
-
-      <aside className={`fixed top-0 right-0 bottom-0 w-[440px] max-w-[92vw] bg-[#F5F6FA] z-50 shadow-2xl transition-transform duration-300 ease-out flex flex-col ${
-        activeProduct ? 'translate-x-0' : 'translate-x-full'
-      }`}>
-        {activeProduct && (
-          <>
-            <div className="flex justify-between items-center px-6 py-5 border-b border-[#E8ECF4] bg-white">
-              <h3 className="font-bold text-lg text-[#1A1D26]">{activeProduct.nickname}</h3>
-              <button onClick={() => setDrawerProductId(null)} className="w-8 h-8 rounded-full bg-[#F5F6FA] flex items-center justify-center text-gray-500 hover:text-gray-900 cursor-pointer">
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {/* QR Box */}
-              <div className="bg-white border border-[#E8ECF4] rounded-2xl p-5 text-center space-y-3">
-                <div className="w-32 h-32 bg-white border border-[#E8ECF4] rounded-2xl p-2 mx-auto shadow-inner flex items-center justify-center">
-                  <svg viewBox="0 0 120 120" className="w-full h-full">
-                    <rect x="5" y="5" width="26" height="26" rx="4" fill="none" stroke="#201C15" strokeWidth="6"/>
-                    <rect x="11" y="11" width="14" height="14" rx="2" fill="#201C15"/>
-                    <rect x="89" y="5" width="26" height="26" rx="4" fill="none" stroke="#201C15" strokeWidth="6"/>
-                    <rect x="95" y="11" width="14" height="14" rx="2" fill="#201C15"/>
-                    <rect x="5" y="89" width="26" height="26" rx="4" fill="none" stroke="#201C15" strokeWidth="6"/>
-                    <rect x="11" y="95" width="14" height="14" rx="2" fill="#201C15"/>
-                    <rect x="42" y="10" width="8" height="8" fill="#201C15"/>
-                    <rect x="62" y="15" width="12" height="6" fill="#201C15"/>
-                    <rect x="36" y="44" width="48" height="32" rx="6" fill="#111111"/>
-                    <text x="60" y="64" fill="#fff" fontFamily="Inter" fontSize="9" fontWeight="800" textAnchor="middle">NamoQR</text>
-                  </svg>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleShareProfile(activeProduct.qrCodeId)}
-                    className="flex-1 py-2 rounded-xl bg-[#111111] hover:bg-black text-xs font-bold text-white cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <Share2 size={12} /> Share Profile
-                  </button>
-                  <button
-                    onClick={() => { setDrawerProductId(null); onBack(); }}
-                    className="flex-1 py-2 rounded-xl bg-[#F5F6FA] border border-[#E8ECF4] text-xs font-bold text-[#1A1D26] hover:bg-[#E2E8F0] cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <ShoppingBag size={12} /> Buy More
-                  </button>
-                </div>
-              </div>
-
-              {/* Stat Grid */}
-              <div className="grid grid-cols-2 gap-3 text-center">
-                <div className="bg-white border border-[#E8ECF4] rounded-xl p-3">
-                  <span className="text-xl font-bold block text-[#1A1D26]">{activeProduct.scans || 0}</span>
-                  <span className="text-[10px] font-bold text-[#64748B]">Total Scans</span>
-                </div>
-                <div className="bg-white border border-[#E8ECF4] rounded-xl p-3">
-                  <span className={`text-xl font-bold block ${activeProduct.status === 'Active' ? 'text-[#16A34A]' : 'text-[#B45309]'}`}>{activeProduct.status}</span>
-                  <span className="text-[10px] font-bold text-[#64748B]">Status</span>
-                </div>
-              </div>
-
-              {/* Emergency Contacts Card */}
-              <div className="bg-white border border-[#E8ECF4] rounded-2xl p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-xs text-[#1A1D26]">Emergency Contacts</h4>
-                  <button
-                    onClick={() => setModal({ type: 'editContacts', sticker: activeProduct })}
-                    className="text-[10px] font-bold text-[#2563EB] hover:underline cursor-pointer"
-                  >
-                    Edit
-                  </button>
-                </div>
-                {activeProduct.contacts.length === 0 ? (
-                  <p className="text-xs text-[#94A3B8] italic">No emergency contacts added yet.</p>
-                ) : (
-                  activeProduct.contacts.map((c, idx) => (
-                    <div key={idx} className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-[#1A1D26]">{c.name}</span>
-                      <span className="font-mono text-[#64748B]">{c.phone}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Sticker Actions */}
-              <div className="bg-white border border-[#E8ECF4] rounded-2xl p-4 space-y-2">
-                <h4 className="font-bold text-xs text-[#1A1D26] mb-1">Sticker Actions</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setModal({ type: 'editDetails', sticker: activeProduct })}
-                    className="py-2.5 rounded-xl bg-[#F5F6FA] border border-[#E8ECF4] text-xs font-bold text-[#1A1D26] hover:bg-[#E2E8F0] cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <Pencil size={13} /> Edit Details
-                  </button>
-                  <button
-                    onClick={() => setModal({ type: 'editContacts', sticker: activeProduct })}
-                    className="py-2.5 rounded-xl bg-[#F5F6FA] border border-[#E8ECF4] text-xs font-bold text-[#1A1D26] hover:bg-[#E2E8F0] cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <Users size={13} /> Edit Contacts
-                  </button>
-                  <button
-                    onClick={() => handleOpenHistory(activeProduct)}
-                    className="py-2.5 rounded-xl bg-[#F5F6FA] border border-[#E8ECF4] text-xs font-bold text-[#1A1D26] hover:bg-[#E2E8F0] cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <History size={13} /> Scan History
-                  </button>
-                  <button
-                    onClick={() => setModal({ type: 'transfer', sticker: activeProduct })}
-                    className="py-2.5 rounded-xl bg-[#F5F6FA] border border-[#E8ECF4] text-xs font-bold text-[#1A1D26] hover:bg-[#E2E8F0] cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <ArrowRightLeft size={13} /> Transfer
-                  </button>
-                </div>
-                {activeProduct.status === 'Active' ? (
-                  <button
-                    onClick={() => setModal({ type: 'deactivate', sticker: activeProduct })}
-                    className="w-full py-2.5 rounded-xl bg-[#FEF3C7] hover:bg-[#FDE68A] text-xs font-bold text-[#B45309] cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <Power size={13} /> Deactivate Sticker
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setModal({ type: 'reactivate', sticker: activeProduct })}
-                    className="w-full py-2.5 rounded-xl bg-[#DCFCE7] hover:bg-[#BBF7D0] text-xs font-bold text-[#16A34A] cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <RefreshCcw size={13} /> Reactivate Sticker
-                  </button>
-                )}
-              </div>
-
-              {/* Danger Zone */}
-              <div className="bg-white border border-[#FECACA] rounded-2xl p-4">
                 <button
-                  onClick={() => setModal({ type: 'delete', sticker: activeProduct })}
-                  className="w-full py-2.5 rounded-xl bg-[#FEE2E2] hover:bg-[#FECACA] text-xs font-bold text-[#DC2626] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  onClick={() => {
+                    setActiveTab('settings');
+                    setOtpStep('input');
+                  }}
+                  className="w-full sm:w-auto px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-2 flex-shrink-0 shadow-xs cursor-pointer"
                 >
-                  <Trash2 size={13} /> Delete Tag
+                  <Smartphone size={14} />
+                  <span>{profile?.phoneNumber ? 'Verify Phone via OTP' : 'Add & Verify Mobile Number'}</span>
+                  <ArrowRight size={14} />
                 </button>
               </div>
-            </div>
-          </>
-        )}
-      </aside>
+            )}
 
-      {/* ─── STICKER ACTION MODALS ─── */}
+            {/* ════ SETUP GUIDE PAGE ════ */}
+            {activeTab === 'setup' && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="bg-white border border-[#EEE] rounded-lg p-6 shadow-xs space-y-6">
+                  <div className="flex justify-between items-center border-b border-[#EEE] pb-4">
+                    <div>
+                      <h1 className="text-2xl font-bold text-[#17181A]">Welcome to RapiQR, {profile?.fullName || 'Client'}!</h1>
+                      <p className="text-xs text-[#777B80] mt-1">Let's start step-by-step to protect your vehicles.</p>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="font-semibold text-[#17181A]">3/3 completed</span>
+                      <div className="w-32 h-1.5 bg-[#DDD] rounded-full overflow-hidden">
+                        <div className="h-full bg-[#4FC47A] rounded-full w-full" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="border border-[#E3E3E5] rounded-md p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-5 h-5 rounded-full bg-[#55C77D] text-white flex items-center justify-center text-xs font-bold">✓</div>
+                        <div>
+                          <p className="font-semibold text-sm text-[#17181A]">Verify Mobile Phone Number OTP</p>
+                          <p className="text-xs text-[#777B80]">Verified mobile number linked: {profile?.phoneNumber || 'Active'}</p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold text-[#2E9E5B]">Completed</span>
+                    </div>
+
+                    <div className="border border-[#E3E3E5] rounded-md p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-5 h-5 rounded-full bg-[#55C77D] text-white flex items-center justify-center text-xs font-bold">✓</div>
+                        <div>
+                          <p className="font-semibold text-sm text-[#17181A]">Link Emergency Responders</p>
+                          <p className="text-xs text-[#777B80]">{totalContacts} emergency contact numbers active</p>
+                        </div>
+                      </div>
+                      <button onClick={() => setActiveTab('contacts')} className="text-xs font-bold text-[#5271D5] hover:underline">Configure ›</button>
+                    </div>
+
+                    <div className="border border-[#E3E3E5] rounded-md p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-5 h-5 rounded-full bg-[#55C77D] text-white flex items-center justify-center text-xs font-bold">✓</div>
+                        <div>
+                          <p className="font-semibold text-sm text-[#17181A]">Active Safety QR Plates</p>
+                          <p className="text-xs text-[#777B80]">{activeCount} active vehicle QR plates online</p>
+                        </div>
+                      </div>
+                      <button onClick={() => setActiveTab('overview')} className="text-xs font-bold text-[#5271D5] hover:underline">View Stickers ›</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ════ HOME OVERVIEW PAGE (Exact design.html layout) ════ */}
+            {activeTab === 'overview' && (
+              <div className="space-y-6">
+                
+                {/* Hero Greeting Section */}
+                <div className="flex justify-between items-start pt-2 pb-4">
+                  <div className="flex gap-4 items-center">
+                    <div className="w-[73px] h-[62px] relative overflow-hidden shrink-0 rounded-2xl bg-gradient-to-tr from-[#624FE1] via-[#D55BEA] to-[#4B72DB] p-0.5 shadow-md flex items-center justify-center text-white font-bold text-xl">
+                      RQ
+                    </div>
+                    <div>
+                      <div className="text-xs text-[#777] mb-1">
+                        {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                      </div>
+                      <h1 className="text-2xl sm:text-[28px] font-bold text-[#17181A] leading-tight tracking-tight">
+                        Good morning, {profile?.fullName?.split(' ')[0] || 'Client'}
+                      </h1>
+                      <p className="text-xs sm:text-sm text-[#777B80] mt-0.5">
+                        Pajama bottoms? No one has to know. Your vehicle safety protection is active.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right text-xs text-[#6F7377] hidden sm:block">
+                    <span className="font-semibold text-[#17181A]">RapiQR Pro Plan</span><br />
+                    <span className="text-[#43818D] font-semibold">Active Protection Enabled</span>
+                  </div>
+                </div>
+
+                {/* HoneyBook Stats Bar (4 columns) */}
+                <div className="bg-white border border-[#EEE] shadow-[0_1px_4px_rgba(0,0,0,0.04)] grid grid-cols-2 lg:grid-cols-4 rounded-lg overflow-hidden divide-x divide-y lg:divide-y-0 divide-[#EEE]">
+                  <div className="p-6">
+                    <div className="text-xs text-[#777B80] mb-1">Active Stickers <small className="text-[#999]">ⓘ</small></div>
+                    <div className="text-3xl font-light tracking-tight text-[#17181A]">{activeCount}</div>
+                  </div>
+                  <div className="p-6">
+                    <div className="text-xs text-[#777B80] mb-1">Total Scans <small className="text-[#999]">ⓘ</small></div>
+                    <div className="text-3xl font-light tracking-tight text-[#17181A]">{totalScans}</div>
+                  </div>
+                  <div className="p-6">
+                    <div className="text-xs text-[#777B80] mb-1">Emergency Contacts <small className="text-[#999]">ⓘ</small></div>
+                    <div className="text-3xl font-light tracking-tight text-[#17181A]">{totalContacts}</div>
+                  </div>
+                  <div className="p-6">
+                    <div className="text-xs text-[#777B80] mb-1">Security Status <small className="text-[#999]">ⓘ</small></div>
+                    <div className="text-2xl font-semibold text-[#4FC47A] tracking-tight mt-1">Protected</div>
+                  </div>
+                </div>
+
+                {/* Bento Grid (3 Columns) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  
+                  {/* Card 1: Create New */}
+                  <div className="bg-white border border-[#EEE] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4 flex flex-col justify-between min-h-[360px]">
+                    <div>
+                      <h3 className="text-xs font-semibold text-[#17181A] mb-3.5">Quick Actions</h3>
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => setActiveTab('chat')}
+                          className="w-full h-11 border border-[#E7E7E8] bg-[#FAFBFF] rounded hover:border-[#5878DA] flex items-center px-3 gap-2.5 text-xs text-[#17181A] font-bold hover:bg-[#F0F4FF] transition-colors cursor-pointer"
+                        >
+                          <span className="text-[#5878DA] font-bold text-sm">💬</span> Open Live Visitor Chat
+                        </button>
+                        <button
+                          onClick={() => setActiveTab('contacts')}
+                          className="w-full h-11 border border-[#E7E7E8] rounded hover:border-[#5878DA] flex items-center px-3 gap-2.5 text-xs text-[#17181A] font-medium hover:bg-[#F8FAFC] transition-colors cursor-pointer"
+                        >
+                          <span className="text-[#5878DA] font-bold text-sm">♙</span> Add Emergency Contact
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const found = await loadProducts();
+                            showToast(`Refreshed ${found?.length || 0} stickers`);
+                          }}
+                          className="w-full h-11 border border-[#E7E7E8] rounded hover:border-[#5878DA] flex items-center px-3 gap-2.5 text-xs text-[#17181A] font-medium hover:bg-[#F8FAFC] transition-colors cursor-pointer"
+                        >
+                          <span className="text-[#5878DA] font-bold text-sm">▣</span> Sync Safety Stickers
+                        </button>
+                        <button
+                          onClick={() => setModal({ type: 'qrCode', sticker: products[0] })}
+                          disabled={!products[0]}
+                          className="w-full h-11 border border-[#E7E7E8] rounded hover:border-[#5878DA] flex items-center px-3 gap-2.5 text-xs text-[#17181A] font-medium hover:bg-[#F8FAFC] transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          <span className="text-[#5878DA] font-bold text-sm">⚡</span> View QR Plate Code
+                        </button>
+                        <button
+                          onClick={() => setActiveTab('history')}
+                          className="w-full h-11 border border-[#E7E7E8] rounded hover:border-[#5878DA] flex items-center px-3 gap-2.5 text-xs text-[#17181A] font-medium hover:bg-[#F8FAFC] transition-colors cursor-pointer"
+                        >
+                          <span className="text-[#5878DA] font-bold text-sm">▤</span> Scan Logs & Alerts
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Active Stickers */}
+                  <div className="bg-white border border-[#EEE] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4 flex flex-col justify-between min-h-[360px]">
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <h3 className="text-xs font-semibold text-[#17181A]">My Safety Stickers ({products.length})</h3>
+                        <button onClick={() => loadProducts()} className="text-xs text-[#5275D9] hover:underline cursor-pointer">Refresh</button>
+                      </div>
+
+                      {productsLoading ? (
+                        <div className="py-12 text-center text-xs text-[#777]">Loading stickers...</div>
+                      ) : products.length === 0 ? (
+                        <div className="py-12 text-center text-xs text-[#777]">
+                          <p className="font-semibold mb-1 text-[#17181A]">No safety stickers linked yet.</p>
+                          <p>Verify phone number to fetch stickers.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
+                          {products.slice(0, 4).map((p) => (
+                            <div key={p.id} className="p-3 border border-[#E9E9EA] rounded-md bg-[#FAFBFF] flex items-center justify-between gap-2">
+                              <div>
+                                <p className="font-bold text-xs text-[#17181A]">{p.qrCodeId}</p>
+                                <p className="text-[11px] text-[#777] font-medium">{p.nickname || p.vehicleNumber || 'Vehicle Tag'}</p>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => setModal({ type: 'qrCode', sticker: p })}
+                                  className="px-2 py-1 bg-[#FFF7DC] border border-[#E0AE00] text-[#4A3900] text-[11px] font-bold rounded cursor-pointer"
+                                >
+                                  QR
+                                </button>
+                                <button
+                                  onClick={() => setModal({ type: 'editDetails', sticker: p })}
+                                  className="px-2 py-1 bg-white border border-[#E5E5E7] text-[#17181A] text-[11px] font-semibold rounded cursor-pointer"
+                                >
+                                  Edit
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="pt-2 text-xs font-semibold text-[#5275D9] cursor-pointer hover:underline" onClick={() => setActiveTab('overview')}>
+                      View all safety stickers ›
+                    </div>
+                  </div>
+
+                  {/* Card 3: Emergency Responders */}
+                  <div className="bg-white border border-[#EEE] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4 flex flex-col justify-between min-h-[360px]">
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <h3 className="text-xs font-semibold text-[#17181A]">Emergency Contacts ({totalContacts})</h3>
+                        <button onClick={() => setActiveTab('contacts')} className="text-xs text-[#5275D9] hover:underline cursor-pointer">＋ Contact</button>
+                      </div>
+
+                      <div className="space-y-3 mt-4">
+                        {products[0]?.contacts?.length ? (
+                          products[0].contacts.map((c, i) => (
+                            <div key={i} className="flex justify-between items-center text-xs pb-2 border-b border-[#F0F0F2]">
+                              <div>
+                                <span className="font-bold text-[#17181A] block">{c.name}</span>
+                                <span className="text-[11px] text-[#777]">{c.relation || 'Emergency Contact'}</span>
+                              </div>
+                              <span className="font-mono text-[11px] font-semibold text-[#5878DA]">{c.phone}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="py-10 text-center text-xs text-[#777]">
+                            <p>No emergency contacts added yet.</p>
+                            <button onClick={() => setActiveTab('contacts')} className="text-[#5275D9] font-bold mt-2 hover:underline">Add Emergency Responders</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="pt-2 text-xs font-semibold text-[#5275D9] cursor-pointer hover:underline" onClick={() => setActiveTab('contacts')}>
+                      Manage responder contacts ›
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Lower Grid (2 Columns: Scans & Activity Log) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+                  <div className="bg-white border border-[#EEE] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="text-xs font-semibold text-[#17181A]">Recent Scans Log ⓘ</h3>
+                      <button onClick={() => setActiveTab('history')} className="text-xs text-[#5275D9] hover:underline">Full Log</button>
+                    </div>
+                    <div className="space-y-2 mt-3">
+                      {allHistory.slice(0, 2).map((h, i) => (
+                        <div key={i} className="border border-[#E9E9EA] rounded p-2.5 flex items-center gap-3">
+                          <div className="border-l-4 border-[#9EACF0] bg-[#FAFBFF] px-2 py-1 text-center text-xs font-bold min-w-[50px]">
+                            {new Date(h.created_at).getDate()}
+                            <small className="block text-[9px] font-normal uppercase">{new Date(h.created_at).toLocaleDateString('en-US', { month: 'short' })}</small>
+                          </div>
+                          <div className="text-xs min-w-0 flex-1">
+                            <p className="font-semibold text-[#17181A] truncate">{h.stickerCode} scanned</p>
+                            <p className="text-[10px] text-[#777]">{h.event_type || 'Vehicle QR Scan Recorded'}</p>
+                          </div>
+                        </div>
+                      ))}
+                      {allHistory.length === 0 && (
+                        <p className="text-xs text-[#777] py-6 text-center">No scan events recorded recently.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-[#EEE] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="text-xs font-semibold text-[#17181A]">Activity Stream ⓘ</h3>
+                      <button onClick={() => setActiveTab('history')} className="text-xs text-[#5275D9] hover:underline">View All</button>
+                    </div>
+                    <div className="space-y-2 mt-3 text-xs">
+                      <div className="p-2.5 bg-[#FAFAF9] rounded border border-[#EAEAEC] flex justify-between">
+                        <span>▱ &nbsp; Verified Protection Active</span>
+                        <span className="text-[#777]">Live</span>
+                      </div>
+                      <div className="p-2.5 bg-[#FAFAF9] rounded border border-[#EAEAEC] flex justify-between">
+                        <span>♙ &nbsp; Responder SMS Notification Ready</span>
+                        <span className="text-[#777]">Active</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* ════ VIEW: LIVE VISITOR CHAT INBOX ════ */}
+            {activeTab === 'chat' && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex justify-between items-start flex-wrap gap-4">
+                  <div>
+                    <h1 className="font-display text-[26px] font-bold text-[#17181C]">
+                      Live Visitor Chat Inbox
+                    </h1>
+                    <p className="text-[13.5px] text-[#777B80] mt-1">
+                      Real-time chat threads from visitors scanning your safety stickers
+                    </p>
+                  </div>
+                  <button
+                    onClick={loadOwnerSessions}
+                    disabled={ownerSessionsLoading}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-[#EAEAEC] text-xs font-bold text-[#17181C] hover:bg-[#FAFAF9] cursor-pointer"
+                  >
+                    <RefreshCcw size={14} className={ownerSessionsLoading ? 'animate-spin' : ''} /> Refresh Inbox
+                  </button>
+                </div>
+
+                {ownerSessionsLoading ? (
+                  <div className="bg-white border border-[#EEE] rounded-lg p-16 text-center text-[#777]">
+                    <Loader2 size={32} className="animate-spin mx-auto mb-2 text-[#5275D9]" />
+                    <p className="text-xs font-semibold">Loading live visitor chat sessions...</p>
+                  </div>
+                ) : ownerSessions.length === 0 ? (
+                  <div className="bg-white border border-[#EEE] rounded-lg p-12 text-center text-[#777] space-y-3">
+                    <div className="w-14 h-14 rounded-2xl bg-[#E8EDFF] text-[#5271D5] mx-auto flex items-center justify-center font-bold">
+                      <MessageSquare size={28} />
+                    </div>
+                    <p className="text-sm font-bold text-[#17181A]">Your inbox is empty</p>
+                    <p className="text-xs text-[#777B80] max-w-md mx-auto">
+                      When a visitor scans your vehicle's QR plate and sends a message, their live chat thread will appear here so you can reply instantly.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-white border border-[#EEE] rounded-lg overflow-hidden divide-y divide-[#EEE]">
+                    {ownerSessions.map((sess) => (
+                      <div
+                        key={sess.id}
+                        onClick={() => setSelectedChatSession(sess)}
+                        className="p-4 hover:bg-[#FAFBFF] transition-colors flex items-center justify-between gap-4 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="w-10 h-10 rounded-full bg-[#E8EDFF] text-[#5271D5] flex items-center justify-center font-bold text-sm shrink-0">
+                            <MessageCircle size={20} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-sm text-[#17181A] truncate">{sess.customer_name || 'Visitor'}</p>
+                              {sess.vehicle_label && (
+                                <span className="px-2 py-0.5 rounded bg-[#FAFAF9] border border-[#E5E5E7] text-[10px] font-mono font-semibold text-[#777]">
+                                  {sess.vehicle_label}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-[#777B80] truncate mt-0.5">{sess.last_message_preview || 'No messages yet'}</p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-[11px] text-[#999] font-mono">
+                            {sess.last_message_at ? new Date(sess.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                          </span>
+                          <button
+                            className="mt-1 block text-xs font-bold text-[#5271D5] hover:underline"
+                          >
+                            Open Chat ›
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+
+              </div>
+            )}
+
+            {/* ════ VIEW 1B: PRODUCTS (PURCHASE / ORDER HISTORY) ════ */}
+            {activeTab === 'products' && (
+              <div className="space-y-6">
+                <div>
+                  <h1 className="font-display text-[26px] font-bold text-[#17181C]">
+                    Products
+                  </h1>
+                  <p className="text-[13.5px] text-[#777B80] mt-1">
+                    Your purchase history — every order placed at checkout, with payment status.
+                  </p>
+                </div>
+
+                {myOrdersLoading ? (
+                  <div className="bg-white border border-[#EAEAEC] rounded-[14px] p-16 text-center text-[#9EA0AA]">
+                    <Loader2 size={32} className="animate-spin mx-auto mb-2 text-[#F6C000]" />
+                    <p className="text-[13.5px] font-semibold text-[#17181C]">Loading your orders...</p>
+                  </div>
+                ) : myOrdersError ? (
+                  <div className="bg-white border border-[#EAEAEC] rounded-[14px] p-16 text-center text-[#9EA0AA]">
+                    <AlertTriangle size={32} className="mx-auto mb-2 text-[#DC2626]" />
+                    <p className="text-[13.5px] font-semibold text-[#17181C]">{myOrdersError}</p>
+                  </div>
+                ) : myOrders.length === 0 ? (
+                  <div className="bg-white border border-[#EAEAEC] rounded-[14px] p-16 text-center text-[#9EA0AA]">
+                    <ShoppingBag size={34} className="mx-auto mb-3 opacity-50 text-[#F6C000]" />
+                    <p className="text-[13.5px] text-[#17181C] font-semibold">No orders yet.</p>
+                    <p className="text-[12.5px] text-[#9EA0AA] mt-1">Purchases you make on the RapiQR store will show up here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {myOrders.map((o) => {
+                      const payStatus: string = o.payment?.status || 'created';
+                      const payLabel = payStatus === 'paid' ? 'Paid' : payStatus === 'failed' ? 'Payment Failed' : 'Awaiting Payment';
+                      const payColor = payStatus === 'paid' ? 'text-[#2E9E5B] bg-[#E9F9EF]' : payStatus === 'failed' ? 'text-[#DC2626] bg-[#FDEAEA]' : 'text-[#B8863F] bg-[#FBF3E4]';
+                      const fulfillColor =
+                        o.status === 'delivered' ? 'text-[#2E9E5B] bg-[#E9F9EF]' :
+                        o.status === 'cancelled' ? 'text-[#DC2626] bg-[#FDEAEA]' :
+                        o.status === 'shipped' ? 'text-[#5271D5] bg-[#E8EDFF]' :
+                        'text-[#B8863F] bg-[#FBF3E4]';
+                      return (
+                        <div key={o.id} className="bg-white border border-[#EAEAEC] rounded-[14px] p-5">
+                          <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-display font-semibold text-[15px] text-[#17181C]">{o.id}</h3>
+                                <span className="text-[11px] text-[#9EA0AA] font-mono">{o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-IN') : ''}</span>
+                              </div>
+                              <p className="text-[12.5px] text-[#777B80] mt-0.5 flex items-center gap-1.5">
+                                <Package size={13} className="text-[#9EA0AA]" />
+                                {(o.items || []).length} item{(o.items || []).length !== 1 ? 's' : ''} · <span className="font-mono">₹{(o.total || 0).toLocaleString('en-IN')}</span>
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2.5 py-1 rounded-[4px] text-[11px] font-bold uppercase tracking-wide ${payColor}`}>{payLabel}</span>
+                              <span className={`px-2.5 py-1 rounded-[4px] text-[11px] font-bold uppercase tracking-wide capitalize ${fulfillColor}`}>{o.status}</span>
+                            </div>
+                          </div>
+                          <div className="mt-3 pt-3 border-t border-[#F3F3F4] divide-y divide-[#F3F3F4]">
+                            {(o.items || []).map((it: any, i: number) => (
+                              <div key={i} className="flex items-center justify-between py-1.5 text-[13px]">
+                                <span className="text-[#17181C]">{it.name} × {it.qty}</span>
+                                <span className="font-mono text-[#777B80]">₹{(it.price * it.qty).toLocaleString('en-IN')}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ════ VIEW 2: EMERGENCY CONTACTS ════ */}
+            {activeTab === 'contacts' && (
+              <EmergencyContactsPanel
+                products={products}
+                onSaveContacts={handleSaveContacts}
+              />
+            )}
+
+            {/* ════ VIEW 3: ALERT HISTORY ════ */}
+            {activeTab === 'history' && (
+              <div className="space-y-6">
+                <div>
+                  <h1 className="font-display text-[26px] font-bold text-[#17181C]">
+                    Alert History
+                  </h1>
+                  <p className="text-[13.5px] text-[#777B80] mt-1">
+                    Log of scan events and responder alerts across your stickers
+                  </p>
+                </div>
+
+                {allHistoryLoading ? (
+                  <div className="bg-white border border-[#EAEAEC] rounded-[14px] p-16 text-center text-[#9EA0AA]">
+                    <Loader2 size={32} className="animate-spin mx-auto mb-2 text-[#F6C000]" />
+                    <p className="text-[13.5px] font-semibold text-[#17181C]">Fetching alert history...</p>
+                  </div>
+                ) : allHistory.length === 0 ? (
+                  <div className="bg-white border border-[#EAEAEC] rounded-[14px] p-16 text-center text-[#9EA0AA]">
+                    <History size={34} className="mx-auto mb-3 opacity-50 text-[#F6C000]" />
+                    <p className="text-[13.5px] text-[#17181C] font-semibold">No alert events recorded yet.</p>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-[14px] border border-[#EAEAEC] overflow-hidden">
+                    <table className="w-full text-sm text-[#17181C]">
+                      <thead>
+                        <tr className="text-left font-display text-[12px] font-semibold text-[#777B80] tracking-normal bg-[#FAFAF9] border-b border-[#EAEAEC]">
+                          <th className="px-6 py-3">Sticker</th>
+                          <th className="px-3 py-3">Event</th>
+                          <th className="px-3 py-3">Time</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#EAEAEC]">
+                        {allHistory.map((h, i) => (
+                          <tr key={i} className="hover:bg-[#FAFAF9]">
+                            <td className="px-6 py-3 font-display font-semibold text-[15px]">{h.stickerCode}</td>
+                            <td className="px-3 py-3 text-xs">{h.event_type || 'Scan Recorded'}</td>
+                            <td className="px-3 py-3 font-mono text-xs text-[#9EA0AA]">{new Date(h.created_at).toLocaleString('en-IN')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ════ VIEW 4: ACCOUNT SETTINGS ════ */}
+            {activeTab === 'settings' && (
+              <AccountSettingsPanel showToast={showToast} onProductsLinked={loadProducts} />
+            )}
+
+            {/* ════ VIEW 5: SUPPORT & LEGAL ════ */}
+            {activeTab === 'support' && (
+              <SupportLegalPanel showToast={showToast} />
+            )}
+
+          </main>
+        </div>
+      </div>
+
+
+
+      {/* ─── LIVE VISITOR CHAT RIGHT-SIDE DRAWER ─── */}
+      {selectedChatSession && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
+            onClick={() => setSelectedChatSession(null)}
+          />
+          <div className="relative z-10 w-full sm:w-[450px] max-w-full h-full bg-white shadow-2xl flex flex-col border-l border-[#EAEAEC] animate-slide-in-right">
+            <RepiChat
+              mode="owner"
+              sessionId={selectedChatSession.id}
+              title={`${selectedChatSession.customer_name} (${selectedChatSession.qr_code_id})`}
+              subtitle={selectedChatSession.vehicle_label || undefined}
+              onClose={() => setSelectedChatSession(null)}
+              className="h-full"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODALS ─── */}
+      {modal?.type === 'qrCode' && (
+        <QrCodeModal
+          sticker={modal.sticker}
+          onClose={() => setModal(null)}
+          onShowToast={showToast}
+        />
+      )}
       {modal?.type === 'editDetails' && (
         <EditDetailsModal
           sticker={modal.sticker}
@@ -901,77 +1164,23 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
           onSave={(contacts) => handleSaveContacts(modal.sticker.id, contacts)}
         />
       )}
-      {modal?.type === 'transfer' && (
-        <TransferModal
-          sticker={modal.sticker}
-          onClose={() => setModal(null)}
-          onTransfer={(email) => handleTransfer(modal.sticker.id, email)}
-        />
-      )}
-      {modal?.type === 'history' && (
-        <ScanHistoryModal
-          sticker={modal.sticker}
-          history={historyData}
-          loading={historyLoading}
-          onClose={() => setModal(null)}
-        />
-      )}
-      {modal?.type === 'deactivate' && (
-        <ConfirmActionModal
-          title="Deactivate this sticker?"
-          description={<><span className="font-bold text-gray-900">{modal.sticker.nickname}</span> will stop triggering alerts and hide contact details on scan until you reactivate it.</>}
-          confirmLabel="Deactivate"
-          tone="warning"
-          busy={modalBusy}
-          onCancel={() => setModal(null)}
-          onConfirm={() => handleSetStatus(modal.sticker, false)}
-        />
-      )}
-      {modal?.type === 'reactivate' && (
-        <ConfirmActionModal
-          title="Reactivate this sticker?"
-          description={<><span className="font-bold text-gray-900">{modal.sticker.nickname}</span> will go live again — scans will resume triggering alerts.</>}
-          confirmLabel="Reactivate"
-          tone="info"
-          busy={modalBusy}
-          onCancel={() => setModal(null)}
-          onConfirm={() => handleSetStatus(modal.sticker, true)}
-        />
-      )}
-      {modal?.type === 'delete' && (
-        <ConfirmActionModal
-          title="Delete this sticker?"
-          description={<><span className="font-bold text-gray-900">{modal.sticker.nickname}</span> will be permanently removed from your dashboard. This cannot be undone.</>}
-          confirmLabel="Delete"
-          tone="danger"
-          busy={modalBusy}
-          onCancel={() => setModal(null)}
-          onConfirm={() => handleConfirmDelete(modal.sticker)}
-        />
-      )}
-      {modal?.type === 'qrCode' && (
-        <QrCodeModal
-          sticker={modal.sticker}
-          onClose={() => setModal(null)}
-          onShowToast={showToast}
-        />
-      )}
 
-      {/* ─── COMPLETE PROFILE POPUP (missing phone and/or email) ─── */}
       {showCompleteProfilePopup && (
         <CompleteProfilePopup
           missingPhone={missingPhone}
           missingEmail={missingEmail}
           onDismiss={() => setProfilePopupDismissed(true)}
-          onGoToSettings={() => { setActiveTab('settings'); setProfilePopupDismissed(true); }}
+          onGoToSettings={() => {
+            setActiveTab('settings');
+            setProfilePopupDismissed(true);
+          }}
+          onProductsLinked={loadProducts}
         />
       )}
 
-      {/* ─── TOAST NOTIFICATION ─── */}
       {toastMsg && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#111111] text-white px-5 py-3 rounded-full text-xs font-bold shadow-2xl animate-bounce flex items-center gap-2">
-          <Sparkles size={15} className="text-white" />
-          <span>{toastMsg}</span>
+        <div className="fixed bottom-6 right-6 z-[120] bg-[#17181C] text-white px-4 py-2.5 rounded-[9px] shadow-lg font-mono text-[13px] border border-[#F6C000]">
+          {toastMsg}
         </div>
       )}
     </div>

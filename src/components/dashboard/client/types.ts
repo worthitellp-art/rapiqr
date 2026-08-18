@@ -28,11 +28,16 @@ export interface DashboardSticker {
   isBackendManaged: boolean; // true when backed by a real products row (API or Supabase-direct)
 }
 
-function titleCaseStatus(raw?: string): StickerStatus {
-  const s = String(raw || 'active').toLowerCase();
-  if (s === 'inactive') return 'Inactive';
+// A sticker only reads as "Active" when both layers agree: the owner's product
+// record AND the underlying QR code itself (which the fleet admin can deactivate
+// independently). Previously this only looked at the product row, so a card
+// could claim "Active" while the QR code behind it was switched off.
+function computeStatus(productStatus?: string, qrStatus?: string): StickerStatus {
+  const s = String(productStatus || 'active').toLowerCase();
   if (s === 'lost') return 'Lost';
   if (s === 'replaced') return 'Replaced';
+  if (s === 'inactive') return 'Inactive';
+  if (qrStatus && qrStatus !== 'active') return 'Inactive';
   return 'Active';
 }
 
@@ -68,7 +73,7 @@ export function mapProductRow(row: any): DashboardSticker {
     category,
     nickname: row.name || `${getCategoryLabel(category as any) || 'Safety'} Sticker (${qrCodeId})`,
     assigned: row.assigned_to || 'Self',
-    status: titleCaseStatus(row.status),
+    status: computeStatus(row.status, qr.status),
     scans: qr.scans_count ?? row.scans_count ?? 0,
     lastScan: formatDate(qr.last_scanned_at ?? row.last_scanned_at),
     ownerPhone: details.ownerPhone || '',

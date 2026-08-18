@@ -4,24 +4,33 @@ import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
 
 const STICKER_SRC = stickerTemplateImg;
 const EDITOR_DISPLAY = { w: 320, h: 200 };
+const DEFAULT_SP: StickerPos = { x: 110, y: 40, w: 100, h: 100 };
+
+function getSavedStickerPos(): StickerPos {
+  try {
+    const saved = localStorage.getItem("repiqr-sticker-pos");
+    if (saved) return JSON.parse(saved);
+  } catch { /* fallback */ }
+  return DEFAULT_SP;
+}
 
 interface StickerThumbProps {
   qr: QrRecord;
-  templates: Template[];
+  templates?: Template[];
+  stickerPos?: StickerPos;
   size?: number;
   fullWidth?: boolean;
 }
 
 export default function StickerThumb({
   qr,
-  templates,
+  stickerPos,
   size = 96,
   fullWidth = false,
 }: StickerThumbProps) {
-  const tpl = templates.find((t) => t.name === qr.template) || templates[0];
-  const sp: StickerPos = tpl?.stickerPos || { x: 110, y: 40, w: 100, h: 100 };
-  const qrFg = (qr?.fg || tpl?.fg || "EAB308").replace(/#/g, "");
-  const qrBg = (qr?.bg || tpl?.bg || "FFFFFF").replace(/#/g, "");
+  const sp = stickerPos || getSavedStickerPos();
+  const qrFg = "000000"; // Pure Black
+  const qrBg = "FFFFFF"; // Pure White
 
   if (fullWidth) {
     const qrXPercent = (sp.x / EDITOR_DISPLAY.w) * 100;
@@ -31,7 +40,7 @@ export default function StickerThumb({
 
     return (
       <div
-        className="w-full relative overflow-hidden bg-slate-100"
+        className="w-full relative overflow-hidden bg-[#0A0B0F]"
         style={{ aspectRatio: `${EDITOR_DISPLAY.w} / ${EDITOR_DISPLAY.h}` }}
       >
         <img
@@ -72,7 +81,7 @@ export default function StickerThumb({
         overflow: "hidden",
         borderRadius: 8,
         flexShrink: 0,
-        boxShadow: "0 4px 16px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.08)",
+        boxShadow: "0 4px 16px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2)",
       }}
     >
       <img

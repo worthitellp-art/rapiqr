@@ -7,3 +7,10 @@ postman request POST 'https://panelv3.cloudshope.com/api/outboundCallQr' \
     "mobile_number": "9368xxxxxx" 
 }' \
   --auth-bearer-token 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjI3OTAwLCJ1c2VybmFtZSI6IkRpdnk2ODU1OCIsIm1haW5fdXNlciI6Mjc5MDAsInNvdXJjZSI6ImEiLCJpYXQiOjE3ODY3Njc3MTAsImV4cCI6MTgxODMwMzcxMCwianRpIjoiMTc4Njc2NzcxMDQ5NyJ9.hQ5PMTIxoR0njVZrjNJUbOtjI6fOSo-2PowI6PiGscw'
+
+
+
+
+
+key_id,key_secret
+rzp_test_TPxmqU5mM69f1a,Y6FXPlCSJRs0zsVGbzLHlzzM

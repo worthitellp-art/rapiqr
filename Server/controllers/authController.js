@@ -21,19 +21,27 @@ class AuthController {
     try {
       const { email, password, fullName, phoneNumber } = req.body;
 
-      if (!email || !password) {
-        logger.warn('AUTH_SIGNUP', 'Signup attempt missing email or password');
-        return res.status(400).json({ success: false, error: 'Email and password are required' });
+      if ((!email && !phoneNumber) || !password) {
+        logger.warn('AUTH_SIGNUP', 'Signup attempt missing required credentials');
+        return res.status(400).json({ success: false, error: 'Email or phone number, and password are required' });
       }
 
-      logger.info('AUTH_SIGNUP', `Processing signup for email: ${email}`);
+      let targetEmail = (email || '').trim().toLowerCase();
+      let formattedPhone = phoneNumber ? String(phoneNumber).trim() : '';
+
+      if (!targetEmail && formattedPhone) {
+        const digits = formattedPhone.replace(/\D/g, '');
+        targetEmail = `${digits}@phone.repiqr.local`;
+      }
+
+      logger.info('AUTH_SIGNUP', `Processing signup for identity: ${targetEmail || formattedPhone}`);
 
       // Create auth user in Supabase
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email,
+        email: targetEmail,
         password,
         email_confirm: true,
-        user_metadata: { full_name: fullName }
+        user_metadata: { full_name: fullName, phone_number: formattedPhone || undefined }
       });
 
       if (authError) {
@@ -45,18 +53,9 @@ class AuthController {
       const profile = await UserModel.upsertProfile({
         id: user.id,
         email: user.email,
-        fullName: fullName || email.split('@')[0],
-        phoneNumber: phoneNumber || undefined
+        fullName: fullName || (email ? email.split('@')[0] : formattedPhone),
+        phoneNumber: formattedPhone || undefined
       });
-
-      // Immediately link any sticker already registered under this phone number
-      // (e.g. activated on the scan page before this account existed), rather
-      // than waiting for the next products fetch to pick it up.
-      if (phoneNumber) {
-        ProductModel.autoClaimByPhone(profile.id, profile.full_name, phoneNumber).catch((err) => {
-          logger.error('PRODUCT_AUTO_CLAIM', 'Failed to auto-claim products after signup', err);
-        });
-      }
 
       const token = jwt.sign(
         { id: profile.id, email: profile.email, role: profile.role },
@@ -64,7 +63,7 @@ class AuthController {
         { expiresIn: '7d' }
       );
 
-      logger.success('AUTH_SIGNUP', `User registered successfully: ${email} (${profile.role})`);
+      logger.success('AUTH_SIGNUP', `User registered successfully: ${profile.email} (${profile.role})`);
 
       return res.json({
         success: true,
@@ -369,19 +368,26 @@ class AuthController {
         return res.status(400).json({ success: false, error: messages[result.reason] || 'Verification failed.' });
       }
 
+      await UserModel.mergeMetadata(req.user.id, {
+        phone_verified: true,
+        phone_verified_at: new Date().toISOString()
+      });
+
       const updated = await UserModel.updateProfile(req.user.id, { phoneNumber: result.phone });
       if (!updated) return res.status(500).json({ success: false, error: 'Failed to save verified phone number.' });
 
+      const finalProfile = (await UserModel.findById(req.user.id)) || updated;
+
       let claimedCount = 0;
       try {
-        const claimed = await ProductModel.autoClaimByPhone(req.user.id, updated.full_name, result.phone);
+        const claimed = await ProductModel.autoClaimByPhone(req.user.id, finalProfile.full_name, result.phone);
         claimedCount = claimed.length;
       } catch (err) {
         logger.error('PRODUCT_AUTO_CLAIM', 'Failed to auto-claim products after verified phone update', err);
       }
 
       logger.user('PHONE_VERIFIED', `Phone number verified & linked for ${req.user.email}`, { claimedCount });
-      return res.json({ success: true, user: updated, claimedCount });
+      return res.json({ success: true, user: finalProfile, claimedCount });
     } catch (err) {
       logger.error('PHONE_OTP_VERIFY', 'Failed to verify phone code', err);
       return res.status(500).json({ success: false, error: err.message });

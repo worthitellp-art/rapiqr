@@ -8,7 +8,10 @@ import {
   saveStickerImageToDb,
   bulkSaveQrCodesToDb,
   getReportsFromDb,
+  deleteQrCodeFromDb,
+  deleteAllQrCodesFromDb,
 } from "../lib/supabaseService";
+import QrRowActions from "./dashboard/admin/QrRowActions";
 import stickerTemplateImg from "../../assets/template-sticker.jpeg";
 import groupLogo from "../../assets/Group 1000005716.png";
 import groupLogo1 from "../../assets/darkbglogo.png";
@@ -1034,7 +1037,16 @@ function QrCodesPage({
             <button onClick={downloadCsv} disabled={qrList.length === 0} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all disabled:opacity-40 cursor-pointer">
               <Download size={12} /> Export CSV
             </button>
-            <button onClick={() => { setQrList([]); setToast("All QR codes cleared"); setTimeout(() => setToast(null), 1500); }} disabled={qrList.length === 0} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 transition-all disabled:opacity-40 cursor-pointer">
+            <button onClick={async () => {
+              setQrList([]);
+              try {
+                localStorage.removeItem("repiqr-qrlist");
+                localStorage.removeItem("namoqr-qrlist");
+              } catch { /* ignore */ }
+              await deleteAllQrCodesFromDb();
+              setToast("All QR codes cleared from database");
+              setTimeout(() => setToast(null), 1500);
+            }} disabled={qrList.length === 0} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 transition-all disabled:opacity-40 cursor-pointer">
               <Trash2 size={12} /> Clear all
             </button>
           </div>
@@ -1087,22 +1099,28 @@ function QrCodesPage({
                       <td className="px-2 py-3 text-[11px] text-gray-600 font-semibold">{fmtDate(q.createdAt)}</td>
                       <td className="px-2 py-3"><StatusPill status={q.status} /></td>
                       <td className="px-6 py-3">
-                        <div className="flex items-center justify-end gap-0.5">
-                          <button
-                            onClick={() => { dispatchActivationToUserDashboard(q); setToast(`Code ${actCode} dispatched`); setTimeout(() => setToast(null), 2000); }}
-                            className="w-7 h-7 rounded-lg hover:bg-yellow-50 hover:text-yellow-600 flex items-center justify-center text-gray-500 transition-all cursor-pointer"
-                            title="Dispatch to user"
-                          >
-                            <UserPlus size={13} />
-                          </button>
-                          <CopyLinkButton qrId={q.id} compact />
-                          <button onClick={() => openQuickLook(q)} className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 transition-all cursor-pointer" title="Quick look">
-                            <Eye size={13} />
-                          </button>
-                          <button onClick={() => { setQrList((prev) => prev.filter((x) => x.id !== q.id)); setToast("QR deleted"); setTimeout(() => setToast(null), 1500); }} className="w-7 h-7 rounded-lg hover:bg-red-50 hover:text-red-500 flex items-center justify-center text-gray-400 transition-all cursor-pointer">
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
+                        <QrRowActions
+                          qr={q}
+                          openQuickLook={openQuickLook}
+                          setDeleteTarget={async (target) => {
+                            const deleted = await deleteQrCodeFromDb(target.id);
+                            if (!deleted) {
+                              setToast(`Failed to delete ${target.id} — it still exists in the database. Please try again.`);
+                              setTimeout(() => setToast(null), 3000);
+                              return;
+                            }
+                            setQrList((prev) => {
+                              const updated = prev.filter((x) => x.id !== target.id);
+                              try {
+                                localStorage.setItem("repiqr-qrlist", JSON.stringify(updated));
+                                localStorage.setItem("namoqr-qrlist", JSON.stringify(updated));
+                              } catch { /* ignore */ }
+                              return updated;
+                            });
+                            setToast("QR deleted from database");
+                            setTimeout(() => setToast(null), 1500);
+                          }}
+                        />
                       </td>
                     </tr>
                   );

@@ -1,17 +1,25 @@
 import type React from "react";
 import StickerEditor from "./StickerEditor";
-import { Template, StickerPos } from "./types";
+import { StickerPos } from "./types";
 
 export default function CustomizePage({
-  templates, setTemplates, stickerPos, setStickerPos, setToast,
+  stickerPos = { x: 110, y: 40, w: 100, h: 100 },
+  setStickerPos = () => {},
+  setToast = () => {},
 }: {
-  templates: Template[]; setTemplates: React.Dispatch<React.SetStateAction<Template[]>>;
-  stickerPos: StickerPos; setStickerPos: (p: StickerPos) => void;
-  setToast: (msg: string | null) => void;
+  templates?: any;
+  setTemplates?: any;
+  stickerPos?: StickerPos;
+  setStickerPos?: (p: StickerPos) => void;
+  setToast?: (msg: string | null) => void;
 }) {
   return (
-    <div className="px-8 pt-7 pb-10 space-y-6 text-gray-900">
-      <StickerEditor stickerPos={stickerPos} setStickerPos={setStickerPos} templates={templates} setTemplates={setTemplates} setToast={setToast} />
+    <div className="px-8 pt-7 pb-16 space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
+      <StickerEditor
+        stickerPos={stickerPos}
+        setStickerPos={setStickerPos}
+        setToast={setToast}
+      />
     </div>
   );
 }

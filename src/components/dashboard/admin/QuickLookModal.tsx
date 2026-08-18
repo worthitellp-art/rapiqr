@@ -7,34 +7,33 @@ interface QuickLookModalProps {
   qr: QrRecord | null;
   onClose: () => void;
   stickerPos?: StickerPos;
-  templates: Template[];
+  templates?: Template[];
 }
 
 export default function QuickLookModal({
   qr,
   onClose,
-  templates,
 }: QuickLookModalProps) {
   if (!qr) return null;
 
   const displayCode = qr.id;
-  const displayLabel = qr.vehicleName ? `${qr.vehicleName}` : "QR STICKER CODE";
+  const displayLabel = qr.vehicleName ? `${qr.vehicleName}` : "FLEET TAG CODE";
 
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      style={{ background: "rgba(15, 23, 42, 0.65)", backdropFilter: "blur(6px)" }}
+      style={{ background: "rgba(23, 24, 28, 0.5)", backdropFilter: "blur(6px)" }}
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden text-slate-900 border border-slate-100 relative"
+        className="bg-white shadow-[0_1px_4px_rgba(0,0,0,0.03)] w-full max-w-sm overflow-hidden text-[#17181A] border border-[#E5E5E7] relative font-body"
         style={{ animation: "modalIn 0.22s cubic-bezier(0.16, 1, 0.3, 1)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Floating Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-slate-900/40 hover:bg-slate-900/70 text-white flex items-center justify-center backdrop-blur-md transition-all cursor-pointer shadow-sm"
+          className="absolute top-3 right-3 z-20 w-8 h-8 rounded-[4px] bg-white/90 hover:bg-white text-[#17181A] flex items-center justify-center transition-all cursor-pointer border border-[#E5E5E7]"
           aria-label="Close modal"
           title="Close"
         >
@@ -42,16 +41,16 @@ export default function QuickLookModal({
         </button>
 
         {/* Top side sticker image full width of card */}
-        <div className="w-full bg-slate-100 relative overflow-hidden">
-          <StickerThumb qr={qr} templates={templates} fullWidth />
+        <div className="w-full bg-[#F3F3F4] relative overflow-hidden border-b border-[#E5E5E7]">
+          <StickerThumb qr={qr} fullWidth />
         </div>
 
-        {/* Bottom Details: Code text and only Copy & Open buttons */}
+        {/* Bottom Details: Code text and Copy & Open buttons */}
         <div className="px-6 pt-5 pb-6 flex flex-col items-center text-center">
-          <h3 className="font-mono font-black text-slate-900 text-xl tracking-tight">
+          <h3 className="font-display font-semibold text-[#17181A] text-[24px] tracking-wider">
             {displayCode}
           </h3>
-          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.15em] mt-1">
+          <p className="text-[10.5px] font-bold text-[#9CA0A6] uppercase tracking-widest mt-0.5">
             {displayLabel}
           </p>
 

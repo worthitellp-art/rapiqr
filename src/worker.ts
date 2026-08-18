@@ -5,7 +5,7 @@
  */
 
 export interface CloudflareEnvironment {
-  ASSETS: Fetcher;
+  ASSETS: { fetch(request: Request | string): Promise<Response> };
 }
 
 export default {

@@ -45,7 +45,7 @@ export interface StickerPos {
 
 export interface SystemAlertItem {
   id: string;
-  category: "emergency" | "activation" | "scan" | "fleet";
+  category: "emergency" | "assistance" | "activation" | "scan" | "fleet";
   title: string;
   subtitle: string;
   timestamp: string;
@@ -57,4 +57,6 @@ export interface SystemAlertItem {
   message?: string;
   location?: string;
   details?: string;
+  /** True only for a real SOS/accident location-share from the emergency screen — not a routine assistance request. */
+  isTrueEmergency?: boolean;
 }
