@@ -541,17 +541,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('namoqr-auth-user', JSON.stringify(updated));
         return { success: true, claimedCount: res.claimedCount || 0 };
       }
+      return { success: false, error: (res as any)?.error || 'Verification failed.' };
     } catch (err: any) {
-      console.warn('Backend OTP verification failed, completing verification locally:', err?.message || err);
+      // A real backend rejection (wrong/expired code, or the code was lost —
+      // e.g. a server restart wiped the in-memory OTP store) must surface as a
+      // real error. Silently marking the phone "verified" here only in local
+      // state — without the backend ever writing profiles.phone_number /
+      // metadata.phone_verified — is what caused the dashboard to ask for
+      // phone verification again on every reload/login: the fake local
+      // "verified" flag never survived a refreshProfile() or getMe() refetch.
+      return { success: false, error: err?.message || 'Verification failed. Please try again.' };
     }
-
-    // Reliable fallback for direct/demo/offline modes: activate phone on profile
-    const updated = { ...profile, phoneNumber: pendingPhone, isPhoneVerified: true };
-    if (profile.role === 'admin') updated.role = 'admin';
-    setProfile(updated);
-    localStorage.setItem('repiqr-auth-user', JSON.stringify(updated));
-    localStorage.setItem('namoqr-auth-user', JSON.stringify(updated));
-    return { success: true, claimedCount: 0 };
   };
 
   // Re-pulls the profile after Account Settings changes (name/phone/email). Only

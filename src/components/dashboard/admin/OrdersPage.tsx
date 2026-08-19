@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   ShoppingBag, Search, Package, Truck, CheckCircle2, XCircle, Clock,
-  Phone, Mail, MapPin, IndianRupee, CreditCard,
+  Phone, Mail, MapPin, IndianRupee, CreditCard, Trash2, AlertTriangle, Loader2
 } from "lucide-react";
 import { apiClient } from "../../../lib/apiClient";
 import { fmtDateTime } from "./helpers";
@@ -61,6 +61,8 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: "single"; order: Order } | { type: "all" } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadOrders = async () => {
     setLoading(true);
@@ -99,6 +101,48 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
     }
   };
 
+  const handleDeleteSingle = async (orderId: string) => {
+    setDeleting(true);
+    try {
+      const res = await apiClient.orders.delete(orderId);
+      if (res?.success) {
+        setOrders((prev) => prev.filter((o) => o.id !== orderId));
+        if (selectedOrder?.id === orderId) {
+          setSelectedOrder(null);
+        }
+        setToast(`Order ${orderId} deleted successfully.`);
+        setDeleteConfirm(null);
+      } else {
+        setToast(res?.message || "Failed to delete order.");
+      }
+    } catch (err: any) {
+      setToast(err?.message || "Failed to delete order.");
+    } finally {
+      setDeleting(false);
+      setTimeout(() => setToast(null), 2500);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    setDeleting(true);
+    try {
+      const res = await apiClient.orders.deleteAll();
+      if (res?.success) {
+        setOrders([]);
+        setSelectedOrder(null);
+        setToast("All orders deleted successfully.");
+        setDeleteConfirm(null);
+      } else {
+        setToast(res?.message || "Failed to delete orders.");
+      }
+    } catch (err: any) {
+      setToast(err?.message || "Failed to delete orders.");
+    } finally {
+      setDeleting(false);
+      setTimeout(() => setToast(null), 2500);
+    }
+  };
+
   const filteredOrders = orders.filter((o) => {
     const matchesFilter = filter === "all" || o.status === filter;
     const q = searchQuery.trim().toLowerCase();
@@ -116,7 +160,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
   const revenue = orders.filter((o) => o.payment?.status === "paid").reduce((sum, o) => sum + (o.total || 0), 0);
 
   return (
-    <div className="px-8 pt-7 pb-16 space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
+    <div className="px-8 pt-7 pb-16 space-y-7 text-[#17181A] font-body relative" style={{ background: "#F7F7F8" }}>
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -125,11 +169,11 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
             Orders
           </h1>
           <p className="text-[13px] text-[#777B80] mt-0.5">
-            Every order placed at checkout — track fulfillment and contact customers.
+            Every order placed at checkout — track fulfillment, contact customers, and manage records.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[4px] bg-[#FBF3E4] text-[#B8863F] text-[12px] font-semibold">
             <Clock size={14} />
             <span className="font-mono font-bold">{placedCount}</span> Awaiting Shipment
@@ -138,6 +182,16 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
             <IndianRupee size={14} />
             <span className="font-mono font-bold">₹{revenue.toLocaleString("en-IN")}</span> Revenue
           </div>
+          {orders.length > 0 && (
+            <button
+              onClick={() => setDeleteConfirm({ type: "all" })}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-red-50 text-red-600 border border-red-200 text-[12px] font-semibold hover:bg-red-100 transition-colors cursor-pointer"
+              title="Delete all orders"
+            >
+              <Trash2 size={13} />
+              Clear All Orders
+            </button>
+          )}
         </div>
       </div>
 
@@ -272,17 +326,29 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-3 border-t border-[#F3F3F4] mt-1">
+                    <div className="flex items-center justify-between pt-3 border-t border-[#F3F3F4] mt-1 gap-2 flex-wrap">
                       <span className="text-[10px] font-mono text-[#9CA0A6]">Placed: {fmtDateTime(order.createdAt)}</span>
-                      {NEXT_STATUS[order.status] && (
+                      <div className="flex items-center gap-2">
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleStatusChange(order.id, NEXT_STATUS[order.status]!); }}
-                          disabled={updatingStatus}
-                          className="px-3.5 py-1.5 rounded-[4px] text-[12px] font-bold bg-[#17181A] text-white hover:bg-[#2A2B2E] transition-all cursor-pointer disabled:opacity-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteConfirm({ type: "single", order });
+                          }}
+                          className="p-1.5 rounded text-[#9CA0A6] hover:text-[#DC2626] hover:bg-red-50 transition-colors cursor-pointer"
+                          title="Delete this order"
                         >
-                          Mark as {STATUS_META[NEXT_STATUS[order.status]!].label}
+                          <Trash2 size={14} />
                         </button>
-                      )}
+                        {NEXT_STATUS[order.status] && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleStatusChange(order.id, NEXT_STATUS[order.status]!); }}
+                            disabled={updatingStatus}
+                            className="px-3.5 py-1.5 rounded-[4px] text-[12px] font-bold bg-[#17181A] text-white hover:bg-[#2A2B2E] transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            Mark as {STATUS_META[NEXT_STATUS[order.status]!].label}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -420,6 +486,17 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                     })}
                   </div>
                 </div>
+
+                <div className="pt-3 border-t border-[#F3F3F4]">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirm({ type: "single", order: selectedOrder })}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-[4px] text-[12px] font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors cursor-pointer"
+                  >
+                    <Trash2 size={14} />
+                    Delete Order Record
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="py-12 text-center text-[#9CA0A6] text-[12.5px]">
@@ -429,6 +506,55 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-xl border border-gray-100 space-y-4 animate-scale-up">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0 mt-0.5">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">
+                  {deleteConfirm.type === "all" ? "Delete All Orders?" : `Delete Order ${deleteConfirm.order.id}?`}
+                </h3>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  {deleteConfirm.type === "all"
+                    ? "This will permanently delete all order records from the database. This action cannot be undone."
+                    : `Are you sure you want to delete the order record for "${deleteConfirm.order.name}" (₹${deleteConfirm.order.total.toLocaleString("en-IN")})?`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(null)}
+                disabled={deleting}
+                className="px-4 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-[4px] transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (deleteConfirm.type === "all") {
+                    handleDeleteAll();
+                  } else {
+                    handleDeleteSingle(deleteConfirm.order.id);
+                  }
+                }}
+                disabled={deleting}
+                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-[4px] transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {deleting && <Loader2 size={13} className="animate-spin" />}
+                <span>{deleting ? "Deleting..." : deleteConfirm.type === "all" ? "Yes, Delete All" : "Yes, Delete"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

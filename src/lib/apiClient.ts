@@ -535,6 +535,18 @@ export const apiClient = {
         body: JSON.stringify({ status }),
       });
     },
+
+    async delete(id: string) {
+      return request<{ success: boolean; message?: string }>(`/orders/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+    },
+
+    async deleteAll() {
+      return request<{ success: boolean; message?: string }>('/orders', {
+        method: 'DELETE',
+      });
+    },
   },
 
   // Razorpay checkout payment flow (test mode) — see docs/razorpayapi.md

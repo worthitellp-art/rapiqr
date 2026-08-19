@@ -854,7 +854,7 @@ export async function updateProductDetailsInDb(productId: string, updates: Recor
       .update(payload)
       .eq('id', productId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
     return { success: true, data };
@@ -893,7 +893,7 @@ export async function updateProductContactsInDb(productId: string, contacts: { n
       .update({ details: mergedDetails })
       .eq('id', productId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
     return { success: true, data };
@@ -923,7 +923,7 @@ export async function setProductStatusInDb(productId: string, active: boolean, q
       .update({ status: active ? 'active' : 'inactive' })
       .eq('id', productId)
       .select()
-      .single();
+      .maybeSingle();
     if (error) throw error;
 
     if (qrCodeId) {

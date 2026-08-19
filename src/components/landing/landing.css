@@ -9,15 +9,18 @@
   --paper-white:  #FFFFFF;
   --paper-warm:   #EEE9DF;
 
-  /* Brand */
+  /* Brand — deepened navy for stronger AA contrast (was #1A3A5C/#234E7D);
+     validated against the "trust navy + premium gold" reference palette. */
   --ink:          #0E1117;
   --ink-soft:     #4A5568;
   --ink-faint:    #9AA5B4;
-  --brand:        #1A3A5C;
-  --brand-mid:    #234E7D;
+  --brand:        #14304F;
+  --brand-mid:    #22507F;
   --brand-light:  #EAF0F8;
 
-  /* Accent (CTAs, active states) */
+  /* Accent (CTAs, active states) — #F0A500 already clears 4.5:1 against
+     --ink text; --accent-deep is the AA-safe choice when accent needs to
+     be the text/foreground color instead of a background. */
   --accent:       #F0A500;
   --accent-deep:  #C98800;
   --accent-light: #FFF8E6;
@@ -29,12 +32,12 @@
 
   /* Borders & shadows */
   --border:       rgba(14,17,23,0.09);
-  --border-brand: rgba(26,58,92,0.25);
+  --border-brand: rgba(20,48,79,0.25);
   --shadow-sm:    0 2px 8px rgba(14,17,23,0.05);
   --shadow-md:    0 8px 28px rgba(14,17,23,0.09);
   --shadow-lg:    0 20px 50px rgba(14,17,23,0.13);
   --shadow-accent:0 12px 32px rgba(240,165,0,0.30);
-  --shadow-brand: 0 14px 40px rgba(26,58,92,0.22);
+  --shadow-brand: 0 14px 40px rgba(20,48,79,0.22);
 
   /* Radii */
   --r-sm:  8px;
@@ -42,6 +45,30 @@
   --r-lg:  20px;
   --r-xl:  28px;
   --r-full:9999px;
+
+  /* Focus ring — used by :focus-visible throughout this file */
+  --ring: 0 0 0 2px var(--paper-white), 0 0 0 4.5px rgba(20,48,79,0.55);
+  --ring-on-dark: 0 0 0 2px rgba(14,17,23,0.85), 0 0 0 4.5px rgba(240,165,0,0.65);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16,1,0.3,1);
+  --ease-spring: cubic-bezier(0.34,1.56,0.64,1);
+
+  /* Type scale — fluid, clamp()-based so headings scale smoothly instead of
+     jumping at breakpoints. */
+  --fs-display-lg: clamp(2.5rem, 4.5vw + 1rem, 4.25rem);
+  --fs-display-md: clamp(2rem, 3vw + 1rem, 3rem);
+  --fs-display-sm: clamp(1.5rem, 1.5vw + 1rem, 2rem);
+}
+
+.namo-landing *:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: var(--r-sm);
+}
+.namo-landing .on-dark:focus-visible,
+.namo-landing [data-on-dark] *:focus-visible {
+  box-shadow: var(--ring-on-dark);
 }
 
 /* ── Base ── */
@@ -49,7 +76,7 @@
   background-color: var(--paper);
   color: var(--ink);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  line-height: 1.5;
+  line-height: 1.55;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -71,7 +98,7 @@
 .display-title {
   font-family: 'DM Serif Display', Georgia, serif;
   letter-spacing: -0.02em;
-  line-height: 1.06;
+  line-height: 1.08;
   font-weight: 400;
 }
 
@@ -81,6 +108,19 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ink-faint);
+}
+
+.section-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-eyebrow::before {
+  content: '';
+  width: 20px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
 }
 
 /* ── QR Dot Grid Background Motif ── */
@@ -147,12 +187,13 @@
   transform: scale(0.96);
 }
 
-/* ── Buttons ── */
+/* ── Buttons — min 44px hit height throughout for touch ── */
 .btn-cta {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  min-height: 48px;
   background: var(--accent);
   color: var(--ink);
   font-family: 'Inter', sans-serif;
@@ -163,7 +204,7 @@
   border: none;
   cursor: pointer;
   box-shadow: var(--shadow-accent);
-  transition: transform 0.22s cubic-bezier(0.34,1.56,0.64,1),
+  transition: transform 0.22s var(--ease-spring),
               box-shadow 0.22s ease;
 }
 .btn-cta:hover {
@@ -177,6 +218,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  min-height: 44px;
   background: transparent;
   color: var(--ink);
   font-family: 'Inter', sans-serif;
@@ -199,6 +241,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  min-height: 46px;
   background: var(--accent);
   color: var(--ink);
   font-family: 'Inter', sans-serif;
@@ -209,7 +252,7 @@
   border: none;
   cursor: pointer;
   box-shadow: var(--shadow-accent);
-  transition: all 0.22s cubic-bezier(0.34,1.56,0.64,1);
+  transition: all 0.22s var(--ease-spring);
 }
 .btn-brand:hover {
   background: var(--accent-deep);
@@ -237,25 +280,29 @@
 .nav-cta:hover { background: #262b36; }
 .nav-cta:active { background: var(--ink); }
 
-/* ── Hero CTAs (scoped to hero only — precise, restrained, no glow/pill) ── */
+/* ── Hero CTAs — matches the amber-pill brand CTA used across the rest of
+   the page (products, combos, categories all use .btn-brand's look). ── */
 .hero-btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: var(--ink);
-  color: #fff;
+  background: var(--accent);
+  color: var(--ink);
   font-family: 'Inter', sans-serif;
-  font-weight: 600;
+  font-weight: 800;
   font-size: 15px;
-  padding: 13px 22px;
-  border-radius: 10px;
+  padding: 15px 26px;
+  border-radius: var(--r-full);
   border: none;
   cursor: pointer;
-  transition: background 0.15s ease;
+  box-shadow: var(--shadow-accent);
+  transition: background 0.2s ease, transform 0.2s var(--ease-spring), box-shadow 0.2s ease;
 }
-.hero-btn-primary:hover { background: #262b36; }
-.hero-btn-primary:active { background: var(--ink); }
+.hero-btn-primary:hover {
+  background: var(--accent-deep);
+  box-shadow: 0 18px 42px rgba(240,165,0,0.4);
+}
 .hero-btn-primary svg { transition: transform 0.15s ease; }
 .hero-btn-primary:hover svg { transform: translateX(2px); }
 
@@ -264,21 +311,24 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: transparent;
+  background: var(--paper-white);
   color: var(--ink);
   font-family: 'Inter', sans-serif;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 15px;
-  padding: 12px 20px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
+  padding: 14px 24px;
+  border-radius: var(--r-full);
+  border: 1.5px solid var(--border);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 .hero-btn-secondary:hover {
-  border-color: var(--ink-faint);
-  background: var(--paper);
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff;
 }
+.hero-btn-secondary svg { color: var(--ink-faint); transition: color 0.15s ease; }
+.hero-btn-secondary:hover svg { color: #fff; }
 
 /* ── Floating Cart Button (bottom-right) ── */
 .floating-cart-btn {
@@ -480,6 +530,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-height: 42px;
   padding: 10px 22px;
   border-radius: var(--r-full);
   font-size: 13.5px;
@@ -1066,8 +1117,10 @@
 }
 .cart-toast-close {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 4px;
+  right: 4px;
+  width: 32px;
+  height: 32px;
   background: none;
   border: none;
   color: var(--ink-faint);
@@ -1075,7 +1128,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3px;
   border-radius: 50%;
   transition: color 0.15s ease, background 0.15s ease;
 }
@@ -1744,7 +1796,8 @@
 
 /* ── Filter Pills (product grid) ── */
 .filter-chip {
-  padding: 8px 20px;
+  min-height: 40px;
+  padding: 10px 20px;
   border-radius: var(--r-full);
   font-size: 13px;
   font-weight: 600;

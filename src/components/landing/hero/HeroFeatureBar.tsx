@@ -20,8 +20,8 @@ export default function HeroFeatureBar() {
               } ${i % 2 === 1 ? 'sm:border-l sm:pl-6' : ''}`}
               style={{ borderColor: '#eeeeee' }}
             >
-              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-amber-50">
-                <f.icon size={19} className="text-amber-500" strokeWidth={2} />
+              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: 'var(--accent-light)' }}>
+                <f.icon size={19} style={{ color: 'var(--accent-deep)' }} strokeWidth={2} />
               </div>
               <div className="min-w-0">
                 <div className="text-[13.5px] font-bold text-neutral-900">{f.title}</div>

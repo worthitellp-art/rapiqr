@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback, type FormEvent } from "react"
 import { Send, X, MessageCircle, Loader2, Check, CheckCheck } from "lucide-react";
 import { apiClient, type ChatMessage } from "../../lib/apiClient";
 import { connectAsOwner, connectAsCustomer } from "../../lib/socketClient";
+import { soundNotification } from "../../utils/soundNotification";
 import type { Socket } from "socket.io-client";
 
 interface RepiChatProps {
@@ -45,6 +46,7 @@ export default function RepiChat({
   const [ready, setReady] = useState(false);
   const [peerTyping, setPeerTyping] = useState(false);
   const [resolvedTitle, setResolvedTitle] = useState(title);
+  const headerTitle = resolvedTitle || title || (mode === "owner" ? "Visitor" : "Vehicle Owner");
 
   const listRef = useRef<HTMLDivElement>(null);
   const sentInitialRef = useRef(false);
@@ -130,6 +132,13 @@ export default function RepiChat({
       if (msg.session_id !== sessionId) return;
       appendMessage(msg);
       setPeerTyping(false);
+      if (msg.sender_type !== mode) {
+        soundNotification.playMessageChime();
+        soundNotification.showBrowserNotification(
+          headerTitle || "New Chat Message",
+          msg.body.length > 60 ? `${msg.body.slice(0, 60)}…` : msg.body
+        );
+      }
     };
     const onTyping = (payload: { sessionId: string; isTyping: boolean; from: "owner" | "customer" }) => {
       if (payload.sessionId !== sessionId || payload.from === mode) return;
@@ -144,7 +153,7 @@ export default function RepiChat({
       socket.off("new_message", onNewMessage);
       socket.off("typing", onTyping);
     };
-  }, [ready, sessionId, mode, customerToken, appendMessage]);
+  }, [ready, sessionId, mode, customerToken, appendMessage, headerTitle]);
 
   // Auto-scroll to the newest message.
   useEffect(() => {
@@ -194,8 +203,6 @@ export default function RepiChat({
     send(input);
     setInput("");
   };
-
-  const headerTitle = resolvedTitle || title || (mode === "owner" ? "Visitor" : "Vehicle Owner");
 
   return (
     <div className={`flex flex-col h-full w-full bg-white ${className}`}>

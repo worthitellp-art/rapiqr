@@ -42,11 +42,7 @@ class UserModel {
 
   /**
    * Update the owner's own name / phone (used by Account Settings).
-   * Intentionally does not catch-and-return-null like the other methods here:
-   * a swallowed error previously surfaced to the client as a hardcoded, useless
-   * "Failed to update profile" no matter what actually went wrong (bad row id,
-   * constraint violation, connectivity) — real failures must propagate so the
-   * controller (and the user) can see the real reason.
+   * Uses maybeSingle and creates/upserts the profile row if it did not exist yet.
    */
   static async updateProfile(userId, updates) {
     const payload = {};
@@ -59,14 +55,39 @@ class UserModel {
       .update(payload)
       .eq('id', userId)
       .select('id, email, full_name, phone_number, avatar_url, role, subscription_plan, is_subscribed, metadata')
-      .single();
+      .maybeSingle();
 
-    if (error) throw error;
-    return data;
+    if (error) {
+      console.error('UserModel.updateProfile Error:', error);
+      throw error;
+    }
+
+    if (data) return data;
+
+    // Fallback: If no row was updated (profile row didn't exist in public.profiles yet),
+    // fetch user identity from Supabase Auth and upsert.
+    let email = null;
+    let authName = null;
+    try {
+      const { data: authData } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (authData?.user) {
+        email = authData.user.email;
+        authName = authData.user.user_metadata?.full_name;
+      }
+    } catch (authErr) {
+      console.warn('UserModel.updateProfile: failed to fetch auth user', authErr);
+    }
+
+    return await this.upsertProfile({
+      id: userId,
+      email: email || `${userId}@user.local`,
+      fullName: updates.fullName || authName || (email ? email.split('@')[0] : 'User'),
+      phoneNumber: updates.phoneNumber
+    });
   }
 
   /**
-   * Shallow-merge new keys into profiles.metadata (used for 2FA state, etc).
+   * Shallow-merge new keys into profiles.metadata (used for 2FA state, phone verification, etc).
    */
   static async mergeMetadata(userId, patch) {
     try {
@@ -78,10 +99,26 @@ class UserModel {
         .update({ metadata: mergedMetadata })
         .eq('id', userId)
         .select('id, email, full_name, phone_number, avatar_url, role, subscription_plan, is_subscribed, metadata')
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
-      return data;
+      if (data) return data;
+
+      // If no profile exists yet, upsert with merged metadata
+      if (!current) {
+        let email = null;
+        try {
+          const { data: authData } = await supabaseAdmin.auth.admin.getUserById(userId);
+          if (authData?.user) email = authData.user.email;
+        } catch { /* ignore */ }
+
+        return await this.upsertProfile({
+          id: userId,
+          email: email || `${userId}@user.local`,
+          metadata: mergedMetadata
+        });
+      }
+      return null;
     } catch (err) {
       console.error('UserModel.mergeMetadata Error:', err);
       return null;
@@ -98,7 +135,7 @@ class UserModel {
         .update({ email })
         .eq('id', userId)
         .select('id, email, full_name, phone_number, avatar_url, role, subscription_plan, is_subscribed, metadata')
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data;
@@ -153,12 +190,15 @@ class UserModel {
       if (profileData.phoneNumber || profileData.phone_number) {
         payload.phone_number = profileData.phoneNumber || profileData.phone_number;
       }
+      if (profileData.metadata) {
+        payload.metadata = profileData.metadata;
+      }
 
       const { data, error } = await supabaseAdmin
         .from('profiles')
         .upsert(payload)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data;

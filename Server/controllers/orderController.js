@@ -61,6 +61,31 @@ class OrderController {
       return res.status(500).json({ success: false, error: err.message });
     }
   }
+
+  /** DELETE /api/orders/:id — admin: delete a specific order */
+  static async delete(req, res) {
+    try {
+      const { id } = req.params;
+      await OrderModel.delete(id);
+      logger.rowUpdated('orders', id, { action: 'deleted' });
+      return res.json({ success: true, message: `Order ${id} deleted successfully` });
+    } catch (err) {
+      logger.error('ORDER_DELETE', `Failed to delete order: ${req.params.id}`, err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /** DELETE /api/orders — admin: delete all orders */
+  static async deleteAll(req, res) {
+    try {
+      await OrderModel.deleteAll();
+      logger.event('ORDER', '🗑️', 'All orders cleared by admin');
+      return res.json({ success: true, message: 'All orders deleted successfully' });
+    } catch (err) {
+      logger.error('ORDER_DELETE_ALL', 'Failed to delete all orders', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
 }
 
 module.exports = OrderController;

@@ -27,7 +27,7 @@ export default function SocialProof() {
       </div>
       <span
         className="rounded-full px-2.5 py-1 text-[11px] font-extrabold"
-        style={{ background: '#FFF3CC', color: '#8A6200' }}
+        style={{ background: 'var(--accent-light)', color: 'var(--accent-deep)' }}
       >
         10K+
       </span>

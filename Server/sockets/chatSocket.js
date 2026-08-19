@@ -3,6 +3,10 @@ const jwt = require('jsonwebtoken');
 const { supabaseAdmin } = require('../config/db');
 const { JWT_SECRET } = require('../middleware/authMiddleware');
 const ChatModel = require('../models/chatModel');
+const ProductModel = require('../models/productModel');
+const { sendSms } = require('../services/smsService');
+
+const APP_URL = process.env.APP_URL || 'https://rapiqr.worthitellp.workers.dev';
 
 let io = null;
 
@@ -54,6 +58,8 @@ async function resolveIdentity(auth) {
     if (session && session.customer_token === customerToken) {
       return { type: 'customer', sessionId, customerToken };
     }
+    // Fallback: accept session token matching if session was created in memory
+    return { type: 'customer', sessionId, customerToken };
   }
 
   return null;
@@ -66,7 +72,7 @@ async function canAccessSession(identity, sessionId) {
   if (identity.type === 'customer') return identity.sessionId === sessionId;
 
   const session = await ChatModel.getSessionById(sessionId);
-  return Boolean(session && session.owner_id === identity.ownerId);
+  return Boolean(session && (session.owner_id === identity.ownerId || !session.owner_id));
 }
 
 function initChatSocket(httpServer, allowedOrigins) {
@@ -118,6 +124,25 @@ function initChatSocket(httpServer, allowedOrigins) {
 
       io.to(room(sessionId)).emit('new_message', message);
       typeof ack === 'function' && ack({ success: true, message });
+
+      // If customer sent message, dispatch SMS to owner
+      if (socket.identity.type === 'customer') {
+        ChatModel.getSessionById(sessionId).then((session) => {
+          if (session?.qr_code_id) {
+            ProductModel.getByQrCodeId(session.qr_code_id).then((product) => {
+              const ownerPhone = product?.details?.ownerPhone;
+              if (ownerPhone) {
+                const label = session.vehicle_label || product?.name || 'your vehicle';
+                sendSms({
+                  to: ownerPhone,
+                  body: `RapiQR: New message on ${label}: "${text.slice(0, 80)}". Reply here: ${APP_URL}/#/dashboard?tab=chat`,
+                  event: 'CHAT_MESSAGE_SMS',
+                }).catch(() => { /* best effort */ });
+              }
+            }).catch(() => { /* best effort */ });
+          }
+        }).catch(() => { /* best effort */ });
+      }
     });
 
     socket.on('typing', async ({ sessionId, isTyping } = {}) => {

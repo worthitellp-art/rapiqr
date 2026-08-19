@@ -46,14 +46,14 @@ class ChatController {
       if (!session) return res.status(500).json({ success: false, error: 'Could not start chat session' });
 
       // First time this visitor opens the thread — notify the owner by SMS so
-      // they know a chat is waiting, with a link straight into the dashboard.
+      // they know a chat is waiting, with a link straight into the dashboard inbox.
       // Best-effort: never block/fail the visitor's chat over a notify hiccup.
       const ownerPhone = product?.details?.ownerPhone;
       if (isNew && ownerPhone) {
         const label = vehicleLabel || 'your RapiQR item';
         sendSms({
           to: ownerPhone,
-          body: `RapiQR: A visitor started a chat about ${label}. Reply here: ${APP_URL}/`,
+          body: `RapiQR: A visitor started a chat about ${label}. View and reply: ${APP_URL}/#/dashboard?tab=chat`,
           event: 'CHAT_START_SMS',
         }).catch((err) => logger.error('CHAT_START_SMS', 'Failed to notify owner of new chat', err));
       }
@@ -114,6 +114,22 @@ class ChatController {
       if (!message) return res.status(500).json({ success: false, error: 'Failed to save message' });
 
       getIo()?.to(`session:${session.id}`).emit('new_message', message);
+
+      // If customer sent a message, notify the owner via SMS with the direct link
+      if (!isOwner) {
+        ProductModel.getByQrCodeId(session.qr_code_id).then((product) => {
+          const ownerPhone = product?.details?.ownerPhone;
+          if (ownerPhone) {
+            const label = session.vehicle_label || product?.name || 'your vehicle';
+            sendSms({
+              to: ownerPhone,
+              body: `RapiQR: New message on ${label}: "${text.slice(0, 80)}". Reply here: ${APP_URL}/#/dashboard?tab=chat`,
+              event: 'CHAT_MESSAGE_SMS',
+            }).catch((err) => logger.error('CHAT_MESSAGE_SMS', 'Failed to SMS owner', err));
+          }
+        }).catch(() => { /* best effort */ });
+      }
+
       return res.json({ success: true, data: message });
     } catch (err) {
       logger.error('CHAT_SEND', 'Failed to send chat message', err);

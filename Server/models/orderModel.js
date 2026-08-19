@@ -118,10 +118,30 @@ class OrderModel {
       .update(payload)
       .eq('id', id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
     return toApi(data);
+  }
+
+  static async delete(id) {
+    const { error } = await supabaseAdmin
+      .from('orders')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return true;
+  }
+
+  static async deleteAll() {
+    const { error } = await supabaseAdmin
+      .from('orders')
+      .delete()
+      .not('id', 'is', null);
+
+    if (error) throw error;
+    return true;
   }
 }
 

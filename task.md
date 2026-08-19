@@ -1,2 +1,1 @@
- if any person click chat with owner then aut matic sms sent to the owner with chat link to create chat sesssion automatic
-  and uknwon person can chat ffirst without initiating session it can nomrally sent sms
+i wnat to reacreate the landing page complely new and best wiht using ui ux pro max skill best 5000$ sass app landing page using tailwind css  no robotics and yellow themed best world ui and ux 

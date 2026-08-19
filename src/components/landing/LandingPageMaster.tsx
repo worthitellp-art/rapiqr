@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import './landing.css';
 import {
   ShieldAlert, ShieldCheck, Car, Home, Luggage,
@@ -413,13 +413,26 @@ export default function LandingPageMaster({
   const [partnerSubmitted, setPartnerSubmitted] = useState(false);
   const [userAppStatus, setUserAppStatus] = useState<DistributorApplication | null>(null);
 
-  // Auto-rotate How It Works active step
+  // Respect the OS-level "reduce motion" setting for the two auto-rotating
+  // carousels below (how-it-works steps, live-demo phone) — checked once,
+  // since a live media-query listener isn't needed for a preference that
+  // essentially never flips mid-session.
+  const prefersReducedMotion = useMemo(
+    () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    []
+  );
+  const [hiwPaused, setHiwPaused] = useState(false);
+  const [demoPaused, setDemoPaused] = useState(false);
+
+  // Auto-rotate How It Works active step — paused on hover/focus and
+  // disabled entirely under prefers-reduced-motion.
   useEffect(() => {
+    if (prefersReducedMotion || hiwPaused) return;
     const timer = setInterval(() => {
       setHiwActiveStep(prev => (prev + 1) % 5);
     }, 4500);
     return () => clearInterval(timer);
-  }, []);
+  }, [hiwPaused, prefersReducedMotion]);
 
   // Sync user's distributor application status
   useEffect(() => {
@@ -596,11 +609,28 @@ export default function LandingPageMaster({
     return () => obs.disconnect();
   }, []);
 
-  // Auto-advance demo every 3.5s if no interaction
+  // Auto-advance demo every 3.5s if no interaction — paused on hover/focus
+  // and disabled under prefers-reduced-motion.
   useEffect(() => {
+    if (prefersReducedMotion || demoPaused) return;
     const t = setTimeout(() => setDemoStep(s => (s + 1) % DEMO_STEPS.length), 3500);
     return () => clearTimeout(t);
-  }, [demoStep]);
+  }, [demoStep, demoPaused, prefersReducedMotion]);
+
+  // Escape closes whichever overlay is currently open (cart drawer,
+  // quick-view modal, partner-application modal) — none of the three
+  // previously had a keyboard dismissal path.
+  useEffect(() => {
+    if (!isCartOpen && !quickView && !isPartnerModalOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (isPartnerModalOpen) { setIsPartnerModalOpen(false); setPartnerSubmitted(false); return; }
+      if (quickView) { setQuickView(null); return; }
+      if (isCartOpen) setIsCartOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isCartOpen, quickView, isPartnerModalOpen]);
 
   const handleDemoAction = (step: number) => {
     if (step === 1) setDemoAlert('📱 Parking alert dispatched. Owner notified via WhatsApp + SMS.');
@@ -673,87 +703,52 @@ export default function LandingPageMaster({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
             {filteredProducts.map((product, pi) => (
               <div key={product.id} className={`prod-card reveal delay-${(pi % 3) + 1}`}>
-                <div style={{ padding: '20px 20px 0' }}>
-                  <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', marginBottom: 18 }}>
-                    <img
-                      src={product.img}
-                      alt={product.name}
-                      className="w-full object-cover"
-                      style={{ height: 200 }}
-                      loading="lazy"
-                    />
-                    <span style={{
-                      position: 'absolute', top: 12, left: 12,
-                      background: 'var(--brand)', color: 'white',
-                      fontSize: 10, fontWeight: 800, padding: '4px 12px',
-                      borderRadius: 99, textTransform: 'uppercase',
-                    }}>{product.badge}</span>
-                    <button
-                      onClick={() => setQuickView(product)}
-                      aria-label={`Quick view ${product.name}`}
-                      style={{
-                        position: 'absolute', bottom: 12, right: 12,
-                        background: 'rgba(255,255,255,0.92)', border: 'none',
-                        borderRadius: '50%', width: 34, height: 34, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 4px 12px rgba(14,17,23,0.14)',
-                        transition: 'transform 0.2s ease',
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.1)')}
-                      onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
-                    >
-                      <Eye size={15} style={{ color: 'var(--ink)' }} />
-                    </button>
+                <div className="prod-card-media">
+                  <img src={product.img} alt={product.name} loading="lazy" />
+                  <span className="prod-badge">{product.badge}</span>
+                  <span className="prod-discount-badge">
+                    {Math.round(((product.mrp - product.price) / product.mrp) * 100)}% OFF
+                  </span>
+                  <button
+                    onClick={() => setQuickView(product)}
+                    aria-label={`Quick view ${product.name}`}
+                    className="prod-quick-view"
+                  >
+                    <Eye size={15} style={{ color: 'var(--ink)' }} />
+                  </button>
+                </div>
+
+                <div className="prod-card-body">
+                  <div className="prod-rating">
+                    <Star size={13} style={{ fill: 'var(--accent)', color: 'var(--accent)' }} />
+                    {product.rating} <span className="count">({product.reviewsCount.toLocaleString()})</span>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: 'var(--accent-deep)' }}>
-                      <Star size={13} style={{ fill: 'var(--accent)', color: 'var(--accent)' }} />
-                      {product.rating} <span style={{ color: 'var(--ink-faint)', fontWeight: 400 }}>({product.reviewsCount.toLocaleString()})</span>
-                    </div>
-                    
-                  </div>
+                  <h3 className="prod-title">{product.name}</h3>
+                  <p className="prod-desc">{product.desc}</p>
 
-                  <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>{product.name}</h3>
-                  <p style={{ fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.6, marginBottom: 16 }}>{product.desc}</p>
-
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, marginBottom: 0 }}>
+                  <ul className="prod-tags" style={{ listStyle: 'none', padding: 0 }}>
                     {product.features.map((f, fi) => (
-                      <li key={fi} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: 'var(--ink-soft)', marginBottom: 7 }}>
-                        <CheckCircle2 size={14} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: 2 }} />
+                      <li key={fi} className="prod-tag">
+                        <CheckCircle2 size={12} />
                         {f}
                       </li>
                     ))}
                   </ul>
                 </div>
 
-                {/* Card footer */}
-                <div style={{
-                  marginTop: 'auto', padding: '16px 20px 20px',
-                  borderTop: '1px solid var(--border)',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                    <span style={{ fontSize: 24, fontWeight: 900, color: 'var(--ink)', lineHeight: 1 }}>₹{product.price}</span>
-                    <span style={{ fontSize: 13, color: 'var(--ink-faint)', textDecoration: 'line-through', fontWeight: 500 }}>₹{product.mrp}</span>
-                    <span style={{
-                      fontSize: 10,
-                      fontWeight: 800,
-                      color: '#047857',
-                      backgroundColor: '#D1FAE5',
-                      padding: '1.5px 6px',
-                      borderRadius: 6,
-                      border: '1px solid #A7F3D0'
-                    }}>
-                      {Math.round(((product.mrp - product.price) / product.mrp) * 100)}% OFF
-                    </span>
+                <div className="prod-card-footer">
+                  <div className="prod-price-row">
+                    <span className="prod-price">₹{product.price}</span>
+                    <span className="prod-mrp">₹{product.mrp}</span>
                   </div>
-                  <div style={{ fontSize: 10, color: '#10B981', fontWeight: 700, marginTop: 4, marginBottom: 14 }}>Lifetime · ₹0 subscription</div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => buyNow(product)} className="btn-brand" style={{ flex: 1, justifyContent: 'center', padding: '10px 14px', fontSize: 13 }}>
+                  <div className="prod-sub-note">Lifetime · ₹0 subscription</div>
+                  <div className="prod-actions">
+                    <button onClick={() => buyNow(product)} className="btn-brand" style={{ flex: 1, justifyContent: 'center', minHeight: 44, fontSize: 13 }}>
                       Buy Now
                     </button>
-                    <button onClick={() => addToCart(product)} className="btn-ghost" style={{ padding: '10px 14px', fontSize: 13 }} aria-label="Add to cart">
-                      <Plus size={14} />
+                    <button onClick={() => addToCart(product)} className="prod-add-btn" style={{ minWidth: 44, minHeight: 44 }} aria-label={`Add ${product.name} to cart`}>
+                      <Plus size={15} />
                     </button>
                   </div>
                 </div>
@@ -778,7 +773,13 @@ export default function LandingPageMaster({
             </p>
           </div>
 
-          <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-center">
+          <div
+            className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-center"
+            onMouseEnter={() => setHiwPaused(true)}
+            onMouseLeave={() => setHiwPaused(false)}
+            onFocus={() => setHiwPaused(true)}
+            onBlur={() => setHiwPaused(false)}
+          >
             {/* Steps List (38%) */}
             <div className="w-full lg:w-[38%] space-y-4 flex-shrink-0">
               {HOW_IT_WORKS_STEPS.map((s, i) => {
@@ -931,11 +932,11 @@ export default function LandingPageMaster({
                   <ul className="space-y-4">
                     {cat.lines.map((line, li) => (
                       <li key={li} className="flex items-start gap-3 text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
-                        <div style={{
-                          width: 20, height: 20, borderRadius: 6, background: 'var(--accent-light)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2,
-                        }}>
-                          <Check size={11} style={{ color: 'var(--accent)' }} />
+                        <div
+                          className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
+                          style={{ background: 'var(--accent-light)' }}
+                        >
+                          <Check size={11} style={{ color: 'var(--accent-deep)' }} />
                         </div>
                         {line}
                       </li>
@@ -1006,7 +1007,13 @@ export default function LandingPageMaster({
             </p>
           </div>
 
-          <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20 justify-center">
+          <div
+            className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20 justify-center"
+            onMouseEnter={() => setDemoPaused(true)}
+            onMouseLeave={() => setDemoPaused(false)}
+            onFocus={() => setDemoPaused(true)}
+            onBlur={() => setDemoPaused(false)}
+          >
 
             {/* Phone */}
             <div className="phone-shell flex-shrink-0 reveal delay-1">
@@ -1202,56 +1209,56 @@ export default function LandingPageMaster({
             {COMBOS.map((plan, pi) => (
               <div key={plan.id} className={`price-card reveal delay-${pi + 1}${plan.popular ? ' featured' : ''}`}>
                 {plan.tag && (
-                  <div style={{
-                    display: 'inline-block', fontSize: 11, fontWeight: 800, letterSpacing: '0.06em',
-                    textTransform: 'uppercase', marginBottom: 16,
-                    padding: '5px 14px', borderRadius: 99,
-                    background: plan.popular ? 'rgba(240,165,0,0.18)' : 'var(--accent-light)',
-                    color: plan.popular ? 'var(--accent)' : 'var(--accent-deep)',
-                  }}>
+                  <div
+                    className="inline-block text-[11px] font-extrabold uppercase tracking-wider mb-4 px-3.5 py-1.5 rounded-full"
+                    style={{
+                      background: plan.popular ? 'rgba(240,165,0,0.18)' : 'var(--accent-light)',
+                      color: plan.popular ? 'var(--accent)' : 'var(--accent-deep)',
+                    }}
+                  >
                     {plan.tag}
                   </div>
                 )}
 
-                <div style={{ marginBottom: 6, fontSize: 20, fontWeight: 800, color: plan.popular ? 'white' : 'var(--ink)' }}>
+                <div className={`mb-1.5 text-xl font-extrabold ${plan.popular ? 'text-white' : ''}`} style={!plan.popular ? { color: 'var(--ink)' } : undefined}>
                   {plan.name}
                 </div>
-                <p style={{ fontSize: 13.5, color: plan.popular ? 'rgba(255,255,255,0.65)' : 'var(--ink-soft)', marginBottom: 24, lineHeight: 1.6 }}>
+                <p className={`text-[13.5px] mb-6 leading-relaxed ${plan.popular ? 'text-white/65' : ''}`} style={!plan.popular ? { color: 'var(--ink-soft)' } : undefined}>
                   {plan.desc}
                 </p>
 
-                <div style={{ marginBottom: 28 }}>
+                <div className="mb-7">
                   {plan.price > 0 ? (
                     <>
-                      <span style={{ fontSize: 42, fontWeight: 900, color: plan.popular ? 'white' : 'var(--ink)', lineHeight: 1 }}>
+                      <span className={`text-[42px] font-black leading-none ${plan.popular ? 'text-white' : ''}`} style={!plan.popular ? { color: 'var(--ink)' } : undefined}>
                         ₹{plan.price}
                       </span>
                       {plan.mrp > 0 && (
-                        <span style={{ fontSize: 15, color: plan.popular ? 'rgba(255,255,255,0.4)' : 'var(--ink-faint)', textDecoration: 'line-through', marginLeft: 10 }}>
+                        <span className={`text-[15px] line-through ml-2.5 ${plan.popular ? 'text-white/40' : ''}`} style={!plan.popular ? { color: 'var(--ink-faint)' } : undefined}>
                           ₹{plan.mrp}
                         </span>
                       )}
-                      <div style={{ fontSize: 12, color: plan.popular ? 'rgba(240,165,0,0.8)' : 'var(--ink-faint)', marginTop: 4 }}>
+                      <div className="text-xs mt-1" style={{ color: plan.popular ? 'rgba(240,165,0,0.8)' : 'var(--ink-faint)' }}>
                         One-time · lifetime access
                       </div>
                     </>
                   ) : (
-                    <span style={{ fontSize: 32, fontWeight: 800, color: plan.popular ? 'white' : 'var(--ink)', lineHeight: 1 }}>
+                    <span className={`text-[32px] font-extrabold leading-none ${plan.popular ? 'text-white' : ''}`} style={!plan.popular ? { color: 'var(--ink)' } : undefined}>
                       Custom quote
                     </span>
                   )}
                 </div>
 
-                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <ul className="flex flex-col gap-2.5 mb-7" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                   {plan.items.map((item, ii) => (
-                    <li key={ii} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13.5, color: plan.popular ? 'rgba(255,255,255,0.8)' : 'var(--ink-soft)' }}>
+                    <li key={ii} className={`flex items-start gap-2.5 text-[13.5px] ${plan.popular ? 'text-white/80' : ''}`} style={!plan.popular ? { color: 'var(--ink-soft)' } : undefined}>
                       <Check size={14} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: 2 }} />
                       {item}
                     </li>
                   ))}
                 </ul>
 
-                <div style={{ marginTop: 'auto' }}>
+                <div className="mt-auto">
                   <button
                     onClick={() => handlePlanCta(plan.id)}
                     className={plan.popular ? 'btn-cta' : 'btn-ghost'}
@@ -1398,21 +1405,20 @@ export default function LandingPageMaster({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {TESTIMONIALS.map((t, ti) => (
               <div key={ti} className={`proof-card reveal delay-${ti + 1}`}>
-                <div className="proof-stars">{'★'.repeat(t.stars)}</div>
-                <p style={{ fontSize: 14, color: 'var(--ink-soft)', lineHeight: 1.7, fontStyle: 'italic', flex: 1 }}>
+                <div className="proof-stars" aria-label={`${t.stars} out of 5 stars`}>{'★'.repeat(t.stars)}</div>
+                <p className="text-sm italic flex-1 leading-[1.7]" style={{ color: 'var(--ink-soft)' }}>
                   "{t.quote}"
                 </p>
-                <div style={{ display: 'flex', items: 'center', gap: 12, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-                  <div style={{
-                    width: 38, height: 38, borderRadius: '50%', background: 'var(--brand-light)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: 800, fontSize: 12, color: 'var(--brand)', flexShrink: 0,
-                  }}>
+                <div className="flex items-center gap-3 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+                  <div
+                    className="w-[38px] h-[38px] rounded-full flex items-center justify-center font-extrabold text-xs flex-shrink-0"
+                    style={{ background: 'var(--brand-light)', color: 'var(--brand)' }}
+                  >
                     {t.avatar}
                   </div>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--ink)' }}>{t.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--ink-faint)' }}>{t.role}</div>
+                    <div className="font-bold text-[13.5px]" style={{ color: 'var(--ink)' }}>{t.name}</div>
+                    <div className="text-xs" style={{ color: 'var(--ink-faint)' }}>{t.role}</div>
                   </div>
                 </div>
               </div>
@@ -1458,20 +1464,21 @@ export default function LandingPageMaster({
       {/* ── FINAL CTA BANNER ────────────────────────────────────────── */}
       <section className="cta-banner qr-dot-bg-light" aria-labelledby="cta-heading">
         <div className="namo-wrap text-center reveal">
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            background: 'rgba(240,165,0,0.12)', border: '1px solid rgba(240,165,0,0.25)',
-            borderRadius: 99, padding: '6px 16px', fontSize: 12, fontWeight: 700,
-            color: 'var(--accent)', marginBottom: 28,
-          }}>
+          <div
+            className="inline-flex items-center gap-2 rounded-full text-xs font-bold mb-7"
+            style={{
+              background: 'rgba(240,165,0,0.14)', border: '1px solid rgba(240,165,0,0.3)',
+              padding: '7px 16px', color: '#FFC94D',
+            }}
+          >
             <Zap size={13} /> One-time purchase · Lifetime protection
           </div>
 
-          <h2 id="cta-heading" className="display-title text-4xl sm:text-5xl md:text-6xl" style={{ color: 'white', maxWidth: 700, margin: '0 auto 20px' }}>
+          <h2 id="cta-heading" className="display-title text-4xl sm:text-5xl md:text-6xl mx-auto mb-5" style={{ color: 'white', maxWidth: 700 }}>
             Protect everyone you care for.<br />Keep your number private.
           </h2>
 
-          <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.60)', maxWidth: 380, margin: '0 auto 36px', lineHeight: 1.7 }}>
+          <p className="text-base mx-auto mb-9 leading-relaxed" style={{ color: 'rgba(255,255,255,0.60)', maxWidth: 380 }}>
             Stick it on. Scan happens. You're protected.
           </p>
 
@@ -1491,10 +1498,10 @@ export default function LandingPageMaster({
         <div className="namo-wrap">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
             <div>
-              <div style={{ marginBottom: 16 }} className="flex items-center">
+              <div className="flex items-center mb-4">
                 <AppLogo variant="dark" className="h-10 sm:h-12 w-auto object-contain" />
               </div>
-              <p style={{ fontSize: 13, lineHeight: 1.7 }}>
+              <p className="text-[13px] leading-relaxed">
                 One QR. Lifetime protection.
               </p>
             </div>
@@ -1511,15 +1518,16 @@ export default function LandingPageMaster({
               },
             ].map((col, ci) => (
               <div key={ci}>
-                <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 14 }}>
+                <div className="text-xs font-extrabold uppercase tracking-wider mb-3.5 text-white/35">
                   {col.title}
                 </div>
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <ul className="flex flex-col gap-2.5" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                   {col.links.map(link => (
                     <li key={link}>
-                      <a href={link === 'Partner Program' ? '#distributorship' : '#'} style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.55)', textDecoration: 'none', transition: 'color 0.2s' }}
-                        onMouseEnter={e => (e.currentTarget.style.color = 'white')}
-                        onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.55)')}>
+                      <a
+                        href={link === 'Partner Program' ? '#distributorship' : '#'}
+                        className="text-[13.5px] text-white/55 no-underline transition-colors duration-200 hover:text-white"
+                      >
                         {link}
                       </a>
                     </li>
@@ -1529,9 +1537,9 @@ export default function LandingPageMaster({
             ))}
           </div>
 
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 28, display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-            <div style={{ fontSize: 12 }}>© 2026 RapiQR. All rights reserved.</div>
-            <div style={{ fontSize: 12 }}>
+          <div className="flex flex-wrap justify-between items-center gap-3 pt-7" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="text-xs">© 2026 RapiQR. All rights reserved.</div>
+            <div className="text-xs">
               Made in India 🇮🇳 · Privacy-first by design
             </div>
           </div>
@@ -1541,48 +1549,46 @@ export default function LandingPageMaster({
       {/* ── QUICK VIEW MODAL ────────────────────────────────────────── */}
       {quickView && (
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(14,17,23,0.6)', backdropFilter: 'blur(8px)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          className="fixed inset-0 flex items-center justify-center p-5 animate-fade-in"
+          style={{ background: 'rgba(14,17,23,0.6)', backdropFilter: 'blur(8px)', zIndex: 400 }}
           onClick={() => setQuickView(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Quick view — ${quickView.name}`}
         >
           <div
-            style={{ background: 'white', maxWidth: 520, width: '100%', borderRadius: 24, overflow: 'hidden', boxShadow: '0 40px 80px rgba(14,17,23,0.3)', position: 'relative' }}
+            className="bg-white w-full max-w-[520px] rounded-3xl overflow-hidden relative"
+            style={{ boxShadow: '0 40px 80px rgba(14,17,23,0.3)' }}
             onClick={e => e.stopPropagation()}
           >
-            <img src={quickView.img} alt={quickView.name} style={{ width: '100%', height: 220, objectFit: 'cover' }} />
+            <img src={quickView.img} alt={quickView.name} className="w-full object-cover" style={{ height: 220 }} />
             <button
               onClick={() => setQuickView(null)}
-              style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(14,17,23,0.6)', border: 'none', borderRadius: '50%', width: 34, height: 34, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              aria-label="Close"
+              className="absolute top-3 right-3 w-10 h-10 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(14,17,23,0.6)' }}
+              aria-label="Close quick view"
             >
               <X size={16} style={{ color: 'white' }} />
             </button>
-            <div style={{ padding: '24px 28px' }}>
-              <div style={{ marginBottom: 12 }}>
-                <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>{quickView.name}</h3>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                  <span style={{ fontSize: 28, fontWeight: 900, color: 'var(--accent)', lineHeight: 1 }}>₹{quickView.price}</span>
-                  <span style={{ fontSize: 15, color: 'var(--ink-faint)', textDecoration: 'line-through', fontWeight: 500 }}>₹{quickView.mrp}</span>
+            <div className="px-7 py-6">
+              <div className="mb-3">
+                <h3 className="text-xl font-bold mb-1.5" style={{ color: 'var(--ink)' }}>{quickView.name}</h3>
+                <div className="flex items-baseline gap-2.5">
+                  <span className="text-[28px] font-black leading-none" style={{ color: 'var(--accent-deep)' }}>₹{quickView.price}</span>
+                  <span className="text-[15px] line-through font-medium" style={{ color: 'var(--ink-faint)' }}>₹{quickView.mrp}</span>
                   {quickView.mrp > quickView.price && (
-                    <span style={{
-                      fontSize: 11,
-                      fontWeight: 800,
-                      color: '#047857',
-                      backgroundColor: '#D1FAE5',
-                      padding: '3px 8px',
-                      borderRadius: 6,
-                      border: '1px solid #A7F3D0'
-                    }}>
+                    <span className="text-[11px] font-extrabold px-2 py-1 rounded-md" style={{ color: '#047857', backgroundColor: '#D1FAE5', border: '1px solid #A7F3D0' }}>
                       {Math.round(((quickView.mrp - quickView.price) / quickView.mrp) * 100)}% OFF
                     </span>
                   )}
                 </div>
               </div>
-              <p style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginBottom: 20, lineHeight: 1.65 }}>{quickView.desc}</p>
-              <div style={{ display: 'flex', gap: 10 }}>
+              <p className="text-[13.5px] mb-5 leading-relaxed" style={{ color: 'var(--ink-soft)' }}>{quickView.desc}</p>
+              <div className="flex gap-2.5">
                 <button onClick={() => { buyNow(quickView); setQuickView(null); }} className="btn-brand" style={{ flex: 1, justifyContent: 'center' }}>
                   Buy Now <ArrowRight size={14} />
                 </button>
-                <button onClick={() => { addToCart(quickView); setQuickView(null); }} className="btn-ghost" style={{ justifyContent: 'center' }} aria-label="Add to cart">
+                <button onClick={() => { addToCart(quickView); setQuickView(null); }} className="btn-ghost" style={{ justifyContent: 'center', minWidth: 48 }} aria-label={`Add ${quickView.name} to cart`}>
                   <Plus size={16} />
                 </button>
               </div>
@@ -1648,40 +1654,61 @@ export default function LandingPageMaster({
       )}
 
       {/* ── CART DRAWER ─────────────────────────────────────────────── */}
-      <div className={`cart-overlay${isCartOpen ? ' open' : ''}`} onClick={() => setIsCartOpen(false)}>
+      <div
+        className={`cart-overlay${isCartOpen ? ' open' : ''}`}
+        onClick={() => setIsCartOpen(false)}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Your cart"
+        aria-hidden={!isCartOpen}
+      >
         <div className="cart-panel" onClick={e => e.stopPropagation()}>
-          <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <ShoppingBag size={18} style={{ color: 'var(--accent)' }} />
-              <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--ink)' }}>Your Cart ({cartItemCount})</span>
+          <div className="flex justify-between items-center px-6 py-5" style={{ borderBottom: '1px solid var(--border)' }}>
+            <div className="flex items-center gap-2.5">
+              <ShoppingBag size={18} style={{ color: 'var(--accent-deep)' }} />
+              <span className="font-bold text-base" style={{ color: 'var(--ink)' }}>Your Cart ({cartItemCount})</span>
             </div>
-            <button onClick={() => setIsCartOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }} aria-label="Close cart">
+            <button
+              onClick={() => setIsCartOpen(false)}
+              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/5 transition-colors"
+              aria-label="Close cart"
+            >
               <X size={20} style={{ color: 'var(--ink-soft)' }} />
             </button>
           </div>
 
-          <div className="cart-items-scroll" style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+          <div className="cart-items-scroll flex-1 overflow-y-auto px-6 py-4">
             {cart.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--ink-faint)', fontSize: 14 }}>
+              <div className="text-center py-16 text-sm" style={{ color: 'var(--ink-faint)' }}>
                 Your cart is empty.<br />
-                <span style={{ fontSize: 12, marginTop: 6, display: 'block' }}>Browse our safety tags above.</span>
+                <span className="text-xs mt-1.5 block">Browse our safety tags above.</span>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="flex flex-col gap-3">
                 {cart.map(item => (
-                  <div key={item.product.id} style={{ display: 'flex', gap: 12, padding: 14, borderRadius: 14, background: 'var(--paper)', border: '1px solid var(--border)' }}>
-                    <img src={item.product.img} alt={item.product.name} style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.product.name}</div>
-                      <div style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 700 }}>₹{item.product.price}</div>
+                  <div key={item.product.id} className="flex gap-3 p-3.5 rounded-2xl" style={{ background: 'var(--paper)', border: '1px solid var(--border)' }}>
+                    <img src={item.product.img} alt={item.product.name} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-bold mb-0.5 truncate" style={{ color: 'var(--ink)' }}>{item.product.name}</div>
+                      <div className="text-[13px] font-bold" style={{ color: 'var(--accent-deep)' }}>₹{item.product.price}</div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                      <button onClick={() => updateQty(item.product.id, -1)} style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--paper-white)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Decrease qty">
-                        <Minus size={11} style={{ color: 'var(--ink)' }} />
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button
+                        onClick={() => updateQty(item.product.id, -1)}
+                        className="w-9 h-9 rounded-full flex items-center justify-center"
+                        style={{ border: '1px solid var(--border)', background: 'var(--paper-white)' }}
+                        aria-label={`Decrease quantity of ${item.product.name}`}
+                      >
+                        <Minus size={13} style={{ color: 'var(--ink)' }} />
                       </button>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', width: 18, textAlign: 'center' }}>{item.qty}</span>
-                      <button onClick={() => updateQty(item.product.id, 1)} style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--paper-white)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Increase qty">
-                        <Plus size={11} style={{ color: 'var(--ink)' }} />
+                      <span className="text-[13px] font-bold text-center" style={{ color: 'var(--ink)', width: 18 }}>{item.qty}</span>
+                      <button
+                        onClick={() => updateQty(item.product.id, 1)}
+                        className="w-9 h-9 rounded-full flex items-center justify-center"
+                        style={{ border: '1px solid var(--border)', background: 'var(--paper-white)' }}
+                        aria-label={`Increase quantity of ${item.product.name}`}
+                      >
+                        <Plus size={13} style={{ color: 'var(--ink)' }} />
                       </button>
                     </div>
                   </div>
@@ -1691,15 +1718,15 @@ export default function LandingPageMaster({
           </div>
 
           {cart.length > 0 && (
-            <div style={{ padding: '16px 24px 24px', borderTop: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14, fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>
+            <div className="px-6 pt-4 pb-6" style={{ borderTop: '1px solid var(--border)' }}>
+              <div className="flex justify-between mb-3.5 text-[15px] font-bold" style={{ color: 'var(--ink)' }}>
                 <span>Subtotal</span>
-                <span style={{ color: 'var(--accent)' }}>₹{cartSubtotal}</span>
+                <span style={{ color: 'var(--accent-deep)' }}>₹{cartSubtotal}</span>
               </div>
               <button onClick={openCheckout} className="btn-cta" style={{ width: '100%', justifyContent: 'center' }}>
                 Checkout <ArrowRight size={14} />
               </button>
-              <p style={{ fontSize: 11, color: 'var(--ink-faint)', textAlign: 'center', marginTop: 10 }}>
+              <p className="text-[11px] text-center mt-2.5" style={{ color: 'var(--ink-faint)' }}>
                 Free shipping · Lifetime protection included
               </p>
             </div>

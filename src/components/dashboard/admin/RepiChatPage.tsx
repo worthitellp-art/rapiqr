@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { MessageCircle, Search } from "lucide-react";
 import { apiClient, type ChatSession } from "../../../lib/apiClient";
 import RepiChat from "../../chat/RepiChat";
+import { connectAsOwner } from "../../../lib/socketClient";
+import { soundNotification } from "../../../utils/soundNotification";
 
 function timeAgo(iso: string | null) {
   if (!iso) return "";
@@ -28,8 +30,22 @@ export default function RepiChatPage() {
 
   useEffect(() => {
     loadSessions();
+    const token = localStorage.getItem("repiqr-token") || localStorage.getItem("namoqr-token") || "";
+    const socket = connectAsOwner(token);
+    const onNewMsg = (msg: any) => {
+      if (msg.sender_type === "customer") {
+        soundNotification.playMessageChime();
+        soundNotification.showBrowserNotification("New Chat Message", msg.body || "New visitor message");
+        loadSessions();
+      }
+    };
+    socket.on("new_message", onNewMsg);
+
     const timer = setInterval(loadSessions, 15000);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      socket.off("new_message", onNewMsg);
+    };
   }, [loadSessions]);
 
   const filtered = sessions.filter((s) => {

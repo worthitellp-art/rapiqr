@@ -33,7 +33,7 @@ export default function HeroContent() {
           transition={{ duration: 0.6, ease: 'easeOut', delay: 0.1 }}
           className="block"
         >
-          <span className="relative inline-block text-amber-500">
+          <span className="relative inline-block" style={{ color: 'var(--accent-deep)' }}>
             QR safety
             <HeroUnderline reduceMotion={reduceMotion} />
           </span>{' '}

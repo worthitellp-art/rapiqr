@@ -58,7 +58,7 @@ export default function PhoneMockup() {
               className="text-center"
             >
               <div className="flex items-center justify-center gap-1.5 text-[13px] font-bold text-white">
-                <ShieldCheck size={14} className="text-amber-400" />
+                <ShieldCheck size={14} style={{ color: 'var(--accent)' }} />
                 Ready to Help
               </div>
               <p className="mt-1 text-[10.5px] text-white/45">Scan this tag in an emergency</p>

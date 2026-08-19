@@ -90,7 +90,7 @@ class ProductModel {
         .update({ user_id: userId, assigned_to: userName || 'Self' })
         .eq('id', productId)
         .select(LIST_SELECT)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data;
@@ -161,12 +161,12 @@ class ProductModel {
           .update({ user_id: userId, assigned_to: newAssigned })
           .eq('id', p.id)
           .select(LIST_SELECT)
-          .single();
+          .maybeSingle();
         if (claimError) {
           console.error(`ProductModel.autoClaimByPhone: failed to claim ${p.id}`, claimError);
           continue;
         }
-        claimed.push(updated);
+        if (updated) claimed.push(updated);
       }
       return claimed;
     } catch (err) {
@@ -228,7 +228,7 @@ class ProductModel {
         .update(payload)
         .eq('id', productId)
         .select(LIST_SELECT)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
@@ -262,7 +262,7 @@ class ProductModel {
         .update({ details: mergedDetails })
         .eq('id', productId)
         .select(LIST_SELECT)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data;
@@ -279,7 +279,7 @@ class ProductModel {
         .update({ status })
         .eq('id', productId)
         .select(LIST_SELECT)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
@@ -308,7 +308,7 @@ class ProductModel {
         .update({ user_id: targetUserId, assigned_to: targetName || 'New Owner' })
         .eq('id', productId)
         .select(LIST_SELECT)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data;

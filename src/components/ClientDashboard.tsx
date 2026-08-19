@@ -46,6 +46,8 @@ import CompleteProfilePopup from './dashboard/client/CompleteProfilePopup';
 import AppLogo from './common/AppLogo';
 import RepiChat from './chat/RepiChat';
 import { apiClient, ChatSession } from '../lib/apiClient';
+import { connectAsOwner } from '../lib/socketClient';
+import { soundNotification } from '../utils/soundNotification';
 import {
   getProductsFromDb,
   updateProductDetailsInDb,
@@ -180,8 +182,12 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
 
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     try {
+      const hash = window.location.hash || window.location.search;
+      if (hash.includes('tab=chat')) return 'chat';
+      if (hash.includes('tab=products')) return 'products';
+      if (hash.includes('tab=settings')) return 'settings';
       const saved = localStorage.getItem('repiqr-client-active-tab') || localStorage.getItem('namoqr-client-active-tab');
-      if (saved && ['overview', 'contacts', 'history', 'settings', 'support'].includes(saved)) {
+      if (saved && ['setup', 'overview', 'products', 'chat', 'contacts', 'history', 'settings', 'support'].includes(saved)) {
         return saved as TabId;
       }
     } catch { /* fallback */ }
@@ -409,7 +415,38 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
 
   useEffect(() => {
     loadOwnerSessions();
-  }, [loadOwnerSessions]);
+    const handleHash = () => {
+      const hash = window.location.hash || window.location.search;
+      if (hash.includes('tab=chat')) {
+        setActiveTab('chat');
+        loadOwnerSessions();
+      }
+    };
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+
+    // Live Socket listener for incoming visitor chat messages across all owner stickers
+    const token = localStorage.getItem('repiqr-token') || localStorage.getItem('namoqr-token') || '';
+    const socket = connectAsOwner(token);
+    const onNewMessage = (msg: any) => {
+      if (msg.sender_type === 'customer') {
+        soundNotification.playMessageChime();
+        soundNotification.showBrowserNotification(
+          'New Visitor Message',
+          msg.body ? (msg.body.length > 50 ? `${msg.body.slice(0, 50)}…` : msg.body) : 'A visitor sent a message.'
+        );
+        showToast(`💬 Visitor: ${msg.body ? (msg.body.length > 40 ? `${msg.body.slice(0, 40)}…` : msg.body) : 'New message'}`);
+        loadOwnerSessions();
+      }
+    };
+
+    socket.on('new_message', onNewMessage);
+
+    return () => {
+      window.removeEventListener('hashchange', handleHash);
+      socket.off('new_message', onNewMessage);
+    };
+  }, [loadOwnerSessions, showToast]);
 
   useEffect(() => {
     if (activeTab !== 'history' || products.length === 0) {
@@ -499,18 +536,26 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
           <nav className="flex-1 space-y-0.5 overflow-y-auto custom-scrollbar">
             {NAV_ITEMS.map((item) => {
               const isActive = activeTab === item.id;
+              const isChat = item.id === 'chat';
               return (
                 <button
                   key={item.id}
                   onClick={() => { setActiveTab(item.id); setIsMobileSidebarOpen(false); }}
-                  className={`w-full h-[34px] rounded-[5px] flex items-center gap-2.5 px-2.5 text-[13px] transition-all cursor-pointer ${
+                  className={`w-full h-[34px] rounded-[5px] flex items-center justify-between px-2.5 text-[13px] transition-all cursor-pointer ${
                     isActive
                       ? 'bg-[#303235] text-white font-semibold'
                       : 'text-[#C9CACC] hover:bg-[#303235]/60 hover:text-white'
                   }`}
                 >
-                  <item.icon size={15} className={isActive ? 'text-[#5C78DF]' : 'text-[#888]'} />
-                  <span>{item.label}</span>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <item.icon size={15} className={isActive ? 'text-[#5C78DF]' : 'text-[#888]'} />
+                    <span className="truncate">{item.label}</span>
+                  </div>
+                  {isChat && totalUnreadChats > 0 && (
+                    <span className="bg-[#5C78DF] text-white rounded-full text-[10px] font-bold px-1.5 py-0.2 shrink-0">
+                      {totalUnreadChats}
+                    </span>
+                  )}
                 </button>
               );
             })}
