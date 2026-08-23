@@ -4,7 +4,7 @@ const { supabaseAdmin } = require('../config/db');
 const { JWT_SECRET } = require('../middleware/authMiddleware');
 const ChatModel = require('../models/chatModel');
 const ProductModel = require('../models/productModel');
-const { sendSms } = require('../services/smsService');
+const { notifyOwner } = require('../services/notificationService');
 
 const APP_URL = process.env.APP_URL || 'https://rapiqr.worthitellp.workers.dev';
 
@@ -72,7 +72,14 @@ async function canAccessSession(identity, sessionId) {
   if (identity.type === 'customer') return identity.sessionId === sessionId;
 
   const session = await ChatModel.getSessionById(sessionId);
-  return Boolean(session && (session.owner_id === identity.ownerId || !session.owner_id));
+  if (!session) return false;
+  if (session.owner_id === identity.ownerId || !session.owner_id) return true;
+
+  if (session.qr_code_id) {
+    const product = await ProductModel.getByQrCodeId(session.qr_code_id).catch(() => null);
+    if (product && product.user_id === identity.ownerId) return true;
+  }
+  return false;
 }
 
 function initChatSocket(httpServer, allowedOrigins) {
@@ -95,6 +102,7 @@ function initChatSocket(httpServer, allowedOrigins) {
 
     if (socket.identity.type === 'owner') {
       markOwnerOnline(socket.identity.ownerId);
+      socket.join(`owner:${socket.identity.ownerId}`);
       socket.on('disconnect', () => markOwnerOffline(socket.identity.ownerId));
     }
 
@@ -125,24 +133,35 @@ function initChatSocket(httpServer, allowedOrigins) {
       io.to(room(sessionId)).emit('new_message', message);
       typeof ack === 'function' && ack({ success: true, message });
 
-      // If customer sent message, dispatch SMS to owner
-      if (socket.identity.type === 'customer') {
-        ChatModel.getSessionById(sessionId).then((session) => {
-          if (session?.qr_code_id) {
-            ProductModel.getByQrCodeId(session.qr_code_id).then((product) => {
-              const ownerPhone = product?.details?.ownerPhone;
-              if (ownerPhone) {
-                const label = session.vehicle_label || product?.name || 'your vehicle';
-                sendSms({
-                  to: ownerPhone,
-                  body: `RapiQR: New message on ${label}: "${text.slice(0, 80)}". Reply here: ${APP_URL}/#/dashboard?tab=chat`,
-                  event: 'CHAT_MESSAGE_SMS',
-                }).catch(() => { /* best effort */ });
-              }
-            }).catch(() => { /* best effort */ });
-          }
-        }).catch(() => { /* best effort */ });
-      }
+      // Notify the owner's personal room in real time for their dashboard inbox
+      ChatModel.getSessionById(sessionId).then(async (session) => {
+        if (!session) return;
+        let ownerId = session.owner_id;
+        let product = null;
+        if (session.qr_code_id) {
+          product = await ProductModel.getByQrCodeId(session.qr_code_id).catch(() => null);
+          if (!ownerId && product?.user_id) ownerId = product.user_id;
+        }
+
+        if (ownerId) {
+          io.to(`owner:${ownerId}`).emit('new_message', message);
+          io.to(`owner:${ownerId}`).emit('inbox_updated', { sessionId, message, session });
+        }
+
+        // If the customer sent it, notify the owner on WhatsApp
+        if (socket.identity.type === 'customer' && product?.details?.ownerPhone) {
+          notifyOwner({
+            type: 'CHAT_MESSAGE',
+            ownerPhone: product.details.ownerPhone,
+            data: {
+              label: session.vehicle_label || product?.name || 'your vehicle',
+              message: text,
+              link: `${APP_URL}/#/dashboard?tab=chat`,
+            },
+            eventId: sessionId,
+          }).catch(() => { /* best effort */ });
+        }
+      }).catch(() => { /* best effort */ });
     });
 
     socket.on('typing', async ({ sessionId, isTyping } = {}) => {

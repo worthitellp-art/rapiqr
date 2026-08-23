@@ -36,11 +36,16 @@ export async function getUserProfile(userId: string, email: string): Promise<Use
   }
 
   try {
-    const { data, error } = await supabase
+    // profiles.id is a uuid. The Google fallback path calls this with Google's
+    // `sub` (a 21-digit decimal string), and Postgres rejects that comparison
+    // outright with a 400 rather than returning no rows — so match on the email
+    // instead, which is unique in this table.
+    const base = supabase
       .from('profiles')
-      .select('id, email, full_name, phone_number, avatar_url, role, subscription_plan, is_subscribed, metadata')
-      .eq('id', userId)
-      .maybeSingle();
+      .select('id, email, full_name, phone_number, avatar_url, role, subscription_plan, is_subscribed, metadata');
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId || '');
+
+    const { data, error } = await (isUuid ? base.eq('id', userId) : base.eq('email', email)).maybeSingle();
 
     if (error) throw error;
 
@@ -81,6 +86,15 @@ export async function getUserProfile(userId: string, email: string): Promise<Use
       isSubscribed: defaultRole === 'admin',
       isPhoneVerified: false,
     };
+
+    // Without a real uuid there is no valid row to write — the id column would
+    // reject it. That is the Google fallback path, where the backend
+    // (/api/auth/google) is the only thing that can mint the auth user, so skip
+    // the write rather than firing one that is guaranteed to 400.
+    if (!isUuid) {
+      console.warn('Skipping profile creation: no Supabase user id for this account yet.');
+      return newProfile;
+    }
 
     const { error: upsertError } = await supabase.from('profiles').upsert({
       id: userId,
@@ -143,3 +157,4 @@ export async function updateProfilePhoneNumber(userId: string, phoneNumber: stri
     return false;
   }
 }
+

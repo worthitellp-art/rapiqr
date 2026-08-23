@@ -89,7 +89,13 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
       if (response.status === 401) {
         window.dispatchEvent(new CustomEvent('rapiqr:unauthorized', { detail: { endpoint } }));
       }
-      throw new Error(errMsg);
+      // Carry the HTTP status on the error so callers can tell "your token is
+      // dead" (401) apart from "the server had a problem answering" (404/5xx).
+      // Without it, AuthContext treated every /auth/me failure as a dead token
+      // and deleted it, after which every later call went out unauthenticated.
+      const err = new Error(errMsg) as Error & { status?: number };
+      err.status = response.status;
+      throw err;
     }
 
     if (data === null) {
@@ -180,7 +186,7 @@ export const apiClient = {
       });
     },
 
-    async updateProfile(updates: { fullName?: string; phoneNumber?: string }) {
+    async updateProfile(updates: { fullName?: string; phoneNumber?: string; avatarUrl?: string }) {
       return request<{ success: boolean; user?: any }>('/auth/me', {
         method: 'PATCH',
         body: JSON.stringify(updates),
@@ -211,17 +217,18 @@ export const apiClient = {
       });
     },
 
+    // `warning` is set when the address changed was the one ADMIN_EMAIL points at:
+    // admin login keeps using the old address until Server/.env is updated.
     async changeEmail(newEmail: string, currentPassword: string) {
-      return request<{ success: boolean; user?: any; token?: string }>('/auth/change-email', {
+      return request<{ success: boolean; user?: any; token?: string; warning?: string }>('/auth/change-email', {
         method: 'POST',
         body: JSON.stringify({ newEmail, currentPassword }),
       });
     },
 
-    async deleteAccount(password: string) {
+    async deleteAccount() {
       return request<{ success: boolean; message?: string }>('/auth/me', {
         method: 'DELETE',
-        body: JSON.stringify({ password }),
       });
     },
   },
@@ -497,6 +504,12 @@ export const apiClient = {
     async closeSession(sessionId: string) {
       return request<{ success: boolean; data: ChatSession }>(`/chat/sessions/${sessionId}/close`, {
         method: 'PATCH',
+      });
+    },
+
+    async deleteSession(sessionId: string) {
+      return request<{ success: boolean; message?: string }>(`/chat/sessions/${sessionId}`, {
+        method: 'DELETE',
       });
     },
   },
@@ -800,10 +813,19 @@ export const apiClient = {
   // Persisted server-side so the scan page and the masked-call bridge can both
   // resolve them without depending on the admin's own browser localStorage.
   helplines: {
-    async getPublic(category?: string) {
+    /**
+     * Active providers. With no filters this is the full list, which the scan
+     * page fetches once and then resolves against locally (see tileActions.ts).
+     * `serviceType` matches the slug; `stickerCategory` keeps providers scoped
+     * to that category plus every provider scoped to none.
+     */
+    async getPublic(filter?: string | { category?: string; serviceType?: string; stickerCategory?: string }) {
       try {
-        const qs = category ? `?category=${encodeURIComponent(category)}` : '';
-        return await request<{ success: boolean; data: any[] }>(`/helplines/public${qs}`, { method: 'GET' });
+        const params = typeof filter === 'string' ? { category: filter } : (filter || {});
+        const qs = new URLSearchParams(
+          Object.entries(params).filter(([, v]) => Boolean(v)) as [string, string][]
+        ).toString();
+        return await request<{ success: boolean; data: any[] }>(`/helplines/public${qs ? `?${qs}` : ''}`, { method: 'GET' });
       } catch {
         return { success: true, data: [] };
       }
@@ -811,13 +833,13 @@ export const apiClient = {
     async getAll() {
       return request<{ success: boolean; data: any[] }>('/helplines', { method: 'GET' });
     },
-    async create(provider: { category: string; label: string; phone: string; active?: boolean }) {
+    async create(provider: { category: string; serviceType?: string; categories?: string[]; label: string; phone: string; active?: boolean }) {
       return request<{ success: boolean; data: any }>('/helplines', {
         method: 'POST',
         body: JSON.stringify(provider),
       });
     },
-    async update(id: string, updates: Partial<{ category: string; label: string; phone: string; active: boolean }>) {
+    async update(id: string, updates: Partial<{ category: string; serviceType: string; categories: string[]; label: string; phone: string; active: boolean }>) {
       return request<{ success: boolean; data: any }>(`/helplines/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(updates),

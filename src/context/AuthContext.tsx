@@ -42,8 +42,9 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName: string, phoneNumber?: string) => Promise<{ success: boolean; error?: string }>;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   adminSignIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
-  deleteAccount: (password: string) => Promise<{ success: boolean; error?: string }>;
+  deleteAccount: () => Promise<{ success: boolean; error?: string }>;
   resetPassword: (email: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   demoLogin: () => void;
   // Links a phone number to the logged-in account — used at signup and to auto-link
@@ -100,10 +101,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
             }
           })
-          .catch(() => {
-            // Token invalid/expired — clear it; Supabase flow below will take over.
-            localStorage.removeItem('repiqr-token');
-            localStorage.removeItem('namoqr-token');
+          .catch((err: any) => {
+            // ONLY a 401 means the token itself is dead. This used to clear the
+            // token on any failure at all — including the 404 that /auth/me
+            // returned for accounts whose profiles row was never written, and
+            // any transient network/5xx blip. Once the token was gone, every
+            // apiClient call went out unauthenticated, 401'd, and tripped the
+            // rapiqr:unauthorized -> signOut() handler below: the client
+            // dashboard would simply never load, seemingly at random.
+            if (err?.status === 401) {
+              localStorage.removeItem('repiqr-token');
+              localStorage.removeItem('namoqr-token');
+            }
           });
       }
     }
@@ -137,6 +146,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (isApiBackendConfigured && currentSession.access_token) {
           localStorage.setItem('repiqr-token', currentSession.access_token);
           localStorage.setItem('namoqr-token', currentSession.access_token);
+
+          // Now that a token exists, pull the profile through the backend. getUserProfile
+          // above writes with the anon key, so RLS can silently drop the insert and leave
+          // an in-memory-only profile — the exact way accounts ended up with no profiles
+          // row. /auth/me runs ensureProfile with the service-role key, which actually
+          // persists it, and derives role/plan from ADMIN_EMAIL so a Google sign-in as the
+          // designated admin comes back as admin rather than a plain user.
+          //
+          // The mount effect's getMe only fires when a token was ALREADY in storage, so
+          // without this a first-time OAuth sign-in wrote nothing until the next reload.
+          try {
+            const res = await apiClient.auth.getMe();
+            if (res?.user) {
+              const backendProfile = backendUserToProfile(res.user);
+              setProfile(backendProfile);
+              localStorage.setItem('repiqr-auth-user', JSON.stringify(backendProfile));
+              localStorage.setItem('namoqr-auth-user', JSON.stringify(backendProfile));
+            }
+          } catch {
+            // Non-fatal — the Supabase-derived profile above is already in state.
+          }
         }
       } else if (event === 'SIGNED_OUT') {
         setProfile(null);
@@ -409,12 +439,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Permanently deletes the account server-side (task.md #3 — DPDP/GDPR "right to
   // be forgotten"), then clears the local session the same way signOut does.
-  const deleteAccount = async (password: string) => {
+  const deleteAccount = async () => {
     if (!isApiBackendConfigured) {
       return { success: false, error: 'Account deletion requires the RapiQR backend to be connected.' };
     }
     try {
-      await apiClient.auth.deleteAccount(password);
+      await apiClient.auth.deleteAccount();
       await signOut();
       return { success: true };
     } catch (err: any) {
@@ -439,8 +469,134 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Used only as the Google Sign-In fallback when Supabase isn't configured — ALWAYS a
-  // regular user. Admin access is only ever granted via adminSignIn() in the Admin Panel.
+  /**
+   * Google Sign-In with real OAuth verification:
+   * Uses Google Identity Services (Token Client) or Supabase OAuth.
+   * Only transitions to logged-in state after Google successfully confirms the account.
+   */
+  const signInWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const clientId =
+        (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
+        '640446362534-73ub5mvtklhs4e3eldvde892q8jbtlbo.apps.googleusercontent.com';
+
+      // 1. Try Google Identity Services (GIS) Token Client first
+      if (typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2 && clientId) {
+        const tokenResponse = await new Promise<any>((resolve, reject) => {
+          try {
+            const client = (window as any).google.accounts.oauth2.initTokenClient({
+              client_id: clientId,
+              scope: 'email profile openid',
+              callback: (response: any) => {
+                if (response.error) {
+                  reject(new Error(response.error_description || response.error));
+                } else if (!response.access_token) {
+                  reject(new Error('No access token returned from Google.'));
+                } else {
+                  resolve(response);
+                }
+              },
+              error_callback: (err: any) => {
+                reject(new Error(err?.message || 'Google Sign-In was cancelled.'));
+              },
+            });
+            client.requestAccessToken({ prompt: 'select_account' });
+          } catch (e) {
+            reject(e);
+          }
+        });
+
+        if (tokenResponse?.access_token) {
+          const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+          });
+
+          if (userInfoRes.ok) {
+            const googleUser = await userInfoRes.json();
+            const email = googleUser.email;
+            const fullName = googleUser.name || email?.split('@')[0] || 'Google User';
+            const avatarUrl = googleUser.picture;
+            const sub = googleUser.sub;
+
+            // Sync with backend /api/auth/google when backend is available
+            if (isApiBackendConfigured) {
+              try {
+                const res = await apiClient.auth.googleAuth({
+                  user: { email, fullName, avatarUrl, id: sub },
+                  token: tokenResponse.access_token,
+                });
+
+                if (res?.token) {
+                  localStorage.setItem('repiqr-token', res.token);
+                  localStorage.setItem('namoqr-token', res.token);
+                }
+                if (res?.user) {
+                  const p = backendUserToProfile(res.user);
+                  setProfile(p);
+                  localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
+                  localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+                  return { success: true };
+                }
+              } catch (apiErr) {
+                console.warn('Backend googleAuth sync warning:', apiErr);
+              }
+            }
+
+            // Sync with Supabase Profile if configured
+            if (isSupabaseConfigured) {
+              try {
+                const p = await getUserProfile(sub, email);
+                if (p) {
+                  p.fullName = fullName;
+                  p.avatarUrl = avatarUrl;
+                  setProfile(p);
+                  localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
+                  localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+                  return { success: true };
+                }
+              } catch (supabaseErr) {
+                console.warn('Supabase profile sync warning:', supabaseErr);
+              }
+            }
+
+            const localProfile: UserProfileData = {
+              id: sub || `google-${Date.now()}`,
+              email,
+              fullName,
+              avatarUrl,
+              role: email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() ? 'admin' : 'user',
+              subscriptionPlan: 'free',
+              isSubscribed: false,
+            };
+            setProfile(localProfile);
+            localStorage.setItem('repiqr-auth-user', JSON.stringify(localProfile));
+            localStorage.setItem('namoqr-auth-user', JSON.stringify(localProfile));
+            return { success: true };
+          }
+        }
+      }
+
+      // 2. Fallback to Supabase OAuth redirect if GIS is not loaded
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: getAuthCallbackUrl('/auth/callback'),
+          },
+        });
+        if (error) {
+          return { success: false, error: error.message };
+        }
+        return { success: true };
+      }
+
+      return { success: false, error: 'Google sign-in client is initializing. Please try again.' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Google sign-in was cancelled or failed.' };
+    }
+  };
+
+  // Used only as demo fallback when explicitly triggered — ALWAYS a regular user.
   const demoLogin = () => {
     const demoUser: UserProfileData = {
       id: 'demo-user-' + Date.now(),
@@ -592,6 +748,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signUp,
         signIn,
         adminSignIn,
+        signInWithGoogle,
         updatePhoneNumber,
         sendPhoneOtp,
         verifyPhoneOtp,

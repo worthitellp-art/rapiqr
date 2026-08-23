@@ -31,18 +31,21 @@ class ProductController {
    */
   static async getMyProducts(req, res) {
     try {
-      const profile = await UserModel.findById(req.user.id);
-      const userPhone = profile?.phone_number ||
-        req.user.phone ||
-        req.user.phoneNumber ||
-        req.user.user_metadata?.phone_number ||
-        req.user.user_metadata?.phoneNumber ||
-        req.user.user_metadata?.phone;
+      // ensureProfile rather than findById: an account whose profiles row was never
+      // written would otherwise report no phone here, auto-claim nothing, and show an
+      // empty dashboard even though its stickers were sitting there waiting.
+      const profile = await UserModel.ensureProfile(req.user.id);
+
+      // ONLY the profile's verified phone number counts. This used to fall back to
+      // req.user.phone / user_metadata.phone_number — fields the account holder sets
+      // themselves at signup with no verification — so putting somebody else's number
+      // in your signup metadata was enough to auto-claim their stickers, routing right
+      // around the OTP flow. The admin console reads the whole fleet and never claims.
+      const userPhone = req.user.role === 'admin' ? null : profile?.phone_number;
 
       if (userPhone) {
         try {
-          const userName = profile?.full_name || req.user.user_metadata?.full_name || req.user.user_metadata?.name;
-          const claimed = await ProductModel.autoClaimByPhone(req.user.id, userName, userPhone);
+          const claimed = await ProductModel.autoClaimByPhone(req.user.id, profile?.full_name, userPhone);
           if (claimed.length > 0) {
             logger.rowUpdated('products', 'auto-claim', { userId: req.user.id, count: claimed.length });
           }

@@ -1,38 +1,77 @@
 import type React from "react";
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Phone, Wrench, Battery, Truck, Settings, Users, Ambulance, ShieldAlert, Car, Lightbulb, AlertTriangle } from "lucide-react";
+import {
+  Plus, Trash2, Phone, Wrench, Battery, Truck, Settings, Users, Ambulance, ShieldAlert,
+  Car, Lightbulb, AlertTriangle, Stethoscope, Droplets, Zap, KeyRound, MoveVertical,
+  Package, PackageOpen, Shield, Headset, Check,
+} from "lucide-react";
 import { useLocalStorage } from "./useLocalStorage";
 import { getCommunicationProvidersFromDb, saveCommunicationProviderToDb, deleteCommunicationProviderFromDb } from "../../../lib/supabaseService";
 import PhoneInputWithCountry from "../../common/PhoneInputWithCountry";
+import { SERVICE_TYPES, slugifyService } from "../../scan/tileActions";
+import { STICKER_CATEGORIES } from "../../../stickerModules";
 
-const CATEGORIES = ["Ambulance", "Towing", "Mechanic", "Flat Tire", "Battery", "Fuel", "Parking", "Police", "Theft", "Headlights", "Family"];
+/**
+ * Service provider directory.
+ *
+ * A provider is matched by SERVICE TYPE (`service_type`) and optionally scoped
+ * to specific sticker CATEGORIES. Leaving the category scope empty means "every
+ * category", which is what every row created before this screen existed is.
+ *
+ * `category` is still written with the service type's legacy label, because the
+ * bespoke car/bike scan screen looks providers up by that exact string
+ * (getAdminContacts("Towing")). Changing it would break the car template.
+ */
 
-const CATEGORY_META: Record<string, { icon: React.ReactNode; color: string; bg: string; placeholder: string }> = {
-  Ambulance:  { icon: <Ambulance size={14} />,    color: "#DC2626", bg: "#FDEAEA", placeholder: "e.g. City Ambulance Service" },
-  Towing:     { icon: <Truck size={14} />,         color: "#DC2626", bg: "#FDEAEA", placeholder: "e.g. Highway Towing 24x7" },
-  Mechanic:   { icon: <Settings size={14} />,       color: "#B8863F", bg: "#FBF3E4", placeholder: "e.g. Mobile Mechanic Near Me" },
-  "Flat Tire": { icon: <Wrench size={14} />,        color: "#B8863F", bg: "#FBF3E4", placeholder: "e.g. Puncture Repair Service" },
-  Battery:    { icon: <Battery size={14} />,         color: "#B8863F", bg: "#FBF3E4", placeholder: "e.g. Battery Jumpstart Helpline" },
-  Fuel:       { icon: <Truck size={14} />,           color: "#5C78DF", bg: "#E8EDFF", placeholder: "e.g. Emergency Fuel Delivery" },
-  Parking:    { icon: <Car size={14} />,             color: "#5C78DF", bg: "#E8EDFF", placeholder: "e.g. Parking Enforcement Helpline" },
-  Police:     { icon: <ShieldAlert size={14} />,     color: "#7B7FD1", bg: "#EDEDFB", placeholder: "e.g. Local Police Control Room" },
-  Theft:      { icon: <AlertTriangle size={14} />,   color: "#DC2626", bg: "#FDEAEA", placeholder: "e.g. Anti-Theft Rapid Response" },
-  Headlights: { icon: <Lightbulb size={14} />,       color: "#B8863F", bg: "#FBF3E4", placeholder: "e.g. Roadside Light Assist" },
-  Family:     { icon: <Users size={14} />,           color: "#2E9E5B", bg: "#E9F9EF", placeholder: "e.g. Father, Mother, Sibling" },
+const SERVICE_META: Record<string, { icon: React.ReactNode; color: string; bg: string; placeholder: string }> = {
+  ambulance:       { icon: <Ambulance size={14} />,     color: "#DC2626", bg: "#FDEAEA", placeholder: "e.g. City Ambulance Service" },
+  towing:          { icon: <Truck size={14} />,          color: "#DC2626", bg: "#FDEAEA", placeholder: "e.g. Highway Towing 24x7" },
+  mechanic:        { icon: <Settings size={14} />,       color: "#B8863F", bg: "#FBF3E4", placeholder: "e.g. Mobile Mechanic Near Me" },
+  flat_tire:       { icon: <Wrench size={14} />,         color: "#B8863F", bg: "#FBF3E4", placeholder: "e.g. Puncture Repair Service" },
+  battery:         { icon: <Battery size={14} />,        color: "#B8863F", bg: "#FBF3E4", placeholder: "e.g. Battery Jumpstart Helpline" },
+  fuel:            { icon: <Truck size={14} />,          color: "#5C78DF", bg: "#E8EDFF", placeholder: "e.g. Emergency Fuel Delivery" },
+  parking:         { icon: <Car size={14} />,            color: "#5C78DF", bg: "#E8EDFF", placeholder: "e.g. Parking Enforcement Helpline" },
+  police:          { icon: <ShieldAlert size={14} />,    color: "#7B7FD1", bg: "#EDEDFB", placeholder: "e.g. Local Police Control Room" },
+  theft:           { icon: <AlertTriangle size={14} />,  color: "#DC2626", bg: "#FDEAEA", placeholder: "e.g. Anti-Theft Rapid Response" },
+  headlights:      { icon: <Lightbulb size={14} />,      color: "#B8863F", bg: "#FBF3E4", placeholder: "e.g. Roadside Light Assist" },
+  family:          { icon: <Users size={14} />,          color: "#2E9E5B", bg: "#E9F9EF", placeholder: "e.g. Father, Mother, Sibling" },
+  veterinarian:    { icon: <Stethoscope size={14} />,    color: "#2E9E5B", bg: "#E9F9EF", placeholder: "e.g. 24x7 Pet Clinic" },
+  plumber:         { icon: <Droplets size={14} />,       color: "#5C78DF", bg: "#E8EDFF", placeholder: "e.g. Emergency Plumbing Service" },
+  electrician:     { icon: <Zap size={14} />,            color: "#B8863F", bg: "#FBF3E4", placeholder: "e.g. On-Call Electrician" },
+  locksmith:       { icon: <KeyRound size={14} />,       color: "#B8863F", bg: "#FBF3E4", placeholder: "e.g. 24x7 Locksmith" },
+  lift_technician: { icon: <MoveVertical size={14} />,   color: "#5C78DF", bg: "#E8EDFF", placeholder: "e.g. Otis Lift Support" },
+  courier:         { icon: <Package size={14} />,        color: "#5C78DF", bg: "#E8EDFF", placeholder: "e.g. Blue Dart Pickup Desk" },
+  lost_found:      { icon: <PackageOpen size={14} />,    color: "#7B7FD1", bg: "#EDEDFB", placeholder: "e.g. Airport Lost & Found" },
+  security:        { icon: <Shield size={14} />,         color: "#7B7FD1", bg: "#EDEDFB", placeholder: "e.g. Society Security Desk" },
+  support:         { icon: <Headset size={14} />,        color: "#17181A", bg: "#F3F3F4", placeholder: "e.g. RepiQR Support Desk" },
 };
+
+const FALLBACK_META = { icon: <Phone size={14} />, color: "#777B80", bg: "#F3F3F4", placeholder: "e.g. Provider Name" };
+
+/** The service type a stored row belongs to, tolerating pre-migration rows. */
+function providerSlug(p: any): string {
+  return slugifyService(p?.service_type || p?.category);
+}
 
 export default function CommunicationPage({ setToast }: { setToast: (msg: string | null) => void }) {
   const [providers, setProviders] = useLocalStorage<any[]>("repiqr-helplines", []);
+  const [serviceType, setServiceType] = useState("ambulance");
+  const [label, setLabel] = useState("");
+  const [phone, setPhone] = useState("");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
 
-  // Save changes & dispatch update event
-  const saveProviders = (newProviders: any[]) => {
-    setProviders(newProviders);
+  const meta = SERVICE_META[serviceType] || FALLBACK_META;
+
+  const announce = () => {
     window.dispatchEvent(new Event("repiqr-helplines-updated"));
     window.dispatchEvent(new Event("namoqr-helplines-updated"));
   };
-  const [category, setCategory] = useState("Ambulance");
-  const [label, setLabel] = useState("");
-  const [phone, setPhone] = useState("");
+
+  const flash = (msg: string, ms = 2000) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), ms);
+  };
 
   useEffect(() => {
     getCommunicationProvidersFromDb().then((dbData) => {
@@ -42,119 +81,238 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
     });
   }, []);
 
+  const toggleCategory = (value: string) => {
+    setCategories((prev) => (prev.includes(value) ? prev.filter((c) => c !== value) : [...prev, value]));
+  };
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!label.trim() || !phone.trim()) return;
-    const p = { id: `prov-${Date.now()}`, category, label: label.trim(), phone: phone.trim(), active: true };
-    setProviders([p, ...providers]);
-    window.dispatchEvent(new Event("namoqr-helplines-updated"));
-    
-    await saveCommunicationProviderToDb({ category, label: label.trim(), phone: phone.trim(), active: true });
+    if (!label.trim() || !phone.trim() || saving) return;
 
-    setLabel("");
-    setPhone("");
-    setToast("Provider saved to database");
-    setTimeout(() => setToast(null), 2000);
+    const type = SERVICE_TYPES.find((s) => s.slug === serviceType);
+    if (!type) return;
+
+    setSaving(true);
+    try {
+      const payload = {
+        // Legacy label stays authoritative for the car/bike screen's lookups.
+        category: type.legacy || type.label,
+        serviceType: type.slug,
+        categories,
+        label: label.trim(),
+        phone: phone.trim(),
+        active: true,
+      };
+
+      const saved = await saveCommunicationProviderToDb(payload);
+      // Adopt the row the server actually created — the old code invented a
+      // local `prov-<timestamp>` id, so later edits (activate/delete) addressed
+      // a row that never existed in the database.
+      const row = Array.isArray(saved) && saved[0] ? saved[0] : { ...payload, id: `prov-${Date.now()}` };
+
+      setProviders([row, ...providers]);
+      announce();
+
+      setLabel("");
+      setPhone("");
+      setCategories([]);
+      flash(Array.isArray(saved) && saved[0] ? "Provider saved to database" : "Provider saved locally — backend unreachable");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleActive = async (p: any) => {
+    const next = p.active === false;
+    setProviders((prev) => prev.map((x: any) => (x.id === p.id ? { ...x, active: next } : x)));
+    announce();
+    await saveCommunicationProviderToDb({ ...p, serviceType: providerSlug(p), active: next });
+    flash(next ? "Provider activated" : "Provider deactivated", 1500);
   };
 
   const handleRemove = async (id: string) => {
     setProviders((prev) => prev.filter((x: any) => x.id !== id));
+    announce();
     await deleteCommunicationProviderFromDb(id);
-    setToast("Provider removed from database");
-    setTimeout(() => setToast(null), 1500);
+    flash("Provider removed from database", 1500);
   };
 
-  const grouped = CATEGORIES.map((cat) => ({
-    cat,
-    items: providers.filter((p: any) => p.category === cat),
+  const grouped = SERVICE_TYPES.map((type) => ({
+    type,
+    items: providers.filter((p: any) => providerSlug(p) === type.slug),
   })).filter((g) => g.items.length > 0);
 
+  // Rows whose service type isn't in the catalogue (hand-entered or renamed)
+  // would otherwise vanish from this screen entirely.
+  const known = new Set(SERVICE_TYPES.map((s) => s.slug));
+  const orphans = providers.filter((p: any) => !known.has(providerSlug(p)));
+
   return (
-    <div className="px-8 pt-7 pb-16 space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
       {/* Add Provider Form */}
       <div className="bg-white border border-[#E5E5E7] p-6 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
         <h3 className="font-display font-semibold text-[#17181A] text-[14px] mb-5 flex items-center gap-2">
-          <Phone size={15} className="text-[#B8863F]" /> Add Helpline Provider
+          <Phone size={15} className="text-[#B8863F]" /> Add Service Provider
         </h3>
-        <form onSubmit={handleAdd} className="grid grid-cols-4 gap-3">
-          <div>
-            <label className="block text-[10px] font-extrabold text-[#777B80] mb-1.5 uppercase tracking-wider">Category</label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-sm rounded-[4px] border border-[#E5E5E7] bg-white outline-none focus:border-[#5C78DF] transition-all font-semibold text-[#17181A]"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+        <form onSubmit={handleAdd} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-[10px] font-extrabold text-[#777B80] mb-1.5 uppercase tracking-wider">Service Type</label>
+              <select
+                value={serviceType}
+                onChange={(e) => setServiceType(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-sm rounded-[4px] border border-[#E5E5E7] bg-white outline-none focus:border-[#5C78DF] transition-all font-semibold text-[#17181A]"
+              >
+                {SERVICE_TYPES.map((s) => (
+                  <option key={s.slug} value={s.slug}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-extrabold text-[#777B80] mb-1.5 uppercase tracking-wider">Provider Name</label>
+              <input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder={meta.placeholder}
+                className="w-full px-3.5 py-2.5 text-sm rounded-[4px] border border-[#E5E5E7] bg-white outline-none focus:border-[#5C78DF] transition-all font-semibold text-[#17181A]"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-extrabold text-[#777B80] mb-1.5 uppercase tracking-wider">Phone Number</label>
+              <PhoneInputWithCountry value={phone} onChange={(full) => setPhone(full)} />
+            </div>
+            <div className="flex items-end">
+              <button
+                type="submit"
+                disabled={!label.trim() || !phone.trim() || saving}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-[4px] bg-[#17181A] hover:bg-[#2A2B2E] text-white text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <Plus size={14} /> {saving ? "Saving…" : "Add"}
+              </button>
+            </div>
           </div>
+
+          {/* Category scope */}
           <div>
-            <label className="block text-[10px] font-extrabold text-[#777B80] mb-1.5 uppercase tracking-wider">Provider Name</label>
-            <input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder={CATEGORY_META[category]?.placeholder || "e.g. Provider Name"}
-              className="w-full px-3.5 py-2.5 text-sm rounded-[4px] border border-[#E5E5E7] bg-white outline-none focus:border-[#5C78DF] transition-all font-semibold text-[#17181A]"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-extrabold text-[#777B80] mb-1.5 uppercase tracking-wider">Phone Number</label>
-            <PhoneInputWithCountry value={phone} onChange={(full) => setPhone(full)} />
-          </div>
-          <div className="flex items-end">
-            <button
-              type="submit"
-              disabled={!label.trim() || !phone.trim()}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-[4px] bg-[#17181A] hover:bg-[#2A2B2E] text-white text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <Plus size={14} /> Add
-            </button>
+            <label className="block text-[10px] font-extrabold text-[#777B80] mb-2 uppercase tracking-wider">
+              Applicable Categories
+              <span className="ml-2 font-semibold normal-case tracking-normal text-[#9CA0A6]">
+                — leave all unselected to make this provider available to every category
+              </span>
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {STICKER_CATEGORIES.map((c) => {
+                const on = categories.includes(c.value);
+                return (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => toggleCategory(c.value)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-[4px] text-[11px] font-bold border transition-all cursor-pointer ${
+                      on
+                        ? "bg-[#17181A] border-[#17181A] text-white"
+                        : "bg-white border-[#E5E5E7] text-[#777B80] hover:border-[#9CA0A6]"
+                    }`}
+                  >
+                    {on && <Check size={11} />} {c.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </form>
       </div>
 
-      {/* Provider List grouped by category */}
-      {grouped.length > 0 ? (
+      {/* Provider list grouped by service type */}
+      {grouped.length > 0 || orphans.length > 0 ? (
         <div className="space-y-3">
-          {grouped.map(({ cat, items }) => {
-            const meta = CATEGORY_META[cat] || { icon: <Phone size={14} />, color: "#777B80", bg: "#F3F3F4" };
+          {grouped.map(({ type, items }) => {
+            const m = SERVICE_META[type.slug] || FALLBACK_META;
             return (
-              <div key={cat} className="bg-white border border-[#E5E5E7] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
-                {/* Category Header */}
+              <div key={type.slug} className="bg-white border border-[#E5E5E7] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
                 <div className="px-5 py-3 border-b border-[#E5E5E7] bg-[#F7F7F8] flex items-center gap-2.5">
-                  <div className="w-6 h-6 rounded-[4px] flex items-center justify-center" style={{ background: meta.bg, color: meta.color }}>
-                    {meta.icon}
+                  <div className="w-6 h-6 rounded-[4px] flex items-center justify-center" style={{ background: m.bg, color: m.color }}>
+                    {m.icon}
                   </div>
-                  <span className="text-xs font-extrabold text-[#17181A] uppercase tracking-wider">{cat}</span>
+                  <span className="text-xs font-extrabold text-[#17181A] uppercase tracking-wider">{type.label}</span>
                   <span className="text-[10px] text-[#777B80] font-semibold bg-[#F3F3F4] px-1.5 py-0.5 rounded-[4px]">{items.length}</span>
+                  <span className="text-[10px] text-[#9CA0A6] font-mono ml-auto">{type.slug}</span>
                 </div>
-                {/* Items */}
-                {items.map((p: any) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between px-5 py-3.5 border-b border-[#E5E5E7] last:border-0 hover:bg-[#F3F3F4] transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-[4px] flex items-center justify-center flex-shrink-0" style={{ background: meta.bg, color: meta.color }}>
-                        {meta.icon}
+
+                {items.map((p: any) => {
+                  const scope: string[] = Array.isArray(p.categories) ? p.categories : [];
+                  const inactive = p.active === false;
+                  return (
+                    <div
+                      key={p.id}
+                      className={`flex items-center justify-between px-5 py-3.5 border-b border-[#E5E5E7] last:border-0 hover:bg-[#F3F3F4] transition-colors ${inactive ? "opacity-55" : ""}`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-[4px] flex items-center justify-center flex-shrink-0" style={{ background: m.bg, color: m.color }}>
+                          {m.icon}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-[#17181A] truncate">{p.label}</p>
+                          <p className="text-[11px] text-[#777B80] font-mono font-semibold mt-0.5">{p.phone}</p>
+                          <p className="text-[10px] text-[#9CA0A6] font-semibold mt-1">
+                            {scope.length === 0
+                              ? "All categories"
+                              : scope.map((s) => STICKER_CATEGORIES.find((c) => c.value === s)?.label || s).join(" · ")}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-[#17181A] truncate">{p.label}</p>
-                        <p className="text-[11px] text-[#777B80] font-mono font-semibold mt-0.5">{p.phone}</p>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => handleToggleActive(p)}
+                          className={`px-2.5 py-1 rounded-[4px] text-[10px] font-extrabold uppercase tracking-wider border transition-all cursor-pointer ${
+                            inactive
+                              ? "bg-white border-[#E5E5E7] text-[#9CA0A6] hover:border-[#2E9E5B] hover:text-[#2E9E5B]"
+                              : "bg-[#E9F9EF] border-[#2E9E5B]/30 text-[#2E9E5B] hover:bg-[#D7F2E2]"
+                          }`}
+                        >
+                          {inactive ? "Inactive" : "Active"}
+                        </button>
+                        <button
+                          onClick={() => handleRemove(p.id)}
+                          className="w-7 h-7 rounded-[4px] hover:bg-[#FDEAEA] hover:text-[#DC2626] flex items-center justify-center text-[#9CA0A6] transition-all cursor-pointer"
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleRemove(p.id)}
-                      className="w-7 h-7 rounded-[4px] hover:bg-[#FDEAEA] hover:text-[#DC2626] flex items-center justify-center text-[#9CA0A6] transition-all cursor-pointer flex-shrink-0"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             );
           })}
+
+          {orphans.length > 0 && (
+            <div className="bg-white border border-[#E5E5E7] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
+              <div className="px-5 py-3 border-b border-[#E5E5E7] bg-[#FBF3E4] flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-[4px] flex items-center justify-center" style={{ background: "#FDEAEA", color: "#B8863F" }}>
+                  <AlertTriangle size={14} />
+                </div>
+                <span className="text-xs font-extrabold text-[#17181A] uppercase tracking-wider">Unrecognised service type</span>
+                <span className="text-[10px] text-[#777B80] font-semibold">These won't be matched by any scan-page button</span>
+              </div>
+              {orphans.map((p: any) => (
+                <div key={p.id} className="flex items-center justify-between px-5 py-3.5 border-b border-[#E5E5E7] last:border-0">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-[#17181A] truncate">{p.label}</p>
+                    <p className="text-[11px] text-[#777B80] font-mono font-semibold mt-0.5">{p.phone}</p>
+                    <p className="text-[10px] text-[#9CA0A6] font-mono mt-1">{p.category || "—"} → {providerSlug(p) || "—"}</p>
+                  </div>
+                  <button
+                    onClick={() => handleRemove(p.id)}
+                    className="w-7 h-7 rounded-[4px] hover:bg-[#FDEAEA] hover:text-[#DC2626] flex items-center justify-center text-[#9CA0A6] transition-all cursor-pointer flex-shrink-0"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-white border border-[#E5E5E7] p-12 text-center shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
@@ -162,7 +320,7 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
             <Phone size={20} className="text-[#9CA0A6]" />
           </div>
           <p className="text-sm font-semibold text-[#17181A]">No providers added yet</p>
-          <p className="text-xs text-[#777B80] mt-1">Add your first helpline provider above</p>
+          <p className="text-xs text-[#777B80] mt-1">Add your first service provider above</p>
         </div>
       )}
     </div>

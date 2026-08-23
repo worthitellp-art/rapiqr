@@ -4,7 +4,8 @@ import {
   Users as UsersIcon, Trash2, Check, AlertTriangle, Plus, Sparkles, Filter, RefreshCw
 } from "lucide-react";
 import StatusPill from "./StatusPill";
-import { avatarUrl, fmtDate } from "./helpers";
+import { fmtDate } from "./helpers";
+import InitialAvatar from "../../common/InitialAvatar";
 import { getUsersFromDb, deleteUserFromDb } from "../../../lib/supabaseService";
 import ConfirmModal from "./ConfirmModal";
 
@@ -62,16 +63,19 @@ export default function UsersPage({
     setDeleteTargetUser(null);
     setIsDeleting(true);
 
-    // Update local state immediately
-    setUsers((prev) => prev.filter((u) => u.id !== target.id));
-
-    const success = await deleteUserFromDb(target.id);
-    setIsDeleting(false);
-
-    if (success) {
-      showToast(`User account ${target.email} deleted successfully`);
-    } else {
-      showToast(`Account removed locally`);
+    try {
+      const success = await deleteUserFromDb(target.id);
+      if (success) {
+        setUsers((prev) => prev.filter((u) => u.id !== target.id));
+        showToast(`User account ${target.email || target.id} deleted successfully`);
+        fetchUserAccounts(searchQuery);
+      } else {
+        showToast(`Failed to delete user account`);
+      }
+    } catch (err: any) {
+      showToast(`Error deleting user: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -81,7 +85,7 @@ export default function UsersPage({
   });
 
   return (
-    <div className="px-8 pt-7 pb-16 space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
       {/* ── Section Header ─────────────────────── */}
       <div className="flex items-baseline justify-between flex-wrap gap-4">
         <div>
@@ -174,8 +178,8 @@ export default function UsersPage({
           </p>
         </div>
       ) : (
-        <div className="bg-white border border-[#E5E5E7] shadow-[0_1px_4px_rgba(0,0,0,0.03)] overflow-hidden">
-          <table className="w-full text-sm text-[#17181A]">
+        <div className="bg-white border border-[#E5E5E7] shadow-[0_1px_4px_rgba(0,0,0,0.03)] overflow-x-auto">
+          <table className="w-full min-w-[880px] text-sm text-[#17181A]">
             <thead>
               <tr className="text-left font-display text-[12px] font-semibold text-[#777B80] tracking-normal bg-[#F7F7F8] border-b border-[#E5E5E7]">
                 <th className="px-6 py-3.5">User Profile</th>
@@ -195,10 +199,11 @@ export default function UsersPage({
                   <tr key={u.id} className="hover:bg-[#F3F3F4] transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={avatarUrl(u.email || u.id)}
-                          alt={u.full_name}
-                          className="w-9 h-9 rounded-full bg-[#F7F7F8] border border-[#E5E5E7] p-0.5 object-cover"
+                        <InitialAvatar
+                          name={u.full_name}
+                          email={u.email}
+                          size={36}
+                          className="border border-[#E5E5E7]"
                         />
                         <div>
                           <p className="font-display font-semibold text-[14px] text-[#17181A] leading-tight">
@@ -242,14 +247,20 @@ export default function UsersPage({
                     </td>
 
                     <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => setDeleteTargetUser(u)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] text-[#DC2626] border border-[#DC2626]/20 text-[12px] font-bold hover:bg-[#FDEAEA] transition-all cursor-pointer"
-                        title="Delete User Account"
-                      >
-                        <Trash2 size={13} />
-                        <span>Delete</span>
-                      </button>
+                      {!isAdminRole ? (
+                        <button
+                          onClick={() => setDeleteTargetUser(u)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] text-[#DC2626] border border-[#DC2626]/20 text-[12px] font-bold hover:bg-[#FDEAEA] transition-all cursor-pointer"
+                          title="Delete User Account"
+                        >
+                          <Trash2 size={13} />
+                          <span>Delete</span>
+                        </button>
+                      ) : (
+                        <span className="text-[11.5px] font-semibold text-[#9CA0A6] italic">
+                          Protected Admin
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );

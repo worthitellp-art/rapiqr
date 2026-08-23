@@ -59,7 +59,7 @@ export default function OverviewPage({
   }).join(" ");
 
   return (
-    <div className="px-8 pt-7 pb-16 space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
       {/* ── Top Greeting & Action Header ─────────── */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
@@ -381,7 +381,7 @@ export default function OverviewPage({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-[#17181A]">
+          <table className="w-full min-w-[720px] text-sm text-[#17181A]">
             <thead>
               <tr className="text-left font-display text-[11px] font-bold text-[#777B80] uppercase tracking-wider bg-[#F7F7F8] border-b border-[#E5E5E7]">
                 <th className="px-4 py-3">QR Plate</th>

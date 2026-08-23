@@ -19,5 +19,6 @@ router.patch('/sessions/:id/read', optionalAuth, ChatController.markRead);
 
 // Owner-only: end the conversation
 router.patch('/sessions/:id/close', verifyToken, ChatController.closeSession);
+router.delete('/sessions/:id', verifyToken, ChatController.deleteSession);
 
 module.exports = router;

@@ -1,14 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Lock, ShieldCheck, CreditCard, Smartphone, Truck,
-  CheckCircle2, ArrowRight, X, MapPin, User, Mail,
-  ArrowLeft, ShoppingBag
+  Lock,
+  ShieldCheck,
+  CreditCard,
+  Smartphone,
+  Truck,
+  CheckCircle2,
+  ArrowRight,
+  MapPin,
+  User,
+  Mail,
+  ArrowLeft,
+  ShoppingBag,
+  Clock,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiClient } from '../../lib/apiClient';
 import { createOrderInDb } from '../../lib/supabaseService';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
-import './landing.css';
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
@@ -19,6 +29,7 @@ interface CheckoutProduct {
   img: string;
   category: string;
 }
+
 interface CheckoutCartItem {
   product: CheckoutProduct;
   qty: number;
@@ -35,7 +46,9 @@ interface CheckoutPageProps {
 const PAYMENT_LOGOS = ['UPI', 'GPay', 'PhonePe', 'Paytm', 'Visa', 'Mastercard', 'RuPay'];
 
 declare global {
-  interface Window { Razorpay: any; }
+  interface Window {
+    Razorpay: any;
+  }
 }
 
 function loadRazorpayScript(): Promise<boolean> {
@@ -50,7 +63,11 @@ function loadRazorpayScript(): Promise<boolean> {
 }
 
 export default function CheckoutPage({
-  onBack, onOpenSignup, onOpenLogin, onViewDashboard, onOrderComplete
+  onBack,
+  onOpenSignup,
+  onOpenLogin,
+  onViewDashboard,
+  onOrderComplete,
 }: CheckoutPageProps) {
   const { isLoggedIn, profile } = useAuth();
 
@@ -60,17 +77,18 @@ export default function CheckoutPage({
   const [confirmedTotal, setConfirmedTotal] = useState(0);
   const [recognized, setRecognized] = useState(false);
 
-  // Cart is persisted to localStorage by the landing page
+  // Cart is persisted in localStorage
   const [cart, setCart] = useState<CheckoutCartItem[]>(() => {
     try {
-      const saved = localStorage.getItem('repiqr-cart') || localStorage.getItem('namoqr-cart');
+      const saved =
+        localStorage.getItem('repiqr-cart') || localStorage.getItem('namoqr-cart');
       return saved ? (JSON.parse(saved) as CheckoutCartItem[]) : [];
     } catch {
       return [];
     }
   });
 
-  // Guest checkout form — only essentials
+  // Guest checkout form
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -78,7 +96,9 @@ export default function CheckoutPage({
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [pincode, setPincode] = useState('');
-  const [pincodeStatus, setPincodeStatus] = useState<'idle' | 'looking' | 'found' | 'not-found'>('idle');
+  const [pincodeStatus, setPincodeStatus] = useState<
+    'idle' | 'looking' | 'found' | 'not-found'
+  >('idle');
   const [delivery, setDelivery] = useState<'standard' | 'express'>('standard');
   const [payment, setPayment] = useState<'upi' | 'card' | 'cod'>('upi');
   const [error, setError] = useState('');
@@ -96,8 +116,7 @@ export default function CheckoutPage({
     }
   }, [profile]);
 
-  // Auto-fill City & State from a valid 6-digit pincode (India Post's public
-  // lookup) so the visitor only has to confirm, not type, two extra fields.
+  // Auto-fill City & State from valid 6-digit Indian pincode
   useEffect(() => {
     const digits = pincode.replace(/\D/g, '');
     if (digits.length !== 6) {
@@ -110,7 +129,8 @@ export default function CheckoutPage({
       try {
         const res = await fetch(`https://api.postalpincode.in/pincode/${digits}`);
         const data = await res.json();
-        const office = data?.[0]?.Status === 'Success' ? data[0].PostOffice?.[0] : null;
+        const office =
+          data?.[0]?.Status === 'Success' ? data[0].PostOffice?.[0] : null;
         if (cancelled) return;
         if (office) {
           setCity(office.District || office.Name || '');
@@ -123,12 +143,14 @@ export default function CheckoutPage({
         if (!cancelled) setPincodeStatus('not-found');
       }
     }, 400);
-    return () => { cancelled = true; clearTimeout(t); };
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [pincode]);
 
   const cleanDigits = (v: string) => (v || '').replace(/\D/g, '');
 
-  // Recognized account = logged-in profile match OR stored user match by email/phone
   const checkRecognized = () => {
     const em = email.trim().toLowerCase();
     const ph = cleanDigits(phone);
@@ -138,25 +160,34 @@ export default function CheckoutPage({
       if (ph && pPhone && ph.includes(pPhone)) return true;
     }
     try {
-      const saved = localStorage.getItem('repiqr-auth-user') || localStorage.getItem('namoqr-auth-user');
+      const saved =
+        localStorage.getItem('repiqr-auth-user') ||
+        localStorage.getItem('namoqr-auth-user');
       if (saved) {
         const u = JSON.parse(saved);
         if (em && (u.email || '').toLowerCase() === em) return true;
         const uPhone = cleanDigits(u.phoneNumber || u.phone);
         if (ph && uPhone && ph.includes(uPhone)) return true;
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return false;
   };
 
-  // Local receipt + sticker records — kept for the guest "order history" fallback
-  // and to make purchased tags appear in the dashboard immediately. Runs only
-  // AFTER the Razorpay payment has been verified server-side (see runCheckout).
   const finalizeLocalRecords = (id: string, isRecognized: boolean) => {
-    const items = cart.map(i => ({ name: i.product.name, qty: i.qty, price: i.product.price }));
+    const items = cart.map((i) => ({
+      name: i.product.name,
+      qty: i.qty,
+      price: i.product.price,
+    }));
 
     try {
-      const orders = JSON.parse(localStorage.getItem('repiqr-orders') || localStorage.getItem('namoqr-orders') || '[]');
+      const orders = JSON.parse(
+        localStorage.getItem('repiqr-orders') ||
+          localStorage.getItem('namoqr-orders') ||
+          '[]'
+      );
       orders.unshift({
         orderId: id,
         email: email.trim(),
@@ -167,20 +198,25 @@ export default function CheckoutPage({
         payment,
         delivery,
         date: new Date().toISOString(),
-        linkedToAccount: isRecognized
+        linkedToAccount: isRecognized,
       });
       localStorage.setItem('repiqr-orders', JSON.stringify(orders));
       localStorage.setItem('namoqr-orders', JSON.stringify(orders));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
-    // Create sticker records so purchased tags appear in the dashboard
     const newStickers: any[] = [];
     let stickerSeq = 0;
-    cart.forEach(item => {
+    cart.forEach((item) => {
       for (let i = 0; i < item.qty; i++) {
-        const codeId = 'NQ-' + (item.product.category || 'car').slice(0, 4).toUpperCase() + '-' + Math.floor(1000 + Math.random() * 9000);
+        const codeId =
+          'RQ-' +
+          (item.product.category || 'car').slice(0, 4).toUpperCase() +
+          '-' +
+          Math.floor(1000 + Math.random() * 9000);
         newStickers.push({
-          id: 'p' + Date.now() + '-' + (stickerSeq++),
+          id: 'p' + Date.now() + '-' + stickerSeq++,
           code: codeId,
           nickname: item.product.name + (item.qty > 1 ? ` #${i + 1}` : ''),
           category: (item.product.category || 'car').toLowerCase(),
@@ -189,48 +225,89 @@ export default function CheckoutPage({
           scans: 0,
           lastScan: 'Just purchased',
           ownerPhone: phone.trim(),
-          meta: [['Purchased', 'Just now'], ['Order ID', id]],
+          meta: [
+            ['Purchased', 'Just now'],
+            ['Order ID', id],
+          ],
           docs: [],
           contacts: [[name.trim() || 'Customer', phone.trim()]],
-          timeline: [['success', 'Order Completed', 'Just now', `Purchased via Order ${id}`]]
+          timeline: [
+            ['success', 'Order Completed', 'Just now', `Purchased via Order ${id}`],
+          ],
         });
       }
     });
+
     try {
-      const existing = JSON.parse(localStorage.getItem('repiqr-client-stickers') || localStorage.getItem('namoqr-client-stickers') || '[]');
-      localStorage.setItem('repiqr-client-stickers', JSON.stringify([...newStickers, ...existing]));
-      localStorage.setItem('namoqr-client-stickers', JSON.stringify([...newStickers, ...existing]));
-      const qrList = JSON.parse(localStorage.getItem('repiqr-qrlist') || localStorage.getItem('namoqr-qrlist') || '[]');
-      const updatedQrList = [...qrList, ...newStickers.map(s => ({
-        id: s.id, code: s.code, status: 'active', ownerPhone: s.ownerPhone, ownerName: s.assigned, category: s.category
-      }))];
+      const existing = JSON.parse(
+        localStorage.getItem('repiqr-client-stickers') ||
+          localStorage.getItem('namoqr-client-stickers') ||
+          '[]'
+      );
+      localStorage.setItem(
+        'repiqr-client-stickers',
+        JSON.stringify([...newStickers, ...existing])
+      );
+      localStorage.setItem(
+        'namoqr-client-stickers',
+        JSON.stringify([...newStickers, ...existing])
+      );
+      const qrList = JSON.parse(
+        localStorage.getItem('repiqr-qrlist') ||
+          localStorage.getItem('namoqr-qrlist') ||
+          '[]'
+      );
+      const updatedQrList = [
+        ...qrList,
+        ...newStickers.map((s) => ({
+          id: s.id,
+          code: s.code,
+          status: 'active',
+          ownerPhone: s.ownerPhone,
+          ownerName: s.assigned,
+          category: s.category,
+        })),
+      ];
       localStorage.setItem('repiqr-qrlist', JSON.stringify(updatedQrList));
       localStorage.setItem('namoqr-qrlist', JSON.stringify(updatedQrList));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   };
 
-  // Full checkout: create the durable order row, open a real Razorpay order
-  // for its server-computed total, launch the Checkout widget, and complete
-  // the order once payment is done.
   const runCheckout = async (isRecognized: boolean) => {
-    // A malformed cart item (missing/non-numeric price) makes `total` NaN, which
-    // Razorpay would render as a broken "₹NaN" amount in its checkout modal —
-    // catch that here instead of ever opening a payment window for it.
     if (!Number.isFinite(total) || total <= 0) {
       setStep('details');
-      setError('Your cart total looks invalid. Please remove and re-add the affected item, then try again.');
+      setError(
+        'Your cart total looks invalid. Please remove and re-add the affected item, then try again.'
+      );
       return;
     }
 
-    const items = cart.map(i => ({ name: i.product.name, qty: i.qty, price: i.product.price }));
+    const items = cart.map((i) => ({
+      name: i.product.name,
+      qty: i.qty,
+      price: i.product.price,
+    }));
 
     let newOrderId: string = '';
     try {
       const res = await apiClient.orders.create({
-        name: name.trim(), email: email.trim(), phone: phone.trim(),
-        items, subtotal, deliveryFee, total,
-        paymentMethod: payment, deliveryMethod: delivery,
-        shippingAddress: { address: address.trim(), city: city.trim(), state: state.trim(), pincode: pincode.trim() },
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        items,
+        subtotal,
+        deliveryFee,
+        total,
+        paymentMethod: payment,
+        deliveryMethod: delivery,
+        shippingAddress: {
+          address: address.trim(),
+          city: city.trim(),
+          state: state.trim(),
+          pincode: pincode.trim(),
+        },
       });
       if (res?.data?.id) {
         newOrderId = res.data.id;
@@ -238,19 +315,35 @@ export default function CheckoutPage({
         throw new Error((res as any)?.error || 'Server did not return an order id');
       }
     } catch (err) {
-      console.warn('API backend order creation failed, falling back to database persistence:', err);
+      console.warn(
+        'API backend order creation failed, falling back to database persistence:',
+        err
+      );
       const fallbackRes = await createOrderInDb({
-        name: name.trim(), email: email.trim(), phone: phone.trim(),
-        items, subtotal, deliveryFee, total,
-        paymentMethod: payment, deliveryMethod: delivery,
-        shippingAddress: { address: address.trim(), city: city.trim(), state: state.trim(), pincode: pincode.trim() },
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        items,
+        subtotal,
+        deliveryFee,
+        total,
+        paymentMethod: payment,
+        deliveryMethod: delivery,
+        shippingAddress: {
+          address: address.trim(),
+          city: city.trim(),
+          state: state.trim(),
+          pincode: pincode.trim(),
+        },
         userId: profile?.id,
       });
       if (fallbackRes?.data?.id) {
         newOrderId = fallbackRes.data.id;
       } else {
         setStep('details');
-        setError("We couldn't confirm your order. Please check your connection and try again.");
+        setError(
+          "We couldn't confirm your order. Please check your connection and try again."
+        );
         return;
       }
     }
@@ -258,28 +351,45 @@ export default function CheckoutPage({
     const scriptOk = await loadRazorpayScript();
     if (!scriptOk) {
       setStep('details');
-      setError('Could not load the payment gateway. Please check your connection and try again.');
+      setError(
+        'Could not load the payment gateway. Please check your connection and try again.'
+      );
       return;
     }
 
-    let rpData: { keyId: string; razorpayOrderId?: string; amount: number; currency: string } | null = null;
+    let rpData: {
+      keyId: string;
+      razorpayOrderId?: string;
+      amount: number;
+      currency: string;
+    } | null = null;
     try {
       const rpRes = await apiClient.payments.createOrder(newOrderId);
-      if (rpRes?.data?.keyId && Number.isFinite(rpRes.data.amount) && rpRes.data.amount > 0) {
+      if (
+        rpRes?.data?.keyId &&
+        Number.isFinite(rpRes.data.amount) &&
+        rpRes.data.amount > 0
+      ) {
         rpData = rpRes.data;
       }
     } catch (err: any) {
-      console.warn('Backend Razorpay order creation failed, using client Razorpay gateway:', err);
+      console.warn(
+        'Backend Razorpay order creation failed, using client Razorpay gateway:',
+        err
+      );
     }
 
     if (!rpData) {
       const fallbackAmount = Math.round(total * 100);
       if (!Number.isFinite(fallbackAmount) || fallbackAmount <= 0) {
         setStep('details');
-        setError("We couldn't determine a valid amount to charge. Please try again or contact support.");
+        setError(
+          "We couldn't determine a valid amount to charge. Please try again or contact support."
+        );
         return;
       }
-      const testKey = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TPxmqU5mM69f1a';
+      const testKey =
+        import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TPxmqU5mM69f1a';
       rpData = {
         keyId: testKey,
         amount: fallbackAmount,
@@ -293,18 +403,14 @@ export default function CheckoutPage({
       currency: rpData.currency,
       name: 'RapiQR Safety Protection',
       description: `Order ${newOrderId}`,
-      // prefill.method opens Razorpay directly on the tab matching our own UPI/Card
-      // toggle above, instead of always landing on its default method picker.
-      prefill: { name: name.trim(), email: email.trim(), contact: phone.trim(), method: payment === 'upi' ? 'upi' : 'card' },
-      theme: { color: '#5271D5' },
+      prefill: {
+        name: name.trim(),
+        email: email.trim(),
+        contact: phone.trim(),
+        method: payment === 'upi' ? 'upi' : 'card',
+      },
+      theme: { color: '#FACC15' },
       handler: async (response: any) => {
-        // When a backend Razorpay order exists, the payment MUST be confirmed
-        // server-side (signature verified against the stored order) before we tell
-        // the customer it succeeded or create their stickers — otherwise a failed
-        // or forged signature would silently pass through and never show as paid
-        // in the admin panel. Only the true offline fallback (no backend order was
-        // ever created — see rpData below) skips this, matching the old degraded
-        // behavior for when the API is unreachable.
         if (rpData?.razorpayOrderId) {
           try {
             const verifyRes = await apiClient.payments.verify({
@@ -313,16 +419,21 @@ export default function CheckoutPage({
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
             });
-            if (!verifyRes?.success) throw new Error(verifyRes?.error || 'Payment verification failed');
+            if (!verifyRes?.success)
+              throw new Error(verifyRes?.error || 'Payment verification failed');
           } catch (err: any) {
             setStep('details');
-            setError(`${err?.message || 'Payment verification failed.'} If money was deducted, contact support with your order ID: ${newOrderId}`);
+            setError(
+              `${
+                err?.message || 'Payment verification failed.'
+              } If money was deducted, contact support with your order ID: ${newOrderId}`
+            );
             return;
           }
         }
 
         setOrderId(newOrderId);
-        setConfirmedTotal(total); // capture before the parent clears the cart
+        setConfirmedTotal(total);
         finalizeLocalRecords(newOrderId, isRecognized);
         setStep('success');
         if (onOrderComplete) onOrderComplete();
@@ -330,7 +441,9 @@ export default function CheckoutPage({
       modal: {
         ondismiss: () => {
           setStep('details');
-          setError('Payment was cancelled — nothing was charged. You can try paying again.');
+          setError(
+            'Payment was cancelled — nothing was charged. You can try paying again.'
+          );
         },
       },
     };
@@ -352,7 +465,14 @@ export default function CheckoutPage({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!name.trim() || !email.trim() || !phone.trim() || !address.trim() || !city.trim() || !pincode.trim()) {
+    if (
+      !name.trim() ||
+      !email.trim() ||
+      !phone.trim() ||
+      !address.trim() ||
+      !city.trim() ||
+      !pincode.trim()
+    ) {
       setError('Please fill in all required fields.');
       return;
     }
@@ -371,330 +491,527 @@ export default function CheckoutPage({
     runCheckout(isRecognized);
   };
 
-  const inputCls: React.CSSProperties = {
-    width: '100%', padding: '12px 14px', fontSize: 13.5, borderRadius: 12,
-    border: '1px solid var(--border)', background: 'var(--paper)', color: 'var(--ink)',
-    outline: 'none', fontFamily: 'inherit', transition: 'border-color .18s ease, box-shadow .18s ease'
-  };
-  const labelCls: React.CSSProperties = {
-    display: 'block', fontSize: 11, fontWeight: 800, color: 'var(--ink-soft)',
-    textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6
-  };
-
   return (
-    <div className="co-page">
-      {/* ── PAGE HEADER ── */}
-      <div className="co-page-header">
-        <div className="co-page-header-inner">
-          <button onClick={onBack} className="co-page-back" aria-label="Back to shop">
-            <ArrowLeft size={16} />
-            <span>Back to Shop</span>
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-16">
+      
+      {/* ── TOP HEADER BAR ── */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-950 transition-colors cursor-pointer"
+            aria-label="Back to shop"
+          >
+            <ArrowLeft size={17} />
+            <span className="hidden sm:inline">Back to Shop</span>
+            <span className="sm:hidden">Back</span>
           </button>
-          <div className="co-page-brand">
-            <ShoppingBag size={17} />
-            <span>RapiQR Checkout</span>
+
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-amber-400 text-slate-950 font-black text-sm flex items-center justify-center shadow-xs">
+              R
+            </div>
+            <span className="font-extrabold text-lg sm:text-xl text-slate-950 tracking-tight">
+              RAPI<span className="text-amber-500">QR</span>{' '}
+              <span className="text-slate-400 font-medium text-sm sm:text-base">| Checkout</span>
+            </span>
           </div>
-          <div className="co-trust-chip co-page-lock">
-            <Lock size={11} /> 256-bit SSL SECURE
+
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <Lock size={12} className="text-emerald-600" />
+            <span className="hidden sm:inline">256-BIT SSL SECURE</span>
+            <span className="sm:hidden">SECURE</span>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="co-page-body">
-        {/* ── EMPTY STATE ── */}
+      {/* ── PAGE CONTENT ── */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-8">
+        
+        {/* ── EMPTY CART STATE ── */}
         {cart.length === 0 && step !== 'success' && (
-          <div className="co-page-empty">
-            <ShoppingBag size={40} style={{ color: 'var(--ink-faint)' }} />
-            <h3 className="co-page-empty-title">Your cart is empty</h3>
-            <p className="co-page-empty-sub">Add a safety tag to get started.</p>
-            <button className="co-cta-primary" onClick={onBack}>
-              Browse Products <ArrowRight size={14} />
+          <div className="max-w-md mx-auto my-16 p-8 bg-white rounded-3xl border border-slate-200 shadow-sm text-center">
+            <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center mx-auto mb-4">
+              <ShoppingBag size={32} />
+            </div>
+            <h3 className="text-xl font-extrabold text-slate-900 mb-2">Your Cart is Empty</h3>
+            <p className="text-sm text-slate-500 mb-6">
+              Add a weatherproof smart QR safety tag to protect your vehicle, pet, or valuable assets.
+            </p>
+            <button
+              onClick={onBack}
+              className="w-full py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-sm transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer"
+            >
+              <span>Browse Products</span>
+              <ArrowRight size={16} />
             </button>
           </div>
         )}
 
+        {/* ── ACTIVE CHECKOUT GRID ── */}
         {cart.length > 0 && step === 'details' && (
-          <div className="co-page-grid">
-            {/* ── LEFT: FORM ── */}
-            <div className="co-page-form">
-              {/* Account awareness */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            {/* ── LEFT COLUMN: FORM DETAILS (7 COLS) ── */}
+            <div className="lg:col-span-7 space-y-6">
+              
+              {/* Account Awareness Banner */}
               {isLoggedIn ? (
-                <div className="co-account-banner co-account-linked">
-                  <CheckCircle2 size={15} style={{ color: '#16A34A' }} />
-                  <span>
-                    Checking out as <strong>{profile?.email || email}</strong> — your order will be linked to this account.
-                  </span>
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs sm:text-sm flex items-center gap-3">
+                  <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                  <div>
+                    Checking out as <strong>{profile?.email || email}</strong>. Your purchased tags will be automatically linked to your account.
+                  </div>
                 </div>
               ) : (
-                <div className="co-account-banner">
-                  <User size={15} style={{ color: 'var(--brand)' }} />
-                  <span>
-                    Quick guest checkout — no account needed.{' '}
-                    <button type="button" className="co-link-btn" onClick={onOpenLogin}>Have an account? Log in</button>
-                  </span>
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-950 text-xs sm:text-sm flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <User size={17} className="text-amber-600 shrink-0" />
+                    <span>Quick guest checkout — no password required.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onOpenLogin}
+                    className="font-bold text-slate-950 underline hover:text-amber-700 shrink-0 cursor-pointer"
+                  >
+                    Log In
+                  </button>
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="co-form">
-                {/* 1. Contact */}
-                <div className="co-section">
-                  <div className="co-section-head">
-                    <span className="co-step-num">1</span>
-                    <span className="co-section-title">Contact Information</span>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                
+                {/* ── 1. Contact Information ── */}
+                <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+                  <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                    <span className="w-6 h-6 rounded-full bg-slate-950 text-amber-300 text-xs font-black flex items-center justify-center">
+                      1
+                    </span>
+                    <h2 className="font-extrabold text-base text-slate-950">Contact Information</h2>
                   </div>
-                  <div className="co-grid-2">
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label style={labelCls}>Full Name *</label>
-                      <input style={inputCls} placeholder="Rahul Sharma" value={name} onChange={e => setName(e.target.value)} />
+                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-1.5">
+                        Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Rahul Sharma"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-sm font-medium text-slate-900 outline-hidden transition-all"
+                      />
                     </div>
+
                     <div>
-                      <label style={labelCls}>Phone *</label>
-                      <PhoneInputWithCountry value={phone} onChange={full => setPhone(full)} />
+                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-1.5">
+                        Phone Number *
+                      </label>
+                      <PhoneInputWithCountry
+                        value={phone}
+                        onChange={(full) => setPhone(full)}
+                      />
                     </div>
                   </div>
-                  <div style={{ marginTop: 12 }}>
-                    <label style={labelCls}>Email Address *</label>
-                    <div style={{ position: 'relative' }}>
-                      <Mail size={14} style={{ position: 'absolute', left: 12, top: 13, color: 'var(--ink-faint)' }} />
+
+                  <div>
+                    <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-1.5">
+                      Email Address (For Order Receipts &amp; Tag Activation) *
+                    </label>
+                    <div className="relative">
+                      <Mail size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
                       <input
                         type="email"
-                        style={{ ...inputCls, paddingLeft: 34 }}
-                        placeholder="you@example.com"
+                        placeholder="rahul@example.com"
                         value={email}
-                        onChange={e => setEmail(e.target.value)}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-sm font-medium text-slate-900 outline-hidden transition-all"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* 2. Shipping */}
-                <div className="co-section">
-                  <div className="co-section-head">
-                    <span className="co-step-num">2</span>
-                    <span className="co-section-title">Shipping Address</span>
+                {/* ── 2. Shipping Address ── */}
+                <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+                  <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                    <span className="w-6 h-6 rounded-full bg-slate-950 text-amber-300 text-xs font-black flex items-center justify-center">
+                      2
+                    </span>
+                    <h2 className="font-extrabold text-base text-slate-950">Shipping Address</h2>
                   </div>
+
                   <div>
-                    <label style={labelCls}>Street Address *</label>
-                    <div style={{ position: 'relative' }}>
-                      <MapPin size={14} style={{ position: 'absolute', left: 12, top: 13, color: 'var(--ink-faint)' }} />
+                    <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-1.5">
+                      Street Address / House / Flat *
+                    </label>
+                    <div className="relative">
+                      <MapPin size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
                       <input
-                        style={{ ...inputCls, paddingLeft: 34 }}
-                        placeholder="Flat 402, Green Heights, Nr. City Mall"
+                        type="text"
+                        placeholder="Flat 402, Green Heights, Opp. City Park"
                         value={address}
-                        onChange={e => setAddress(e.target.value)}
+                        onChange={(e) => setAddress(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-sm font-medium text-slate-900 outline-hidden transition-all"
                       />
                     </div>
                   </div>
-                  <div className="co-grid-3" style={{ marginTop: 12 }}>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                      <label style={labelCls}>Pincode *</label>
+                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-1.5">
+                        Pincode *
+                      </label>
                       <input
-                        style={inputCls}
-                        placeholder="360001"
+                        type="text"
+                        placeholder="560001"
                         inputMode="numeric"
                         maxLength={6}
                         value={pincode}
-                        onChange={e => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        onChange={(e) =>
+                          setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))
+                        }
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-sm font-medium text-slate-900 outline-hidden transition-all"
                       />
                       {pincodeStatus === 'looking' && (
-                        <span style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 4, display: 'block' }}>Looking up city &amp; state…</span>
+                        <span className="text-[11px] text-slate-400 mt-1 block">
+                          Looking up location…
+                        </span>
                       )}
                       {pincodeStatus === 'found' && (
-                        <span style={{ fontSize: 11, color: '#16A34A', marginTop: 4, display: 'block' }}>✓ City &amp; state filled in</span>
+                        <span className="text-[11px] text-emerald-600 font-semibold mt-1 block">
+                          ✓ City &amp; State found
+                        </span>
                       )}
                       {pincodeStatus === 'not-found' && (
-                        <span style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 4, display: 'block' }}>Enter city &amp; state manually</span>
+                        <span className="text-[11px] text-slate-400 mt-1 block">
+                          Enter city manually
+                        </span>
                       )}
                     </div>
+
                     <div>
-                      <label style={labelCls}>City *</label>
-                      <input style={inputCls} placeholder="Rajkot" value={city} onChange={e => setCity(e.target.value)} />
+                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-1.5">
+                        City *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Bengaluru"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-sm font-medium text-slate-900 outline-hidden transition-all"
+                      />
                     </div>
+
                     <div>
-                      <label style={labelCls}>State *</label>
-                      <input style={inputCls} placeholder="Gujarat" value={state} onChange={e => setState(e.target.value)} />
+                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-1.5">
+                        State *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Karnataka"
+                        value={state}
+                        onChange={(e) => setState(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-sm font-medium text-slate-900 outline-hidden transition-all"
+                      />
                     </div>
                   </div>
                 </div>
 
-                {/* 3. Delivery */}
-                <div className="co-section">
-                  <div className="co-section-head">
-                    <span className="co-step-num">3</span>
-                    <span className="co-section-title">Delivery Method</span>
+                {/* ── 3. Delivery Method ── */}
+                <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+                  <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                    <span className="w-6 h-6 rounded-full bg-slate-950 text-amber-300 text-xs font-black flex items-center justify-center">
+                      3
+                    </span>
+                    <h2 className="font-extrabold text-base text-slate-950">Delivery Method</h2>
                   </div>
-                  <div className="co-grid-2">
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <button
                       type="button"
                       onClick={() => setDelivery('standard')}
-                      className={`co-pay-opt${delivery === 'standard' ? ' active' : ''}`}
+                      className={`p-4 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                        delivery === 'standard'
+                          ? 'border-amber-400 bg-amber-50/60 ring-2 ring-amber-400/30'
+                          : 'border-slate-200 bg-slate-50 hover:bg-white'
+                      }`}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <Truck size={16} />
-                        <div style={{ textAlign: 'left' }}>
-                          <div className="co-opt-title">Standard</div>
-                          <div className="co-opt-sub">4–6 business days</div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-700">
+                          <Truck size={18} />
+                        </div>
+                        <div>
+                          <div className="font-bold text-sm text-slate-900">Standard Delivery</div>
+                          <div className="text-xs text-slate-500">4–6 business days</div>
                         </div>
                       </div>
-                      <span className="co-opt-price">FREE</span>
+                      <span className="font-black text-xs text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full">
+                        FREE
+                      </span>
                     </button>
+
                     <button
                       type="button"
                       onClick={() => setDelivery('express')}
-                      className={`co-pay-opt${delivery === 'express' ? ' active' : ''}`}
+                      className={`p-4 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                        delivery === 'express'
+                          ? 'border-amber-400 bg-amber-50/60 ring-2 ring-amber-400/30'
+                          : 'border-slate-200 bg-slate-50 hover:bg-white'
+                      }`}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <Truck size={16} />
-                        <div style={{ textAlign: 'left' }}>
-                          <div className="co-opt-title">Express</div>
-                          <div className="co-opt-sub">1–2 business days</div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-700">
+                          <Clock size={18} />
+                        </div>
+                        <div>
+                          <div className="font-bold text-sm text-slate-900">Express Priority</div>
+                          <div className="text-xs text-slate-500">1–2 business days</div>
                         </div>
                       </div>
-                      <span className="co-opt-price">₹99</span>
+                      <span className="font-black text-xs text-slate-900 bg-amber-200 px-2.5 py-1 rounded-full">
+                        ₹99
+                      </span>
                     </button>
                   </div>
                 </div>
 
-                {/* 4. Payment */}
-                <div className="co-section">
-                  <div className="co-section-head">
-                    <span className="co-step-num">4</span>
-                    <span className="co-section-title">Payment Method</span>
+                {/* ── 4. Payment Method ── */}
+                <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+                  <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                    <span className="w-6 h-6 rounded-full bg-slate-950 text-amber-300 text-xs font-black flex items-center justify-center">
+                      4
+                    </span>
+                    <h2 className="font-extrabold text-base text-slate-950">Payment Method</h2>
                   </div>
-                  <div className="co-pay-row">
+
+                  <div className="grid grid-cols-2 gap-4">
                     <button
                       type="button"
                       onClick={() => setPayment('upi')}
-                      className={`co-pay-opt${payment === 'upi' ? ' active' : ''}`}
+                      className={`p-4 rounded-2xl border text-center flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
+                        payment === 'upi'
+                          ? 'border-amber-400 bg-amber-50/60 ring-2 ring-amber-400/30'
+                          : 'border-slate-200 bg-slate-50 hover:bg-white'
+                      }`}
                     >
-                      <Smartphone size={16} /> UPI
+                      <Smartphone size={20} className="text-amber-600" />
+                      <span className="font-bold text-sm text-slate-900">UPI / QR (Instant)</span>
                     </button>
+
                     <button
                       type="button"
                       onClick={() => setPayment('card')}
-                      className={`co-pay-opt${payment === 'card' ? ' active' : ''}`}
+                      className={`p-4 rounded-2xl border text-center flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
+                        payment === 'card'
+                          ? 'border-amber-400 bg-amber-50/60 ring-2 ring-amber-400/30'
+                          : 'border-slate-200 bg-slate-50 hover:bg-white'
+                      }`}
                     >
-                      <CreditCard size={16} /> Card
+                      <CreditCard size={20} className="text-amber-600" />
+                      <span className="font-bold text-sm text-slate-900">Card / NetBanking</span>
                     </button>
                   </div>
                 </div>
 
+                {/* Error Banner */}
                 {error && (
-                  <div className="co-error">
-                    <span>⚠</span> {error}
+                  <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2.5">
+                    <AlertCircle size={18} className="shrink-0 text-red-500" />
+                    <span>{error}</span>
                   </div>
                 )}
 
-                <button type="submit" className="co-pay-btn">
-                  Pay ₹{total} Securely <Lock size={13} /> <ArrowRight size={14} />
+                {/* Submit Action */}
+                <button
+                  type="submit"
+                  className="w-full py-4 rounded-2xl bg-slate-950 hover:bg-slate-900 text-white font-extrabold text-base transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-950/20 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                >
+                  <span>Pay ₹{total} Securely</span>
+                  <Lock size={16} className="text-amber-400" />
+                  <ArrowRight size={17} className="text-amber-400" />
                 </button>
-                <p className="co-terms">
-                  By continuing you agree to our Terms &amp; Privacy Policy. Free returns within 7 days.
+
+                <p className="text-center text-xs text-slate-500 leading-relaxed">
+                  🔒 By proceeding you agree to RapiQR Terms of Service &amp; Privacy Policy. Free replacement within 7 days.
                 </p>
+
               </form>
             </div>
 
-            {/* ── RIGHT: FINAL BILLING ── */}
-            <div className="co-page-bill">
-              <div className="co-page-bill-sticky">
-                <div className="co-page-bill-head">
-                  <Lock size={13} />
-                  <span>Final Billing</span>
+            {/* ── RIGHT COLUMN: FINAL BILLING SUMMARY (5 COLS) ── */}
+            <div className="lg:col-span-5">
+              <div className="sticky top-28 bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                
+                <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                  <div className="flex items-center gap-2 font-black text-slate-950 text-base">
+                    <Lock size={16} className="text-amber-500" />
+                    <span>Order Summary</span>
+                  </div>
+                  <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+                    {cart.reduce((s, i) => s + i.qty, 0)} Items
+                  </span>
                 </div>
 
-                <div className="co-summary-items">
-                  {cart.map(item => (
-                    <div key={item.product.id} className="co-sum-item">
-                      <img src={item.product.img} alt={item.product.name} className="co-sum-img" />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="co-sum-name">{item.product.name}</div>
-                        <div className="co-sum-sub">Qty {item.qty}</div>
+                {/* Cart Items List */}
+                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                  {cart.map((item) => (
+                    <div
+                      key={item.product.id}
+                      className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3"
+                    >
+                      <img
+                        src={item.product.img}
+                        alt={item.product.name}
+                        className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0 bg-white"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-sm text-slate-900 truncate">
+                          {item.product.name}
+                        </div>
+                        <div className="text-xs text-slate-500 font-medium">Qty: {item.qty}</div>
                       </div>
-                      <div className="co-sum-price">₹{item.product.price * item.qty}</div>
+                      <div className="font-black text-sm text-slate-950">
+                        ₹{item.product.price * item.qty}
+                      </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="co-sum-lines">
-                  <div className="co-sum-line"><span>Subtotal</span><span>₹{subtotal}</span></div>
-                  <div className="co-sum-line"><span>Delivery</span><span>{deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}</span></div>
-                  <div className="co-sum-line"><span>GST (Included)</span><span>Incl.</span></div>
-                  <div className="co-sum-line total"><span>Total Payable</span><span>₹{total}</span></div>
+                {/* Price Breakdown */}
+                <div className="space-y-2.5 pt-4 border-t border-slate-100 text-sm">
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span>Item Subtotal</span>
+                    <span className="font-semibold text-slate-900">₹{subtotal}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span>Shipping</span>
+                    <span className="font-semibold text-emerald-700">
+                      {deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span>GST (18% Included)</span>
+                    <span className="font-medium text-slate-500">Included</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-200 text-base sm:text-lg font-black text-slate-950">
+                    <span>Total Payable</span>
+                    <span className="text-amber-600">₹{total}</span>
+                  </div>
                 </div>
 
-                <div className="co-gateways co-page-gateways">
-                  <div className="co-gateway-logos">
-                    {PAYMENT_LOGOS.map(l => (
-                      <span key={l} className="co-gateway-chip">{l}</span>
+                {/* Payment Gateway Badges */}
+                <div className="pt-4 border-t border-slate-100 space-y-3">
+                  <div className="flex flex-wrap items-center justify-center gap-1.5">
+                    {PAYMENT_LOGOS.map((logo) => (
+                      <span
+                        key={logo}
+                        className="px-2 py-1 bg-slate-100 text-slate-700 font-extrabold text-[10px] rounded-md border border-slate-200"
+                      >
+                        {logo}
+                      </span>
                     ))}
                   </div>
-                  <div className="co-secure-note">
-                    <ShieldCheck size={12} /> PCI-DSS compliant · Razorpay secure payments
+
+                  <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 font-medium">
+                    <ShieldCheck size={14} className="text-emerald-600" />
+                    <span>PCI-DSS Compliant Razorpay Gateway</span>
                   </div>
                 </div>
 
-                <div className="co-page-free">
-                  <CheckCircle2 size={14} style={{ color: '#16A34A' }} />
-                  Free shipping · Lifetime protection included
+                {/* Trust Guarantee */}
+                <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 text-amber-950 text-xs font-semibold flex items-center gap-2.5">
+                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                  <span>3-Year 3M Weatherproof tag warranty included</span>
                 </div>
+
               </div>
             </div>
+
           </div>
         )}
 
-        {/* ── STEP: PROCESSING ── */}
+        {/* ── STEP: PROCESSING MODAL ── */}
         {step === 'processing' && (
-          <div className="co-processing">
-            <div className="co-spinner" />
-            <h3 className="co-proc-title">Processing your payment securely…</h3>
-            <p className="co-proc-sub">Please don't close this window. This takes a few seconds.</p>
+          <div className="max-w-md mx-auto my-16 p-10 bg-white rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+            <div className="w-16 h-16 rounded-full border-4 border-amber-400 border-t-transparent animate-spin mx-auto" />
+            <h3 className="text-xl font-extrabold text-slate-950">Processing Payment Securely</h3>
+            <p className="text-sm text-slate-500">
+              Please do not close or refresh this page. Connecting to Razorpay proxy…
+            </p>
           </div>
         )}
 
-        {/* ── STEP: SUCCESS ── */}
+        {/* ── STEP: SUCCESS CONFIRMATION ── */}
         {step === 'success' && (
-          <div className="co-success">
-            <div className="co-success-icon">
-              <CheckCircle2 size={34} />
+          <div className="max-w-xl mx-auto my-12 p-8 sm:p-10 bg-white rounded-3xl border border-slate-200 shadow-2xl text-center space-y-6">
+            <div className="w-20 h-20 rounded-3xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto shadow-md animate-bounce">
+              <CheckCircle2 size={42} />
             </div>
-            <h3 className="co-success-title">Order Confirmed!</h3>
-            <p className="co-success-sub">
-              Thank you, <strong>{name.trim()}</strong>! Your order <strong className="co-order-id">{orderId}</strong> of ₹{confirmedTotal} is confirmed.
-            </p>
+
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-950">Order Confirmed!</h2>
+              <p className="text-sm text-slate-600 mt-2">
+                Thank you, <strong>{name.trim()}</strong>! Your order{' '}
+                <span className="font-mono font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                  {orderId}
+                </span>{' '}
+                of <strong>₹{confirmedTotal}</strong> is confirmed.
+              </p>
+            </div>
 
             {recognized ? (
-              <div className="co-nudge recognized">
-                <div className="co-nudge-icon"><CheckCircle2 size={18} /></div>
-                <div>
-                  <div className="co-nudge-title">Order linked to your account</div>
-                  <p className="co-nudge-text">
-                    Your stickers are ready. Open the dashboard to activate and manage them.
-                  </p>
+              <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-left space-y-3">
+                <div className="flex items-center gap-2 font-bold text-emerald-900 text-sm">
+                  <CheckCircle2 size={18} className="text-emerald-600" />
+                  <span>Order Linked to Your Account</span>
                 </div>
-                <button className="co-cta-primary" onClick={onViewDashboard}>
-                  Open Dashboard <ArrowRight size={14} />
+                <p className="text-xs text-emerald-800 leading-relaxed">
+                  Your safety tags are provisioned in your Client Dashboard. You can assign contacts and configure alert routing now.
+                </p>
+                <button
+                  onClick={onViewDashboard}
+                  className="w-full py-3 rounded-xl bg-slate-950 hover:bg-slate-900 text-white font-extrabold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                >
+                  <span>Open Client Dashboard</span>
+                  <ArrowRight size={14} className="text-amber-400" />
                 </button>
               </div>
             ) : (
-              <div className="co-nudge">
-                <div className="co-nudge-title">Create an account to activate and manage your sticker!</div>
-                <p className="co-nudge-text">
-                  One free account lets you activate your tag, manage emergency contacts and track scans — pre-filled with your order email.
-                </p>
-                <div className="co-nudge-email">
-                  <Mail size={13} /> {email.trim()}
+              <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 text-left space-y-4">
+                <div className="font-black text-slate-950 text-base">
+                  Activate &amp; Manage Your Safety Tag
                 </div>
-                <div className="co-nudge-actions">
-                  <button className="co-cta-primary" onClick={() => onOpenSignup(email.trim())}>
-                    Create Free Account <ArrowRight size={14} />
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Create a free account with your purchase email to track live scan events, set private phone numbers, and manage masked telephony.
+                </p>
+                <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-mono text-slate-700 flex items-center gap-2">
+                  <Mail size={14} className="text-amber-500" />
+                  <span>{email.trim()}</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <button
+                    onClick={() => onOpenSignup(email.trim())}
+                    className="flex-1 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                  >
+                    <span>Create Free Account</span>
+                    <ArrowRight size={14} />
                   </button>
-                  <button className="co-cta-ghost" onClick={onBack}>Continue as Guest</button>
+                  <button
+                    onClick={onBack}
+                    className="py-3 px-5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 transition-colors cursor-pointer"
+                  >
+                    Continue as Guest
+                  </button>
                 </div>
               </div>
             )}
+
           </div>
         )}
-      </div>
+
+      </main>
+
     </div>
   );
 }

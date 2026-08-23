@@ -1,5 +1,5 @@
 import type React from "react";
-import { LogOut, Tag, ShieldCheck, ChevronRight, HelpCircle, Settings as SettingsIcon } from "lucide-react";
+import { LogOut, ChevronRight, X, Settings as SettingsIcon } from "lucide-react";
 import { NAV_ITEMS, REPICHAT_NAV_ITEM } from "./constants";
 import AppLogo from "../../common/AppLogo";
 
@@ -54,6 +54,8 @@ export default function Sidebar({
   onSignOut,
   unreadAlerts,
   unreadChats,
+  isOpen = false,
+  onClose,
 }: {
   page: string;
   setPage: (p: string) => void;
@@ -62,6 +64,9 @@ export default function Sidebar({
   onSignOut: () => void;
   unreadAlerts?: number;
   unreadChats?: number;
+  /** Mobile drawer state — ignored at md+ where the sidebar is always docked. */
+  isOpen?: boolean;
+  onClose?: () => void;
 }) {
   const isClientUser = admin.role === "Client Account";
 
@@ -75,21 +80,32 @@ export default function Sidebar({
 
   return (
     <aside
-      className="w-[220px] flex-shrink-0 flex flex-col h-full py-[18px] px-3 sticky top-0 z-20"
+      className={`w-[220px] flex-shrink-0 flex flex-col h-full py-[18px] px-3 fixed inset-y-0 left-0 z-50 transition-transform duration-300 md:sticky md:top-0 md:z-20 md:translate-x-0 ${
+        isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
+      }`}
       style={{ background: "#111315", fontFamily: "'Inter', sans-serif" }}
     >
       {/* ── Brand Header ────────────────────── */}
-      <a
-        href="/"
-        className="flex items-center px-2 mb-5 cursor-pointer flex-shrink-0 group"
-        onClick={(e) => {
-          e.preventDefault();
-          onBack();
-        }}
-        aria-label="RapiQR Console home"
-      >
-        <AppLogo variant="dark" className="h-8 w-auto object-contain transition-transform group-hover:scale-105" />
-      </a>
+      <div className="flex items-center justify-between px-2 mb-5 flex-shrink-0">
+        <a
+          href="/"
+          className="flex items-center cursor-pointer group"
+          onClick={(e) => {
+            e.preventDefault();
+            onBack();
+          }}
+          aria-label="RapiQR Console home"
+        >
+          <AppLogo variant="dark" className="h-8 w-auto object-contain transition-transform group-hover:scale-105" />
+        </a>
+        <button
+          onClick={onClose}
+          className="md:hidden p-1.5 rounded-[4px] text-[#C9CACC] hover:text-white hover:bg-[#303235] transition-all cursor-pointer"
+          aria-label="Close navigation menu"
+        >
+          <X size={16} />
+        </button>
+      </div>
 
       {/* ── Setup Progress Card Widget ─────────────── */}
       <div className="mx-0.5 mb-[9px] border border-[#414347] rounded-[7px] p-3 text-white">
@@ -116,7 +132,7 @@ export default function Sidebar({
           const badge = item.id === "alerts" ? unreadAlerts : item.id === "repichat" ? unreadChats : undefined;
 
           return (
-            <SideItem key={item.id} active={isActive} label={item.label} badge={badge} onClick={() => setPage(item.id)}>
+            <SideItem key={item.id} active={isActive} label={item.label} badge={badge} onClick={() => { setPage(item.id); onClose?.(); }}>
               <Icon size={15} strokeWidth={2} />
             </SideItem>
           );
@@ -126,7 +142,7 @@ export default function Sidebar({
       {/* ── Bottom Fixed Utilities ──────────────── */}
       <div className="pt-3 border-t border-[#292B2E] space-y-1">
         <button
-          onClick={() => setPage("customize")}
+          onClick={() => { setPage("customize"); onClose?.(); }}
           className="w-full flex items-center gap-2.5 h-[34px] px-2.5 rounded-[5px] text-sm text-[#C9CACC] hover:text-white hover:bg-[#303235] transition-all cursor-pointer"
         >
           <SettingsIcon size={15} />

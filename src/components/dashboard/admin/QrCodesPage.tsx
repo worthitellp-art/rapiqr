@@ -130,7 +130,7 @@ export default function QrCodesPage({
   const inputCls = "w-full px-3 py-2.5 text-[13.5px] rounded-[4px] border border-[#E5E5E7] bg-white text-[#17181A] outline-none focus:border-[#5C78DF] focus:ring-2 focus:ring-[#5C78DF]/25 transition-all font-body";
 
   return (
-    <div className="px-8 pt-7 pb-16 space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
       {/* ── Section Header ────────────────────────────────────────── */}
       <div className="flex items-baseline justify-between flex-wrap gap-4">
         <div>
@@ -312,8 +312,8 @@ export default function QrCodesPage({
           </p>
         </div>
       ) : (
-        <div className="bg-white border border-[#E5E5E7] shadow-[0_1px_4px_rgba(0,0,0,0.03)] overflow-hidden">
-          <table className="w-full text-sm text-[#17181A]">
+        <div className="bg-white border border-[#E5E5E7] shadow-[0_1px_4px_rgba(0,0,0,0.03)] overflow-x-auto">
+          <table className="w-full min-w-[760px] text-sm text-[#17181A]">
             <thead>
               <tr className="text-left font-display text-[12px] font-semibold text-[#777B80] tracking-normal bg-[#F7F7F8] border-b border-[#E5E5E7]">
                 <th className="px-6 py-3">QR Plate</th>

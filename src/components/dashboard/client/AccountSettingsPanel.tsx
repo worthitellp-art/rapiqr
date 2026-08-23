@@ -17,7 +17,7 @@ function Banner({ tone, message }: { tone: 'success' | 'error'; message: string 
 }
 
 export default function AccountSettingsPanel({ showToast, onAccountDeleted, onProductsLinked }: { showToast: (msg: string) => void; onAccountDeleted?: () => void; onProductsLinked?: () => Promise<any> | void }) {
-  const { profile, refreshProfile } = useAuth();
+  const { profile, refreshProfile, isAdmin } = useAuth();
 
   if (!isApiBackendConfigured) {
     return (
@@ -36,33 +36,31 @@ export default function AccountSettingsPanel({ showToast, onAccountDeleted, onPr
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-7 animate-fade-in">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1D26]">Account Settings</h1>
-        <p className="text-xs sm:text-sm text-[#64748B] mt-1">Manage your name, phone, email, password and security options.</p>
+        <p className="text-sm text-[#64748B] mt-1">Manage your account details, contact info, and security credentials.</p>
       </div>
 
       <ProfileForm profile={profile} refreshProfile={refreshProfile} showToast={showToast} onProductsLinked={onProductsLinked} />
       <EmailForm profile={profile} refreshProfile={refreshProfile} showToast={showToast} />
       <PasswordForm showToast={showToast} />
       <TwoFactorSection profile={profile} refreshProfile={refreshProfile} showToast={showToast} />
-      <DangerZoneSection onAccountDeleted={onAccountDeleted} />
+      {/* No Danger Zone for the admin account — the server refuses to delete it
+          (deleting it would unlink every sticker it touches and lock the fleet
+          console out), so offering the button would only ever produce an error. */}
+      {!isAdmin && <DangerZoneSection onAccountDeleted={onAccountDeleted} />}
     </div>
   );
 }
 
 function DangerZoneSection({ onAccountDeleted }: { onAccountDeleted?: () => void }) {
   const { deleteAccount } = useAuth();
-  const [password, setPassword] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
   const handleDelete = async () => {
-    if (!password) {
-      setMsg({ tone: 'error', text: 'Enter your password to confirm.' });
-      return;
-    }
     if (!confirming) {
       setConfirming(true);
       setMsg(null);
@@ -70,7 +68,7 @@ function DangerZoneSection({ onAccountDeleted }: { onAccountDeleted?: () => void
     }
     setBusy(true);
     setMsg(null);
-    const res = await deleteAccount(password);
+    const res = await deleteAccount();
     setBusy(false);
     if (res.success) {
       onAccountDeleted?.();
@@ -86,25 +84,25 @@ function DangerZoneSection({ onAccountDeleted }: { onAccountDeleted?: () => void
       <p className="text-xs text-[#64748B]">
         Permanently delete your account, profile, and every sticker linked to it. This cannot be undone.
       </p>
-      <div className="max-w-xs">
-        <label className={labelCls}>Confirm Your Password</label>
-        <input
-          type="password"
-          className={inputCls}
-          value={password}
-          onChange={(e) => { setPassword(e.target.value); setConfirming(false); setMsg(null); }}
-        />
-      </div>
       {msg && <Banner tone={msg.tone} message={msg.text} />}
       {confirming && !msg && (
-        <p className="text-xs font-bold text-[#B45309]">Click "Confirm Delete" again to permanently delete your account.</p>
+        <div className="p-3 bg-[#FEF2F2] border border-[#FECACA] rounded-xl flex items-center justify-between">
+          <p className="text-xs font-semibold text-[#DC2626]">Are you sure? This action is permanent and cannot be undone.</p>
+          <button
+            type="button"
+            onClick={() => setConfirming(false)}
+            className="text-xs text-[#64748B] hover:text-[#17181A] underline cursor-pointer ml-2"
+          >
+            Cancel
+          </button>
+        </div>
       )}
       <button
         onClick={handleDelete}
         disabled={busy}
-        className="px-5 py-2.5 rounded-xl bg-[#FEE2E2] hover:bg-[#FECACA] text-[#DC2626] text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
+        className="px-5 py-2.5 rounded-xl bg-[#FEE2E2] hover:bg-[#FECACA] text-[#DC2626] text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5 w-fit"
       >
-        {busy && <Loader2 size={13} className="animate-spin" />} {confirming ? 'Confirm Delete' : 'Delete Account'}
+        {busy && <Loader2 size={13} className="animate-spin" />} {confirming ? 'Confirm Delete Account' : 'Delete Account'}
       </button>
     </div>
   );
@@ -210,6 +208,16 @@ function ProfileForm({ profile, refreshProfile, showToast, onProductsLinked }: a
         {saving && <Loader2 size={13} className="animate-spin" />} Save Name
       </button>
 
+      {/* The admin account has no phone number. The fleet console already sees every
+          sticker, so a number on this account would only compete with the real owner
+          for the stickers registered under it — the server rejects it outright. */}
+      {profile?.role === 'admin' ? (
+        <div className="pt-4 border-t border-[#E8ECF4]">
+          <p className="text-xs text-[#64748B]">
+            The admin account doesn't use a phone number — the Fleet console lists every sticker regardless of who owns it.
+          </p>
+        </div>
+      ) : (
       <div className="pt-4 border-t border-[#E8ECF4] space-y-3">
         <div className="flex items-center justify-between">
           <label className={`${labelCls} mb-0`}>Phone Number <span className="text-[#DC2626]">*</span></label>
@@ -286,6 +294,7 @@ function ProfileForm({ profile, refreshProfile, showToast, onProductsLinked }: a
         )}
         {phoneMsg && <Banner tone={phoneMsg.tone} message={phoneMsg.text} />}
       </div>
+      )}
     </div>
   );
 }
@@ -296,9 +305,18 @@ function EmailForm({ profile, refreshProfile, showToast }: any) {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
+  // The admin signs in against ADMIN_EMAIL/ADMIN_PASSWORD from the server env, not a
+  // Supabase Auth password — there is nothing for a re-entry check to verify, so the
+  // server skips it for admin and this form drops the field to match.
+  const isAdminAccount = profile?.role === 'admin';
+
   const handleSave = async () => {
-    if (!newEmail.includes('@') || !currentPassword) {
-      setMsg({ tone: 'error', text: 'Enter a valid new email and your current password.' });
+    if (!newEmail.includes('@')) {
+      setMsg({ tone: 'error', text: 'Enter a valid email address.' });
+      return;
+    }
+    if (!isAdminAccount && !currentPassword) {
+      setMsg({ tone: 'error', text: 'Enter your current password to confirm.' });
       return;
     }
     setSaving(true);
@@ -310,7 +328,12 @@ function EmailForm({ profile, refreshProfile, showToast }: any) {
         localStorage.setItem('namoqr-token', res.token);
       }
       await refreshProfile();
-      setMsg({ tone: 'success', text: 'Email updated.' });
+      // The server sends `warning` when the changed address was the one ADMIN_EMAIL
+      // still points at — admin login keeps using the old address until Server/.env
+      // is updated, and silently letting that surprise them later is worse than a banner.
+      setMsg(res.warning
+        ? { tone: 'error', text: res.warning }
+        : { tone: 'success', text: 'Email updated.' });
       showToast('Email address updated');
       setNewEmail('');
       setCurrentPassword('');
@@ -325,15 +348,17 @@ function EmailForm({ profile, refreshProfile, showToast }: any) {
     <div className={cardCls}>
       <h3 className="font-bold text-sm text-[#1A1D26] flex items-center gap-2"><Mail size={15} /> Email Address</h3>
       <p className="text-xs text-[#64748B]">Current: <span className="font-semibold text-[#1A1D26]">{profile?.email}</span></p>
-      <div className="grid sm:grid-cols-2 gap-3.5">
+      <div className={isAdminAccount ? 'max-w-sm' : 'grid sm:grid-cols-2 gap-3.5'}>
         <div>
           <label className={labelCls}>New Email</label>
           <input className={inputCls} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="new@email.com" />
         </div>
-        <div>
-          <label className={labelCls}>Current Password</label>
-          <input type="password" className={inputCls} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
-        </div>
+        {!isAdminAccount && (
+          <div>
+            <label className={labelCls}>Current Password</label>
+            <input type="password" className={inputCls} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+          </div>
+        )}
       </div>
       {msg && <Banner tone={msg.tone} message={msg.text} />}
       <button

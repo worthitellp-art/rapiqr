@@ -71,8 +71,8 @@ export default function MessageManagerPage() {
   const successRate = stats && stats.total > 0 ? Math.round((stats.sent / stats.total) * 100) : null;
 
   return (
-    <div className="px-8 pt-7 pb-16 space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
-      <div className="flex items-center justify-between">
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h3 className="font-display font-semibold text-[#17181A] text-[14px] flex items-center gap-2">
             <Send size={15} className="text-[#5C78DF]" /> Message Manager
@@ -81,7 +81,7 @@ export default function MessageManagerPage() {
         </div>
         <button
           onClick={load}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[4px] bg-white border border-[#E5E5E7] text-[12px] font-semibold text-[#17181A] hover:bg-[#F3F3F4] transition-all cursor-pointer"
+          className="self-start inline-flex items-center gap-1.5 px-3 py-2 rounded-[4px] bg-white border border-[#E5E5E7] text-[12px] font-semibold text-[#17181A] hover:bg-[#F3F3F4] transition-all cursor-pointer flex-shrink-0"
         >
           <RefreshCcw size={13} /> Refresh
         </button>
@@ -99,7 +99,7 @@ export default function MessageManagerPage() {
       </div>
 
       {/* ── Filters ── */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {["ALL", "sent", "failed", "simulated"].map((s) => (
           <button
             key={s}
@@ -128,7 +128,7 @@ export default function MessageManagerPage() {
       {/* ── Message Log Table ── */}
       <div className="bg-white border border-[#E5E5E7] shadow-[0_1px_4px_rgba(0,0,0,0.03)] overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[680px] text-sm">
             <thead>
               <tr className="border-b border-[#E5E5E7] text-[10px] font-extrabold text-[#777B80] uppercase tracking-wider">
                 <th className="text-left px-4 py-3">Status</th>

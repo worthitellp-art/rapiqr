@@ -160,7 +160,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
   const revenue = orders.filter((o) => o.payment?.status === "paid").reduce((sum, o) => sum + (o.total || 0), 0);
 
   return (
-    <div className="px-8 pt-7 pb-16 space-y-7 text-[#17181A] font-body relative" style={{ background: "#F7F7F8" }}>
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#17181A] font-body relative" style={{ background: "#F7F7F8" }}>
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

@@ -43,6 +43,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const [unreadChats, setUnreadChats] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // RepiChat unread count — client accounts only; admin gets the "Online Now"
   // presence widget on the Overview page instead of a chat inbox.
@@ -174,10 +175,28 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
       className="h-screen w-full flex overflow-hidden text-[#17181A]"
       style={{ "--accent": "#5C78DF", fontFamily: "'Inter', sans-serif", background: "#F7F7F8" } as React.CSSProperties}
     >
-      <Sidebar page={page} setPage={setPage} admin={admin} onBack={onBack} onSignOut={signOut} unreadAlerts={unreadAlerts} unreadChats={unreadChats} />
+      {/* Mobile drawer backdrop — md+ docks the sidebar so it never renders there */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      <Sidebar
+        page={page} setPage={setPage} admin={admin} onBack={onBack} onSignOut={signOut}
+        unreadAlerts={unreadAlerts} unreadChats={unreadChats}
+        isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)}
+      />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: "#F7F7F8" }}>
-        <TopBar admin={admin} searchQuery={searchQuery} setSearchQuery={setSearchQuery} page={page} setPage={setPage} activeCount={qrList.filter(q => q.status === "active").length || 18} />
+        <TopBar
+          admin={admin} searchQuery={searchQuery} setSearchQuery={setSearchQuery}
+          page={page} setPage={setPage}
+          activeCount={qrList.filter(q => q.status === "active").length || 18}
+          onOpenSidebar={() => setSidebarOpen(true)}
+        />
 
         <div className="flex-1 overflow-y-auto">
           {page === "overview" && (

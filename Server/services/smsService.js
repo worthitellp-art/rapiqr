@@ -1,120 +1,281 @@
 const { logger } = require('../middleware/loggerMiddleware');
 const { getTwilioCredentials, callTwilioApi, resolveAccountAndCallerId } = require('./twilioClient');
+const {
+  getMsg91Config,
+  sendMsg91FlowSms,
+  sendMsg91WhatsApp,
+  sendMsg91SessionWhatsApp,
+  sendMsg91Otp,
+  verifyMsg91Otp,
+} = require('./msg91Client');
 const MessageModel = require('../models/messageModel');
 
-// While we're validating Twilio end-to-end, only these event types are allowed
-// to actually hit the network — everything else (OTP, phone-verify, etc.) stays
-// simulated even with real credentials configured, so we don't accidentally
-// burn Twilio spend or text a real user before the feature is trusted. Override
-// with SMS_LIVE_EVENTS in Server/.env (comma-separated); set it empty/unset to
-// go back to fully simulated.
-const LIVE_EVENTS = new Set(
-  (process.env.SMS_LIVE_EVENTS || 'CHAT_START_SMS,ALERT_SMS,ALERT_SMS_CONTACT')
+// While validating live delivery, only these event types are allowed to hit
+// external networks. Override with SMS_LIVE_EVENTS / WHATSAPP_LIVE_EVENTS in Server/.env (comma-separated).
+const LIVE_SMS_EVENTS = new Set(
+  (process.env.SMS_LIVE_EVENTS || 'CHAT_START_SMS,ALERT_SMS,ALERT_SMS_CONTACT,PHONE_VERIFY_SMS,ACTIVATION_OTP_SMS')
+    .split(',')
+    .map((e) => e.trim())
+    .filter(Boolean)
+);
+
+const LIVE_WHATSAPP_EVENTS = new Set(
+  (
+    process.env.WHATSAPP_LIVE_EVENTS ||
+    process.env.SMS_LIVE_EVENTS ||
+    'CHAT_START_WHATSAPP,ALERT_WHATSAPP,ALERT_WHATSAPP_CONTACT,PHONE_VERIFY_WHATSAPP,ACTIVATION_OTP_WHATSAPP,WHATSAPP_SEND'
+  )
     .split(',')
     .map((e) => e.trim())
     .filter(Boolean)
 );
 
 /**
- * Real delivery requires TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN (or the SK API-key
- * pair) + a Twilio number in Server/.env. Mirrors emailService's contract: without
- * credentials this logs exactly what WOULD have been sent instead of silently
- * doing nothing or lying about success (task.md #5/#13 — the old "SMS & Alert
- * dispatched" banner never actually sent anything).
- * @param {{ to: string, body: string, event?: string }} opts
+ * Resolves which SMS provider to use based on configuration and availability.
+ * Priority: Explicit SMS_PROVIDER setting ('msg91' | 'twilio') -> MSG91 (if authKey set) -> Twilio -> Simulation
+ *
+ * @returns {'msg91' | 'twilio' | 'simulated'}
  */
-async function sendSms({ to, body, event = 'SMS_SEND' }) {
+function resolveSmsProvider() {
+  const preferred = (process.env.SMS_PROVIDER || '').trim().toLowerCase();
+  const msg91Config = getMsg91Config();
+  const twilioConfig = getTwilioCredentials();
+
+  if (preferred === 'msg91' && msg91Config.isConfigured) return 'msg91';
+  if (preferred === 'twilio' && twilioConfig.authUser && twilioConfig.authPass) return 'twilio';
+
+  if (msg91Config.isConfigured) return 'msg91';
+  if (twilioConfig.authUser && twilioConfig.authPass) return 'twilio';
+
+  return 'simulated';
+}
+
+/**
+ * Resolves which WhatsApp provider to use based on configuration and availability.
+ * Priority: Explicit WHATSAPP_PROVIDER setting ('msg91' | 'twilio') -> MSG91 (if integrated number set) -> Twilio -> Simulation
+ *
+ * @returns {'msg91' | 'twilio' | 'simulated'}
+ */
+function resolveWhatsAppProvider() {
+  const preferred = (process.env.WHATSAPP_PROVIDER || process.env.SMS_PROVIDER || '').trim().toLowerCase();
+  const msg91Config = getMsg91Config();
+  const { authUser, authPass } = getTwilioCredentials();
+  const twilioWhatsAppNumber = (process.env.TWILIO_WHATSAPP_NUMBER || '').trim();
+
+  const msg91Ready = Boolean(msg91Config.isConfigured && msg91Config.whatsappIntegratedNumber);
+  const twilioReady = Boolean(authUser && authPass && twilioWhatsAppNumber);
+
+  if (preferred === 'msg91' && msg91Ready) return 'msg91';
+  if (preferred === 'twilio' && twilioReady) return 'twilio';
+
+  if (msg91Ready) return 'msg91';
+  if (twilioReady) return 'twilio';
+
+  return 'simulated';
+}
+
+/**
+ * Dispatches an SMS using the active messaging provider (MSG91 or Twilio).
+ * Falls back to simulation if credentials are not configured or the event is not live-eligible.
+ *
+ * @param {{ to: string, body: string, event?: string, flowId?: string, variables?: Record<string, any> }} opts
+ * @returns {Promise<{ sent: boolean, simulated: boolean, sid?: string, error?: string, reason?: string }>}
+ */
+async function sendSms({ to, body, event = 'SMS_SEND', flowId, variables }) {
   if (!to) {
     return { sent: false, simulated: false, reason: 'no_recipient' };
   }
 
-  const isLiveEligible = LIVE_EVENTS.has(event);
-  const { authUser, authPass, twilioNumber } = getTwilioCredentials();
-  if (!isLiveEligible || !authUser || !authPass) {
-    const reason = !isLiveEligible ? ` ("${event}" isn't in SMS_LIVE_EVENTS)` : ' (set TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN in Server/.env to send for real)';
+  const isLiveEligible = LIVE_SMS_EVENTS.has(event);
+  const provider = resolveSmsProvider();
+
+  // If not eligible for live send or no provider credentials configured
+  if (!isLiveEligible || provider === 'simulated') {
+    const reason = !isLiveEligible
+      ? ` ("${event}" isn't in SMS_LIVE_EVENTS)`
+      : ' (configure MSG91_AUTH_KEY or TWILIO credentials in Server/.env to send for real)';
     logger.external(event, `[SIMULATED] Would send SMS to ${to}: "${body}"${reason}`, { to, body });
     MessageModel.record({ channel: 'sms', to, event, status: 'simulated', body });
     return { sent: false, simulated: true };
   }
 
-  // Testing mode: redirect real sends to a fixed test number instead of the
-  // actual owner/contact phone on file, so live testing can't reach a real user.
+  // Testing mode: redirect real sends to a fixed test number if set
   const testNumber = (process.env.TEST_SMS_NUMBER || '').trim();
   const recipient = testNumber || to;
-  const outboundBody = testNumber && testNumber !== to ? `[TEST → meant for ${to}] ${body}` : body;
+  const outboundBody = testNumber && testNumber !== to ? `[TEST -> meant for ${to}] ${body}` : body;
 
-  try {
-    const { accountSid, callerId } = await resolveAccountAndCallerId(authUser, authPass, twilioNumber);
-    if (!callerId) {
-      logger.warn(event, `No Twilio sender number configured/found — cannot SMS ${recipient}`);
-      MessageModel.record({ channel: 'sms', to: recipient, event, status: 'failed', error: 'No Twilio sender number configured', body: outboundBody });
-      return { sent: false, simulated: false, error: 'No Twilio sender number configured' };
+  // --- 1. MSG91 SMS Execution ---
+  if (provider === 'msg91') {
+    try {
+      const msg91Result = await sendMsg91FlowSms({
+        to: recipient,
+        flowId,
+        variables,
+        body: outboundBody,
+      });
+
+      if (msg91Result.success) {
+        logger.external(event, `MSG91 SMS sent to ${recipient}`, { to: recipient, messageId: msg91Result.messageId });
+        MessageModel.record({ channel: 'sms', to: recipient, event, status: 'sent', sid: msg91Result.messageId, body: outboundBody });
+        return { sent: true, simulated: false, sid: msg91Result.messageId };
+      }
+
+      logger.error(event, `MSG91 SMS to ${recipient} failed`, msg91Result.error);
+      MessageModel.record({ channel: 'sms', to: recipient, event, status: 'failed', error: msg91Result.error, body: outboundBody });
+      return { sent: false, simulated: false, error: msg91Result.error };
+    } catch (err) {
+      logger.error(event, `Exception while sending MSG91 SMS to ${recipient}`, err);
+      MessageModel.record({ channel: 'sms', to: recipient, event, status: 'failed', error: err.message, body: outboundBody });
+      return { sent: false, simulated: false, error: err.message };
     }
-
-    const result = await callTwilioApi(authUser, authPass, 'POST', `/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-      To: recipient,
-      From: callerId,
-      Body: outboundBody,
-    });
-
-    if (result.status >= 200 && result.status < 300) {
-      logger.external(event, `SMS sent to ${recipient}`, { to: recipient, sid: result.body.sid });
-      MessageModel.record({ channel: 'sms', to: recipient, event, status: 'sent', sid: result.body.sid, body: outboundBody });
-      return { sent: true, simulated: false, sid: result.body.sid };
-    }
-
-    logger.error(event, `Twilio SMS to ${recipient} failed`, result.body);
-    MessageModel.record({ channel: 'sms', to: recipient, event, status: 'failed', error: result.body?.message || 'Twilio SMS failed', body: outboundBody });
-    return { sent: false, simulated: false, error: result.body?.message || 'Twilio SMS failed' };
-  } catch (err) {
-    logger.error(event, `Failed to send SMS to ${recipient}`, err);
-    MessageModel.record({ channel: 'sms', to: recipient, event, status: 'failed', error: err.message, body: outboundBody });
-    return { sent: false, simulated: false, error: err.message };
   }
+
+  // --- 2. Twilio SMS Execution ---
+  if (provider === 'twilio') {
+    const { authUser, authPass, twilioNumber } = getTwilioCredentials();
+    try {
+      const { accountSid, callerId } = await resolveAccountAndCallerId(authUser, authPass, twilioNumber);
+      if (!callerId) {
+        logger.warn(event, `No Twilio sender number configured/found — cannot SMS ${recipient}`);
+        MessageModel.record({ channel: 'sms', to: recipient, event, status: 'failed', error: 'No Twilio sender number configured', body: outboundBody });
+        return { sent: false, simulated: false, error: 'No Twilio sender number configured' };
+      }
+
+      const result = await callTwilioApi(authUser, authPass, 'POST', `/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+        To: recipient,
+        From: callerId,
+        Body: outboundBody,
+      });
+
+      if (result.status >= 200 && result.status < 300) {
+        logger.external(event, `Twilio SMS sent to ${recipient}`, { to: recipient, sid: result.body.sid });
+        MessageModel.record({ channel: 'sms', to: recipient, event, status: 'sent', sid: result.body.sid, body: outboundBody });
+        return { sent: true, simulated: false, sid: result.body.sid };
+      }
+
+      logger.error(event, `Twilio SMS to ${recipient} failed`, result.body);
+      MessageModel.record({ channel: 'sms', to: recipient, event, status: 'failed', error: result.body?.message || 'Twilio SMS failed', body: outboundBody });
+      return { sent: false, simulated: false, error: result.body?.message || 'Twilio SMS failed' };
+    } catch (err) {
+      logger.error(event, `Failed to send Twilio SMS to ${recipient}`, err);
+      MessageModel.record({ channel: 'sms', to: recipient, event, status: 'failed', error: err.message, body: outboundBody });
+      return { sent: false, simulated: false, error: err.message };
+    }
+  }
+
+  return { sent: false, simulated: true };
 }
 
 /**
- * Same Twilio Messages API as sendSms, just with whatsapp: prefixed numbers.
- * Requires a WhatsApp-enabled Twilio sender in TWILIO_WHATSAPP_NUMBER (the
- * Twilio Sandbox number while testing, or an approved WhatsApp Business
- * sender in production) — falls back to simulated mode without it, same
- * contract as sendSms/sendEmail.
- * @param {{ to: string, body: string, event?: string }} opts
+ * Dispatches a WhatsApp notification using MSG91 WhatsApp Outbound API or Twilio WhatsApp.
+ * Supports template outbound messages with components, session messages, test redirects, and database logging.
+ *
+ * @param {{ to: string|string[], body?: string, event?: string, templateName?: string, variables?: Array<string|number>|Record<string, any>, components?: Record<string, any>, headerMediaUrl?: string, isSessionMessage?: boolean }} opts
+ * @returns {Promise<{ sent: boolean, simulated: boolean, sid?: string, error?: string, reason?: string }>}
  */
-async function sendWhatsApp({ to, body, event = 'WHATSAPP_SEND' }) {
+async function sendWhatsApp({
+  to,
+  body = '',
+  event = 'WHATSAPP_SEND',
+  templateName,
+  variables,
+  components,
+  headerMediaUrl,
+  isSessionMessage = false,
+}) {
   if (!to) return { sent: false, simulated: false, reason: 'no_recipient' };
 
-  const { authUser, authPass } = getTwilioCredentials();
-  const whatsappNumber = (process.env.TWILIO_WHATSAPP_NUMBER || '').trim();
+  const isLiveEligible = LIVE_WHATSAPP_EVENTS.has(event);
+  const provider = resolveWhatsAppProvider();
 
-  if (!authUser || !authPass || !whatsappNumber) {
-    logger.external(event, `[SIMULATED] Would send WhatsApp to ${to}: "${body}" (set TWILIO_WHATSAPP_NUMBER in Server/.env to send for real)`, { to, body });
-    MessageModel.record({ channel: 'whatsapp', to, event, status: 'simulated', body });
+  // If not eligible for live send or no provider credentials configured
+  if (!isLiveEligible || provider === 'simulated') {
+    const reason = !isLiveEligible
+      ? ` ("${event}" isn't in WHATSAPP_LIVE_EVENTS)`
+      : ' (configure MSG91_WHATSAPP_INTEGRATED_NUMBER or TWILIO_WHATSAPP_NUMBER in Server/.env to send for real)';
+    logger.external(event, `[SIMULATED] Would send WhatsApp to ${to}: "${body}"${reason}`, { to, body });
+    MessageModel.record({ channel: 'whatsapp', to: Array.isArray(to) ? to.join(',') : to, event, status: 'simulated', body });
     return { sent: false, simulated: true };
   }
 
-  try {
-    const { accountSid } = await resolveAccountAndCallerId(authUser, authPass, whatsappNumber);
-    const result = await callTwilioApi(authUser, authPass, 'POST', `/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-      To: `whatsapp:${to}`,
-      From: `whatsapp:${whatsappNumber}`,
-      Body: body,
-    });
+  // Testing mode: redirect real sends to a fixed test number if set
+  const testNumber = (process.env.TEST_WHATSAPP_NUMBER || process.env.TEST_SMS_NUMBER || '').trim();
+  const recipient = testNumber || to;
+  const outboundBody = testNumber && testNumber !== to ? `[TEST -> meant for ${to}] ${body}` : body;
 
-    if (result.status >= 200 && result.status < 300) {
-      logger.external(event, `WhatsApp sent to ${to}`, { to, sid: result.body.sid });
-      MessageModel.record({ channel: 'whatsapp', to, event, status: 'sent', sid: result.body.sid, body });
-      return { sent: true, simulated: false, sid: result.body.sid };
+  // --- 1. MSG91 WhatsApp Execution ---
+  if (provider === 'msg91') {
+    try {
+      const msg91Res = isSessionMessage
+        ? await sendMsg91SessionWhatsApp({
+            to: recipient,
+            text: outboundBody,
+          })
+        : await sendMsg91WhatsApp({
+            to: recipient,
+            templateName,
+            variables,
+            components,
+            body: outboundBody,
+            headerMediaUrl,
+          });
+
+      if (msg91Res.success) {
+        logger.external(event, `MSG91 WhatsApp sent to ${recipient}`, { to: recipient, sid: msg91Res.messageId });
+        MessageModel.record({ channel: 'whatsapp', to: recipient, event, status: 'sent', sid: msg91Res.messageId, body: outboundBody });
+        return { sent: true, simulated: false, sid: msg91Res.messageId };
+      }
+
+      logger.error(event, `MSG91 WhatsApp to ${recipient} failed`, msg91Res.error);
+      MessageModel.record({ channel: 'whatsapp', to: recipient, event, status: 'failed', error: msg91Res.error, body: outboundBody });
+      return { sent: false, simulated: false, error: msg91Res.error };
+    } catch (err) {
+      logger.error(event, `Exception while sending MSG91 WhatsApp to ${recipient}`, err);
+      MessageModel.record({ channel: 'whatsapp', to: recipient, event, status: 'failed', error: err.message, body: outboundBody });
+      return { sent: false, simulated: false, error: err.message };
     }
-
-    logger.error(event, `Twilio WhatsApp to ${to} failed`, result.body);
-    MessageModel.record({ channel: 'whatsapp', to, event, status: 'failed', error: result.body?.message || 'Twilio WhatsApp failed', body });
-    return { sent: false, simulated: false, error: result.body?.message || 'Twilio WhatsApp failed' };
-  } catch (err) {
-    logger.error(event, `Failed to send WhatsApp to ${to}`, err);
-    MessageModel.record({ channel: 'whatsapp', to, event, status: 'failed', error: err.message, body });
-    return { sent: false, simulated: false, error: err.message };
   }
+
+  // --- 2. Twilio WhatsApp Execution ---
+  if (provider === 'twilio') {
+    const { authUser, authPass } = getTwilioCredentials();
+    const twilioWhatsAppNumber = (process.env.TWILIO_WHATSAPP_NUMBER || '').trim();
+
+    try {
+      const { accountSid } = await resolveAccountAndCallerId(authUser, authPass, twilioWhatsAppNumber);
+      const result = await callTwilioApi(authUser, authPass, 'POST', `/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+        To: `whatsapp:${recipient}`,
+        From: `whatsapp:${twilioWhatsAppNumber}`,
+        Body: outboundBody,
+      });
+
+      if (result.status >= 200 && result.status < 300) {
+        logger.external(event, `Twilio WhatsApp sent to ${recipient}`, { to: recipient, sid: result.body.sid });
+        MessageModel.record({ channel: 'whatsapp', to: recipient, event, status: 'sent', sid: result.body.sid, body: outboundBody });
+        return { sent: true, simulated: false, sid: result.body.sid };
+      }
+
+      logger.error(event, `Twilio WhatsApp to ${recipient} failed`, result.body);
+      MessageModel.record({ channel: 'whatsapp', to: recipient, event, status: 'failed', error: result.body?.message || 'Twilio WhatsApp failed', body: outboundBody });
+      return { sent: false, simulated: false, error: result.body?.message || 'Twilio WhatsApp failed' };
+    } catch (err) {
+      logger.error(event, `Failed to send Twilio WhatsApp to ${recipient}`, err);
+      MessageModel.record({ channel: 'whatsapp', to: recipient, event, status: 'failed', error: err.message, body: outboundBody });
+      return { sent: false, simulated: false, error: err.message };
+    }
+  }
+
+  return { sent: false, simulated: true };
 }
 
-module.exports = { sendSms, sendWhatsApp };
+module.exports = {
+  sendSms,
+  sendWhatsApp,
+  sendMsg91Otp,
+  verifyMsg91Otp,
+  sendMsg91WhatsApp,
+  sendMsg91SessionWhatsApp,
+  getMsg91Config,
+  resolveSmsProvider,
+  resolveWhatsAppProvider,
+};

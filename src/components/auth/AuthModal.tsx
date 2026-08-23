@@ -4,7 +4,6 @@ import AppLogo from '../common/AppLogo';
 import AuthAlertMessage from './AuthAlertMessage';
 import AuthMethodList from './AuthMethodList';
 import EmailAuthStep from './EmailAuthStep';
-import PhoneAuthStep from './PhoneAuthStep';
 import ForgotPasswordForm from './ForgotPasswordForm';
 import { useAuthForm } from './hooks/useAuthForm';
 
@@ -27,7 +26,6 @@ export default function AuthModal({
     authMode,
     authStep,
     email,
-    phone,
     password,
     fullName,
     isPasswordVisible,
@@ -35,14 +33,12 @@ export default function AuthModal({
     errorMessage,
     successMessage,
     setEmail,
-    setPhone,
     setPassword,
     setFullName,
     setIsPasswordVisible,
     switchAuthMode,
     selectAuthStep,
     handleEmailSubmit,
-    handlePhoneSubmit,
     handlePasswordResetSubmit,
     handleGoogleAuthentication,
   } = useAuthForm({
@@ -103,7 +99,6 @@ export default function AuthModal({
           <p className="relative text-xs text-slate-500 font-medium mt-1 leading-relaxed">
             {authStep === 'list' && 'Select your preferred sign-in option below'}
             {authStep === 'email' && 'Enter your email details to proceed'}
-            {authStep === 'phone' && 'Enter your mobile phone details to proceed'}
             {authStep === 'forgot' && 'Enter your email address to reset your password'}
           </p>
         </div>
@@ -141,25 +136,7 @@ export default function AuthModal({
           />
         )}
 
-        {/* Step 2B: Phone Input Screen */}
-        {authStep === 'phone' && (
-          <PhoneAuthStep
-            currentMode={authMode}
-            phone={phone}
-            fullName={fullName}
-            password={password}
-            isPasswordVisible={isPasswordVisible}
-            isSubmitting={isSubmitting}
-            onPhoneChange={setPhone}
-            onFullNameChange={setFullName}
-            onPasswordChange={setPassword}
-            onTogglePasswordVisibility={handleTogglePasswordVisibility}
-            onBackToList={handleReturnToListStep}
-            onSubmit={handlePhoneSubmit}
-          />
-        )}
-
-        {/* Step 2C: Password Reset Screen */}
+        {/* Step 2B: Password Reset Screen */}
         {authStep === 'forgot' && (
           <ForgotPasswordForm
             identifier={email}

@@ -163,7 +163,7 @@ export default function AlertsPage({
   };
 
   return (
-    <div className="px-8 pt-7 pb-16 space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
       {/* True Emergency Banner — impossible to miss when a real SOS is active */}
       {trueEmergencyCount > 0 && (
         <div className="flex items-center gap-3 border border-[#DC2626] bg-[#FDEAEA] px-4 py-3">

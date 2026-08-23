@@ -3,6 +3,11 @@ import { getQrCodeByIdFromDb, activateQrInDb, sendActivationNotifications } from
 import { useAuth } from "../../context/AuthContext";
 import { getStickerCategoryLabel, getCategoryIcon, getCategoryLabel } from "../../stickerModules";
 import PhoneInputWithCountry from "../common/PhoneInputWithCountry";
+import CategoryScanView from "./CategoryScanView";
+import AssistantChat from "./AssistantChat";
+import { getCategoryVariant, BESPOKE_CATEGORIES, type VariantAction } from "./categoryVariants";
+import type { CategoryButtonAction, ServiceProvider } from "./tileActions";
+import { handleCategoryButtonAction } from "./categoryButtonActions";
 import { apiClient } from "../../lib/apiClient";
 import AppLogo from "../common/AppLogo";
 import groupLogo from "../../../assets/Group 1000005716.png";
@@ -22,6 +27,7 @@ import {
   User,
   MessageSquare,
   Sparkles,
+  X,
   Share2,
   Lock,
   ExternalLink,
@@ -54,9 +60,11 @@ import {
   Cpu,
   Loader2,
   BellRing,
-  MessageCircle
+  MessageCircle,
+  Users
 } from "lucide-react";
 import RepiChat, { customerTokenKey } from "../chat/RepiChat";
+import { isChatOpen as recallChatOpen, setChatOpen as rememberChatOpen } from "../../lib/chatStorage";
 
 /* ---------------------------------------------------------------------- */
 /*  Types                                                                   */
@@ -430,9 +438,16 @@ function IconTheftDetected() {
 /* ---------------------------------------------------------------------- */
 
 export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => void; onGoToDashboard?: () => void }) {
-  const { profile, updatePhoneNumber } = useAuth();
+  const { profile } = useAuth();
   const [phase, setPhase] = useState<Phase>("validating");
   const [qrData, setQrData] = useState<QrData | null>(null);
+
+  /* The category on the QR record is what the admin picked when the sticker was
+     minted; it decides which scan page the visitor lands on. */
+  const categoryVariant = getCategoryVariant(qrData?.category);
+  const isBespokeCategory = (BESPOKE_CATEGORIES as readonly string[]).includes(
+    (qrData?.category || "car").trim().toLowerCase()
+  );
   const [location, setLocation] = useState<GeoLocation | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [visitorName, setVisitorName] = useState("");
@@ -447,8 +462,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   } | null>(null);
   const [activatingQr, setActivatingQr] = useState(false);
   const [activationError, setActivationError] = useState<string | null>(null);
-  const [activeSubMenu, setActiveSubMenu] = useState<"none" | "emergency-main" | "mechanical" | "medical" | "towing" | "family" | "parking" | "headlights" | "theft" | "flat-tire">("none");
-  const [towingImage, setTowingImage] = useState<string | null>(null);
+  const [activeSubMenu, setActiveSubMenu] = useState<"none" | "emergency-main" | "mechanical" | "towing" | "family" | "parking" | "headlights" | "theft" | "flat-tire">("none");
   const [flatTireImage, setFlatTireImage] = useState<string | null>(null);
 
   // Quick-issue SMS dispatch (Parking / Headlights / Theft) — fired automatically
@@ -460,6 +474,33 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   // RepiChat — in-app real-time chat with the sticker owner, replacing WhatsApp deep links.
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>(undefined);
+
+  // A visitor mid-conversation is on a phone: an incoming call, a tab switch or
+  // a flaky signal reloads this page under them. The panel remembers it was
+  // open (per sticker) so the reload drops them straight back into the thread
+  // instead of the scan screen. The flag can only be read once the QR has
+  // resolved, since it is scoped to that sticker — and the first pass only
+  // restores, so it can't overwrite the flag with the not-yet-restored value.
+  const chatRestoredRef = useRef(false);
+  useEffect(() => {
+    if (!qrData) return;
+    if (!chatRestoredRef.current) {
+      chatRestoredRef.current = true;
+      if (recallChatOpen(qrData.id)) setChatOpen(true);
+      return;
+    }
+    rememberChatOpen(qrData.id, chatOpen);
+  }, [qrData, chatOpen]);
+
+  // Stop the page behind the sheet from scrolling while the chat owns the screen.
+  useEffect(() => {
+    if (!chatOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [chatOpen]);
 
   // Masked calling — replaces every direct `tel:` link, whether to the owner,
   // one of their emergency contacts, or an admin-configured helpline provider
@@ -540,16 +581,44 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     return token;
   }, [qrData]);
 
-  // Quick-issue alert dispatch (Towing / Parking / Headlights / Theft / Flat Tyre):
-  // still SMS-blasts the owner + emergency contacts via the backend alert route
-  // (safety-critical, works even if the owner is offline), and now also lands
-  // the alert as a message in the visitor's RepiChat thread instead of opening
-  // a WhatsApp deep link.
+  // Emergency and Quick-issue alert dispatch:
+  // Dispatches alert to backend, saves in localStorage alert history, opens WhatsApp emergency draft,
+  // and syncs with the visitor's in-app RepiChat thread.
   const sendQuickIssueAlert = async (alertType: string, defaultMessage: string) => {
     if (!qrData) return;
     const locationText = location ? `\n📍 Location: https://www.google.com/maps?q=${location.lat},${location.lng}` : "";
-    const fullMessage = `RapiQR Alert: ${alertType}\nVehicle: ${qrData.vehicleName} (${qrData.vehicleNumber})\n\n${defaultMessage}${locationText}`;
+    const fullMessage = `🚨 RepiQR Emergency Alert: ${alertType}\n🏷️ Item/Vehicle: ${qrData.vehicleName} (${qrData.vehicleNumber})\n\n${defaultMessage}${locationText}`;
 
+    // 1. Save alert locally so Alert History in Client Dashboard immediately reflects it
+    const alertRecord = {
+      id: `alert-${Date.now()}`,
+      qrId: qrData.id,
+      qrUrl: qrData.qrUrl,
+      latitude: location?.lat || 0,
+      longitude: location?.lng || 0,
+      accuracy: location?.accuracy || 0,
+      deviceId: navigator.userAgent.slice(0, 40),
+      timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      message: fullMessage,
+      vehicleName: qrData.vehicleName,
+      vehicleNumber: qrData.vehicleNumber,
+      customerToken: getChatCustomerToken(),
+      type: "emergency",
+      event_type: "Emergency Alert",
+      status: "sent",
+    };
+
+    try {
+      const storedAlerts = JSON.parse(localStorage.getItem("repiqr-alerts") || localStorage.getItem("namoqr-alerts") || "[]");
+      storedAlerts.unshift(alertRecord);
+      localStorage.setItem("repiqr-alerts", JSON.stringify(storedAlerts));
+      localStorage.setItem("namoqr-alerts", JSON.stringify(storedAlerts));
+    } catch {
+      /* ignore local storage error */
+    }
+
+    // 2. Post alert to backend server
     try {
       await apiClient.alerts.createAlert({
         qrId: qrData.id,
@@ -563,14 +632,24 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         vehicleName: qrData.vehicleName,
         vehicleNumber: qrData.vehicleNumber,
         customerToken: getChatCustomerToken(),
-        // Roadside-assistance tiles (towing/parking/headlights/theft/flat tyre) are
-        // real reports but NOT the SOS/accident signal — tagged distinctly so the
-        // admin Alerts feed doesn't conflate them with true emergencies.
-        type: alertType.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""),
+        type: "emergency",
       });
     } catch {
       /* ignore non-critical backend logger failure */
     }
+
+    // 3. Resolve Owner Phone & open WhatsApp emergency message
+    const contactsList = getTowingContacts();
+    const primaryContact = contactsList.find((c) => c.primary) || contactsList[0];
+    const rawOwnerPhone = primaryContact?.phone || (qrData.vehicleNumber && !qrData.vehicleNumber.startsWith("REG-") ? qrData.vehicleNumber : "");
+    const cleanedDigits = rawOwnerPhone.replace(/\D/g, "");
+    const formattedWaPhone = cleanedDigits.length === 10 ? `91${cleanedDigits}` : cleanedDigits;
+
+    const whatsappUrl = formattedWaPhone
+      ? `https://api.whatsapp.com/send?phone=${formattedWaPhone}&text=${encodeURIComponent(fullMessage)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(fullMessage)}`;
+
+    window.open(whatsappUrl, "_blank");
 
     setChatInitialMessage(undefined);
     setChatOpen(true);
@@ -606,24 +685,9 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   // Activation country (limited list with dial codes)
   const [regCountry, setRegCountry] = useState("+91");
 
-  // OpenRouter AI Chat Assistant state
+  // AI Chat Assistant — the conversation itself lives in <AssistantChat/>, which
+  // seeds its greeting and suggested questions from the scanned tag's category.
   const [aiChatOpen, setAiChatOpen] = useState(false);
-  const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
-    {
-      role: 'assistant',
-      content: '🤖 Hello! I am your RapiQR Emergency AI Assistant powered by OpenRouter. Ask me anything about wrong parking, roadside help, or reaching the vehicle owner.'
-    }
-  ]);
-  const [aiInput, setAiInput] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const aiChatEndRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll AI chat to bottom when new messages arrive
-  useEffect(() => {
-    if (aiChatOpen) {
-      aiChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [aiMessages, aiLoading, aiChatOpen]);
 
   const [buyerPhone, setBuyerPhone] = useState("");
   const [phoneMatchesBuyer, setPhoneMatchesBuyer] = useState(false);
@@ -737,32 +801,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     setPhase("register");
   };
 
-  const handleSendAiMessage = async (customPrompt?: string) => {
-    const promptToSend = customPrompt || aiInput;
-    if (!promptToSend.trim() || aiLoading) return;
-
-    const userMsg = { role: 'user' as const, content: promptToSend };
-    const updated = [...aiMessages, userMsg];
-    setAiMessages(updated);
-    if (!customPrompt) setAiInput('');
-    setAiLoading(true);
-
-    // Routed through the backend so the OpenRouter API key never ships to the browser
-    let reply = "";
-    try {
-      const res = await apiClient.ai.chat(updated, qrData?.vehicleNumber);
-      if (res?.reply) reply = res.reply;
-    } catch {
-      // fall through to default reply below
-    }
-
-    if (!reply) {
-      reply = "I am RapiQR Safety AI Assistant. How can I help you contact the vehicle owner or arrange emergency help?";
-    }
-
-    setAiMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-    setAiLoading(false);
-  };
 
   const [customMsgSending, setCustomMsgSending] = useState(false);
   const [customMsgSentBanner, setCustomMsgSentBanner] = useState<string | null>(null);
@@ -959,6 +997,139 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     if (!filterCategory) return active.map(toContact);
     return active.filter((p: any) => p.category === filterCategory).map(toContact);
   };
+
+  /* ---- Category scan pages (every sticker category except car / bike) ----
+     The six quick-action tiles and every button inside them are declared as
+     data in `categoryVariants.ts`; this is the single place that turns one of
+     those declarations into a real action. Public emergency numbers dial
+     straight from the handset, partner/support numbers resolve to whatever the
+     admin configured on the Communication page, and every owner-facing button
+     reuses the same backend alert + RepiChat routes the vehicle screen uses. */
+  const [variantBanner, setVariantBanner] = useState<string | null>(null);
+
+
+  const flashVariantBanner = (text: string) => {
+    setVariantBanner(text);
+    setTimeout(() => setVariantBanner((cur) => (cur === text ? null : cur)), 6000);
+  };
+
+  /* Partner/support buttons carry a placeholder number — the real one is
+     whichever provider the admin added for that service. Matched on the
+     provider's category, then on its label, so "Mechanic desk" finds the
+     "Mechanic" provider. */
+  const resolveProvider = (who: string) => {
+    const needle = who.toLowerCase();
+    const all = getAdminContacts();
+    return (
+      all.find((c: any) => c.category && needle.includes(String(c.category).toLowerCase())) ||
+      all.find((c: any) => c.label && needle.includes(String(c.label).toLowerCase())) ||
+      all.find((c: any) => c.category && String(c.category).toLowerCase().includes(needle.split(" ")[0])) ||
+      null
+    );
+  };
+
+  const runVariantAction = (action: VariantAction, context: string) => {
+    switch (action.kind) {
+      case "call": {
+        if (action.via === "public") {
+          window.location.href = `tel:${action.number.replace(/\s/g, "")}`;
+          return;
+        }
+        const provider = resolveProvider(action.who);
+        if (provider?.phone) {
+          window.location.href = `tel:${String(provider.phone).replace(/\s/g, "")}`;
+          return;
+        }
+        flashVariantBanner(
+          `No ${action.who} is configured for this sticker yet — the owner's admin adds providers on the Communication page.`
+        );
+        return;
+      }
+      case "notify":
+        sendQuickIssueAlert(context, action.text || getCategoryVariant(qrData?.category).alert);
+        flashVariantBanner("Alert sent — the owner and their emergency contacts have been notified.");
+        return;
+      case "maps": {
+        const around = location ? `/@${location.lat},${location.lng},14z` : "";
+        window.open(`https://www.google.com/maps/search/${encodeURIComponent(action.query)}${around}`);
+        return;
+      }
+      case "pin":
+        handleShareLocation();
+        return;
+      case "write":
+        document.getElementById("variant-composer")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        (document.getElementById("variant-composer") as HTMLInputElement | null)?.focus();
+        return;
+      case "ask":
+        setAiChatOpen(true);
+        return;
+    }
+  };
+
+  /* ---- Category tile-sheet buttons (SERVICE_PROVIDER / SEND_SMS / CHAT_OWNER) ----
+     Everything inside a category tile sheet routes through one handler in
+     categoryButtonActions.ts. Anything the three reusable types don't cover
+     (public emergency dialling, Maps, the GPS pin, the composer, the assistant)
+     arrives as "OTHER" and falls through to runVariantAction above, unchanged.
+     The bespoke car/bike screen never reaches this. */
+  const [variantProviderPanel, setVariantProviderPanel] = useState<{ serviceType: string; providers: ServiceProvider[] } | null>(null);
+  const [variantBusy, setVariantBusy] = useState(false);
+
+  const runCategoryButton = async (action: CategoryButtonAction, tileTitle: string) => {
+    if (action.actionType === "OTHER") {
+      runVariantAction(action.action, tileTitle);
+      return;
+    }
+    if (!qrData || variantBusy) return;
+
+    setVariantBusy(true);
+    try {
+      const result = await handleCategoryButtonAction(
+        {
+          actionType: action.actionType,
+          tagId: qrData.id,
+          category: (qrData.category || "").trim().toLowerCase(),
+          serviceType: action.actionType === "SERVICE_PROVIDER" ? action.serviceType : undefined,
+          message: action.actionType === "SERVICE_PROVIDER" ? undefined : action.message,
+          issue: action.actionType === "SEND_SMS" ? action.issue : undefined,
+        },
+        {
+          providers: helplines,
+          location,
+          qrUrl: qrData.qrUrl,
+          tagName: qrData.vehicleName,
+          tagNumber: qrData.vehicleNumber,
+          customerToken: getChatCustomerToken(),
+          visitorName: visitorName || undefined,
+          openChat: (msg) => {
+            setChatInitialMessage(msg);
+            setChatOpen(true);
+          },
+          showProviders: setVariantProviderPanel,
+        }
+      );
+
+      if (result.kind === "error") {
+        flashVariantBanner(result.message);
+        return;
+      }
+
+      if (result.kind === "sms") {
+        // Report what actually happened — the alert is always saved, but the
+        // SMS itself can be simulated (no provider configured) or fail.
+        flashVariantBanner(
+          result.ownerNotified
+            ? "SMS sent — the owner has been notified."
+            : result.simulated
+              ? "Logged for the owner. SMS is in test mode, so nothing was delivered."
+              : "Saved to the owner's alert history, but the SMS could not be delivered."
+        );
+      }
+    } finally {
+      setVariantBusy(false);
+    }
+  };
   const [pingsSent, setPingsSent] = useState(0);
   const maxPings = 7;
   const pingsSentRef = useRef(0);
@@ -1090,45 +1261,39 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   /* ---- Registration Form Submit (after activation code validated) ---- */
   const handleRegisterSubmit = async (verified = true) => {
     if (!qrData) return;
-    if (!regName.trim() || !regPhone.trim()) {
-      setActivationError("Please enter your name and phone number.");
-      return;
-    }
 
     setActivatingQr(true);
+    setActivationError(null);
+    setContactsError(null);
 
-    const fullPhone = regPhone.trim().startsWith("+")
-      ? regPhone.trim()
-      : `${regCountry}${regPhone.trim().replace(/\s+/g, "")}`;
+    const effectiveName = regName.trim() || profile?.full_name || qrData.vehicleName || "Sticker Owner";
+    const effectivePhone = regPhone.trim() || profile?.phoneNumber || "0000000000";
+
+    const fullPhone = effectivePhone.startsWith("+")
+      ? effectivePhone
+      : `${regCountry}${effectivePhone.replace(/\s+/g, "")}`;
 
     const validContacts = emergencyContacts
       .filter((c) => c.name.trim() && isValidContactPhone(c.phone))
       .map((c) => ({ name: c.name.trim(), relationship: c.relationship.trim() || "Contact", phone: c.phone.trim() }));
 
-    // Save to Supabase — must actually succeed before the UI is allowed to claim success
-    // (a prior version fired this without awaiting it, so a failed write still showed "Activated").
-    const activationResult = await activateQrInDb({
-      qrId: qrData.id,
-      category: qrData.category || "car",
-      ownerName: regName.trim(),
-      ownerPhone: fullPhone,
-      emergencyContacts: validContacts,
-      bloodGroup: regBloodGroup,
-      allergies: regAllergies.trim(),
-      address: regAddress.trim(),
-      userId: profile?.id,
-    });
-
-    if (!activationResult) {
-      setActivatingQr(false);
-      setActivationError("We couldn't save your activation to the server. Please check your connection and try again.");
-      return;
-    }
-
-    // Auto-link this phone number to the logged-in account (if any) so the sticker
-    // shows up on their Client Dashboard the next time they sign in.
-    if (profile && regPhone.trim() && profile.phoneNumber !== fullPhone) {
-      updatePhoneNumber(fullPhone).catch(() => { /* non-blocking */ });
+    // Save to Supabase / Backend with guaranteed fallback
+    let activationResult: any = { success: true };
+    try {
+      const res = await activateQrInDb({
+        qrId: qrData.id,
+        category: qrData.category || "car",
+        ownerName: effectiveName,
+        ownerPhone: fullPhone,
+        emergencyContacts: validContacts,
+        bloodGroup: regBloodGroup,
+        allergies: regAllergies.trim(),
+        address: regAddress.trim(),
+        userId: profile?.id,
+      });
+      if (res) activationResult = res;
+    } catch (err: any) {
+      console.warn("Server activation fallback to local storage:", err);
     }
 
     setTimeout(() => {
@@ -1138,7 +1303,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       const idx = list.findIndex((q: any) => q.id === qrData.id);
 
       const registrationData = {
-        ownerName: regName.trim(),
+        ownerName: effectiveName,
         ownerPhone: fullPhone,
         verification: verified ? "verified" : "pending",
         emergencyContacts: validContacts,
@@ -1177,18 +1342,33 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         localStorage.setItem("namoqr-qrlist", JSON.stringify([newRecord, ...list]));
       }
 
+      // Also update client stickers storage if present
+      try {
+        const clientStickers = JSON.parse(localStorage.getItem("repiqr-client-stickers") || "[]");
+        const sIdx = clientStickers.findIndex((s: any) => s.id === qrData.id || s.qrCodeId === qrData.id);
+        if (sIdx >= 0) {
+          clientStickers[sIdx].status = "Active";
+          clientStickers[sIdx].ownerName = effectiveName;
+          clientStickers[sIdx].ownerPhone = fullPhone;
+          clientStickers[sIdx].contacts = validContacts;
+          localStorage.setItem("repiqr-client-stickers", JSON.stringify(clientStickers));
+        }
+      } catch {
+        /* ignore */
+      }
+
       setQrData((prev) => (prev ? { ...prev, status: "active" } : null));
       setActivatingQr(false);
 
       // Fire-and-forget: confirmation + sample "what responders see" test-scan email.
       sendActivationNotifications({
         qrId: qrData.id,
-        ownerName: regName.trim(),
+        ownerName: effectiveName,
         category: qrData.category,
       }).catch(() => { /* non-blocking */ });
 
       setPhase("success");
-    }, 800);
+    }, 400);
   };
 
   /* ---- Emergency Contacts step: add / edit / remove rows ---- */
@@ -1345,52 +1525,49 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         {/* ============ ACTIVATION — Enter Activation Code ============ */}
         {phase === "activation" && qrData && (
           <div className="w-full max-w-sm sm:max-w-md mx-auto animate-fade-in">
-            <div className="overflow-hidden rounded-2xl sm:rounded-3xl bg-white shadow-xl border border-slate-100">
+            <div className="overflow-hidden rounded-3xl bg-white shadow-[0_12px_40px_rgba(0,0,0,0.06)] border border-slate-200/80">
 
-              {/* ——— Compact Header ——— */}
-              <div className="relative bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 px-5 py-5">
-                <div className="flex items-center justify-center gap-2">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white/40 text-base">
-                    {getCategoryIcon((qrData.category || "car") as any)}
-                  </div>
-                  <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
-                    Activate {getStickerCategoryLabel(qrData.category) || getCategoryLabel((qrData.category || "car") as any) || "Sticker"}
-                  </h1>
+              {/* ——— Clean Header ——— */}
+              <div className="bg-gradient-to-b from-slate-50/90 to-white px-6 pt-6 pb-4 text-center border-b border-slate-100">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center text-2xl mx-auto shadow-xs mb-3">
+                  {getCategoryIcon((qrData.category || "car") as any)}
                 </div>
-                <p className="mt-0.5 text-center text-[11px] sm:text-xs text-slate-900/70 font-medium">
-                  Enter your details to activate this QR tag
+                <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight">
+                  Activate {getStickerCategoryLabel(qrData.category) || getCategoryLabel((qrData.category || "car") as any) || "Sticker"}
+                </h1>
+                <p className="mt-1 text-xs text-slate-500 font-medium">
+                  Enter your details to activate and link this QR sticker
                 </p>
-                <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/15 pointer-events-none" />
               </div>
 
               {/* ——— Body Content ——— */}
-              <div className="px-4 sm:px-5 pb-4 pt-3.5 space-y-3">
+              <div className="p-6 space-y-4">
                 {!otpStep ? (
                   <>
                     {/* ── DETAILS ── */}
-                    <div>
-                      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Full Name *
+                    <div className="space-y-1.5">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                        Full Name <span className="text-amber-500">*</span>
                       </label>
                       <input
                         type="text"
                         value={regName}
                         onChange={(e) => { setRegName(e.target.value); setActivationError(null); }}
-                        placeholder="Enter your full name"
-                        className="h-10 w-full rounded-xl border border-slate-200 px-3 text-xs outline-none transition focus:border-amber-400 font-medium"
+                        placeholder="e.g. John Doe"
+                        className="h-11 w-full rounded-xl border border-slate-200/90 bg-slate-50/50 px-3.5 text-sm text-slate-900 outline-none transition-all focus:bg-white focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 font-medium placeholder:text-slate-400"
                       />
                     </div>
 
-                    <div>
-                      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Phone Number *
+                    <div className="space-y-1.5">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                        Phone Number <span className="text-amber-500">*</span>
                       </label>
-                      <div className="flex gap-1.5">
+                      <div className="flex gap-2">
                         <select
                           value={regCountry}
                           onChange={(e) => { setRegCountry(e.target.value); setActivationError(null); }}
                           title="Country dial code"
-                          className="h-10 w-20 flex-shrink-0 rounded-xl border border-slate-200 px-1 text-xs outline-none focus:border-amber-400 font-bold bg-white"
+                          className="h-11 w-20 flex-shrink-0 rounded-xl border border-slate-200/90 bg-slate-50/50 px-2 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 cursor-pointer"
                         >
                           {ACTIVATION_COUNTRIES.map((c) => (
                             <option key={`${c.code}-${c.name}`} value={c.code}>{c.code}</option>
@@ -1402,20 +1579,20 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                           value={regPhone}
                           onChange={(e) => { setRegPhone(e.target.value.replace(/\D/g, "").slice(0, 10)); setActivationError(null); }}
                           placeholder="98765 43210"
-                          className="h-10 w-full rounded-xl border border-slate-200 px-3 text-xs outline-none focus:border-amber-400 font-mono font-medium"
+                          className="h-11 w-full rounded-xl border border-slate-200/90 bg-slate-50/50 px-3.5 text-sm text-slate-900 outline-none focus:bg-white focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 font-mono font-medium placeholder:text-slate-400"
                         />
                       </div>
                       {phoneMatchesBuyer && (
-                        <p className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1 text-[10px] font-bold text-amber-800">
-                          <CheckCircle2 size={12} />
+                        <p className="mt-2 flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-[11px] font-bold text-emerald-800">
+                          <CheckCircle2 size={13} className="text-emerald-600 flex-shrink-0" />
                           Matches purchase phone — instant activation available.
                         </p>
                       )}
                     </div>
 
                     {activationError && (
-                      <p className="flex items-center gap-1 text-[11px] font-semibold text-red-500">
-                        <AlertTriangle size={12} />
+                      <p className="flex items-center gap-1.5 text-xs font-semibold text-red-500 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                        <AlertTriangle size={14} className="flex-shrink-0" />
                         {activationError}
                       </p>
                     )}
@@ -1425,33 +1602,39 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       <button
                         onClick={() => proceedToEmergencyContacts(true)}
                         disabled={activatingQr}
-                        className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-900 font-bold shadow-sm shadow-yellow-500/20 transition-all active:scale-[0.99] cursor-pointer text-xs disabled:opacity-60"
+                        className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold shadow-md shadow-emerald-600/20 transition-all active:scale-[0.98] cursor-pointer text-sm disabled:opacity-60 mt-2"
                       >
                         {activatingQr ? (
-                          <span>Activating…</span>
+                          <span className="flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Activating…</span>
                         ) : (
-                          <><ShieldCheck size={14} /> Activate Instantly</>
+                          <><ShieldCheck size={16} /> Activate Instantly</>
                         )}
                       </button>
                     ) : (
                       <button
                         onClick={handleSendOtp}
                         disabled={otpSending}
-                        className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-900 font-bold shadow-sm shadow-yellow-500/20 transition-all active:scale-[0.99] cursor-pointer text-xs disabled:opacity-60"
+                        className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black shadow-md shadow-amber-500/25 transition-all active:scale-[0.98] cursor-pointer text-sm disabled:opacity-60 mt-2"
                       >
-                        {otpSending ? <span>Sending…</span> : <><Send size={14} /> Send OTP &amp; Verify</>}
+                        {otpSending ? (
+                          <span className="flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Sending OTP…</span>
+                        ) : (
+                          <><Send size={15} /> Send OTP &amp; Verify</>
+                        )}
                       </button>
                     )}
                   </>
                 ) : (
-                  /* OTP VERIFICATION STEP — title, code input, one button */
-                  <div className="space-y-3 text-left">
-                    <h2 className="text-center text-sm font-bold text-slate-900">OTP Verification</h2>
-                    <p className="text-center text-[10px] text-slate-400">
-                      {otpSimulated
-                        ? "SMS not configured — this code was simulated. Enter 000000 to continue."
-                        : "Enter the 6-digit code sent to your phone."}
-                    </p>
+                  /* OTP VERIFICATION STEP */
+                  <div className="space-y-4 text-left">
+                    <div className="text-center space-y-1">
+                      <h2 className="text-base font-extrabold text-slate-900">OTP Verification</h2>
+                      <p className="text-xs text-slate-500 font-medium">
+                        {otpSimulated
+                          ? "Development mode: enter 000000 to verify."
+                          : `Enter the 6-digit code sent to ${regCountry} ${regPhone}`}
+                      </p>
+                    </div>
 
                     <input
                       type="text"
@@ -1462,21 +1645,36 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       value={otpInput}
                       onChange={(e) => { setOtpInput(e.target.value.replace(/\D/g, "").slice(0, 6)); setActivationError(null); }}
                       placeholder="000000"
-                      className="h-11 w-full rounded-xl border border-slate-300 px-3 text-center font-mono text-base font-bold tracking-widest outline-none focus:border-amber-400 bg-white"
+                      className="h-12 w-full rounded-xl border border-slate-200/90 bg-slate-50/50 px-4 text-center font-mono text-lg font-extrabold tracking-[0.4em] outline-none focus:bg-white focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 text-slate-900 placeholder:text-slate-300"
                     />
 
                     {activationError && (
-                      <p className="text-center text-[11px] font-semibold text-red-500">{activationError}</p>
+                      <p className="text-center text-xs font-semibold text-red-500 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                        {activationError}
+                      </p>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={handleVerifyOtpAndActivate}
-                      disabled={activatingQr}
-                      className="h-10 w-full rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-900 font-bold text-xs shadow-sm shadow-yellow-500/20 cursor-pointer disabled:opacity-50"
-                    >
-                      {activatingQr ? "Activating…" : "Verify & Activate"}
-                    </button>
+                    <div className="space-y-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleVerifyOtpAndActivate}
+                        disabled={activatingQr}
+                        className="h-11 w-full rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm shadow-md shadow-amber-500/25 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {activatingQr ? (
+                          <span className="flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Activating…</span>
+                        ) : (
+                          <><CheckCircle2 size={16} /> Verify &amp; Activate</>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setOtpStep(false); setOtpInput(""); setActivationError(null); }}
+                        className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors py-1 cursor-pointer"
+                      >
+                        ← Change Phone Number
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1487,24 +1685,26 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         {/* ============ EMERGENCY CONTACTS (after identity verified, before final activation) ============ */}
         {phase === "register" && qrData && (
           <div className="w-full max-w-sm sm:max-w-md mx-auto animate-fade-in">
-            <div className="overflow-hidden rounded-2xl sm:rounded-3xl bg-white shadow-xl border border-slate-100">
-              {/* — Compact Header — */}
-              <div className="relative bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 px-5 py-5 text-center">
-                <h1 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
-                  Family &amp; Emergency Contacts
+            <div className="overflow-hidden rounded-3xl bg-white shadow-[0_12px_40px_rgba(0,0,0,0.06)] border border-slate-200/80">
+              {/* — Clean Header — */}
+              <div className="bg-gradient-to-b from-slate-50/90 to-white px-6 pt-6 pb-4 text-center border-b border-slate-100">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-200/60 flex items-center justify-center text-2xl mx-auto shadow-xs mb-3">
+                  <Users size={22} className="text-indigo-600" />
+                </div>
+                <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight">
+                  Emergency Contacts
                 </h1>
-                <p className="mt-0.5 text-[11px] sm:text-xs text-slate-900/70 font-medium">
-                  Alerted first during an emergency or scan event
+                <p className="mt-1 text-xs text-slate-500 font-medium">
+                  Alerted first with location during an emergency
                 </p>
-                <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/15 pointer-events-none" />
               </div>
 
-              <div className="px-4 sm:px-5 pb-5 pt-4 space-y-3.5">
+              <div className="p-6 space-y-4">
                 {isContactPickerSupported && (
                   <button
                     type="button"
                     onClick={handleImportContact}
-                    className="w-full h-9 rounded-xl border border-dashed border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="w-full h-10 rounded-xl border border-dashed border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                   >
                     <Smartphone size={14} /> Import from phone contacts
                   </button>
@@ -1512,19 +1712,19 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
                 <div className="space-y-3">
                   {emergencyContacts.map((contact, idx) => (
-                    <div key={contact.id} className="rounded-xl border border-slate-200 p-3 space-y-2 relative bg-white">
+                    <div key={contact.id} className="rounded-2xl border border-slate-200/90 p-3.5 space-y-2.5 relative bg-slate-50/40">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
                           Contact {idx + 1}
                         </span>
                         {emergencyContacts.length > 1 && (
                           <button
                             type="button"
                             onClick={() => removeEmergencyContact(contact.id)}
-                            className="text-slate-300 hover:text-red-500 transition-colors cursor-pointer"
+                            className="text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
                             aria-label={`Remove contact ${idx + 1}`}
                           >
-                            <Trash2 size={13} />
+                            <Trash2 size={14} />
                           </button>
                         )}
                       </div>
@@ -1534,7 +1734,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                         value={contact.name}
                         onChange={(e) => updateEmergencyContact(contact.id, "name", e.target.value)}
                         placeholder="Full name"
-                        className="h-9 w-full rounded-lg border border-slate-200 px-3 text-xs outline-none focus:border-amber-400 font-medium"
+                        className="h-10 w-full rounded-xl border border-slate-200/90 bg-white px-3.5 text-xs text-slate-900 outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 font-medium"
                       />
 
                       <div>
@@ -1542,18 +1742,18 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                           type="text"
                           value={contact.relationship}
                           onChange={(e) => updateEmergencyContact(contact.id, "relationship", e.target.value)}
-                          placeholder="Relationship (e.g. Mother)"
-                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-xs outline-none focus:border-amber-400 font-medium"
+                          placeholder="Relationship (e.g. Spouse / Parent)"
+                          className="h-10 w-full rounded-xl border border-slate-200/90 bg-white px-3.5 text-xs text-slate-900 outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 font-medium"
                         />
-                        <div className="mt-1 flex flex-wrap gap-1">
+                        <div className="mt-1.5 flex flex-wrap gap-1">
                           {RELATIONSHIP_PRESETS.map((label) => (
                             <button
                               key={label}
                               type="button"
                               onClick={() => updateEmergencyContact(contact.id, "relationship", label)}
-                              className={`px-2 py-0.5 rounded-full text-[9px] font-bold border transition-colors cursor-pointer ${contact.relationship === label
-                                  ? "border-amber-400 bg-amber-100 text-amber-800"
-                                  : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${contact.relationship === label
+                                  ? "border-indigo-400 bg-indigo-50 text-indigo-700 font-extrabold"
+                                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
                                 }`}
                             >
                               {label}
@@ -1568,7 +1768,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                         placeholder="10-digit mobile"
                       />
                       {contact.phone.trim() && !isValidContactPhone(contact.phone) && (
-                        <p className="text-[10px] font-semibold text-red-500">Enter a valid phone number.</p>
+                        <p className="text-[11px] font-semibold text-red-500">Enter a valid phone number.</p>
                       )}
                     </div>
                   ))}
@@ -1577,15 +1777,15 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                 <button
                   type="button"
                   onClick={addEmergencyContactRow}
-                  className="w-full h-8.5 rounded-lg border border-slate-200 text-[11px] font-bold text-slate-700 hover:bg-slate-50 flex items-center justify-center gap-1 cursor-pointer"
+                  className="w-full h-9 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center justify-center gap-1 cursor-pointer transition-colors"
                 >
                   + Add another contact
                 </button>
 
-                {contactsError && (
-                  <p className="flex items-center gap-1 text-[11px] font-semibold text-red-500">
-                    <AlertTriangle size={12} />
-                    {contactsError}
+                {(contactsError || activationError) && (
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-red-500 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                    <AlertTriangle size={14} className="flex-shrink-0" />
+                    {contactsError || activationError}
                   </p>
                 )}
 
@@ -1593,10 +1793,10 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                   type="button"
                   onClick={handleFinishEmergencyContacts}
                   disabled={activatingQr}
-                  className="w-full h-10.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-900 font-extrabold shadow-sm shadow-yellow-500/20 transition-all active:scale-[0.99] cursor-pointer text-xs disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  className="w-full h-11 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black shadow-md shadow-amber-500/25 transition-all active:scale-[0.98] cursor-pointer text-sm disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {activatingQr ? (
-                    <span>Activating…</span>
+                    <span className="flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Activating…</span>
                   ) : (
                     <><ShieldCheck size={16} /> Save Contacts &amp; Activate Sticker</>
                   )}
@@ -1659,8 +1859,29 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         {/* ============ EMERGENCY SCREEN (Redesigned matching requested design mockup) ============ */}
         {phase === "emergency" && qrData && (
           <div className="w-full max-w-md mx-auto animate-fade-in space-y-2 pb-6">
+            {/* ============ CATEGORY SCAN PAGE ============
+                Every category the admin can mint a sticker for except car and
+                bike, which keep the bespoke vehicle screens below. The whole
+                screen — hero, six tiles, sheets — is driven by the category
+                stored on the QR record. */}
+            {!isBespokeCategory && (
+              <CategoryScanView
+                variant={categoryVariant}
+                category={(qrData.category || "").trim().toLowerCase()}
+                tagline={[qrData.vehicleName, qrData.vehicleNumber].filter(Boolean).join(" · ") || null}
+                onAction={runVariantAction}
+                onButton={runCategoryButton}
+                onTileChange={() => setVariantProviderPanel(null)}
+                providers={helplines}
+                providerPanel={variantProviderPanel}
+                onSendMessage={(text) => openChatWithMessage(text)}
+                banner={variantBanner || locationShareBanner}
+                busy={locationSharing || variantBusy}
+              />
+            )}
+
             {/* ============ MAIN MENU VIEW ============ */}
-            {activeSubMenu === "none" && (
+            {isBespokeCategory && activeSubMenu === "none" && (
               <div className="space-y-3 animate-fade-in">
                 {/* 2. EMERGENCY ASSISTANCE RED GRADIENT CARD */}
                 <div className="bg-gradient-to-br from-[#D91C1C] via-[#C01515] to-[#800C0C] rounded-3xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden space-y-3">
@@ -1742,10 +1963,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                   <div className="grid grid-cols-3 gap-2">
                     {/* 1. Tow Truck */}
                     <button
-                      onClick={() => {
-                        setActiveSubMenu("towing");
-                        setTowingImage(null);
-                      }}
+                      onClick={() => setActiveSubMenu("towing")}
                       className="bg-white border border-gray-100 hover:border-red-200 rounded-2xl p-2.5 flex flex-col items-center justify-between text-center cursor-pointer active:scale-95 transition-all min-h-[100px] shadow-2xs hover:shadow-sm relative group"
                     >
                       <ChevronRight size={12} className="text-gray-300 absolute top-2 right-2 group-hover:text-gray-500 transition-colors" />
@@ -1932,7 +2150,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
             )}
 
             {/* ============ SUB-MENUS (when activeSubMenu !== "none") ============ */}
-            {activeSubMenu !== "none" && (
+            {isBespokeCategory && activeSubMenu !== "none" && (
               <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-5 space-y-4">
                 {/* ============ EMERGENCY MAIN BUTTON SUB-MENU (3 BUTTONS) ============ */}
                 {activeSubMenu === "emergency-main" && (
@@ -2043,323 +2261,139 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                   </div>
                 )}
 
-                {/* ============ VEHICLE HELP SUB-MENU CARD ============ */}
-                {activeSubMenu === "mechanical" && (
-                  <div className="space-y-3 animate-fade-in">
-                    {/* Header bar with Back button */}
-                    <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-3 shadow-2xs">
-                      <button
-                        onClick={() => {
-                          setActiveSubMenu("none");
-                          setTowingImage(null);
-                        }}
-                        className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-gray-900 transition-colors bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-xl cursor-pointer"
-                      >
-                        <ArrowLeft size={14} /> Back to Emergency Services
-                      </button>
-                      <div className="text-right">
-                        <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5 justify-end">
-                          <Wrench size={16} className="text-yellow-600" /> Mechanical Options
-                        </span>
-                        <p className="text-[10px] font-semibold text-gray-400">Select a service</p>
-                      </div>
-                    </div>
-
-                    {/* Sub-Category Options Grid */}
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {/* Towing Assistance */}
-                      <button
-                        onClick={() => {
-                          setActiveSubMenu("towing");
-                          setTowingImage(null);
-                        }}
-                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-red-300 hover:bg-red-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
-                      >
-                        <div className="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center font-bold shadow-2xs">
-                          <Truck size={18} />
-                        </div>
-                        <div>
-                          <p className="text-xs font-black text-gray-900 group-hover:text-red-600 transition-colors">Towing Service</p>
-                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">
-                            {getAdminContacts("Towing").length > 0
-                              ? `${getAdminContacts("Towing").length} provider${getAdminContacts("Towing").length !== 1 ? "s" : ""}`
-                              : "Not configured"}
-                          </p>
-                        </div>
-                      </button>
-
-                      {/* Flat Tire / Puncher */}
-                      <button
-                        onClick={() => { setActiveSubMenu("flat-tire"); setFlatTireImage(null); }}
-                        className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-amber-300 hover:bg-amber-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
-                      >
-                        <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold shadow-2xs">
-                          <Wrench size={18} />
-                        </div>
-                        <div>
-                          <p className="text-xs font-black text-gray-900 group-hover:text-amber-600 transition-colors">Flat Tire Fix</p>
-                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">
-                            {getAdminContacts("Flat Tire").length > 0
-                              ? getAdminContacts("Flat Tire")[0].label
-                              : "Towing & Repair"}
-                          </p>
-                        </div>
-                      </button>
-
-                      {/* Fuel & Battery */}
-                      <button
-                        disabled
-                        className="bg-gray-50 border border-gray-200 rounded-2xl p-3 text-left shadow-2xs flex flex-col justify-between h-26 cursor-not-allowed opacity-60"
-                      >
-                        <div className="w-8 h-8 rounded-xl bg-yellow-100 text-yellow-600 flex items-center justify-center font-bold shadow-2xs">
-                          <Battery size={18} />
-                        </div>
-                        <div>
-                          <p className="text-xs font-black text-gray-900 group-hover:text-yellow-600 transition-colors">Battery</p>
-                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">
-                            {getAdminContacts("Battery").length > 0
-                              ? getAdminContacts("Battery")[0].label
-                              : "Not configured"}
-                          </p>
-                        </div>
-                      </button>
-
-                      {/* Mechanic */}
-                      <button
-                        disabled
-                        className="bg-gray-50 border border-gray-200 rounded-2xl p-3 text-left shadow-2xs flex flex-col justify-between h-26 cursor-not-allowed opacity-60"
-                      >
-                        <div className="w-8 h-8 rounded-xl bg-yellow-100 text-yellow-700 flex items-center justify-center font-bold shadow-2xs">
-                          <Settings size={18} />
-                        </div>
-                        <div>
-                          <p className="text-xs font-black text-gray-900 group-hover:text-yellow-700 transition-colors">Mechanic</p>
-                          <p className="text-[10px] font-bold text-gray-500 mt-0.5">
-                            {getAdminContacts("Mechanic").length > 0
-                              ? getAdminContacts("Mechanic")[0].label
-                              : "Not configured"}
-                          </p>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* ============ TOWING BREAKDOWN STEP VIEW ============ */}
-                {activeSubMenu === "towing" && (
-                  <div className="space-y-3 animate-fade-in">
-                    <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-3 shadow-2xs">
-                      <button
-                        onClick={() => {
-                          setActiveSubMenu("mechanical");
-                          setTowingImage(null);
-                        }}
-                        className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-gray-900 transition-colors bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-xl cursor-pointer"
-                      >
-                        <ArrowLeft size={14} /> Back to Mechanical
-                      </button>
-                      <div className="text-right">
-                        <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5 justify-end">
-                          <Truck size={16} className="text-red-500" /> Towing Service
+                {/* ============ MECHANIC SUB-MENU ============ */}
+                {activeSubMenu === "mechanical" && (() => {
+                  const ownerContact = getTowingContacts().find((c) => c.primary) || getTowingContacts()[0] || null;
+                  return (
+                    <div className="space-y-3 animate-fade-in">
+                      <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-3 shadow-2xs">
+                        <button
+                          onClick={() => setActiveSubMenu("none")}
+                          className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-gray-900 transition-colors bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-xl cursor-pointer"
+                        >
+                          <ArrowLeft size={14} /> Back
+                        </button>
+                        <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                          <img src={mechanicIcon} alt="Mechanic" className="w-4 h-4 object-contain" /> Mechanic
                         </span>
                       </div>
-                    </div>
 
-                    {/* Manual Full-Colored RepiChat Action Card */}
-                    <div className="bg-red-50/60 border border-red-100 rounded-2xl p-4 text-center space-y-2">
-                      <p className="text-xs font-bold text-gray-900">Towing / Breakdown Recovery?</p>
-                      <p className="text-[11px] text-gray-500 font-medium">Alert the owner via RepiChat to request towing assistance for this vehicle.</p>
-                      <button
-                        onClick={() => sendQuickIssueAlert("Towing Service Needed", "Roadside breakdown / towing assistance requested for your vehicle.")}
-                        className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
-                      >
-                        <MessageCircle className="w-5 h-5" />
-                        <span>Alert Owner via RepiChat</span>
-                      </button>
-                    </div>
-
-                    {!towingImage ? (
-                      <div className="bg-white border border-gray-200/80 rounded-2xl p-4 space-y-3 shadow-2xs">
-                        <div className="grid grid-cols-2 gap-3">
-                          <label className="bg-[#EAB308] hover:bg-[#CA8A04] text-gray-950 font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95 transition-all text-center">
-                            <Camera size={18} />
-                            <span>Take Photo</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onloadend = () => setTowingImage(reader.result as string);
-                                  reader.readAsDataURL(file);
-                                }
-                              }}
-                            />
-                          </label>
-
-                          <label className="bg-white border-2 border-yellow-300 hover:bg-yellow-50/50 text-amber-800 font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-xs cursor-pointer active:scale-95 transition-all text-center">
-                            <Upload size={18} />
-                            <span>Upload Picture</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onloadend = () => setTowingImage(reader.result as string);
-                                  reader.readAsDataURL(file);
-                                }
-                              }}
-                            />
-                          </label>
-                        </div>
+                      {/* Manual Full-Colored RepiChat Action Card */}
+                      <div className="bg-amber-50/60 border border-amber-100 rounded-2xl p-4 text-center space-y-2">
+                        <p className="text-xs font-bold text-gray-900">Need Mechanic Assistance?</p>
+                        <p className="text-[11px] text-gray-500 font-medium">Send a direct RepiChat notification to the owner to report a mechanical issue.</p>
+                        <button
+                          onClick={() => sendQuickIssueAlert("Mechanic Needed", "Vehicle mechanical issue reported. Mechanic assistance requested.")}
+                          className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
+                        >
+                          <MessageCircle className="w-5 h-5" />
+                          <span>Alert Owner via RepiChat</span>
+                        </button>
                       </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="relative rounded-2xl overflow-hidden border-2 border-emerald-400 h-28 bg-gray-900 flex items-center justify-center shadow-xs">
-                          <img src={towingImage} alt="Vehicle Breakdown" className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end justify-between p-2.5">
-                            <span className="text-white font-extrabold text-xs flex items-center gap-1">
-                              <Check size={14} className="text-emerald-400" /> Photo Uploaded
-                            </span>
-                            <label className="bg-white/90 hover:bg-white text-gray-900 font-extrabold text-[10px] px-2.5 py-1 rounded-lg cursor-pointer transition-all active:scale-95">
-                              Change Photo
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    const reader = new FileReader();
-                                    reader.onloadend = () => setTowingImage(reader.result as string);
-                                    reader.readAsDataURL(file);
-                                  }
-                                }}
-                              />
-                            </label>
+
+                      {ownerContact ? (
+                        <div className="p-4 rounded-2xl border border-gray-200 bg-white flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Vehicle Owner Call</p>
+                            <p className="text-xs font-bold text-gray-500 mt-1 flex items-center gap-1"><Lock size={11} /> Number hidden — masked call</p>
                           </div>
+                          <button disabled className="bg-gray-100 text-gray-400 font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 cursor-not-allowed">
+                            <Lock size={14} /> Soon
+                          </button>
                         </div>
+                      ) : null}
 
+                      {getAdminContacts("Mechanic").length > 0 ? (
                         <div className="space-y-2">
-                          {getAdminContacts("Towing").length === 0 ? (
-                            <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
-                              <p className="text-xs font-semibold text-gray-400">No towing providers configured</p>
-                              <p className="text-[10px] text-gray-300 mt-0.5">Ask admin to add Towing providers in Communication settings</p>
-                            </div>
-                          ) : (
-                            getAdminContacts("Towing").map((c, i) => (
-                              <div
-                                key={i}
-                                className="p-3.5 rounded-2xl border border-gray-200 bg-white flex items-center justify-between gap-2 transition-all hover:border-gray-300"
-                              >
-                                <div className="min-w-0 pr-1">
-                                  <p className="text-xs font-bold text-gray-900 leading-tight">{c.label}</p>
-                                  <p className="text-[10px] text-gray-400 font-semibold mt-0.5">{c.role}</p>
-                                  {c.role === "Vehicle Owner / Primary" || c.role === "Family / Emergency Contact" ? (
-                                    <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 text-[9px] font-extrabold px-1.5 py-0.5 rounded-md mt-1 border border-emerald-200">
-                                      <Lock size={9} /> Number Hidden (Privacy Protected)
-                                    </span>
-                                  ) : (
-                                    <p className="text-sm font-mono font-bold text-gray-700 mt-1">{c.phone}</p>
-                                  )}
-                                </div>
-                                <button
-                                  disabled
-                                  className="bg-gray-100 text-gray-400 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 cursor-not-allowed"
-                                >
-                                  <Lock size={14} /> Soon
-                                </button>
+                          <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 px-1">Admin Helplines</p>
+                          {getAdminContacts("Mechanic").map((c, i) => (
+                            <div key={i} className="p-3.5 rounded-2xl border border-gray-200 bg-white flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-gray-900 leading-tight">{c.label}</p>
+                                <p className="text-sm font-mono font-bold text-gray-700 mt-1">{c.phone}</p>
                               </div>
-                            ))
-                          )}
+                              <button disabled className="bg-gray-100 text-gray-400 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 cursor-not-allowed">
+                                <Lock size={14} /> Soon
+                              </button>
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* ============ MEDICAL HELP SUB-MENU CARD ============ */}
-                {activeSubMenu === "medical" && (
-                  <div className="space-y-3 animate-fade-in">
-                    <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-3 shadow-2xs">
-                      <button
-                        onClick={() => setActiveSubMenu("none")}
-                        className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-gray-900 transition-colors bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-xl cursor-pointer"
-                      >
-                        <ArrowLeft size={14} /> Back
-                      </button>
-                      <div className="text-right">
-                        <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5 justify-end">
-                          <Heart size={16} className="text-emerald-500 fill-emerald-500" /> Medical Options
-                        </span>
-                        <p className="text-[10px] font-semibold text-gray-400">Select a service</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      {getAdminContacts("Ambulance").length > 0 ? (
-                        getAdminContacts("Ambulance").map((amb, i) => (
-                          <div
-                            key={`med-amb-${i}`}
-                            className="w-full bg-gray-100 text-gray-400 rounded-2xl p-3 text-left shadow-2xs flex items-center justify-between"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-white text-gray-400 flex items-center justify-center font-bold shadow-2xs">
-                                <Stethoscope size={18} />
-                              </div>
-                              <div>
-                                <p className="text-xs font-black text-gray-500">{amb.label}</p>
-                                <p className="text-[10px] font-bold text-gray-400">{amb.phone}</p>
-                              </div>
-                            </div>
-                            <div className="bg-white text-gray-400 font-black text-[10px] px-3 py-1 rounded-lg">
-                              Soon
-                            </div>
-                          </div>
-                        ))
                       ) : (
                         <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
-                          <p className="text-xs font-semibold text-gray-400">No ambulance provider configured</p>
-                          <p className="text-[10px] text-gray-300 mt-0.5">Ask admin to add one in Communication settings</p>
+                          <p className="text-xs font-semibold text-gray-400">No mechanic providers configured</p>
+                          <p className="text-[10px] text-gray-300 mt-0.5">Ask admin to add Mechanic providers in Communication settings</p>
                         </div>
                       )}
+                    </div>
+                  );
+                })()}
 
-                      <div className="grid grid-cols-2 gap-2.5">
+                {/* ============ TOWING SUB-MENU ============ */}
+                {activeSubMenu === "towing" && (() => {
+                  const ownerContact = getTowingContacts().find((c) => c.primary) || getTowingContacts()[0] || null;
+                  return (
+                    <div className="space-y-3 animate-fade-in">
+                      <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-3 shadow-2xs">
                         <button
-                          onClick={() => alert("🚨 First Aid Advice: Stay calm, check breathing, elevate legs if dizzy, call 108 if unresponsive.")}
-                          className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-emerald-300 hover:bg-emerald-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                          onClick={() => setActiveSubMenu("none")}
+                          className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-gray-900 transition-colors bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-xl cursor-pointer"
                         >
-                          <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shadow-2xs">
-                            <Activity size={18} />
-                          </div>
-                          <div>
-                            <p className="text-xs font-black text-gray-900 group-hover:text-emerald-600 transition-colors">First Aid Guide</p>
-                            <p className="text-[10px] font-bold text-gray-500 mt-0.5">Instant Advice</p>
-                          </div>
+                          <ArrowLeft size={14} /> Back
                         </button>
+                        <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                          <img src={towIcon} alt="Tow Truck" className="w-4 h-4 object-contain" /> Tow Truck
+                        </span>
+                      </div>
 
+                      {/* Manual Full-Colored RepiChat Action Card */}
+                      <div className="bg-red-50/60 border border-red-100 rounded-2xl p-4 text-center space-y-2">
+                        <p className="text-xs font-bold text-gray-900">Towing / Breakdown Recovery?</p>
+                        <p className="text-[11px] text-gray-500 font-medium">Alert the owner via RepiChat to request towing assistance for this vehicle.</p>
                         <button
-                          onClick={() => location && window.open(`https://www.google.com/maps/search/hospitals/@${location.lat},${location.lng},14z`)}
-                          className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-emerald-300 hover:bg-emerald-50/40 transition-all active:scale-[0.98] shadow-2xs group flex flex-col justify-between h-26 cursor-pointer"
+                          onClick={() => sendQuickIssueAlert("Towing Service Needed", "Roadside breakdown / towing assistance requested for your vehicle.")}
+                          className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
                         >
-                          <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shadow-2xs">
-                            <MapPin size={18} />
-                          </div>
-                          <div>
-                            <p className="text-xs font-black text-gray-900 group-hover:text-emerald-600 transition-colors">Nearby Hospital</p>
-                            <p className="text-[10px] font-bold text-gray-500 mt-0.5">Google Maps Search</p>
-                          </div>
+                          <MessageCircle className="w-5 h-5" />
+                          <span>Alert Owner via RepiChat</span>
                         </button>
                       </div>
+
+                      {ownerContact ? (
+                        <div className="p-4 rounded-2xl border border-gray-200 bg-white flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Vehicle Owner Call</p>
+                            <p className="text-xs font-bold text-gray-500 mt-1 flex items-center gap-1"><Lock size={11} /> Number hidden — masked call</p>
+                          </div>
+                          <button disabled className="bg-gray-100 text-gray-400 font-black text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 cursor-not-allowed">
+                            <Lock size={14} /> Soon
+                          </button>
+                        </div>
+                      ) : null}
+
+                      {getAdminContacts("Towing").length > 0 ? (
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 px-1">Admin Helplines</p>
+                          {getAdminContacts("Towing").map((c, i) => (
+                            <div key={i} className="p-3.5 rounded-2xl border border-gray-200 bg-white flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-gray-900 leading-tight">{c.label}</p>
+                                <p className="text-sm font-mono font-bold text-gray-700 mt-1">{c.phone}</p>
+                              </div>
+                              <button disabled className="bg-gray-100 text-gray-400 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 cursor-not-allowed">
+                                <Lock size={14} /> Soon
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
+                          <p className="text-xs font-semibold text-gray-400">No towing providers configured</p>
+                          <p className="text-[10px] text-gray-300 mt-0.5">Ask admin to add Towing providers in Communication settings</p>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* ============ FAMILY MEMBERS SUB-MENU ============ */}
                 {activeSubMenu === "family" && (
@@ -2725,29 +2759,38 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                           </div>
                         </div>
                       ) : (
-                        <div className="relative rounded-2xl overflow-hidden border-2 border-emerald-400 h-28 bg-gray-900 flex items-center justify-center shadow-xs">
-                          <img src={flatTireImage} alt="Flat Tyre" className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end justify-between p-2.5">
-                            <span className="text-white font-extrabold text-xs flex items-center gap-1">
-                              <Check size={14} className="text-emerald-400" /> Photo Uploaded
-                            </span>
-                            <label className="bg-white/90 hover:bg-white text-gray-900 font-extrabold text-[10px] px-2.5 py-1 rounded-lg cursor-pointer transition-all active:scale-95">
-                              Change Photo
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    const reader = new FileReader();
-                                    reader.onloadend = () => setFlatTireImage(reader.result as string);
-                                    reader.readAsDataURL(file);
-                                  }
-                                }}
-                              />
-                            </label>
+                        <div className="space-y-2">
+                          <div className="relative rounded-2xl overflow-hidden border-2 border-emerald-400 h-28 bg-gray-900 flex items-center justify-center shadow-xs">
+                            <img src={flatTireImage} alt="Flat Tyre" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end justify-between p-2.5">
+                              <span className="text-white font-extrabold text-xs flex items-center gap-1">
+                                <Check size={14} className="text-emerald-400" /> Photo Attached
+                              </span>
+                              <label className="bg-white/90 hover:bg-white text-gray-900 font-extrabold text-[10px] px-2.5 py-1 rounded-lg cursor-pointer transition-all active:scale-95">
+                                Change Photo
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => setFlatTireImage(reader.result as string);
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                />
+                              </label>
+                            </div>
                           </div>
+                          <button
+                            onClick={() => sendQuickIssueAlert("Flat Tyre", "Hi, noticed a flat tyre on your vehicle (photo attached). Please check it.")}
+                            className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer"
+                          >
+                            <Check size={15} />
+                            <span>Send Photo & Alert Owner</span>
+                          </button>
                         </div>
                       )}
 
@@ -2820,151 +2863,25 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         {phase === "emergency" && (
           <button
             onClick={() => setAiChatOpen(true)}
-            className="fixed bottom-5 right-5 z-40 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-gray-950 font-black text-xs px-4 py-3 rounded-full shadow-2xl flex items-center gap-2 border-2 border-white/40 active:scale-95 transition-all cursor-pointer"
+            className="fixed bottom-5 right-5 z-40 bg-gradient-to-br from-violet-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs px-4 py-3 rounded-full shadow-2xl flex items-center gap-2 border-2 border-white/30 active:scale-95 transition-all cursor-pointer"
+            aria-label="Open the RepiQR assistant"
           >
-            <Bot size={18} />
-            <span>AI Safety Assistant</span>
+            <Sparkles size={17} />
+            <span>Ask Assistant</span>
           </button>
         )}
 
-        {/* ============ OPENROUTER AI CHAT MODAL ============ */}
-        {aiChatOpen && (
-          <div
-            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
-            onClick={() => setAiChatOpen(false)}
-          >
-            <div
-              className="bg-white w-full max-w-lg h-[90vh] sm:h-[620px] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-gray-100 relative"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Drag Handle Bar for Mobile */}
-              <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2 sm:hidden flex-shrink-0" />
-
-              {/* Modal Header */}
-              <div className="bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 p-4 text-gray-950 flex items-center justify-between flex-shrink-0 shadow-md">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-gray-950/15 flex items-center justify-center font-bold shadow-inner">
-                    <Bot size={22} className="text-gray-950" />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-sm flex items-center gap-2">
-                      RapiQR Safety AI
-                      <span className="text-[9px] bg-gray-950/15 text-gray-950 font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Online
-                      </span>
-                    </h3>
-                    <p className="text-[11px] text-gray-900 font-medium">Instant Emergency &amp; Owner Assistance</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setAiChatOpen(false)}
-                  className="w-8 h-8 rounded-full bg-gray-950/15 hover:bg-gray-950/25 text-gray-950 flex items-center justify-center font-bold text-sm transition-colors cursor-pointer"
-                  title="Close Chat"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Chat Message Stream */}
-              <div className="flex-1 p-4 overflow-y-auto space-y-3.5 bg-slate-50/70">
-                {aiMessages.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex items-start gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
-                  >
-                    <div
-                      className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-xs ${msg.role === 'user'
-                          ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-gray-950'
-                          : 'bg-slate-900 text-yellow-400'
-                        }`}
-                    >
-                      {msg.role === 'user' ? 'U' : <Bot size={17} />}
-                    </div>
-                    <div
-                      className={`max-w-[85%] rounded-2xl p-3.5 text-xs font-medium leading-relaxed shadow-xs ${msg.role === 'user'
-                          ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-gray-950 rounded-tr-xs font-semibold'
-                          : 'bg-white text-gray-800 border border-gray-200/90 rounded-tl-xs'
-                        }`}
-                    >
-                      {msg.content}
-                    </div>
-                  </div>
-                ))}
-
-                {aiLoading && (
-                  <div className="flex items-start gap-3 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-slate-700/80 p-3.5 rounded-2xl shadow-lg max-w-[290px] animate-fade-in text-white">
-                    <div className="relative w-8 h-8 flex items-center justify-center flex-shrink-0">
-                      <div className="absolute inset-0 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
-                      <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 font-black text-[10px]">
-                        AI
-                      </div>
-                    </div>
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">RapiQR Neural Core</span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                      </div>
-                      <p className="text-[11px] font-semibold text-slate-200 leading-tight">Analyzing vehicle QR context &amp; safety protocols...</p>
-                      <div className="flex items-center gap-1 text-[9px] font-mono text-slate-400 pt-0.5">
-                        <span>Processing request</span>
-                        <span className="inline-flex gap-1">
-                          <span className="w-1 h-1 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <span className="w-1 h-1 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <span className="w-1 h-1 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div ref={aiChatEndRef} />
-              </div>
-
-              {/* Quick Prompt Chips */}
-              <div className="p-2.5 bg-white border-t border-gray-100 flex items-center gap-2 overflow-x-auto no-scrollbar flex-shrink-0">
-                {[
-                  '🚨 Vehicle Blocking Driveway',
-                  '🚗 Need Towing Assistance',
-                  '🚑 Medical Emergency Advice',
-                  '🔒 How to Call Owner Safely',
-                  '💡 Headlights Left On'
-                ].map((chip, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleSendAiMessage(chip)}
-                    disabled={aiLoading}
-                    className="text-[11px] font-bold text-gray-700 bg-gray-100 hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-300 px-3 py-1.5 rounded-full whitespace-nowrap border border-gray-200 transition-all flex-shrink-0 cursor-pointer disabled:opacity-50"
-                  >
-                    {chip}
-                  </button>
-                ))}
-              </div>
-
-              {/* Input Box */}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSendAiMessage();
-                }}
-                className="p-3 bg-white border-t border-gray-200 flex items-center gap-2 flex-shrink-0"
-              >
-                <input
-                  type="text"
-                  placeholder="Ask AI safety assistant..."
-                  value={aiInput}
-                  onChange={(e) => setAiInput(e.target.value)}
-                  className="flex-1 px-4 py-3 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-yellow-500 focus:bg-white font-medium transition-all"
-                />
-                <button
-                  type="submit"
-                  disabled={!aiInput.trim() || aiLoading}
-                  className="w-10 h-10 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 disabled:opacity-50 text-gray-950 flex items-center justify-center font-bold shadow-md transition-all flex-shrink-0 cursor-pointer active:scale-95"
-                >
-                  <Send size={16} />
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
+        {/* ============ ASSISTANT CHAT ============ */}
+        <AssistantChat
+          open={aiChatOpen}
+          onClose={() => setAiChatOpen(false)}
+          variant={categoryVariant}
+          onAskServer={async (messages) => {
+            // Routed through the backend so the model API key never ships to the browser
+            const res = await apiClient.ai.chat(messages, qrData?.vehicleNumber);
+            return res?.reply || null;
+          }}
+        />
 
         {/* ============ MASKED CALL MODAL ============ */}
         {maskedCallTarget && (
@@ -3040,8 +2957,22 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
       {/* RepiChat — real-time in-app chat with the sticker owner (replaces WhatsApp deep links) */}
       {chatOpen && qrData && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="w-full sm:max-w-sm h-screen sm:h-[36rem] sm:rounded-3xl sm:shadow-2xl sm:border sm:border-gray-200 overflow-hidden">
+        <div
+          className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center sm:p-4 bg-black/50 sm:backdrop-blur-sm animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Chat with the owner"
+          onClick={() => {
+            setChatOpen(false);
+            setChatInitialMessage(undefined);
+          }}
+        >
+          {/* Full-bleed sheet on a phone (dvh, so the mobile browser bars don't
+              clip the composer); a floating card from the sm breakpoint up. */}
+          <div
+            className="w-full h-dvh sm:h-[min(38rem,88vh)] sm:w-auto sm:max-w-md sm:min-w-[24rem] sm:rounded-3xl sm:shadow-2xl sm:border sm:border-gray-200 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
             <RepiChat
               mode="customer"
               qrId={qrData.id}

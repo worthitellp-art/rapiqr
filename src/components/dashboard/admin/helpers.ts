@@ -9,9 +9,6 @@ export function qrImageUrl(data: string, fg: string, bg: string, size = 220) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}&color=${fg}&bgcolor=${bg}&qzone=1`;
 }
 
-export function avatarUrl(seed: string) {
-  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}&backgroundColor=eef2ff,fce7f3,dbeafe,fef3c7`;
-}
 
 export function fmtDate(d: string) {
   try {

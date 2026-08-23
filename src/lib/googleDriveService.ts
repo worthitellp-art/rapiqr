@@ -7,6 +7,10 @@ export interface GoogleDriveConfig {
   folderName: string;
   autoBackup: boolean;
   lastBackupTime?: string;
+  connectedEmail?: string;
+  connectedName?: string;
+  connectedAvatar?: string;
+  connectedAt?: string;
 }
 
 export interface BackupPackage {
@@ -25,6 +29,9 @@ export interface BackupPackage {
 
 const CONFIG_STORAGE_KEY = "repiqr-gdrive-config";
 const BACKUP_HISTORY_KEY = "repiqr-backup-history";
+export const DEFAULT_GOOGLE_CLIENT_ID =
+  (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
+  "640446362534-73ub5mvtklhs4e3eldvde892q8jbtlbo.apps.googleusercontent.com";
 
 /**
  * Get stored Google Drive configuration
@@ -49,6 +56,182 @@ export function saveGoogleDriveConfig(config: GoogleDriveConfig): void {
   try {
     localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
   } catch { /* fallback */ }
+}
+
+/**
+ * Disconnect Google Drive account
+ */
+export function disconnectGoogleDrive(): GoogleDriveConfig {
+  const cleared: GoogleDriveConfig = {
+    accessToken: "",
+    folderId: "",
+    folderName: "RapiQR Fleet Backups",
+    autoBackup: false,
+    connectedEmail: undefined,
+    connectedName: undefined,
+    connectedAvatar: undefined,
+    connectedAt: undefined,
+  };
+  saveGoogleDriveConfig(cleared);
+  return cleared;
+}
+
+/**
+ * Ensure Google Identity Services script is loaded
+ */
+export function loadGoogleGsiScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (typeof (window as any).google?.accounts?.oauth2 !== "undefined") {
+      resolve();
+      return;
+    }
+    const existing = document.getElementById("google-gsi-script");
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("Failed to load Google Identity Services")));
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = "google-gsi-script";
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Google Identity Services"));
+    document.head.appendChild(script);
+  });
+}
+
+/**
+ * Connect Google Drive using official Google OAuth Token Client (1-Click Popup)
+ */
+export async function connectGoogleDriveOAuth(
+  customClientId?: string
+): Promise<{ success: boolean; config?: GoogleDriveConfig; error?: string }> {
+  try {
+    await loadGoogleGsiScript();
+
+    const clientId = (customClientId || DEFAULT_GOOGLE_CLIENT_ID).trim();
+    if (!clientId) {
+      return { success: false, error: "Google Client ID is not configured." };
+    }
+
+    const tokenResponse = await new Promise<any>((resolve, reject) => {
+      try {
+        const client = (window as any).google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: [
+            "https://www.googleapis.com/auth/drive.file",
+            "https://www.googleapis.com/auth/drive",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/userinfo.profile",
+          ].join(" "),
+          callback: (response: any) => {
+            if (response.error) {
+              reject(new Error(response.error_description || response.error));
+            } else if (!response.access_token) {
+              reject(new Error("No access token returned from Google."));
+            } else {
+              resolve(response);
+            }
+          },
+          error_callback: (err: any) => {
+            reject(new Error(err?.message || "Google OAuth sign-in was cancelled or failed."));
+          },
+        });
+
+        client.requestAccessToken({ prompt: "consent" });
+      } catch (err: any) {
+        reject(err);
+      }
+    });
+
+    const accessToken = tokenResponse.access_token;
+
+    // Fetch user profile info to verify connection and display user details
+    let connectedEmail: string | undefined;
+    let connectedName: string | undefined;
+    let connectedAvatar: string | undefined;
+
+    try {
+      const userRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        connectedEmail = userData.email;
+        connectedName = userData.name;
+        connectedAvatar = userData.picture;
+      }
+    } catch {
+      // Non-critical, fallback gracefully
+    }
+
+    // Automatically locate or create the "RapiQR Fleet Backups" folder on Drive
+    let folderId = "";
+    try {
+      folderId = await ensureDriveBackupFolder(accessToken, "RapiQR Fleet Backups");
+    } catch (folderErr) {
+      console.warn("Could not create/locate backup folder, using root Drive:", folderErr);
+    }
+
+    const currentConfig = getGoogleDriveConfig();
+    const updatedConfig: GoogleDriveConfig = {
+      ...currentConfig,
+      accessToken,
+      folderId: folderId || currentConfig.folderId || "",
+      folderName: "RapiQR Fleet Backups",
+      connectedEmail: connectedEmail || "Connected Google Account",
+      connectedName: connectedName || "Google Drive User",
+      connectedAvatar,
+      connectedAt: new Date().toISOString(),
+    };
+
+    saveGoogleDriveConfig(updatedConfig);
+    return { success: true, config: updatedConfig };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to authenticate with Google Drive." };
+  }
+}
+
+/**
+ * Locate or create the backup folder on Google Drive
+ */
+export async function ensureDriveBackupFolder(accessToken: string, folderName = "RapiQR Fleet Backups"): Promise<string> {
+  // Check if folder already exists
+  const query = `name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`;
+  const searchRes = await fetch(searchUrl, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (searchRes.ok) {
+    const searchData = await searchRes.json();
+    if (searchData.files && searchData.files.length > 0) {
+      return searchData.files[0].id;
+    }
+  }
+
+  // Create folder if not found
+  const createRes = await fetch("https://www.googleapis.com/drive/v3/files", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name: folderName,
+      mimeType: "application/vnd.google-apps.folder",
+      description: "Automated database backups from RapiQR Fleet Manager",
+    }),
+  });
+
+  if (createRes.ok) {
+    const createData = await createRes.json();
+    return createData.id;
+  }
+
+  return "";
 }
 
 /**
@@ -101,7 +284,7 @@ export async function uploadBackupToGoogleDrive(
   stickerPos: StickerPos
 ): Promise<{ success: boolean; fileId?: string; fileName?: string; error?: string }> {
   if (!config.accessToken || !config.accessToken.trim()) {
-    return { success: false, error: "Google Drive Access Token is missing. Please configure your API token." };
+    return { success: false, error: "Google Drive is not connected. Please connect your Google account first." };
   }
 
   const packageData = createBackupPackage(qrList, stickerPos);
@@ -112,7 +295,7 @@ export async function uploadBackupToGoogleDrive(
   const fileMetadata: Record<string, any> = {
     name: fileName,
     mimeType: "application/json",
-    description: "RapiQR Fleet Database Backup (Protected)",
+    description: `RapiQR Fleet Database Backup (${qrList.length} QR stickers)`,
   };
 
   if (config.folderId && config.folderId.trim()) {
@@ -144,6 +327,9 @@ export async function uploadBackupToGoogleDrive(
 
     if (!response.ok) {
       const errText = await response.text();
+      if (response.status === 401) {
+        return { success: false, error: "Google Drive session expired. Please re-connect your Google Account." };
+      }
       return { success: false, error: `Google Drive API Error (${response.status}): ${errText}` };
     }
 
@@ -178,7 +364,7 @@ export async function listGoogleDriveBackups(
   config: GoogleDriveConfig
 ): Promise<{ success: boolean; files?: Array<{ id: string; name: string; createdTime: string; size?: string }>; error?: string }> {
   if (!config.accessToken || !config.accessToken.trim()) {
-    return { success: false, error: "Access token required" };
+    return { success: false, error: "Google Drive is not connected." };
   }
 
   try {
@@ -193,6 +379,9 @@ export async function listGoogleDriveBackups(
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        return { success: false, error: "Google Drive session expired. Please re-connect your Google Account." };
+      }
       const errText = await response.text();
       return { success: false, error: `Failed to list files: ${errText}` };
     }
@@ -272,3 +461,4 @@ export async function downloadAndRestoreFromDrive(
     return { success: false, error: err.message || "Failed to download and restore backup" };
   }
 }
+

@@ -38,6 +38,23 @@ class MessageModel {
     }
   }
 
+  /**
+   * Advance a delivery to the status the provider's webhook reported.
+   * Best-effort like record(): a missing row (send predates tracking, or the
+   * `messages` table isn't created yet) is not an error worth surfacing.
+   */
+  static async updateStatusByProviderId(providerMessageId, status) {
+    if (!supabaseAdmin || !providerMessageId || !tableExists) return;
+    try {
+      await supabaseAdmin
+        .from('messages')
+        .update({ status })
+        .eq('provider_sid', providerMessageId);
+    } catch {
+      // Non-blocking — a tracking failure must never fail a webhook.
+    }
+  }
+
   static async getMessages({ limit = 100, channel = null, status = null, event = null } = {}) {
     if (!supabaseAdmin) return [];
     try {

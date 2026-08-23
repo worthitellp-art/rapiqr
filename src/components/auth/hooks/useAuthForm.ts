@@ -3,7 +3,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { supabase, isSupabaseConfigured, getAuthCallbackUrl } from '../../../lib/supabase';
 
 export type AuthMode = 'login' | 'signup';
-export type AuthStep = 'list' | 'email' | 'phone' | 'forgot';
+export type AuthStep = 'list' | 'email' | 'forgot';
 
 interface UseAuthFormOptions {
   isOpen: boolean;
@@ -20,13 +20,12 @@ export function useAuthForm({
   onClose,
   onSuccess,
 }: UseAuthFormOptions) {
-  const { signIn, signUp, resetPassword, demoLogin } = useAuth();
+  const { signIn, signUp, resetPassword, signInWithGoogle } = useAuth();
 
   const [authMode, setAuthMode] = useState<AuthMode>(initialMode);
   const [authStep, setAuthStep] = useState<AuthStep>('list');
 
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -81,7 +80,6 @@ export function useAuthForm({
     clearFeedbackMessages();
 
     const trimmedEmail = email.trim();
-
     if (!trimmedEmail) {
       setErrorMessage('Please enter your email address.');
       return;
@@ -104,61 +102,7 @@ export function useAuthForm({
           return;
         }
 
-        const signUpResponse = await signUp(
-          trimmedEmail,
-          password,
-          trimmedFullName,
-          phone.trim() || undefined
-        );
-
-        if (!signUpResponse.success) {
-          setErrorMessage(signUpResponse.error || 'Failed to create account.');
-        } else {
-          handleAuthenticationSuccess('Account created successfully!');
-        }
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handlePhoneSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    clearFeedbackMessages();
-
-    const trimmedPhone = phone.trim();
-
-    if (!trimmedPhone) {
-      setErrorMessage('Please enter a valid phone number.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      if (authMode === 'login') {
-        const signInResponse = await signIn(trimmedPhone, password);
-        if (!signInResponse.success) {
-          setErrorMessage(signInResponse.error || 'Failed to sign in with phone.');
-        } else {
-          handleAuthenticationSuccess('Signed in successfully!');
-        }
-      } else {
-        const trimmedFullName = fullName.trim();
-        const trimmedEmail = email.trim() || `${trimmedPhone.replace(/\D/g, '')}@rapiqr.user`;
-
-        if (!trimmedFullName) {
-          setErrorMessage('Please enter your full name.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        const signUpResponse = await signUp(
-          trimmedEmail,
-          password,
-          trimmedFullName,
-          trimmedPhone
-        );
-
+        const signUpResponse = await signUp(trimmedEmail, password, trimmedFullName);
         if (!signUpResponse.success) {
           setErrorMessage(signUpResponse.error || 'Failed to create account.');
         } else {
@@ -194,7 +138,16 @@ export function useAuthForm({
   };
 
   const handleGoogleAuthentication = async () => {
-    if (isSupabaseConfigured) {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const result = await signInWithGoogle();
+      if (!result.success) {
+        setErrorMessage(result.error || 'Google sign-in was cancelled or failed.');
+        return;
+      }
+
       try {
         localStorage.setItem('repiqr-current-page', 'dashboard');
         localStorage.setItem('namoqr-current-page', 'dashboard');
@@ -202,24 +155,18 @@ export function useAuthForm({
         // Safe fallback if local storage access is restricted
       }
 
-      await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: getAuthCallbackUrl('/auth/callback'),
-        },
-      });
-      return;
+      handleAuthenticationSuccess('Logged in with Google successfully');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Google authentication failed.');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    demoLogin();
-    handleAuthenticationSuccess('Logged in as Demo User');
   };
 
   return {
     authMode,
     authStep,
     email,
-    phone,
     password,
     fullName,
     isPasswordVisible,
@@ -227,14 +174,12 @@ export function useAuthForm({
     errorMessage,
     successMessage,
     setEmail,
-    setPhone,
     setPassword,
     setFullName,
     setIsPasswordVisible,
     switchAuthMode,
     selectAuthStep,
     handleEmailSubmit,
-    handlePhoneSubmit,
     handlePasswordResetSubmit,
     handleGoogleAuthentication,
   };

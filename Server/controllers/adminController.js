@@ -15,7 +15,7 @@ class AdminController {
   static async listUsers(req, res) {
     try {
       const { search } = req.query;
-      const users = await UserModel.searchAll(search, 200);
+      const users = await UserModel.searchAll(search, 1000);
 
       const { data: counts } = await supabaseAdmin.from('products').select('user_id');
       const countMap = {};
@@ -146,36 +146,76 @@ class AdminController {
   }
 
   /**
-   * Admin console: Delete a user account and all their linked products/stickers.
+   * Admin console: Delete a user account and all their linked records.
    * DELETE /api/admin/users/:id
    */
   static async deleteUser(req, res) {
     try {
       const { id } = req.params;
-      const profile = await UserModel.findById(id);
-
-      // Unlink orders so FK constraints don't block user deletion
-      try {
-        await supabaseAdmin.from('orders').update({ user_id: null }).eq('user_id', id);
-      } catch (e) { /* ignore order unlink error */ }
-
-      // Clean up chat sessions owned by this user
-      try {
-        await supabaseAdmin.from('chat_sessions').delete().eq('owner_id', id);
-      } catch (e) { /* ignore chat delete error */ }
-
-      // Unlink or delete products owned by this user
-      try {
-        await supabaseAdmin.from('products').update({ user_id: null, assigned_to: 'Unassigned' }).eq('user_id', id);
-      } catch (e) { /* ignore product update error */ }
-
-      // Delete profile record from public.profiles
-      const { error: profileErr } = await supabaseAdmin.from('profiles').delete().eq('id', id);
-      if (profileErr) {
-        console.warn('Profile delete warning:', profileErr.message);
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'User ID is required' });
       }
 
-      // Delete auth user from Supabase Auth auth.users
+      const profile = await UserModel.findById(id);
+      if (profile && profile.role === 'admin') {
+        return res.status(403).json({ success: false, error: 'Administrator accounts cannot be deleted' });
+      }
+
+      // 1. Unlink orders so FK constraints don't block user deletion
+      try {
+        await supabaseAdmin.from('orders').update({ user_id: null }).eq('user_id', id);
+      } catch (orderErr) {
+        logger.warn('ADMIN_USER_DELETE', `Orders update skipped for ${id}: ${orderErr.message}`);
+      }
+
+      // 2. Clean up chat messages and chat sessions owned by this user
+      try {
+        const { data: userSessions } = await supabaseAdmin
+          .from('chat_sessions')
+          .select('id')
+          .eq('owner_id', id);
+
+        if (userSessions && userSessions.length > 0) {
+          const sessionIds = userSessions.map((s) => s.id);
+          await supabaseAdmin.from('chat_messages').delete().in('session_id', sessionIds);
+        }
+        await supabaseAdmin.from('chat_sessions').delete().eq('owner_id', id);
+      } catch (chatErr) {
+        logger.warn('ADMIN_USER_DELETE', `Chat cleanup skipped for ${id}: ${chatErr.message}`);
+      }
+
+      // 3. Unlink QR codes
+      try {
+        await supabaseAdmin.from('qr_codes').update({ user_id: null }).eq('user_id', id);
+      } catch (qrErr) {
+        logger.warn('ADMIN_USER_DELETE', `QR codes unlink skipped for ${id}: ${qrErr.message}`);
+      }
+
+      // 4. Unlink or delete products owned by this user
+      try {
+        await supabaseAdmin.from('products').update({ user_id: null, assigned_to: 'Unassigned' }).eq('user_id', id);
+      } catch (productErr) {
+        logger.warn('ADMIN_USER_DELETE', `Products update skipped for ${id}: ${productErr.message}`);
+      }
+
+      // 5. Unlink distributor applications
+      try {
+        await supabaseAdmin.from('distributor_applications').update({ user_id: null }).eq('user_id', id);
+      } catch (distErr) {
+        logger.warn('ADMIN_USER_DELETE', `Distributor applications update skipped for ${id}: ${distErr.message}`);
+      }
+
+      // 6. Delete profile record from public.profiles
+      try {
+        const { error: profileErr } = await supabaseAdmin.from('profiles').delete().eq('id', id);
+        if (profileErr) {
+          logger.warn('ADMIN_USER_DELETE', `Profile delete warning for ${id}: ${profileErr.message}`);
+        }
+      } catch (profileErr) {
+        logger.warn('ADMIN_USER_DELETE', `Profile delete skipped for ${id}: ${profileErr.message}`);
+      }
+
+      // 7. Delete auth user from Supabase Auth auth.users
       try {
         const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(id);
         if (authErr) {

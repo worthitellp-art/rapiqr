@@ -8,6 +8,7 @@ const { logger } = require('../middleware/loggerMiddleware');
 const { generateSecret, verifyTOTP, buildOtpauthUrl } = require('../utils/totp');
 const { sendSms, sendWhatsApp } = require('../services/smsService');
 const { createOtp, verifyOtp } = require('../services/phoneVerificationService');
+const { normalizePhone } = require('../utils/phone');
 
 // No hardcoded fallback: an unset GOOGLE_CLIENT_ID would otherwise let
 // verifyIdToken's audience check silently pass against the wrong project (task.md #7/#23).
@@ -228,14 +229,24 @@ class AuthController {
         return res.status(400).json({ success: false, error: 'Google credential or user data missing' });
       }
 
-      logger.info('AUTH_GOOGLE', `Google OAuth verification for: ${email}`);
+      logger.info('AUTH_GOOGLE', `Google OAuth verification for: ${email} (sub: ${sub || 'none'})`);
 
       const isDesignatedAdmin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
       let profile = await UserModel.findByEmail(email);
       if (!profile) {
+        // profiles.id is a uuid tied to auth.users — Google's `sub` is a decimal
+        // string and cannot go in it. Resolve (or mint) the real auth user first.
+        const userId = await UserModel.findOrCreateAuthUserId(email, { fullName, avatarUrl });
+        if (!userId) {
+          logger.error('AUTH_GOOGLE', `Could not resolve an auth user for: ${email}`);
+          return res.status(500).json({ success: false, error: 'Could not create an account for this Google user' });
+        }
+
+        // A trigger on auth.users may have already inserted the profiles row
+        // (hardcoded to role 'user'), so upsert rather than insert.
         profile = await UserModel.upsertProfile({
-          id: sub || `google-${Date.now()}`,
+          id: userId,
           email,
           fullName: fullName || email.split('@')[0],
           avatarUrl,
@@ -276,10 +287,36 @@ class AuthController {
    */
   static async getMe(req, res) {
     try {
-      const profile = await UserModel.findById(req.user.id);
+      // ensureProfile backfills from auth.users when the profiles row is missing,
+      // so legacy accounts (created while the server wrote through the anon key and
+      // RLS silently dropped the insert) stop 404-ing on every dashboard load.
+      const profile = await UserModel.ensureProfile(req.user.id);
       if (!profile) {
-        logger.warn('AUTH_ME', `Profile not found for ID: ${req.user.id}`);
-        return res.status(404).json({ success: false, error: 'User profile not found' });
+        // adminSignIn mints a synthetic `admin-<hex>` id when ADMIN_EMAIL has no
+        // Supabase Auth account behind it; there is no profiles row to find and
+        // never will be (its id is an FK into auth.users). The credentials were
+        // already checked against ADMIN_EMAIL/ADMIN_PASSWORD to issue this token,
+        // so echo that identity back rather than logging the admin panel out.
+        if (req.user.role === 'admin' && String(req.user.id).startsWith('admin-')) {
+          return res.json({
+            success: true,
+            user: {
+              id: req.user.id,
+              email: req.user.email,
+              full_name: 'Fleet Admin',
+              role: 'admin',
+              subscription_plan: 'enterprise',
+              is_subscribed: true,
+            },
+          });
+        }
+
+        logger.warn('AUTH_ME', `No auth user behind ID: ${req.user.id}`);
+        // No auth.users row behind this token — the account was deleted, or the
+        // token carries the synthetic admin id. Either way the session is dead, so
+        // answer 401: the client signs out cleanly on 401, where a 404 left it
+        // half-authenticated with a token it had already discarded.
+        return res.status(401).json({ success: false, error: 'Session no longer valid — please sign in again.' });
       }
       return res.json({ success: true, user: profile });
     } catch (err) {
@@ -293,21 +330,27 @@ class AuthController {
    */
   static async updateProfile(req, res) {
     try {
-      const { fullName, phoneNumber } = req.body || {};
-      if (fullName === undefined && phoneNumber === undefined) {
-        return res.status(400).json({ success: false, error: 'Nothing to update' });
-      }
-      const updated = await UserModel.updateProfile(req.user.id, { fullName, phoneNumber });
-      if (!updated) return res.status(500).json({ success: false, error: 'Failed to update profile' });
-      logger.user('PROFILE_UPDATED', `Profile updated for ${req.user.email}`, { fullName: !!fullName, phoneNumber: !!phoneNumber });
+      const { fullName, phoneNumber, avatarUrl } = req.body || {};
 
-      // Immediately link any sticker registered under this phone number, rather
-      // than waiting for the next products fetch to pick it up.
-      if (phoneNumber) {
-        ProductModel.autoClaimByPhone(req.user.id, updated.full_name, phoneNumber).catch((err) => {
-          logger.error('PRODUCT_AUTO_CLAIM', 'Failed to auto-claim products after phone update', err);
+      // Phone numbers do NOT change here. This endpoint set the number straight onto
+      // the account with no proof of ownership and then auto-claimed every sticker
+      // registered under it — typing a stranger's number was enough to pull their
+      // stickers into your dashboard, which is exactly what the OTP flow exists to
+      // prevent. sendPhoneOtp -> verifyPhoneOtp is the only way in.
+      if (phoneNumber !== undefined) {
+        return res.status(400).json({
+          success: false,
+          error: 'Phone numbers must be verified. Request a code with /auth/phone/send-otp first.',
         });
       }
+
+      if (fullName === undefined && avatarUrl === undefined) {
+        return res.status(400).json({ success: false, error: 'Nothing to update' });
+      }
+
+      const updated = await UserModel.updateProfile(req.user.id, { fullName, avatarUrl });
+      if (!updated) return res.status(500).json({ success: false, error: 'Failed to update profile' });
+      logger.user('PROFILE_UPDATED', `Profile updated for ${req.user.email}`, { fullName: !!fullName, avatar: !!avatarUrl });
 
       return res.json({ success: true, user: updated });
     } catch (err) {
@@ -326,8 +369,29 @@ class AuthController {
   static async sendPhoneOtp(req, res) {
     try {
       const { phoneNumber } = req.body || {};
-      if (!phoneNumber || String(phoneNumber).replace(/\D/g, '').length < 7) {
-        return res.status(400).json({ success: false, error: 'Enter a valid phone number.' });
+      if (!normalizePhone(phoneNumber)) {
+        return res.status(400).json({ success: false, error: 'Enter a valid 10-digit mobile number.' });
+      }
+
+      // The admin console is not a sticker dashboard — it sees every sticker in the
+      // fleet regardless. Giving the admin account a phone number only made it
+      // compete with the real owner for the stickers registered under it.
+      if (req.user.role === 'admin') {
+        return res.status(400).json({
+          success: false,
+          error: 'The admin account does not use a phone number.',
+        });
+      }
+
+      // One number, one dashboard. Checked here so the user finds out before we
+      // spend an SMS, and again at verify time in case the number was taken in between.
+      const taken = await UserModel.findByPhone(phoneNumber, { excludeUserId: req.user.id });
+      if (taken) {
+        logger.security('PHONE_ALREADY_LINKED', `Phone already on another account, rejected for ${req.user.email}`);
+        return res.status(409).json({
+          success: false,
+          error: 'This number is already linked to another RapiQR account. Sign in to that account, or remove the number there first.',
+        });
       }
 
       const code = createOtp(req.user.id, phoneNumber);
@@ -366,6 +430,18 @@ class AuthController {
           invalid_code: `Incorrect code.${result.attemptsLeft ? ` ${result.attemptsLeft} attempt(s) left.` : ''}`,
         };
         return res.status(400).json({ success: false, error: messages[result.reason] || 'Verification failed.' });
+      }
+
+      // Re-check ownership at the moment we commit: the code was issued minutes ago
+      // and another account could have verified the same number in between. Without
+      // this, two accounts end up holding one number and both compete for its stickers.
+      const taken = await UserModel.findByPhone(result.phone, { excludeUserId: req.user.id });
+      if (taken) {
+        logger.security('PHONE_ALREADY_LINKED', `Phone claimed by another account mid-verification for ${req.user.email}`);
+        return res.status(409).json({
+          success: false,
+          error: 'This number was just linked to another RapiQR account. Only one account can hold a number.',
+        });
       }
 
       await UserModel.mergeMetadata(req.user.id, {
@@ -430,32 +506,86 @@ class AuthController {
   }
 
   /**
-   * Account Settings — permanently delete the account (DPDP/GDPR "right to be
-   * forgotten"). Re-verifies the current password first, same pattern as
-   * changePassword/changeEmail. Deleting the auth.users row cascades to
-   * public.profiles and public.products via their ON DELETE CASCADE FKs, so no
-   * manual cleanup is needed here.
+   * Account Settings — permanently delete the authenticated user's account
+   * and clean up associated profile/sticker records.
    */
   static async deleteAccount(req, res) {
     try {
-      const { password } = req.body || {};
-      if (!password) {
-        return res.status(400).json({ success: false, error: 'password is required to confirm account deletion' });
+      const targetUserId = req.user.id;
+      const targetUserEmail = req.user.email;
+
+      // The admin account is the fleet console itself, not a customer account —
+      // deleting it would unlink every sticker it touches and lock the console out
+      // with no way back short of editing the database by hand.
+      if (req.user.role === 'admin' || String(targetUserEmail).toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+        logger.security('ACCOUNT_DELETE_DENIED', `Admin account deletion refused: ${targetUserEmail}`);
+        return res.status(403).json({
+          success: false,
+          error: 'The admin account cannot be deleted.',
+        });
       }
 
-      const { error: verifyError } = await supabaseAdmin.auth.signInWithPassword({
-        email: req.user.email,
-        password,
-      });
-      if (verifyError) {
-        logger.security('ACCOUNT_DELETE_DENIED', `Incorrect password for account deletion attempt: ${req.user.email}`);
-        return res.status(401).json({ success: false, error: 'Password is incorrect' });
+      // Unlink orders so FK constraints don't block user deletion
+      try {
+        await supabaseAdmin.from('orders').update({ user_id: null }).eq('user_id', targetUserId);
+      } catch (orderUnlinkError) {
+        logger.warn('ACCOUNT_DELETE', `Order unlink skipped for ${targetUserId}: ${orderUnlinkError.message}`);
       }
 
-      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(req.user.id);
-      if (deleteError) return res.status(500).json({ success: false, error: deleteError.message });
+      // Clean up chat messages and chat sessions owned by this user
+      try {
+        const { data: userSessions } = await supabaseAdmin
+          .from('chat_sessions')
+          .select('id')
+          .eq('owner_id', targetUserId);
 
-      logger.security('ACCOUNT_DELETED', `Account permanently deleted: ${req.user.email}`, { userId: req.user.id });
+        if (userSessions && userSessions.length > 0) {
+          const sessionIds = userSessions.map((s) => s.id);
+          await supabaseAdmin.from('chat_messages').delete().in('session_id', sessionIds);
+        }
+        await supabaseAdmin.from('chat_sessions').delete().eq('owner_id', targetUserId);
+      } catch (chatCleanError) {
+        logger.warn('ACCOUNT_DELETE', `Chat cleanup skipped for ${targetUserId}: ${chatCleanError.message}`);
+      }
+
+      // Unlink QR codes
+      try {
+        await supabaseAdmin.from('qr_codes').update({ user_id: null }).eq('user_id', targetUserId);
+      } catch (qrUnlinkError) {
+        logger.warn('ACCOUNT_DELETE', `QR codes unlink skipped for ${targetUserId}: ${qrUnlinkError.message}`);
+      }
+
+      // Unlink products owned by this user
+      try {
+        await supabaseAdmin.from('products').update({ user_id: null, assigned_to: 'Unassigned' }).eq('user_id', targetUserId);
+      } catch (productUnlinkError) {
+        logger.warn('ACCOUNT_DELETE', `Product unlink skipped for ${targetUserId}: ${productUnlinkError.message}`);
+      }
+
+      // Unlink distributor applications
+      try {
+        await supabaseAdmin.from('distributor_applications').update({ user_id: null }).eq('user_id', targetUserId);
+      } catch (distUnlinkError) {
+        logger.warn('ACCOUNT_DELETE', `Distributor applications unlink skipped for ${targetUserId}: ${distUnlinkError.message}`);
+      }
+
+      // Delete profile record from public.profiles
+      try {
+        const { error: profileDeleteError } = await supabaseAdmin.from('profiles').delete().eq('id', targetUserId);
+        if (profileDeleteError) {
+          logger.warn('ACCOUNT_DELETE', `Profile delete warning for ${targetUserId}: ${profileDeleteError.message}`);
+        }
+      } catch (profileDeleteError) {
+        logger.warn('ACCOUNT_DELETE', `Profile delete skipped for ${targetUserId}: ${profileDeleteError.message}`);
+      }
+
+      // Delete user from Supabase Auth
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId);
+      if (deleteError) {
+        logger.warn('ACCOUNT_DELETE', `Auth deleteUser warning for ${targetUserId}: ${deleteError.message}`);
+      }
+
+      logger.security('ACCOUNT_DELETED', `Account permanently deleted: ${targetUserEmail}`, { userId: targetUserId });
       return res.json({ success: true, message: 'Account permanently deleted' });
     } catch (err) {
       logger.error('ACCOUNT_DELETE', 'Failed to delete account', err);
@@ -464,29 +594,46 @@ class AuthController {
   }
 
   /**
-   * Account Settings — change the account email. Requires current password re-entry.
+   * Account Settings — change the account email.
+   *
+   * Regular accounts re-enter their current password. The admin account does not:
+   * it authenticates against ADMIN_EMAIL/ADMIN_PASSWORD in Server/.env rather than
+   * a Supabase Auth password, so signInWithPassword has nothing to check it against
+   * and the re-entry step could only ever fail. See adminSignIn.
    */
   static async changeEmail(req, res) {
     try {
       const { newEmail, currentPassword } = req.body || {};
-      if (!newEmail || !newEmail.includes('@') || !currentPassword) {
+      const isAdmin = req.user.role === 'admin';
+
+      if (!newEmail || !newEmail.includes('@')) {
+        return res.status(400).json({ success: false, error: 'Enter a valid email address' });
+      }
+      if (!isAdmin && !currentPassword) {
         return res.status(400).json({ success: false, error: 'newEmail and currentPassword are required' });
       }
 
-      const { error: verifyError } = await supabaseAdmin.auth.signInWithPassword({
-        email: req.user.email,
-        password: currentPassword,
-      });
-      if (verifyError) {
-        logger.security('EMAIL_CHANGE_DENIED', `Incorrect current password for ${req.user.email}`);
-        return res.status(401).json({ success: false, error: 'Current password is incorrect' });
+      if (!isAdmin) {
+        const { error: verifyError } = await supabaseAdmin.auth.signInWithPassword({
+          email: req.user.email,
+          password: currentPassword,
+        });
+        if (verifyError) {
+          logger.security('EMAIL_CHANGE_DENIED', `Incorrect current password for ${req.user.email}`);
+          return res.status(401).json({ success: false, error: 'Current password is incorrect' });
+        }
       }
 
-      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(req.user.id, {
-        email: newEmail,
-        email_confirm: true,
-      });
-      if (updateError) return res.status(500).json({ success: false, error: updateError.message });
+      // Skipped for the synthetic `admin-<hex>` id, which has no auth.users row behind
+      // it at all — there the profile row (or the JWT alone) is the whole identity.
+      const hasAuthUser = !String(req.user.id).startsWith('admin-');
+      if (hasAuthUser) {
+        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(req.user.id, {
+          email: newEmail,
+          email_confirm: true,
+        });
+        if (updateError) return res.status(500).json({ success: false, error: updateError.message });
+      }
 
       const updated = await UserModel.updateEmail(req.user.id, newEmail);
       logger.security('EMAIL_CHANGED', `Email changed for account ${req.user.id}`, { from: req.user.email, to: newEmail });
@@ -497,7 +644,14 @@ class AuthController {
         { expiresIn: '7d' }
       );
 
-      return res.json({ success: true, user: updated, token });
+      // ADMIN_EMAIL in Server/.env is what adminSignIn checks the login against, and
+      // this endpoint cannot rewrite the server's environment. Say so plainly rather
+      // than letting the next admin login fail for no visible reason.
+      const warning = String(req.user.email).toLowerCase() === ADMIN_EMAIL.toLowerCase()
+        ? `Admin login still uses ${ADMIN_EMAIL}. Update ADMIN_EMAIL in Server/.env and restart the server to sign in with ${newEmail}.`
+        : undefined;
+
+      return res.json({ success: true, user: updated, token, warning });
     } catch (err) {
       logger.error('EMAIL_CHANGE', 'Failed to change email', err);
       return res.status(500).json({ success: false, error: err.message || 'Failed to change email' });

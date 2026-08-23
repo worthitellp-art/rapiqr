@@ -2,14 +2,28 @@ const crypto = require('crypto');
 const ChatModel = require('../models/chatModel');
 const ProductModel = require('../models/productModel');
 const { supabaseAdmin } = require('../config/db');
+const { notifyOwner } = require('../services/notificationService');
 const { logger } = require('../middleware/loggerMiddleware');
 const { getIo, getOnlineOwners } = require('../sockets/chatSocket');
-const { sendSms } = require('../services/smsService');
 
 const APP_URL = process.env.APP_URL || 'https://rapiqr.worthitellp.workers.dev';
 
-function isOwnerOfSession(req, session) {
-  return Boolean(req.user && session.owner_id && req.user.id === session.owner_id);
+async function isOwnerOfSession(req, session) {
+  if (!req.user) return false;
+  if (req.user.role === 'admin') return true;
+  if (session.owner_id && req.user.id === session.owner_id) return true;
+
+  if (session.qr_code_id) {
+    const product = await ProductModel.getByQrCodeId(session.qr_code_id).catch(() => null);
+    if (product && product.user_id === req.user.id) {
+      if (!session.owner_id) {
+        supabaseAdmin.from('chat_sessions').update({ owner_id: req.user.id }).eq('id', session.id).then();
+        session.owner_id = req.user.id;
+      }
+      return true;
+    }
+  }
+  return false;
 }
 
 function isCustomerOfSession(req, session) {
@@ -45,17 +59,22 @@ class ChatController {
 
       if (!session) return res.status(500).json({ success: false, error: 'Could not start chat session' });
 
-      // First time this visitor opens the thread — notify the owner by SMS so
+      // Notify the owner's dashboard live inbox in real time
+      if (ownerId) {
+        getIo()?.to(`owner:${ownerId}`).emit('inbox_updated', { sessionId: session.id, session, isNew });
+      }
+
+      // First time this visitor opens the thread — notify the owner on WhatsApp so
       // they know a chat is waiting, with a link straight into the dashboard inbox.
       // Best-effort: never block/fail the visitor's chat over a notify hiccup.
       const ownerPhone = product?.details?.ownerPhone;
       if (isNew && ownerPhone) {
-        const label = vehicleLabel || 'your RapiQR item';
-        sendSms({
-          to: ownerPhone,
-          body: `RapiQR: A visitor started a chat about ${label}. View and reply: ${APP_URL}/#/dashboard?tab=chat`,
-          event: 'CHAT_START_SMS',
-        }).catch((err) => logger.error('CHAT_START_SMS', 'Failed to notify owner of new chat', err));
+        notifyOwner({
+          type: 'CHAT_STARTED',
+          ownerPhone,
+          data: { label: vehicleLabel || 'your RapiQR item', link: `${APP_URL}/#/dashboard?tab=chat` },
+          eventId: session.id,
+        }).catch((err) => logger.error('CHAT_STARTED', 'Failed to notify owner of new chat', err));
       }
 
       return res.json({
@@ -75,7 +94,9 @@ class ChatController {
     try {
       const session = await ChatModel.getSessionById(req.params.id);
       if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
-      if (!isOwnerOfSession(req, session) && !isCustomerOfSession(req, session)) {
+      const isOwner = await isOwnerOfSession(req, session);
+      const isCustomer = isCustomerOfSession(req, session);
+      if (!isOwner && !isCustomer) {
         return res.status(403).json({ success: false, error: 'Forbidden' });
       }
 
@@ -97,7 +118,7 @@ class ChatController {
       const session = await ChatModel.getSessionById(req.params.id);
       if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
 
-      const isOwner = isOwnerOfSession(req, session);
+      const isOwner = await isOwnerOfSession(req, session);
       if (!isOwner && !isCustomerOfSession(req, session)) {
         return res.status(403).json({ success: false, error: 'Forbidden' });
       }
@@ -115,19 +136,31 @@ class ChatController {
 
       getIo()?.to(`session:${session.id}`).emit('new_message', message);
 
-      // If customer sent a message, notify the owner via SMS with the direct link
-      if (!isOwner) {
-        ProductModel.getByQrCodeId(session.qr_code_id).then((product) => {
-          const ownerPhone = product?.details?.ownerPhone;
-          if (ownerPhone) {
-            const label = session.vehicle_label || product?.name || 'your vehicle';
-            sendSms({
-              to: ownerPhone,
-              body: `RapiQR: New message on ${label}: "${text.slice(0, 80)}". Reply here: ${APP_URL}/#/dashboard?tab=chat`,
-              event: 'CHAT_MESSAGE_SMS',
-            }).catch((err) => logger.error('CHAT_MESSAGE_SMS', 'Failed to SMS owner', err));
-          }
-        }).catch(() => { /* best effort */ });
+      let ownerId = session.owner_id;
+      let product = null;
+      if (session.qr_code_id) {
+        product = await ProductModel.getByQrCodeId(session.qr_code_id).catch(() => null);
+        if (!ownerId && product?.user_id) ownerId = product.user_id;
+      }
+      if (ownerId) {
+        getIo()?.to(`owner:${ownerId}`).emit('new_message', message);
+        getIo()?.to(`owner:${ownerId}`).emit('inbox_updated', { sessionId: session.id, message, session });
+      }
+
+      // If the customer sent it, notify the owner on WhatsApp with the direct link
+      if (!isOwner && product?.details?.ownerPhone) {
+        const ownerPhone = product.details.ownerPhone;
+        const label = session.vehicle_label || product?.name || 'your vehicle';
+        notifyOwner({
+          type: 'CHAT_MESSAGE',
+          ownerPhone,
+          data: {
+            label,
+            message: text,
+            link: `${APP_URL}/#/dashboard?tab=chat`,
+          },
+          eventId: session.id,
+        }).catch((err) => logger.error('CHAT_MESSAGE', 'Failed to notify owner', err));
       }
 
       return res.json({ success: true, data: message });
@@ -152,7 +185,7 @@ class ChatController {
       const session = await ChatModel.getSessionById(req.params.id);
       if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
 
-      const isOwner = isOwnerOfSession(req, session);
+      const isOwner = await isOwnerOfSession(req, session);
       if (!isOwner && !isCustomerOfSession(req, session)) {
         return res.status(403).json({ success: false, error: 'Forbidden' });
       }
@@ -202,12 +235,30 @@ class ChatController {
     try {
       const session = await ChatModel.getSessionById(req.params.id);
       if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
-      if (!isOwnerOfSession(req, session)) return res.status(403).json({ success: false, error: 'Forbidden' });
+      const isOwner = await isOwnerOfSession(req, session);
+      if (!isOwner) return res.status(403).json({ success: false, error: 'Forbidden' });
 
       const updated = await ChatModel.closeSession(session.id);
       return res.json({ success: true, data: updated });
     } catch (err) {
       logger.error('CHAT_CLOSE', 'Failed to close chat session', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  static async deleteSession(req, res) {
+    try {
+      const session = await ChatModel.getSessionById(req.params.id);
+      if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+      const isOwner = await isOwnerOfSession(req, session);
+      if (!isOwner) return res.status(403).json({ success: false, error: 'Forbidden' });
+
+      await ChatModel.deleteSession(session.id);
+      getIo()?.to(`session:${session.id}`).emit('session_deleted', { sessionId: session.id });
+      getIo()?.to(`owner:${req.user.id}`).emit('inbox_updated', { sessionId: session.id, deleted: true });
+      return res.json({ success: true, message: 'Chat session deleted' });
+    } catch (err) {
+      logger.error('CHAT_DELETE', 'Failed to delete chat session', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

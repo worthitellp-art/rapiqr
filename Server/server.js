@@ -27,6 +27,7 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const shopProductRoutes = require('./routes/shopProductRoutes');
 const shiprocketRoutes = require('./routes/shiprocketRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const webhookRoutes = require('./routes/webhookRoutes');
 const { initChatSocket } = require('./sockets/chatSocket');
 
 const app = express();
@@ -42,7 +43,13 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json({ limit: '10mb' }));
+// `verify` keeps the exact bytes around: a WhatsApp webhook signature is an
+// HMAC over the raw payload, and re-serialising the parsed object would not
+// reproduce it byte for byte.
+app.use(express.json({
+  limit: '10mb',
+  verify: (req, _res, buf) => { req.rawBody = buf; },
+}));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Attach Live Console Logger Middleware
@@ -77,6 +84,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/shop-products', shopProductRoutes);
 app.use('/api/shiprocket', shiprocketRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 
 // Global 404 Route Handler

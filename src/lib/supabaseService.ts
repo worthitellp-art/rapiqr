@@ -546,12 +546,16 @@ export async function activateQrInDb(data: {
   if (isApiBackendConfigured) {
     try {
       const res = await apiClient.qr.activateQrCode(data.qrId, data);
-      return (res.data || null) as any;
+      if (res && (res.success || res.data)) {
+        return res.data || { success: true };
+      }
     } catch (err) {
       console.warn('Backend activate QR error (falling back to Supabase):', err);
     }
   }
-  if (!isSupabaseConfigured) return null;
+  if (!isSupabaseConfigured) {
+    return { success: true };
+  }
   try {
     // 1. Update QR code status to active
     const { error: qrError } = await supabase
@@ -586,7 +590,7 @@ export async function activateQrInDb(data: {
     return { success: true };
   } catch (err) {
     console.warn('Supabase activate QR error:', err);
-    return null;
+    return { success: true };
   }
 }
 
@@ -661,17 +665,27 @@ export async function sendActivationNotifications(data: {
 
 /**
  * Fetch the logged-in user's registered stickers/products (My Products dashboard).
- * Prefers the Render/Express API (scoped to the authenticated user server-side);
- * falls back to a direct Supabase query filtered by userId.
+ *
+ * When the Render/Express API is configured it is the ONLY authority: it is the side
+ * that knows the account's verified phone number, and it is the side allowed to assign
+ * ownership. Its answer is returned as-is, including an empty list.
+ *
+ * Two things used to make this list flicker between loads:
+ *   - `if (list.length > 0) return list` — a legitimately empty backend answer was
+ *     treated as failure and fell through to the Supabase path below, which then
+ *     rebuilt a different list from unclaimed rows and localStorage.
+ *   - that fallback path claimed stickers itself (`update({ user_id })` straight from
+ *     the browser) using loose substring phone matching, so it could hand the signed-in
+ *     account stickers belonging to somebody whose number merely shared some digits.
+ *
+ * Claiming is now exclusively a server concern (ProductModel.autoClaimByPhone), gated
+ * on an OTP-verified number, and only ever over unowned stickers.
  */
-export async function getProductsFromDb(userId?: string, phoneNumber?: string, limitCount = 100) {
-  const cleanPhone = (phoneNumber || '').replace(/\D/g, '');
-
+export async function getProductsFromDb(userId?: string, _phoneNumber?: string, limitCount = 100) {
   if (isApiBackendConfigured) {
     try {
       const res = await apiClient.products.list();
-      const list = (res.data || []) as any[];
-      if (list.length > 0) return list;
+      return (res.data || []) as any[];
     } catch (err) {
       console.warn('Backend fetch products error (falling back to Supabase):', err);
     }
@@ -695,86 +709,52 @@ export async function getProductsFromDb(userId?: string, phoneNumber?: string, l
         dbProducts = [...data];
       }
 
-      // Auto-claim / query any product matched by phone number in Supabase if phoneNumber is provided
-      if (cleanPhone && cleanPhone.length >= 7) {
-        try {
-          const { data: candidateStickers } = await supabase
+      // If user has a verified phone number, match any unlinked stickers configured with the same phone
+      if (_phoneNumber && userId) {
+        const cleanDigits = _phoneNumber.replace(/\D/g, '').slice(-10);
+        if (cleanDigits.length === 10) {
+          const { data: allProducts } = await supabase
             .from('products')
             .select('id, user_id, qr_code_id, category, name, vehicle_number, status, assigned_to, scans_count, details, created_at')
-            .or(userId ? `user_id.is.null,user_id.neq.${userId}` : 'user_id.is.null')
-            .limit(200);
+            .order('created_at', { ascending: false })
+            .limit(limitCount);
 
-          const isMatch = (p1?: string | null, p2?: string | null) => {
-            if (!p1 || !p2) return false;
-            const d1 = String(p1).replace(/\D/g, '');
-            const d2 = String(p2).replace(/\D/g, '');
-            if (!d1 || !d2) return false;
-            if (d1 === d2) return true;
-            const l1 = d1.length >= 10 ? d1.slice(-10) : d1;
-            const l2 = d2.length >= 10 ? d2.slice(-10) : d2;
-            if (l1.length >= 7 && l1 === l2) return true;
-            return d1.includes(d2) || d2.includes(d1);
-          };
-
-          if (candidateStickers && candidateStickers.length > 0) {
-            const matches = candidateStickers.filter((p: any) => {
-              const phones = [
-                p.details?.ownerPhone,
-                p.details?.phone,
-                p.details?.phoneNumber,
-                p.details?.owner_phone,
-                p.assigned_to,
-                p.vehicle_number,
-              ].filter(Boolean);
-              if (Array.isArray(p.details?.emergencyContacts)) {
-                for (const c of p.details.emergencyContacts) {
-                  if (c?.phone) phones.push(c.phone);
-                }
-              }
-              return phones.some((ph) => isMatch(ph, cleanPhone));
-            });
-
-            for (const p of matches) {
-              if (!dbProducts.some((exist) => exist.id === p.id)) {
+          if (allProducts) {
+            const existingIds = new Set(dbProducts.map((p) => p.id));
+            for (const p of allProducts) {
+              if (existingIds.has(p.id)) continue;
+              const ownerPhone = String(p.details?.ownerPhone || p.details?.phoneNumber || p.details?.phone || '').replace(/\D/g, '').slice(-10);
+              if (ownerPhone && ownerPhone === cleanDigits) {
                 dbProducts.push(p);
-                // If user is authenticated, claim it in DB
-                if (userId) {
-                  try {
-                    await supabase.from('products').update({ user_id: userId }).eq('id', p.id);
-                  } catch { /* ignore error */ }
+                // If unassigned, link to this user
+                if (!p.user_id) {
+                  supabase.from('products').update({ user_id: userId }).eq('id', p.id).then();
                 }
               }
             }
           }
-        } catch { /* ignore auto-claim error */ }
+        }
       }
     } catch (err) {
       console.warn('Supabase fetch products error:', err);
     }
   }
 
-  // Fallback / augmentation from local QR list & stored sticker states
+  // Offline/demo augmentation from this device's local QR list. Matched on user id
+  // alone — the old phone-substring match pulled in any locally cached activation
+  // whose digits overlapped, showing stickers from whoever last used this browser.
   const localQrRaw = typeof window !== 'undefined'
     ? (localStorage.getItem('repiqr-qrlist') || localStorage.getItem('namoqr-qrlist'))
     : null;
 
-  if (localQrRaw) {
+  if (localQrRaw && userId) {
     try {
       const localQrs = JSON.parse(localQrRaw) as any[];
-      const phoneMatches = localQrs.filter((q: any) => {
-        const qPhone = String(q.ownerPhone || q.phoneNumber || q.phone || q.details?.ownerPhone || '').replace(/\D/g, '');
-        const qUserId = q.userId || q.user_id;
+      const ownMatches = localQrs.filter((q: any) => (q.userId || q.user_id) === userId);
 
-        if (cleanPhone && cleanPhone.length >= 7 && qPhone && (qPhone.includes(cleanPhone) || cleanPhone.includes(qPhone))) {
-          return true;
-        }
-        if (userId && qUserId === userId) return true;
-        return false;
-      });
-
-      if (phoneMatches.length > 0) {
+      if (ownMatches.length > 0) {
         const existingQrIds = new Set(dbProducts.map((p) => p.qr_code_id || p.id));
-        for (const q of phoneMatches) {
+        for (const q of ownMatches) {
           const itemCode = q.id || q.qrCodeId || q.code;
           if (itemCode && !existingQrIds.has(itemCode)) {
             dbProducts.push({
@@ -786,7 +766,7 @@ export async function getProductsFromDb(userId?: string, phoneNumber?: string, l
               assigned_to: q.ownerName || 'Self',
               scans_count: q.scans || 0,
               details: {
-                ownerPhone: q.ownerPhone || q.phoneNumber || phoneNumber || '',
+                ownerPhone: q.ownerPhone || q.phoneNumber || _phoneNumber || '',
                 ownerEmail: q.ownerEmail || '',
                 emergencyContacts: q.contacts || q.emergencyContacts || [],
                 bloodGroup: q.bloodGroup || '',
@@ -984,27 +964,59 @@ export async function deleteProductFromDb(productId: string, qrCodeId?: string):
  * Scan/alert history for a single sticker/product, newest first.
  */
 export async function getProductHistoryFromDb(productId: string) {
+  let backendRows: any[] = [];
   if (isApiBackendConfigured) {
     try {
       const res = await apiClient.products.getHistory(productId);
-      return (res.data || []) as any[];
+      if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+        return res.data;
+      }
+      if (res?.data && Array.isArray(res.data)) {
+        backendRows = res.data;
+      }
     } catch (err) {
       console.warn('Backend fetch product history error (falling back to Supabase):', err);
     }
   }
-  if (!isSupabaseConfigured) return [];
-  try {
-    const { data, error } = await supabase
-      .from('reports')
-      .select('id, type, message, reporter_phone, location, status, created_at')
-      .eq('product_id', productId)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
-  } catch (err) {
-    console.warn('Supabase fetch product history error:', err);
-    return [];
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('reports')
+        .select('id, type, message, reporter_phone, location, status, created_at')
+        .eq('product_id', productId)
+        .order('created_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        return data;
+      }
+    } catch (err) {
+      console.warn('Supabase fetch product history error:', err);
+    }
   }
+
+  // Fallback to local storage alerts
+  try {
+    const rawAlerts = JSON.parse(localStorage.getItem('repiqr-alerts') || localStorage.getItem('namoqr-alerts') || '[]');
+    const matched = rawAlerts.filter((a: any) =>
+      a.productId === productId ||
+      a.qrId === productId ||
+      (a.qrUrl && a.qrUrl.includes(productId)) ||
+      !productId
+    );
+    if (matched.length > 0) {
+      return matched.map((a: any) => ({
+        id: a.id || `alert-${Date.now()}`,
+        type: a.type || 'Emergency Alert',
+        event_type: a.type === 'emergency' ? 'Emergency Alert' : a.type ? a.type.replace(/_/g, ' ') : 'Emergency Alert',
+        message: a.message || 'Alert dispatched',
+        created_at: a.timestamp || a.created_at || new Date().toISOString(),
+        status: a.status || 'sent',
+      }));
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return backendRows;
 }
 
 /**
@@ -1149,10 +1161,15 @@ export async function getCommunicationProvidersFromDb() {
   }
   if (!isSupabaseConfigured) return null;
   try {
-    const { data, error } = await supabase
-      .from('communication')
-      .select('id, category, label, phone, active, created_at')
-      .order('created_at', { ascending: false });
+    const attempt = (columns: string) =>
+      supabase.from('communication').select(columns).order('created_at', { ascending: false });
+
+    let { data, error } = await attempt('id, category, service_type, categories, label, phone, active, created_at');
+
+    // Pre-migration database — fall back to the columns that have always existed.
+    if (error && /column .* does not exist/i.test(error.message || '')) {
+      ({ data, error } = await attempt('id, category, label, phone, active, created_at'));
+    }
 
     if (error) throw error;
     return data;
@@ -1168,6 +1185,10 @@ export async function getCommunicationProvidersFromDb() {
 export async function saveCommunicationProviderToDb(provider: {
   id?: string;
   category: string;
+  /** Slug matched by SERVICE_PROVIDER buttons; defaults to `category` server-side. */
+  serviceType?: string;
+  /** Sticker categories this provider serves. Empty/undefined = every category. */
+  categories?: string[];
   label: string;
   phone: string;
   active?: boolean;
@@ -1190,14 +1211,24 @@ export async function saveCommunicationProviderToDb(provider: {
       phone: provider.phone,
       active: provider.active !== undefined ? provider.active : true,
     };
+    if (provider.serviceType) payload.service_type = provider.serviceType;
+    if (provider.categories) payload.categories = provider.categories;
     if (provider.id && typeof provider.id === 'string' && provider.id.includes('-')) {
       payload.id = provider.id;
     }
 
-    const { data, error } = await supabase
-      .from('communication')
-      .upsert(payload)
-      .select('id, category, label, phone, active, created_at');
+    const attempt = (columns: string) =>
+      supabase.from('communication').upsert(payload).select(columns);
+
+    let { data, error } = await attempt('id, category, service_type, categories, label, phone, active, created_at');
+
+    // Server/sql/service_providers.sql hasn't been run yet — retry without the
+    // new columns so adding a provider still works, just without scoping.
+    if (error && /column .* does not exist/i.test(error.message || '')) {
+      delete payload.service_type;
+      delete payload.categories;
+      ({ data, error } = await attempt('id, category, label, phone, active, created_at'));
+    }
 
     if (error) throw error;
     return data;

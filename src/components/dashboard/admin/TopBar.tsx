@@ -1,7 +1,6 @@
 import type React from "react";
 import { useState, useRef, useEffect } from "react";
-import { Search, Bell, Plus, Tag, UserPlus, HardDriveDownload, Sparkles, ChevronDown } from "lucide-react";
-import { avatarUrl } from "./helpers";
+import { Search, Bell, Plus, Tag, UserPlus, HardDriveDownload, Menu } from "lucide-react";
 
 export default function TopBar({
   admin,
@@ -10,6 +9,7 @@ export default function TopBar({
   page,
   setPage,
   activeCount = 18,
+  onOpenSidebar,
 }: {
   admin: { name: string; email?: string; role?: string };
   searchQuery: string;
@@ -17,6 +17,7 @@ export default function TopBar({
   page: string;
   setPage: (p: string) => void;
   activeCount?: number;
+  onOpenSidebar?: () => void;
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -32,20 +33,30 @@ export default function TopBar({
   }, []);
 
   return (
-    <header className="h-[57px] flex-shrink-0 bg-[#F7F7F8] border-b border-[#E5E5E7] flex items-center justify-between px-6 sm:px-10 z-20 font-body">
-      {/* ── Left Search Bar ────────────────── */}
-      <div className="relative w-[220px]">
-        <Search size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6F7377]" />
-        <input
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search"
-          className="w-full pl-8 pr-3 h-[31px] text-[12px] rounded-full border-0 bg-[#EFEFF0] text-[#17181A] placeholder-[#6F7377] outline-none transition-all focus:ring-2 focus:ring-[#5C78DF]/25"
-        />
+    <header className="h-[57px] flex-shrink-0 bg-[#F7F7F8] border-b border-[#E5E5E7] flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-10 z-20 font-body">
+      {/* ── Left: mobile menu toggle + search ────────────────── */}
+      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+        <button
+          onClick={onOpenSidebar}
+          className="md:hidden flex-shrink-0 w-8 h-8 rounded-full bg-white border border-[#E5E5E7] flex items-center justify-center text-[#17181A] cursor-pointer"
+          aria-label="Open navigation menu"
+        >
+          <Menu size={16} />
+        </button>
+
+        <div className="relative w-full max-w-[220px] min-w-0">
+          <Search size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6F7377]" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search"
+            className="w-full pl-8 pr-3 h-[31px] text-[12px] rounded-full border-0 bg-[#EFEFF0] text-[#17181A] placeholder-[#6F7377] outline-none transition-all focus:ring-2 focus:ring-[#5C78DF]/25"
+          />
+        </div>
       </div>
 
       {/* ── Right Action Cluster ──────────────────────────────────── */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
         {/* Status Badge */}
         <div className="hidden lg:inline-flex items-center gap-2 text-[12px] text-[#777B80]">
           <span className="w-1.5 h-1.5 rounded-full bg-[#4FC47A]" />

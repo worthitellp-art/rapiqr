@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getCategoryIcon, getCategoryLabel } from '../stickerModules';
 import {
@@ -44,9 +44,11 @@ import AccountSettingsPanel from './dashboard/client/AccountSettingsPanel';
 import SupportLegalPanel from './dashboard/client/SupportLegalPanel';
 import CompleteProfilePopup from './dashboard/client/CompleteProfilePopup';
 import AppLogo from './common/AppLogo';
+import InitialAvatar from './common/InitialAvatar';
 import RepiChat from './chat/RepiChat';
 import { apiClient, ChatSession } from '../lib/apiClient';
 import { connectAsOwner } from '../lib/socketClient';
+import { recallOwnerThread, rememberOwnerThread } from '../lib/chatStorage';
 import { soundNotification } from '../utils/soundNotification';
 import {
   getProductsFromDb,
@@ -88,7 +90,11 @@ type ModalState =
   | null;
 
 export default function ClientDashboard({ onBack }: ClientDashboardProps) {
-  const { profile, signOut, sendPhoneOtp, verifyPhoneOtp, updatePhoneNumber } = useAuth();
+  const { profile, signOut, sendPhoneOtp, verifyPhoneOtp } = useAuth();
+  // The admin account never links stickers by phone — the fleet console already sees
+  // every sticker. Prompting it to verify a number only put the admin in competition
+  // with the real owner for the stickers registered under that number.
+  const isAdminAccount = profile?.role === 'admin';
 
   // ─── DASHBOARD PREPARATION SPLASH ANIMATION ───
   const [isPreparing, setIsPreparing] = useState(true);
@@ -145,7 +151,9 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
       setLinkingLoading(false);
       if (res.success) {
         setIsPreparing(true);
-        await updatePhoneNumber(linkingPhone);
+        // verifyPhoneOtp already wrote the verified number to the profile and ran the
+        // server-side claim. The updatePhoneNumber() call that used to sit here re-sent
+        // the number through the unverified PATCH path and re-triggered claiming.
         const claimed = await loadProducts();
         setOtpStep('input');
         setOtpCode('');
@@ -168,7 +176,7 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
     onBack();
   };
 
-  const missingPhone = !profile?.phoneNumber;
+  const missingPhone = !isAdminAccount && !profile?.phoneNumber;
   const missingEmail = !profile?.email || profile.email.endsWith('.repiqr.local');
   const [profilePopupDismissed, setProfilePopupDismissed] = useState(false);
   const showCompleteProfilePopup = Boolean(profile) && (missingPhone || missingEmail) && !profilePopupDismissed;
@@ -400,6 +408,25 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
   const [ownerSessionsLoading, setOwnerSessionsLoading] = useState(false);
   const [selectedChatSession, setSelectedChatSession] = useState<ChatSession | null>(null);
 
+  // Selecting a thread records it, so a reload reopens the same conversation
+  // rather than dumping the owner back on the sticker list.
+  const openChatSession = useCallback((session: ChatSession | null) => {
+    setSelectedChatSession(session);
+    rememberOwnerThread(session?.id ?? null);
+  }, []);
+
+  // The remembered id can only be matched once the sessions themselves arrive,
+  // and only on the first load — after that, a closed drawer stays closed.
+  const restoredChatRef = useRef(false);
+  useEffect(() => {
+    if (restoredChatRef.current || ownerSessions.length === 0) return;
+    restoredChatRef.current = true;
+    const remembered = recallOwnerThread();
+    if (!remembered) return;
+    const match = ownerSessions.find((s) => s.id === remembered);
+    if (match) setSelectedChatSession(match);
+  }, [ownerSessions]);
+
   const totalUnreadChats = ownerSessions.reduce((sum, s) => sum + (s.unread_owner_count || 0), 0);
 
   const loadOwnerSessions = useCallback(async () => {
@@ -412,6 +439,23 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
       setOwnerSessions([]);
     }
   }, []);
+
+  const handleDeleteChatSession = async (e: React.MouseEvent, sessId: string) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this chat conversation?')) return;
+    try {
+      const res = await apiClient.chat.deleteSession(sessId);
+      if (res?.success) {
+        setOwnerSessions((prev) => prev.filter((s) => s.id !== sessId));
+        if (selectedChatSession?.id === sessId) openChatSession(null);
+        showToast('Chat conversation deleted');
+      } else {
+        showToast(res?.message || 'Failed to delete chat');
+      }
+    } catch {
+      showToast('Failed to delete chat');
+    }
+  };
 
   useEffect(() => {
     loadOwnerSessions();
@@ -441,10 +485,12 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
     };
 
     socket.on('new_message', onNewMessage);
+    socket.on('inbox_updated', loadOwnerSessions);
 
     return () => {
       window.removeEventListener('hashchange', handleHash);
       socket.off('new_message', onNewMessage);
+      socket.off('inbox_updated', loadOwnerSessions);
     };
   }, [loadOwnerSessions, showToast]);
 
@@ -478,6 +524,12 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
   const totalScans = products.reduce((s, p) => s + (p.scans || 0), 0);
   const totalContacts = products.reduce((s, p) => s + (p.contacts?.length || 0), 0);
 
+  const isPhoneComplete = isAdminAccount || Boolean(profile?.isPhoneVerified && profile?.phoneNumber);
+  const isContactsComplete = totalContacts > 0;
+  const isStickersComplete = activeCount > 0;
+  const completedSetupCount = [isPhoneComplete, isContactsComplete, isStickersComplete].filter(Boolean).length;
+  const setupPercent = Math.round((completedSetupCount / 3) * 100);
+
   // ─── DASHBOARD PREPARATION SPLASH LOADING ANIMATION ───
   if (isPreparing) {
     return (
@@ -504,36 +556,52 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
     <div className="min-h-screen w-full flex flex-col overflow-x-hidden text-[#17181A] bg-[#F7F7F8] font-body pb-16">
 
       <div className="flex flex-1 min-h-screen">
+        {/* Mobile drawer backdrop — md+ docks the sidebar so it never renders there */}
+        {isMobileSidebarOpen && (
+          <div
+            className="fixed inset-0 z-[25] bg-black/50 md:hidden"
+            onClick={() => setIsMobileSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
         {/* ─── SIDEBAR (HoneyBook Dark Style from design.html) ─── */}
         <aside
-          className={`w-[213px] flex-shrink-0 flex flex-col h-screen fixed left-0 top-0 bottom-0 py-3.5 px-2 bg-[#111315] text-[#DDD] z-30 transition-all duration-300 ${
+          className={`w-[245px] flex-shrink-0 flex flex-col h-screen fixed left-0 top-0 bottom-0 py-4 px-3 bg-[#111315] text-[#DDD] z-30 transition-all duration-300 ${
             isMobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
           }`}
         >
           {/* Logo */}
-          <div className="flex items-center justify-between px-2 mb-3.5 flex-shrink-0">
+          <div className="flex items-center justify-between px-2 mb-4 flex-shrink-0">
             <button onClick={onBack} className="flex items-center gap-2 cursor-pointer group">
-              <AppLogo variant="dark" className="h-8 w-auto object-contain transition-transform group-hover:scale-105" />
+              <AppLogo variant="dark" className="h-9 w-auto object-contain transition-transform group-hover:scale-105" />
+            </button>
+            <button
+              onClick={() => setIsMobileSidebarOpen(false)}
+              className="md:hidden p-1.5 rounded-lg text-[#C9CACC] hover:text-white hover:bg-[#303235] transition-all cursor-pointer"
+              aria-label="Close navigation menu"
+            >
+              <X size={18} />
             </button>
           </div>
 
           {/* Setup Box Widget */}
           <div
             onClick={() => setActiveTab('setup')}
-            className="border border-[#414347] rounded-[7px] p-2.5 mb-2.5 bg-[#292B2E]/60 hover:bg-[#292B2E] transition-colors cursor-pointer"
+            className="border border-[#414347] rounded-xl p-3 mb-3 bg-[#292B2E]/60 hover:bg-[#292B2E] transition-colors cursor-pointer"
           >
-            <div className="flex justify-between items-center text-[12px] text-white font-semibold mb-2">
+            <div className="flex justify-between items-center text-xs text-white font-semibold mb-2">
               <span>Set up your account</span>
               <span className="text-[#4FC47A] font-bold">›</span>
             </div>
-            <div className="h-[5px] bg-[#3D4142] rounded-full overflow-hidden">
-              <div className="h-full bg-[#4FC47A] rounded-full w-[88%]" />
+            <div className="h-[6px] bg-[#3D4142] rounded-full overflow-hidden">
+              <div className="h-full bg-[#4FC47A] rounded-full transition-all duration-500" style={{ width: `${setupPercent}%` }} />
             </div>
-            <div className="text-[11px] text-[#DDD] mt-1.5">6/7 completed</div>
+            <div className="text-[11px] text-[#DDD] mt-1.5">{completedSetupCount}/3 completed</div>
           </div>
 
           {/* Nav */}
-          <nav className="flex-1 space-y-0.5 overflow-y-auto custom-scrollbar">
+          <nav className="flex-1 space-y-1 overflow-y-auto custom-scrollbar">
             {NAV_ITEMS.map((item) => {
               const isActive = activeTab === item.id;
               const isChat = item.id === 'chat';
@@ -541,18 +609,18 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                 <button
                   key={item.id}
                   onClick={() => { setActiveTab(item.id); setIsMobileSidebarOpen(false); }}
-                  className={`w-full h-[34px] rounded-[5px] flex items-center justify-between px-2.5 text-[13px] transition-all cursor-pointer ${
+                  className={`w-full h-[38px] rounded-lg flex items-center justify-between px-3 text-[13.5px] transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-[#303235] text-white font-semibold'
+                      ? 'bg-[#303235] text-white font-semibold shadow-xs'
                       : 'text-[#C9CACC] hover:bg-[#303235]/60 hover:text-white'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <item.icon size={15} className={isActive ? 'text-[#5C78DF]' : 'text-[#888]'} />
+                  <div className="flex items-center gap-3 min-w-0">
+                    <item.icon size={17} className={isActive ? 'text-[#5C78DF]' : 'text-[#94A3B8]'} />
                     <span className="truncate">{item.label}</span>
                   </div>
                   {isChat && totalUnreadChats > 0 && (
-                    <span className="bg-[#5C78DF] text-white rounded-full text-[10px] font-bold px-1.5 py-0.2 shrink-0">
+                    <span className="bg-[#5C78DF] text-white rounded-full text-[10px] font-bold px-2 py-0.5 shrink-0">
                       {totalUnreadChats}
                     </span>
                   )}
@@ -562,79 +630,81 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
           </nav>
 
           {/* Bottom Nav Profile */}
-          <div className="pt-2 border-t border-[#292B2E] space-y-1">
-            <div className="flex items-center gap-2.5 p-2 rounded-[6px] bg-[#292B2E]">
-              <img
-                src={profile?.avatarUrl || "https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&q=80&w=100"}
-                alt="User Avatar"
-                className="w-7 h-7 rounded-full object-cover bg-white p-0.5"
+          <div className="pt-3 border-t border-[#292B2E] space-y-1.5">
+            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-[#292B2E] border border-[#3D4142]/40">
+              <InitialAvatar
+                name={profile?.fullName}
+                email={profile?.email}
+                size={36}
+                className="border border-white/20 shadow-xs"
               />
               <div className="min-w-0 flex-1">
-                <p className="text-[12px] font-semibold text-white truncate leading-tight">{profile?.fullName || 'Client'}</p>
-                <p className={`text-[10px] truncate font-mono font-medium ${profile?.isPhoneVerified ? 'text-[#4FC47A]' : 'text-amber-400'}`}>
-                  {profile?.isPhoneVerified ? '✓ Phone Verified' : '⚠ Phone Unverified'}
+                <p className="text-[13px] font-bold text-white truncate leading-tight">{profile?.fullName || 'Client'}</p>
+                <p className={`text-[11px] truncate font-mono font-medium mt-0.5 ${isAdminAccount || profile?.isPhoneVerified ? 'text-[#4FC47A]' : 'text-amber-400'}`}>
+                  {isAdminAccount ? 'Fleet Admin' : profile?.isPhoneVerified ? '✓ Phone Verified' : '⚠ Phone Unverified'}
                 </p>
               </div>
             </div>
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-[5px] text-[12px] text-[#DC2626] hover:bg-[#DC2626]/10 transition-all cursor-pointer"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-[#DC2626] hover:bg-[#DC2626]/10 transition-all cursor-pointer"
             >
-              <LogOut size={14} />
+              <LogOut size={15} />
               <span>Sign Out</span>
             </button>
           </div>
         </aside>
 
-        {/* ─── RIGHT MAIN CONTENT CANVAS (margin-left: 213px) ─── */}
-        <div className="flex-1 md:ml-[213px] min-h-screen flex flex-col min-w-0">
+        {/* ─── RIGHT MAIN CONTENT CANVAS (margin-left: 245px) ─── */}
+        <div className="flex-1 md:ml-[245px] min-h-screen flex flex-col min-w-0">
           
           {/* Top Bar */}
-          <header className="h-[57px] flex-shrink-0 bg-[#F7F7F8] border-b border-[#E5E5E7] flex items-center justify-between px-6 sm:px-12 z-20">
-            <div className="flex items-center gap-3">
+          <header className="h-[62px] flex-shrink-0 bg-[#F7F7F8] border-b border-[#E5E5E7] flex items-center justify-between gap-4 px-4 sm:px-8 lg:px-10 z-20">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <button
                 onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-                className="md:hidden w-8 h-8 rounded-full bg-white border border-[#E5E5E7] flex items-center justify-center text-[#17181A] cursor-pointer"
+                className="md:hidden flex-shrink-0 w-9 h-9 rounded-full bg-white border border-[#E5E5E7] flex items-center justify-center text-[#17181A] cursor-pointer"
+                aria-label="Open navigation menu"
               >
-                <Menu size={16} />
+                <Menu size={18} />
               </button>
 
-              <div className="bg-[#EFEFF0] rounded-full h-[31px] w-[140px] sm:w-[180px] flex items-center gap-2 px-3 text-[#6F7377] text-xs">
-                <Search size={13} />
+              <div className="bg-[#EFEFF0] rounded-full h-[36px] w-full max-w-[240px] min-w-0 flex items-center gap-2 px-3.5 text-[#6F7377] text-xs focus-within:ring-2 focus-within:ring-[#5C78DF]/20 transition-all">
+                <Search size={14} />
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search..."
+                  placeholder="Search stickers, contacts..."
                   className="bg-transparent border-none outline-none w-full text-xs text-[#17181A] placeholder-[#6F7377]"
                 />
               </div>
             </div>
 
-            <div className="flex items-center gap-4 text-xs">
-              <span className="font-semibold text-[#477486] hidden sm:inline-flex items-center gap-1">
+            <div className="flex items-center gap-3 sm:gap-4 text-xs flex-shrink-0">
+              <span className="font-semibold text-[#477486] hidden sm:inline-flex items-center gap-1.5 bg-[#E8F3F6] px-2.5 py-1 rounded-full text-xs">
                 ◆ Pro Protection
               </span>
               <button
                 onClick={() => setActiveTab('chat')}
-                className="relative text-[#777] hover:text-[#17181A] cursor-pointer transition-colors"
+                className="relative p-2 text-[#777] hover:text-[#17181A] hover:bg-black/5 rounded-full cursor-pointer transition-colors"
                 title={totalUnreadChats > 0 ? `${totalUnreadChats} unread message(s)` : 'Live Chat Notifications'}
               >
-                <Bell size={17} />
+                <Bell size={18} />
                 {totalUnreadChats > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-[#5579DC] text-white rounded-full text-[9px] px-1 font-bold animate-pulse">
+                  <span className="absolute top-0.5 right-0.5 bg-[#5579DC] text-white rounded-full text-[9px] px-1.5 font-bold animate-pulse">
                     {totalUnreadChats}
                   </span>
                 )}
               </button>
-              <span className="bg-[#EEE9FF] text-[#7259D9] rounded px-1.5 py-1 text-xs font-bold">✦</span>
+              <span className="bg-[#EEE9FF] text-[#7259D9] rounded-lg px-2 py-1 text-xs font-bold shadow-2xs">✦ Active</span>
             </div>
           </header>
 
-          {/* Page Container (max-width: 1014px) */}
-          <main className="max-w-[1014px] w-full mx-auto p-4 sm:p-8 space-y-6">
+          {/* Page Container (expanded for spacious and zoomed look) */}
+          <main className="max-w-[1360px] w-full mx-auto p-4 sm:p-7 lg:p-9 space-y-7">
 
             {/* ── MANDATORY PHONE VERIFICATION ALERT BANNER ── */}
-            {(!profile?.isPhoneVerified && (!profile?.phoneNumber || profile?.isPhoneVerified === false)) && (
+            {(!isAdminAccount && !profile?.isPhoneVerified && (!profile?.phoneNumber || profile?.isPhoneVerified === false)) && (
               <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-fade-in">
                 <div className="flex items-start gap-3.5">
                   <div className="w-10 h-10 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-700 flex-shrink-0 mt-0.5 sm:mt-0">
@@ -677,45 +747,76 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                       <p className="text-xs text-[#777B80] mt-1">Let's start step-by-step to protect your vehicles.</p>
                     </div>
                     <div className="flex items-center gap-3 text-xs">
-                      <span className="font-semibold text-[#17181A]">3/3 completed</span>
+                      <span className="font-semibold text-[#17181A]">{completedSetupCount}/3 completed</span>
                       <div className="w-32 h-1.5 bg-[#DDD] rounded-full overflow-hidden">
-                        <div className="h-full bg-[#4FC47A] rounded-full w-full" />
+                        <div className="h-full bg-[#4FC47A] rounded-full transition-all duration-500" style={{ width: `${setupPercent}%` }} />
                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-3">
-                    <div className="border border-[#E3E3E5] rounded-md p-4 flex items-center justify-between">
+                    {/* Step 1: Phone Verification */}
+                    <div className="border border-[#E3E3E5] rounded-md p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-5 h-5 rounded-full bg-[#55C77D] text-white flex items-center justify-center text-xs font-bold">✓</div>
+                        <div className={`w-5 h-5 rounded-full ${isPhoneComplete ? 'bg-[#55C77D]' : 'bg-amber-400'} text-white flex items-center justify-center text-xs font-bold`}>
+                          {isPhoneComplete ? '✓' : '!'}
+                        </div>
                         <div>
                           <p className="font-semibold text-sm text-[#17181A]">Verify Mobile Phone Number OTP</p>
-                          <p className="text-xs text-[#777B80]">Verified mobile number linked: {profile?.phoneNumber || 'Active'}</p>
+                          <p className="text-xs text-[#777B80]">
+                            {isPhoneComplete
+                              ? `Verified mobile number linked: ${profile?.phoneNumber}`
+                              : profile?.phoneNumber
+                                ? `Verification pending for ${profile.phoneNumber}`
+                                : 'No mobile number verified yet (Required to auto-claim stickers)'}
+                          </p>
                         </div>
                       </div>
-                      <span className="text-xs font-bold text-[#2E9E5B]">Completed</span>
+                      {isPhoneComplete ? (
+                        <span className="text-xs font-bold text-[#2E9E5B]">Completed</span>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setActiveTab('settings');
+                            setOtpStep('input');
+                          }}
+                          className="text-xs font-bold text-amber-600 hover:underline cursor-pointer"
+                        >
+                          Verify Phone ›
+                        </button>
+                      )}
                     </div>
 
-                    <div className="border border-[#E3E3E5] rounded-md p-4 flex items-center justify-between">
+                    {/* Step 2: Emergency Contacts */}
+                    <div className="border border-[#E3E3E5] rounded-md p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-5 h-5 rounded-full bg-[#55C77D] text-white flex items-center justify-center text-xs font-bold">✓</div>
+                        <div className={`w-5 h-5 rounded-full ${isContactsComplete ? 'bg-[#55C77D]' : 'bg-slate-300'} text-white flex items-center justify-center text-xs font-bold`}>
+                          {isContactsComplete ? '✓' : '2'}
+                        </div>
                         <div>
                           <p className="font-semibold text-sm text-[#17181A]">Link Emergency Responders</p>
                           <p className="text-xs text-[#777B80]">{totalContacts} emergency contact numbers active</p>
                         </div>
                       </div>
-                      <button onClick={() => setActiveTab('contacts')} className="text-xs font-bold text-[#5271D5] hover:underline">Configure ›</button>
+                      <button onClick={() => setActiveTab('contacts')} className="text-xs font-bold text-[#5271D5] hover:underline cursor-pointer">
+                        {isContactsComplete ? 'Configure ›' : 'Add Contacts ›'}
+                      </button>
                     </div>
 
-                    <div className="border border-[#E3E3E5] rounded-md p-4 flex items-center justify-between">
+                    {/* Step 3: Safety Stickers */}
+                    <div className="border border-[#E3E3E5] rounded-md p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-5 h-5 rounded-full bg-[#55C77D] text-white flex items-center justify-center text-xs font-bold">✓</div>
+                        <div className={`w-5 h-5 rounded-full ${isStickersComplete ? 'bg-[#55C77D]' : 'bg-slate-300'} text-white flex items-center justify-center text-xs font-bold`}>
+                          {isStickersComplete ? '✓' : '3'}
+                        </div>
                         <div>
                           <p className="font-semibold text-sm text-[#17181A]">Active Safety QR Plates</p>
                           <p className="text-xs text-[#777B80]">{activeCount} active vehicle QR plates online</p>
                         </div>
                       </div>
-                      <button onClick={() => setActiveTab('overview')} className="text-xs font-bold text-[#5271D5] hover:underline">View Stickers ›</button>
+                      <button onClick={() => setActiveTab('overview')} className="text-xs font-bold text-[#5271D5] hover:underline cursor-pointer">
+                        View Stickers ›
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -985,7 +1086,7 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                     {ownerSessions.map((sess) => (
                       <div
                         key={sess.id}
-                        onClick={() => setSelectedChatSession(sess)}
+                        onClick={() => openChatSession(sess)}
                         className="p-4 hover:bg-[#FAFBFF] transition-colors flex items-center justify-between gap-4 cursor-pointer"
                       >
                         <div className="flex items-center gap-3.5 min-w-0">
@@ -1004,14 +1105,21 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                             <p className="text-xs text-[#777B80] truncate mt-0.5">{sess.last_message_preview || 'No messages yet'}</p>
                           </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <span className="text-[11px] text-[#999] font-mono">
-                            {sess.last_message_at ? new Date(sess.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                          </span>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <span className="text-[11px] text-[#999] font-mono">
+                              {sess.last_message_at ? new Date(sess.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </span>
+                            <span className="mt-1 block text-xs font-bold text-[#5271D5] hover:underline">
+                              Open Chat ›
+                            </span>
+                          </div>
                           <button
-                            className="mt-1 block text-xs font-bold text-[#5271D5] hover:underline"
+                            onClick={(e) => handleDeleteChatSession(e, sess.id)}
+                            title="Delete conversation"
+                            className="p-2 text-[#999] hover:text-[#DC2626] hover:bg-[#FEE2E2] rounded-lg transition-colors cursor-pointer"
                           >
-                            Open Chat ›
+                            <Trash2 size={15} />
                           </button>
                         </div>
                       </div>
@@ -1127,8 +1235,8 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                     <p className="text-[13.5px] text-[#17181C] font-semibold">No alert events recorded yet.</p>
                   </div>
                 ) : (
-                  <div className="bg-white rounded-[14px] border border-[#EAEAEC] overflow-hidden">
-                    <table className="w-full text-sm text-[#17181C]">
+                  <div className="bg-white rounded-[14px] border border-[#EAEAEC] overflow-x-auto">
+                    <table className="w-full min-w-[520px] text-sm text-[#17181C]">
                       <thead>
                         <tr className="text-left font-display text-[12px] font-semibold text-[#777B80] tracking-normal bg-[#FAFAF9] border-b border-[#EAEAEC]">
                           <th className="px-6 py-3">Sticker</th>
@@ -1169,18 +1277,25 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
 
       {/* ─── LIVE VISITOR CHAT RIGHT-SIDE DRAWER ─── */}
       {selectedChatSession && (
-        <div className="fixed inset-0 z-50 flex justify-end">
+        <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
           <div
             className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
-            onClick={() => setSelectedChatSession(null)}
+            onClick={() => openChatSession(null)}
           />
-          <div className="relative z-10 w-full sm:w-[450px] max-w-full h-full bg-white shadow-2xl flex flex-col border-l border-[#EAEAEC] animate-slide-in-right">
+          {/* Edge-to-edge on a phone (dvh keeps the composer clear of the
+              browser chrome), a 26rem drawer from sm up. */}
+          <div className="relative z-10 w-full sm:w-[26rem] max-w-full h-dvh bg-white shadow-2xl flex flex-col sm:border-l border-[#EAEAEC] animate-slide-in-right">
             <RepiChat
+              key={selectedChatSession.id}
               mode="owner"
               sessionId={selectedChatSession.id}
-              title={`${selectedChatSession.customer_name} (${selectedChatSession.qr_code_id})`}
-              subtitle={selectedChatSession.vehicle_label || undefined}
-              onClose={() => setSelectedChatSession(null)}
+              title={selectedChatSession.customer_name}
+              subtitle={
+                [selectedChatSession.vehicle_label, selectedChatSession.qr_code_id]
+                  .filter(Boolean)
+                  .join(' · ') || undefined
+              }
+              onClose={() => openChatSession(null)}
               className="h-full"
             />
           </div>

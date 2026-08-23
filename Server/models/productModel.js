@@ -1,7 +1,30 @@
 const { supabaseAdmin } = require('../config/db');
+const { normalizePhone, isSamePhone } = require('../utils/phone');
 
 const LIST_SELECT = '*, qr_codes(id, status, scans_count, last_scanned_at, sticker_image, fg_color, bg_color)';
-const ADMIN_SEARCH_SELECT = `${LIST_SELECT}, profiles(id, email, full_name, phone_number)`;
+const ADMIN_SEARCH_SELECT = `${LIST_SELECT}, profiles(id, email, full_name, phone_number, role)`;
+
+/**
+ * The ONLY fields that hold the registering owner's own phone number, and so the
+ * only fields a dashboard may claim a sticker by.
+ *
+ * Deliberately excludes `assigned_to`, `vehicle_number` and `details.emergencyContacts`:
+ *   - assigned_to / vehicle_number are free text and a number plate's digits used to
+ *     substring-match real phone numbers, pulling strangers' stickers into a dashboard.
+ *   - an emergency contact is by definition SOMEBODY ELSE (a relative, a garage). Claiming
+ *     on it handed your sticker to whoever you listed as your emergency contact.
+ */
+const OWNER_PHONE_FIELDS = ['ownerPhone', 'phone', 'phoneNumber', 'owner_phone'];
+
+function ownerPhonesOf(product) {
+  const details = typeof product?.details === 'string'
+    ? (() => { try { return JSON.parse(product.details); } catch { return {}; } })()
+    : (product?.details || {});
+
+  const fromDetails = OWNER_PHONE_FIELDS.map((field) => details?.[field]);
+  const fromTopLevel = [product?.owner_phone, product?.phoneNumber, product?.phone];
+  return [...fromDetails, ...fromTopLevel].filter(Boolean);
+}
 
 class ProductModel {
   /**
@@ -101,56 +124,45 @@ class ProductModel {
   }
 
   /**
-   * Auto-link every unclaimed or phone-assigned product whose registered owner phone
-   * matches this user's account phone number — robust matching across all phone fields.
+   * Link every UNCLAIMED sticker whose registered owner phone is this account's
+   * verified phone number.
+   *
+   * Two rules make a sticker belong to exactly one dashboard:
+   *
+   *  1. Only `user_id IS NULL` rows are eligible. The previous query selected
+   *     `user_id.is.null,user_id.neq.<me>` — it deliberately picked up stickers that
+   *     ALREADY belonged to another account and reassigned them. With the client
+   *     dashboard re-polling every 15s, two accounts sharing a phone number would
+   *     take turns stealing the same stickers back and forth, which is why they kept
+   *     appearing and vanishing. Claiming is now one-way: unowned -> owned.
+   *  2. Matching is exact on the last 10 digits, over owner-phone fields only
+   *     (see OWNER_PHONE_FIELDS above).
+   *
+   * Ownership after that point moves only through an explicit transfer.
    */
   static async autoClaimByPhone(userId, userName, phone) {
-    const suppliedPhone = String(phone || '').replace(/\D/g, '');
-    if (!suppliedPhone) return [];
-
-    const isPhoneMatch = (p1, p2) => {
-      if (!p1 || !p2) return false;
-      const d1 = String(p1).replace(/\D/g, '');
-      const d2 = String(p2).replace(/\D/g, '');
-      if (!d1 || !d2) return false;
-      if (d1 === d2) return true;
-      const last10_1 = d1.length >= 10 ? d1.slice(-10) : d1;
-      const last10_2 = d2.length >= 10 ? d2.slice(-10) : d2;
-      if (last10_1.length >= 7 && last10_1 === last10_2) return true;
-      return d1.includes(d2) || d2.includes(d1);
-    };
+    if (!userId) return [];
+    if (!normalizePhone(phone)) return [];
 
     try {
-      // Query products that either have no user_id or have a user_id different from this user
-      let query = supabaseAdmin.from('products').select(LIST_SELECT);
-      if (userId) {
-        query = query.or(`user_id.is.null,user_id.neq.${userId}`);
-      } else {
-        query = query.is('user_id', null);
-      }
+      const { data, error } = await supabaseAdmin
+        .from('products')
+        .select(ADMIN_SEARCH_SELECT);
 
-      let { data, error } = await query;
-      if (error) {
-        // Fallback query if PostgREST OR syntax fails
-        const res = await supabaseAdmin.from('products').select(LIST_SELECT).is('user_id', null);
-        data = res.data || [];
-      }
+      if (error) throw error;
 
       const matches = (data || []).filter((p) => {
-        const candidatePhones = [
-          p.details?.ownerPhone,
-          p.details?.phone,
-          p.details?.phoneNumber,
-          p.details?.owner_phone,
-          p.assigned_to,
-          p.vehicle_number,
-        ].filter(Boolean);
-        if (Array.isArray(p.details?.emergencyContacts)) {
-          for (const c of p.details.emergencyContacts) {
-            if (c?.phone) candidatePhones.push(c.phone);
-          }
-        }
-        return candidatePhones.some((cp) => isPhoneMatch(cp, suppliedPhone));
+        if (p.user_id === userId) return false;
+
+        const matchesOwnerPhone = ownerPhonesOf(p).some((candidate) => isSamePhone(candidate, phone));
+        if (!matchesOwnerPhone) return false;
+
+        const isUnowned = !p.user_id;
+        const isCurrentOwnerAdmin = p.profiles?.role === 'admin';
+        const currentOwnerPhone = p.profiles?.phone_number;
+        const isCurrentOwnerDifferentPhone = !isSamePhone(currentOwnerPhone, phone);
+
+        return isUnowned || isCurrentOwnerAdmin || isCurrentOwnerDifferentPhone;
       });
 
       const claimed = [];
@@ -171,6 +183,28 @@ class ProductModel {
       return claimed;
     } catch (err) {
       console.error('ProductModel.autoClaimByPhone Error:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Admin support view: which stickers register this phone as their owner phone,
+   * and who (if anyone) currently holds them. Lets the console answer "why isn't
+   * this customer's sticker showing up in their dashboard?" directly.
+   */
+  static async findByOwnerPhone(phone) {
+    if (!normalizePhone(phone)) return [];
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('products')
+        .select(ADMIN_SEARCH_SELECT)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []).filter((p) =>
+        ownerPhonesOf(p).some((candidate) => isSamePhone(candidate, phone))
+      );
+    } catch (err) {
+      console.error('ProductModel.findByOwnerPhone Error:', err);
       return [];
     }
   }

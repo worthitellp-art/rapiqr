@@ -1,9 +1,13 @@
 const AlertModel = require('../models/alertModel');
 const ProductModel = require('../models/productModel');
 const ChatModel = require('../models/chatModel');
-const { sendSms } = require('../services/smsService');
+const { notifyOwner, notifyEmergencyContacts } = require('../services/notificationService');
 const { getIo } = require('../sockets/chatSocket');
 const { logger } = require('../middleware/loggerMiddleware');
+
+// Same origin ChatController uses, so the owner lands on the dashboard inbox
+// that already holds this visitor's thread.
+const APP_URL = process.env.APP_URL || 'https://rapiqr.worthitellp.workers.dev';
 
 class AlertController {
   /**
@@ -27,16 +31,18 @@ class AlertController {
       const result = await AlertModel.createAlert(alertPayload);
       logger.success('ALERT_EMERGENCY', `Alert dispatched successfully: ${result.id || 'ok'}`);
 
-      // Best-effort SMS to the sticker owner AND their registered emergency/family
-      // contacts — real sends via Twilio, honestly reported back so the frontend
-      // never claims "dispatched" on a channel that wasn't actually sent.
-      // Emergency contacts are the "Emergency Panel" the owner configured in
-      // their dashboard — a location share or alert should reach them the same
-      // way it reaches the owner. The owner additionally gets this alert as a
-      // real-time RepiChat message (replaces the old WhatsApp deep-link send).
+      // Best-effort WhatsApp to the sticker owner AND, for emergencies, their
+      // registered emergency contacts. SMS is deliberately not used and is not a
+      // fallback for this launch (see services/notificationService.js).
       let smsResult = { sent: false, simulated: false, reason: 'no_owner_phone' };
       let contactsNotified = 0;
       let chatSessionId = null;
+
+      // SEND_SMS buttons on the category scan pages notify the OWNER ONLY — a
+      // blocked driveway or a found wallet is not a reason to wake the whole
+      // family contact list. Defaults to true so the emergency paths that
+      // already relied on the fan-out (SOS, live-location share) are unchanged.
+      const notifyContacts = alertPayload.notifyContacts !== false;
 
       if (product) {
         const ownerPhone = product.details?.ownerPhone;
@@ -45,17 +51,38 @@ class AlertController {
           ? `RapiQR Alert on ${label}: "${String(alertPayload.message).slice(0, 100)}"`
           : `RapiQR Alert: someone scanned and reported an issue with ${label}. Open the app for details.`;
 
+        // The owner's copy carries a deep link into the dashboard inbox, so the
+        // notification is the entry point into the chat with whoever scanned the
+        // tag. Contacts don't get it — that inbox isn't theirs.
+        const chatLink = `${APP_URL}/#/dashboard?tab=chat`;
+
+        // An alert that fans out to the family contact list is an emergency; one
+        // that goes to the owner alone is a scan report. Same distinction the
+        // notifyContacts flag already draws, now reflected in the template used.
         if (ownerPhone) {
-          smsResult = await sendSms({ to: ownerPhone, body: text, event: 'ALERT_SMS' });
+          const result = await notifyOwner({
+            type: notifyContacts ? 'EMERGENCY_ALERT' : 'QR_SCAN_ALERT',
+            ownerPhone,
+            data: { label, message: alertPayload.message || 'an issue was reported', link: chatLink },
+            eventId: alertPayload.productId || qrId,
+          });
+          // The scan page renders this receipt; `simulated` covers both the mock
+          // provider and a live provider with no credentials, so the visitor is
+          // never told a message was delivered when it was not.
+          smsResult = { sent: result.sent && !result.mock, simulated: result.mock || result.status === 'simulated' };
         }
 
-        const emergencyContacts = Array.isArray(product.details?.emergencyContacts) ? product.details.emergencyContacts : [];
-        const contactResults = await Promise.all(
-          emergencyContacts
-            .filter((c) => c?.phone)
-            .map((c) => sendSms({ to: c.phone, body: text, event: 'ALERT_SMS_CONTACT' }))
-        );
-        contactsNotified = contactResults.filter((sms) => sms?.sent).length;
+        const emergencyContacts = notifyContacts && Array.isArray(product.details?.emergencyContacts)
+          ? product.details.emergencyContacts
+          : [];
+        if (emergencyContacts.length > 0) {
+          const contactResult = await notifyEmergencyContacts({
+            contacts: emergencyContacts,
+            data: { label, message: alertPayload.message || 'an issue was reported' },
+            eventId: alertPayload.productId || qrId,
+          });
+          contactsNotified = contactResult.delivered;
+        }
 
         // Seed/continue the visitor's RepiChat thread with this alert so it
         // shows up in the owner's chat inbox in real time.

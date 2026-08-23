@@ -313,6 +313,26 @@ class ChatModel {
     }
     return null;
   }
+
+  static async deleteSession(sessionId) {
+    try {
+      await supabaseAdmin
+        .from('chat_messages')
+        .delete()
+        .eq('session_id', sessionId);
+
+      await supabaseAdmin
+        .from('chat_sessions')
+        .delete()
+        .eq('id', sessionId);
+    } catch (err) {
+      console.error(`ChatModel.deleteSession (${sessionId}) Error:`, err.message);
+    }
+
+    inMemorySessions.delete(sessionId);
+    inMemoryMessages.delete(sessionId);
+    return true;
+  }
 }
 
 module.exports = ChatModel;

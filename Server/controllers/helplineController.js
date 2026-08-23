@@ -3,12 +3,21 @@ const { logger } = require('../middleware/loggerMiddleware');
 
 class HelplineController {
   /**
-   * Public: active helplines for the scan page (optionally filtered by category).
+   * Public: active providers for the scan page.
+   *
+   * Query params (all optional, all backwards compatible):
+   *   category        legacy label filter ("Towing") — used by the car/bike screen
+   *   serviceType     slug filter ("towing", "veterinarian") — used by SERVICE_PROVIDER buttons
+   *   stickerCategory keeps only providers scoped to that sticker category ("pet"),
+   *                   plus every provider scoped to no category at all
+   *
+   * With no params this returns the full active list, which is what the scan page
+   * preloads once on mount and then resolves against client-side.
    */
   static async getPublic(req, res) {
     try {
-      const { category } = req.query;
-      const data = await HelplineModel.getActive(category);
+      const { category, serviceType, stickerCategory } = req.query;
+      const data = await HelplineModel.getActive({ category, serviceType, stickerCategory });
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('HELPLINE_LIST', 'Failed to fetch public helplines', err);
@@ -31,11 +40,11 @@ class HelplineController {
 
   static async create(req, res) {
     try {
-      const { category, label, phone, active } = req.body || {};
+      const { category, serviceType, categories, label, phone, active } = req.body || {};
       if (!category || !label || !phone) {
         return res.status(400).json({ success: false, error: 'category, label and phone are required' });
       }
-      const data = await HelplineModel.create({ category, label, phone, active });
+      const data = await HelplineModel.create({ category, serviceType, categories, label, phone, active });
       logger.rowInserted('communication', data.id, { category, label });
       return res.json({ success: true, data });
     } catch (err) {

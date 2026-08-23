@@ -136,6 +136,38 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
   animation: progress 2s ease-out forwards;
 }
 
+@keyframes flow-line {
+  0% { stroke-dashoffset: 48; }
+  100% { stroke-dashoffset: 0; }
+}
+.animate-flow-line {
+  animation: flow-line 1.8s linear infinite;
+}
+
+@keyframes flow-line-reverse {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 48; }
+}
+.animate-flow-line-reverse {
+  animation: flow-line-reverse 1.8s linear infinite;
+}
+
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+.animate-float-gentle {
+  animation: float-gentle 4s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.08); }
+}
+.animate-pulse-glow {
+  animation: pulse-glow 2.5s ease-in-out infinite;
+}
+
 /* ── Design Buttons from docs/buttonsanddesign.txt ── */
 .btn {
   display: inline-flex;
@@ -191,5 +223,38 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
 
 .btn-block {
   width: 100%;
+}
+
+/* ── Scroll reveal ─────────────────────────────────────────────────────────
+   Opacity + transform only, so every frame stays on the compositor and the
+   page never reflows while scrolling. One observer in LandingPageMaster adds
+   .is-revealed; set --reveal-i on siblings to stagger a row of cards. */
+[data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 16px, 0);
+  transition:
+    opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(var(--reveal-i, 0) * 70ms);
+}
+
+[data-reveal].is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+/* Cards in a row settle one after another rather than all at once. */
+[data-reveal]:nth-child(2) { transition-delay: 70ms; }
+[data-reveal]:nth-child(3) { transition-delay: 140ms; }
+[data-reveal]:nth-child(4) { transition-delay: 210ms; }
+[data-reveal]:nth-child(5) { transition-delay: 280ms; }
+
+/* Anyone who asked the OS for less motion gets the content, not the movement. */
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
 

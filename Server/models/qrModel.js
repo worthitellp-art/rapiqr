@@ -1,4 +1,45 @@
 const { supabaseAdmin } = require('../config/db');
+const { normalizePhone, isSamePhone } = require('../utils/phone');
+
+/**
+ * Which account (if any) an activation should link the sticker to.
+ *
+ * The activate route is public and takes `userId` straight from the request
+ * body, so this used to bind the row to whoever happened to be signed in. When
+ * a sticker is registered on somebody else's behalf — an admin or a shop
+ * activating a customer's tag — that locked the row to the wrong account, and
+ * autoClaimByPhone only ever considers `user_id IS NULL`. The real owner could
+ * refresh their dashboard forever and never see it.
+ *
+ * So: keep the link only when we cannot prove it belongs to someone else.
+ * An account with no verified number yet is activating its own sticker (the
+ * long-standing case, and the one ScanPage relies on), so that still links.
+ * An account whose verified number contradicts the number being registered is
+ * acting for a third party, so the row is left unclaimed for auto-claim to
+ * hand to the person who actually owns that number.
+ */
+async function resolveOwnerId(userId, ownerPhone) {
+  if (!userId) return null;
+  if (!normalizePhone(ownerPhone)) return null;
+
+  try {
+    const { data } = await supabaseAdmin
+      .from('profiles')
+      .select('phone_number, role')
+      .eq('id', userId)
+      .maybeSingle();
+
+    // Admins manage the fleet and should never claim personal ownership of customer stickers
+    if (data?.role === 'admin') return null;
+
+    const accountPhone = data?.phone_number;
+    if (!normalizePhone(accountPhone)) return null;
+    return isSamePhone(accountPhone, ownerPhone) ? userId : null;
+  } catch (err) {
+    console.error('QrModel.resolveOwnerId Error:', err);
+    return null;
+  }
+}
 
 class QrModel {
   /**
@@ -128,22 +169,42 @@ class QrModel {
 
     // Upsert product record for user dashboard
     if (activationData.ownerName || activationData.ownerPhone) {
+      // This is an upsert on qr_code_id, so a re-activation rewrites whatever is
+      // already there. Read it first: the owner who claimed this sticker and the
+      // emergency contacts they curated must survive a second activation, which
+      // previously reset user_id to null and replaced details wholesale.
+      const { data: existing } = await supabaseAdmin
+        .from('products')
+        .select('user_id, details')
+        .eq('qr_code_id', qrId)
+        .maybeSingle();
+
+      const requestedUserId = activationData.userId || activationData.user_id || null;
+      const ownerId = await resolveOwnerId(requestedUserId, activationData.ownerPhone);
+
+      const details = { ...(existing?.details || {}) };
+      if (activationData.ownerPhone) details.ownerPhone = activationData.ownerPhone;
+      if (activationData.ownerEmail) details.ownerEmail = activationData.ownerEmail;
+      if (Array.isArray(activationData.emergencyContacts) && activationData.emergencyContacts.length) {
+        details.emergencyContacts = activationData.emergencyContacts;
+      } else if (!Array.isArray(details.emergencyContacts)) {
+        details.emergencyContacts = [];
+      }
+      if (activationData.bloodGroup) details.bloodGroup = activationData.bloodGroup;
+      if (activationData.allergies) details.allergies = activationData.allergies;
+      if (activationData.address) details.address = activationData.address;
+      details.activatedAt = details.activatedAt || new Date().toISOString();
+
       const productPayload = {
         qr_code_id: qrId,
-        user_id: activationData.userId || activationData.user_id || null,
+        // A confirmed owner wins; otherwise keep whoever already holds it rather
+        // than dropping the claim back to null on every re-activation.
+        user_id: ownerId || existing?.user_id || null,
         category: activationData.category || data?.category || 'car',
         name: activationData.ownerName || 'Vehicle Owner',
         status: 'active',
         assigned_to: activationData.ownerName || 'Vehicle Owner',
-        details: {
-          ownerPhone: activationData.ownerPhone || '',
-          ownerEmail: activationData.ownerEmail || '',
-          emergencyContacts: activationData.emergencyContacts || [],
-          bloodGroup: activationData.bloodGroup || '',
-          allergies: activationData.allergies || '',
-          address: activationData.address || '',
-          activatedAt: new Date().toISOString(),
-        },
+        details,
       };
 
       const { error: productError } = await supabaseAdmin

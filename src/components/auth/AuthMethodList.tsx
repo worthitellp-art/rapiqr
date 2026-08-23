@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, Smartphone, ChevronRight } from 'lucide-react';
+import { Mail, ChevronRight } from 'lucide-react';
 import { AuthMode, AuthStep } from './hooks/useAuthForm';
 
 interface AuthMethodListProps {
@@ -21,10 +21,6 @@ export default function AuthMethodList({
     onSelectStep('email');
   };
 
-  const handleSelectPhoneStep = () => {
-    onSelectStep('phone');
-  };
-
   const handleLoginTabClick = () => {
     onSelectMode('login');
   };
@@ -35,7 +31,7 @@ export default function AuthMethodList({
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Log In / Create Account Switcher — sliding pill indicator */}
+      {/* Log In / Create Account Switcher */}
       <div className="relative flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200/60 shadow-inner">
         <div
           className="absolute top-1.5 bottom-1.5 left-1.5 w-[calc(50%-0.375rem)] rounded-xl bg-slate-900 shadow-sm transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
@@ -62,7 +58,7 @@ export default function AuthMethodList({
         </button>
       </div>
 
-      {/* Clean Minimal Method List */}
+      {/* Auth Method Options */}
       <div className="space-y-3">
         {/* Email Option */}
         <button
@@ -86,29 +82,7 @@ export default function AuthMethodList({
           <ChevronRight size={18} className="text-slate-400 group-hover:text-slate-800 transition-colors" />
         </button>
 
-        {/* Phone Number Option */}
-        <button
-          type="button"
-          onClick={handleSelectPhoneStep}
-          className="w-full p-4 rounded-2xl border border-slate-200/90 bg-white hover:bg-slate-50/80 hover:border-slate-300 hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-between group cursor-pointer shadow-2xs hover:shadow-md active:scale-[0.99] active:translate-y-0"
-        >
-          <div className="flex items-center gap-3.5 text-left">
-            <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-amber-500 group-hover:text-white transition-colors">
-              <Smartphone size={20} />
-            </div>
-            <div>
-              <div className="text-sm font-bold text-slate-900">
-                Continue with Phone Number
-              </div>
-              <div className="text-xs text-slate-500 font-medium mt-0.5">
-                {currentMode === 'login' ? 'Sign in using mobile number' : 'Register with mobile phone number'}
-              </div>
-            </div>
-          </div>
-          <ChevronRight size={18} className="text-slate-400 group-hover:text-slate-800 transition-colors" />
-        </button>
-
-        {/* Google Quick Sign-In Option */}
+        {/* Google Sign-In Option */}
         <button
           type="button"
           disabled={isSubmitting}

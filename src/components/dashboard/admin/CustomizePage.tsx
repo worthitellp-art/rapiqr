@@ -14,7 +14,7 @@ export default function CustomizePage({
   setToast?: (msg: string | null) => void;
 }) {
   return (
-    <div className="px-8 pt-7 pb-16 space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
       <StickerEditor
         stickerPos={stickerPos}
         setStickerPos={setStickerPos}

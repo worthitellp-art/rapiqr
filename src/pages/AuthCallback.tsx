@@ -86,6 +86,13 @@ export default function AuthCallback({ onSuccess }: AuthCallbackProps) {
       if (isCancelled) return;
       setStatus('success');
       
+      try {
+        localStorage.setItem('repiqr-current-page', 'dashboard');
+        localStorage.setItem('namoqr-current-page', 'dashboard');
+      } catch {
+        // Ignore storage errors
+      }
+
       const targetUrl = typeof window !== 'undefined' && window.location?.origin ? window.location.origin + '/' : '/';
       window.history.replaceState({}, document.title, targetUrl);
       
