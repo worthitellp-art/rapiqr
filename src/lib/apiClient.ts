@@ -830,16 +830,36 @@ export const apiClient = {
         return { success: true, data: [] };
       }
     },
+    /**
+     * Public: a provider applying through the landing page "Join us" form.
+     * Stored inactive, so it stays out of every scan page until an admin
+     * approves it in Admin -> Communication.
+     */
+    async apply(application: {
+      category: string;
+      serviceType?: string;
+      categories?: string[];
+      label: string;
+      phone: string;
+      email?: string;
+      city?: string;
+      notes?: string;
+    }) {
+      return request<{ success: boolean; data: any }>('/helplines/apply', {
+        method: 'POST',
+        body: JSON.stringify(application),
+      });
+    },
     async getAll() {
       return request<{ success: boolean; data: any[] }>('/helplines', { method: 'GET' });
     },
-    async create(provider: { category: string; serviceType?: string; categories?: string[]; label: string; phone: string; active?: boolean }) {
+    async create(provider: { category: string; serviceType?: string; categories?: string[]; label: string; phone: string; active?: boolean; email?: string | null; city?: string | null; notes?: string | null }) {
       return request<{ success: boolean; data: any }>('/helplines', {
         method: 'POST',
         body: JSON.stringify(provider),
       });
     },
-    async update(id: string, updates: Partial<{ category: string; serviceType: string; categories: string[]; label: string; phone: string; active: boolean }>) {
+    async update(id: string, updates: Partial<{ category: string; serviceType: string; categories: string[]; label: string; phone: string; active: boolean; email: string | null; city: string | null; notes: string | null }>) {
       return request<{ success: boolean; data: any }>(`/helplines/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(updates),

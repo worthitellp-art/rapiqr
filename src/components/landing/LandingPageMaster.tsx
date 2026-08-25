@@ -1,47 +1,43 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  motion,
+  AnimatePresence,
+  useScroll,
+  useTransform,
+  useSpring,
+  useInView,
+  useMotionValueEvent,
+  useReducedMotion,
+} from 'framer-motion';
 import {
   ArrowRight,
-  ShieldCheck,
+  ArrowLeft,
+  ArrowUpRight,
   Car,
   Laptop,
   Dog,
   Luggage,
   Key,
-  Shield,
   Lock,
-  MessageSquare,
-  Radio,
-  Send,
-  Download,
   Plus,
   Minus,
-  Sparkles,
-  ChevronRight,
   Menu,
   X,
-  PhoneCall,
-  Users,
   MapPin,
   CheckCircle2,
   Zap,
   Bike,
   DoorClosed,
   Boxes,
-  HelpCircle,
-  MessageCircle,
-  Star,
-  ShoppingBag,
-  Eye,
   Check,
-  Smartphone,
-  Truck,
-  RotateCcw,
-  Store,
-  HeartPulse,
-  Umbrella,
-  Play,
   Bell,
-  Phone,
+  ChevronDown,
+  Handshake,
+  Mail,
+  Loader2,
+  ShoppingBag,
+  Star,
+  Shield,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
@@ -50,6 +46,10 @@ import {
   getUserDistributorApplication,
   DistributorApplication,
 } from '../../lib/distributorService';
+import { submitProviderApplication } from '../../lib/supabaseService';
+import { SERVICE_TYPES } from '../scan/tileActions';
+import { getServiceMeta } from '../scan/serviceMeta';
+import { STICKER_CATEGORIES } from '../../stickerModules';
 
 // Image assets
 import stepImg1 from '../../../assets/landing-step-1.webp';
@@ -57,8 +57,21 @@ import stepImg2 from '../../../assets/landing-step-2.webp';
 import stepImg3 from '../../../assets/landing-step-3.webp';
 import stepImg4 from '../../../assets/landing-step-4.webp';
 import stepImg5 from '../../../assets/landing-step-5.webp';
-import logoForWhiteBg from '../../../assets/logo for wh bg.png';
 import darkBgLogo from '../../../assets/darkbglogo.png';
+import heroImage from '../../../assets/hero.png';
+
+/* Hero backdrop. A photograph rather than a video: it parallaxes and scales on
+   scroll, which reads as motion without shipping a 20 MB asset. Served from
+   /public, so swapping the file swaps the hero with no code change. */
+const HERO_BG = heroImage;
+
+/* ──────────────────────────────────────────────────────────────────────────
+   PALETTE
+   Near-black and warm paper carry the whole page; amber is a signature, not a
+   theme — it appears only on arrow glyphs, the active progress line and a
+   handful of small dots. Every panel that used to be a yellow wash is paper.
+   ────────────────────────────────────────────────────────────────────────── */
+const INK = '#0B0B0C';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -67,6 +80,7 @@ export interface LandingPageMasterProps {
   onLogin?: () => void;
   onOpenDistributorDashboard?: () => void;
   onOpenCheckout?: () => void;
+  onOpenJoinUs?: () => void;
   isEmbeddedInDashboard?: boolean;
 }
 
@@ -89,34 +103,32 @@ interface CartItem {
   qty: number;
 }
 
-interface AssetMockupRow {
-  id: string;
-  name: string;
-  category: string;
-  status: string;
-  location: string;
-  balance: string;
-  icon: 'car' | 'laptop' | 'dog' | 'luggage';
-}
-
-interface FeatureItem {
-  id: string;
-  title: string;
-  description: string;
-  badge: string;
-  previewTag: string;
-  previewTarget: string;
-  securityLevel: string;
-  latency: string;
-}
-
 interface FaqItem {
   id: string;
   question: string;
   answer: string;
 }
 
-// ── Data Constants ─────────────────────────────────────────────────────────
+interface DistributorTier {
+  id: string;
+  name: string;
+  badge: string;
+  minUnits: string;
+  margin: string;
+  desc: string;
+  features: string[];
+  isPopular?: boolean;
+  ctaText: string;
+}
+
+// ── Data ───────────────────────────────────────────────────────────────────
+
+/** Selling points shown beside the "Join us" provider application. */
+const JOIN_BENEFITS = [
+  'A scan near you rings your phone through a masked bridge — the caller never sees your number.',
+  'Choose which sticker categories you cover, or serve every one of them.',
+  'No listing fee. Our team verifies your details before you go live.',
+];
 
 const PRODUCTS: ProductItem[] = [
   {
@@ -127,7 +139,7 @@ const PRODUCTS: ProductItem[] = [
     mrp: 599,
     category: 'Vehicle',
     badge: 'For vehicles',
-    img: stepImg2,
+    img: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=1200&q=85',
     rating: 4.9,
     reviewsCount: 3840,
     features: ['Parking issue masked call', 'Tow & emergency alert', 'Works with any phone camera'],
@@ -140,7 +152,7 @@ const PRODUCTS: ProductItem[] = [
     mrp: 699,
     category: 'Home',
     badge: 'For gates & doors',
-    img: stepImg1,
+    img: 'https://images.unsplash.com/photo-1558008258-3256797b43f3?auto=format&fit=crop&w=1200&q=85',
     rating: 4.8,
     reviewsCount: 2190,
     features: ['Virtual visitor doorbell', 'Zero app required', 'Instant WhatsApp alert'],
@@ -153,7 +165,7 @@ const PRODUCTS: ProductItem[] = [
     mrp: 499,
     category: 'Family',
     badge: 'For pets & kids',
-    img: stepImg5,
+    img: 'https://images.unsplash.com/photo-1558788353-f76d92427f16?auto=format&fit=crop&w=1200&q=85',
     rating: 4.9,
     reviewsCount: 1740,
     features: ['GPS location share', 'Multi-contact emergency tree', 'Masked call to guardians'],
@@ -166,7 +178,7 @@ const PRODUCTS: ProductItem[] = [
     mrp: 599,
     category: 'Travel',
     badge: 'For bags & keys',
-    img: stepImg3,
+    img: 'https://images.unsplash.com/photo-1553531384-cc64ac80f931?auto=format&fit=crop&w=1200&q=85',
     rating: 4.9,
     reviewsCount: 2860,
     features: ['Airport baggage recovery', 'Instant finder chat', 'No app for the finder'],
@@ -177,176 +189,178 @@ const HOW_IT_WORKS_STEPS = [
   {
     step: 1,
     title: 'Order your sticker',
-    body: 'Pick a type — vehicle, gate, bag, keychain. Delivered across India.',
+    body: 'Pick a type — vehicle, gate, bag, keychain. Delivered across India in two to three days.',
     img: stepImg1,
-    badge: 'Pick Your Tag',
+    badge: 'Pick your tag',
   },
   {
     step: 2,
     title: 'Stick it on',
-    body: 'Peel and stick it where a finder will look first.',
+    body: 'Peel and stick it where a finder will look first. Weatherproof adhesive, rated for years outdoors.',
     img: stepImg2,
-    badge: 'Peel & Stick',
+    badge: 'Peel & stick',
   },
   {
     step: 3,
     title: 'Anyone scans — no app',
-    body: 'Camera → secure proxy page. Nothing to install or login.',
+    body: 'Their camera opens a secure proxy page. Nothing to install, nothing to sign up for.',
     img: stepImg5,
-    badge: 'Zero App Scan',
+    badge: 'Zero-app scan',
   },
   {
     step: 4,
     title: 'They reach you',
-    body: 'Call, message, GPS, or alert. Your number is never visible.',
+    body: 'Call, message, GPS or emergency alert. Your number is never rendered on the page.',
     img: stepImg3,
-    badge: 'Masked Call & GPS',
+    badge: 'Masked call & GPS',
   },
   {
     step: 5,
     title: 'You get pinged instantly',
-    body: 'Push + SMS + WhatsApp. Resolve any issue in one tap.',
+    body: 'SMS and WhatsApp land within seconds, carrying their message and location if they shared it.',
     img: stepImg4,
-    badge: 'Instant Multi-Channel Alert',
+    badge: 'Instant alert',
   },
 ];
 
-const MOCKUP_ASSETS: AssetMockupRow[] = [
+/* The "everything on one tag" grid. Each card borrows a step image so the
+   section stays photographic instead of turning into another icon wall. */
+const FEATURE_CARDS = [
   {
-    id: 'asset-1',
-    name: 'BMW M340i Sedan',
-    category: 'Vehicle Tag',
-    status: 'Active Shield',
-    location: 'Downtown Hub (Zone A)',
-    balance: '₹48,500/yr',
-    icon: 'car',
+    id: 'masked',
+    title: 'Masked telephony',
+    description:
+      'Calls route through a virtual bridge. The finder reaches you without either side seeing a real number.',
+    img: stepImg3,
+    tag: 'Privacy',
   },
   {
-    id: 'asset-2',
-    name: 'MacBook Pro 16"',
-    category: 'Valuables Plate',
-    status: 'Protected',
-    location: 'Co-Working Studio',
-    balance: '₹12,400/yr',
-    icon: 'laptop',
+    id: 'alerts',
+    title: 'Multi-channel alerts',
+    description:
+      'SMS and WhatsApp fire the moment a tag is scanned, carrying the message and the location if shared.',
+    img: stepImg4,
+    tag: 'Alerts',
   },
   {
-    id: 'asset-3',
-    name: 'Bella (Golden Retriever)',
-    category: 'Pet Smart Collar',
-    status: 'Safe',
-    location: 'Home Perimeter',
-    balance: '₹8,200/yr',
-    icon: 'dog',
+    id: 'contacts',
+    title: 'Backup contact tree',
+    description:
+      'Every tag carries more than one contact, so an emergency reaches your backup people, not just you.',
+    img: stepImg5,
+    tag: 'Emergency',
   },
   {
-    id: 'asset-4',
-    name: 'Rimowa Classic Cabin',
-    category: 'Travel Luggage Tag',
-    status: 'Standby',
-    location: 'Terminal 3 Baggage',
-    balance: '₹15,800/yr',
-    icon: 'luggage',
+    id: 'edge',
+    title: 'Opens anywhere',
+    description:
+      'A plain HTTPS link served from the edge. Any iOS or Android camera opens it, even on patchy mobile data.',
+    img: stepImg1,
+    tag: 'Reach',
   },
 ];
 
-interface DistributorTier {
-  id: string;
-  name: string;
-  badge: string;
-  minUnits: string;
-  priceDisplay: string;
-  margin: string;
-  desc: string;
-  features: string[];
-  isPopular?: boolean;
-  ctaText: string;
-}
+/* Deliberately verifiable numbers rather than vanity metrics — each one is
+   something the product actually guarantees. */
+const STATS = [
+  { value: 10000, kilo: true, suffix: '+', label: 'Owners protected' },
+  { value: 0, suffix: '', label: 'Numbers ever exposed' },
+  { value: 8, suffix: '', label: 'Asset categories covered' },
+  { value: 3, suffix: ' yrs', label: 'Outdoor-rated adhesive' },
+];
 
 const DISTRIBUTOR_TIERS: DistributorTier[] = [
   {
     id: 'retailer-starter',
     name: 'Retailer Starter Pack',
-    badge: 'Garages & Retail Shops',
-    minUnits: '50 - 100 Units',
-    priceDisplay: 'Contact for Pricing',
-    margin: '40%+ Retail Margin',
+    badge: 'Garages & retail shops',
+    minUnits: '50 - 100 units',
+    margin: '40%+ retail margin',
     desc: 'Ideal for auto garages, bike accessory shops, mobile stores, and local locksmiths.',
     features: [
-      '50x Pre-activated 3M weatherproof smart tags',
-      'Free premium acrylic POS counter display rack',
-      'Full marketing promotional posters & flyers kit',
-      'Dealer dashboard access with instant QR restock',
+      '50x pre-activated weatherproof smart tags',
+      'Free acrylic counter display rack',
+      'Marketing posters and flyer kit',
+      'Dealer dashboard with instant QR restock',
       '48-hour priority doorstep logistics',
     ],
-    ctaText: 'Inquire Retail Pack',
+    ctaText: 'Inquire retail pack',
   },
   {
     id: 'city-franchise',
     name: 'City Exclusive Franchise',
-    badge: 'Exclusive Territory Partner',
-    minUnits: '500 - 1,000 Units',
-    priceDisplay: 'Contact for Pricing',
-    margin: '50%+ Exclusive Margin',
+    badge: 'Exclusive territory partner',
+    minUnits: '500 - 1,000 units',
+    margin: '50%+ exclusive margin',
     isPopular: true,
-    desc: 'Sole exclusive distributor rights for your city or district with localized customer lead distribution.',
+    desc: 'Sole distributor rights for your city or district, with local buyer leads routed to you.',
     features: [
-      'Exclusive city territory rights & protection',
-      '500x Smart QR tags across all categories',
-      'Customized localized dealer branding & shop sign kit',
-      'Dedicated territory account manager & priority support',
+      'Exclusive city territory rights and protection',
+      '500x smart QR tags across all categories',
+      'Localised dealer branding and shop sign kit',
+      'Dedicated territory account manager',
       'All local website buyer leads redirected to you',
-      'Quarterly volume bonuses & maximum tier rebate',
+      'Quarterly volume bonuses and tier rebate',
     ],
-    ctaText: 'Apply for City Franchise',
+    ctaText: 'Apply for city franchise',
   },
   {
     id: 'master-partner',
     name: 'Master State / Fleet Partner',
-    badge: 'Regional Master Rights',
-    minUnits: '2,500+ Units',
-    priceDisplay: 'Contact for Pricing',
-    margin: '60%+ Master Margin',
-    desc: 'State-level master franchise & large fleet deployments for corporate and logistics networks.',
+    badge: 'Regional master rights',
+    minUnits: '2,500+ units',
+    margin: '60%+ master margin',
+    desc: 'State-level master franchise and large fleet deployments for corporate and logistics networks.',
     features: [
-      'State-wide master franchise distribution exclusivity',
-      'Custom white-label QR sticker batch generation',
-      'Enterprise REST API & master fleet sync console',
-      'Sub-dealer network management & commission control',
-      '24/7 dedicated enterprise technical support',
+      'State-wide master distribution exclusivity',
+      'Custom white-label QR sticker batches',
+      'Enterprise REST API and fleet sync console',
+      'Sub-dealer network and commission control',
+      '24/7 dedicated enterprise support',
     ],
-    ctaText: 'Contact for Master Rights',
+    ctaText: 'Contact for master rights',
   },
 ];
 
-const INFRASTRUCTURE_CARDS = [
+const PRICING_PLANS = [
   {
-    letter: 'R',
-    title: 'Global Edge Network',
-    description:
-      'The scan page is served from Cloudflare\u2019s edge network, so it opens quickly on a phone even on mobile data.',
-    color: '#FACC15',
+    id: 'solo',
+    name: 'Solo Starter',
+    desc: 'One vehicle or personal asset.',
+    tier: 'Retail Kit (50 Units)',
+    features: [
+      '1x weatherproof smart sticker',
+      'Masked call and WhatsApp alerts',
+      'Lifetime dashboard access',
+    ],
+    cta: 'Contact for pricing',
+    featured: false,
   },
   {
-    letter: 'A',
-    title: 'Backup Contacts',
-    description:
-      'Every tag can carry more than one contact, so an emergency alert reaches your backup people, not just you.',
-    color: '#F59E0B',
+    id: 'family',
+    name: 'Family Trio',
+    desc: 'Three tags for car, bike and gate or pets.',
+    tier: 'Retail Kit (50 Units)',
+    features: [
+      '3x multi-category smart tags',
+      'Multi-responder emergency tree',
+      'Free priority 48h shipping',
+    ],
+    cta: 'Contact for pricing',
+    featured: true,
   },
   {
-    letter: 'P',
-    title: 'Privacy-First Architecture',
-    description:
-      'Your name, address and number are never rendered on the scan page. A finder only ever sees what helps them help you.',
-    color: '#EAB308',
-  },
-  {
-    letter: 'I',
-    title: 'Universal Zero-App Scan',
-    description:
-      'A plain HTTPS link that any iOS or Android camera app opens directly. No app, no login, no sign-up.',
-    color: '#FBBF24',
+    id: 'fleet',
+    name: 'Society & Fleet',
+    desc: 'Bulk tags for apartments, schools and logistics.',
+    tier: 'State Partner (2500+ Units)',
+    features: [
+      'Custom branded logo and colours',
+      'Admin master fleet dashboard',
+      'Dedicated relationship manager',
+    ],
+    cta: 'Inquire bulk quote',
+    featured: false,
   },
 ];
 
@@ -355,37 +369,37 @@ const FAQS: FaqItem[] = [
     id: 'faq-1',
     question: 'How does the RapiQR tag protect my personal phone number?',
     answer:
-      'When someone scans your QR tag, they interact with a secure proxy page. When they tap "Call Owner", our telecom cloud server connects both parties through a masked virtual line. Neither your number nor their number is ever revealed to each other.',
+      'When someone scans your QR tag, they interact with a secure proxy page. When they tap "Call Owner", our telecom cloud connects both parties through a masked virtual line. Neither your number nor theirs is ever revealed to the other.',
   },
   {
     id: 'faq-2',
     question: 'Does the person scanning my tag need to download an app?',
     answer:
-      'No. The scanner simply uses their regular smartphone camera or Google Lens. The scan instantly opens a high-speed, responsive web application without requiring any software installation, login, or sign-up.',
+      'No. The scanner uses their regular smartphone camera or Google Lens. The scan opens a fast, responsive web page with no software installation, login, or sign-up.',
   },
   {
     id: 'faq-3',
     question: 'Can I add multiple emergency contacts to a single sticker?',
     answer:
-      'Yes. In your Client Dashboard, you can register primary, secondary, and tertiary emergency contacts. You can also specify distinct roles such as family members, vehicle insurance agents, or fleet managers.',
+      'Yes. In your dashboard you can register primary, secondary and tertiary emergency contacts, and give each a role such as family member, insurance agent or fleet manager.',
   },
   {
     id: 'faq-4',
-    question: 'What happens if my parked car is blocking someone or in an emergency?',
+    question: 'What happens if my parked car is blocking someone, or in an emergency?',
     answer:
-      'The person can scan your windshield tag and choose "Notify for Parking Issue", "Wrong Parking", or "Emergency". You receive an SMS, WhatsApp and email alert with their message and, if they shared it, their location.',
+      'They scan your windshield tag and choose "Notify for parking issue", "Wrong parking" or "Emergency". You receive an SMS, WhatsApp and email alert with their message and, if they shared it, their location.',
   },
   {
     id: 'faq-5',
     question: 'How durable are the physical tags against rain and sunlight?',
     answer:
-      'Tags are printed on laminated weatherproof stock and are meant to live outdoors on a windshield, gate or collar. If a tag wears out or stops scanning, contact support and we will replace it \u2014 your tag ID and its contacts stay the same.',
+      'Tags are printed on laminated weatherproof stock and are meant to live outdoors on a windshield, gate or collar. If one wears out or stops scanning, contact support and we will replace it — your tag ID and its contacts stay the same.',
   },
   {
     id: 'faq-6',
     question: 'Can I reassign or transfer a tag if I sell my car or replace an item?',
     answer:
-      'Absolutely. With one click in your Client Dashboard, you can update vehicle details, change linked contact numbers, or transfer ownership of the tag securely to another user.',
+      'Yes. From your dashboard you can update vehicle details, change linked contact numbers, or transfer ownership of the tag to another user in one step.',
   },
 ];
 
@@ -396,85 +410,261 @@ const BADGE_ITEMS = [
   { label: 'Luggage', icon: Luggage },
   { label: 'Electronics', icon: Laptop },
   { label: 'Keychains', icon: Key },
-  { label: 'Gates & Doors', icon: DoorClosed },
-  { label: 'Cargo & Fleet', icon: Boxes },
+  { label: 'Gates & doors', icon: DoorClosed },
+  { label: 'Cargo & fleet', icon: Boxes },
 ];
 
-// ── Real QR Code SVG Component ─────────────────────────────────────────────
+/* The photo wall. Tiles are grouped into three columns that drift at different
+   speeds, so the whole block breathes as it passes. */
+const MOSAIC_COLUMNS = [
+  [stepImg1, stepImg4, stepImg2],
+  [stepImg5, stepImg2, stepImg3],
+  [stepImg3, stepImg1, stepImg5],
+];
 
-function RealQRCodeSvg({ size = 160 }: { size?: number }) {
+// ── Motion primitives ──────────────────────────────────────────────────────
+
+const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+
+/* React is installed without @types/react, so TS has no JSX namespace and
+   checks these helpers by call signature — which means `key` has to be declared
+   as a prop or every `.map()` over one fails to compile. React strips it before
+   props are built, so nothing reads it at runtime. */
+type Keyed = { key?: string | number };
+
+/** Fade + rise + de-blur once, when the element first enters the viewport. */
+function Reveal({
+  children,
+  delay = 0,
+  y = 30,
+  className,
+}: Keyed & {
+  children: React.ReactNode;
+  delay?: number;
+  y?: number;
+  className?: string;
+}) {
+  const reduced = useReducedMotion();
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 120 120"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className="w-full h-auto max-w-[160px] mx-auto shadow-sm rounded-xl"
+    <motion.div
+      className={className}
+      initial={reduced ? undefined : { opacity: 0, y, filter: 'blur(8px)' }}
+      whileInView={reduced ? undefined : { opacity: 1, y: 0, filter: 'blur(0px)' }}
+      viewport={{ once: true, margin: '0px 0px -10% 0px' }}
+      transition={{ duration: 0.85, delay, ease: EASE }}
     >
-      <rect width="120" height="120" fill="white" rx="10" />
-      {/* Top Left Finder */}
-      <rect x="8" y="8" width="34" height="34" fill="#0F172A" rx="6" />
-      <rect x="14" y="14" width="22" height="22" fill="white" rx="3" />
-      <rect x="19" y="19" width="12" height="12" fill="#0F172A" rx="2" />
+      {children}
+    </motion.div>
+  );
+}
 
-      {/* Top Right Finder */}
-      <rect x="78" y="8" width="34" height="34" fill="#0F172A" rx="6" />
-      <rect x="84" y="14" width="22" height="22" fill="white" rx="3" />
-      <rect x="89" y="19" width="12" height="12" fill="#0F172A" rx="2" />
+/** Headline that rises word by word out of a clipped line box. */
+function SplitWords({
+  text,
+  className,
+  delay = 0,
+  stagger = 0.055,
+  animateOnLoad = false,
+}: {
+  text: string;
+  className?: string;
+  delay?: number;
+  stagger?: number;
+  animateOnLoad?: boolean;
+}) {
+  const reduced = useReducedMotion();
+  const words = text.split(' ');
+  if (reduced) return <span className={className}>{text}</span>;
+  return (
+    <span className={className}>
+      {words.map((word, i) => (
+        <span key={`${word}-${i}`} className="inline-block overflow-hidden align-bottom pb-[0.08em]">
+          <motion.span
+            className="inline-block whitespace-pre"
+            initial={{ y: '115%' }}
+            {...(animateOnLoad ? { animate: { y: '0%' } } : { whileInView: { y: '0%' } })}
+            viewport={{ once: true, margin: '0px 0px -8% 0px' }}
+            transition={{ duration: 0.9, delay: delay + i * stagger, ease: EASE }}
+          >
+            {i < words.length - 1 ? `${word} ` : word}
+          </motion.span>
+        </span>
+      ))}
+    </span>
+  );
+}
 
-      {/* Bottom Left Finder */}
-      <rect x="8" y="78" width="34" height="34" fill="#0F172A" rx="6" />
-      <rect x="14" y="84" width="22" height="22" fill="white" rx="3" />
-      <rect x="19" y="89" width="12" height="12" fill="#0F172A" rx="2" />
+/** Vertical drift tied to the element's own trip through the viewport. */
+function Parallax({
+  children,
+  distance = 70,
+  className,
+}: Keyed & {
+  children: React.ReactNode;
+  distance?: number;
+  className?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const reduced = useReducedMotion();
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
+  const raw = useTransform(scrollYProgress, [0, 1], [distance, -distance]);
+  const y = useSpring(raw, { stiffness: 90, damping: 26, mass: 0.4 });
+  return (
+    <div ref={ref} className={className}>
+      <motion.div style={reduced ? undefined : { y }}>{children}</motion.div>
+    </div>
+  );
+}
 
-      {/* Matrix Data Modules */}
-      <rect x="48" y="10" width="7" height="7" fill="#0F172A" rx="1.5" />
-      <rect x="62" y="10" width="7" height="7" fill="#0F172A" rx="1.5" />
-      <rect x="48" y="24" width="7" height="7" fill="#0F172A" rx="1.5" />
-      <rect x="62" y="24" width="7" height="7" fill="#0F172A" rx="1.5" />
-      <rect x="10" y="48" width="7" height="7" fill="#0F172A" rx="1.5" />
-      <rect x="24" y="48" width="7" height="7" fill="#0F172A" rx="1.5" />
-      <rect x="34" y="58" width="7" height="7" fill="#0F172A" rx="1.5" />
-      <rect x="78" y="48" width="7" height="7" fill="#0F172A" rx="1.5" />
-      <rect x="92" y="48" width="7" height="7" fill="#0F172A" rx="1.5" />
-      <rect x="104" y="58" width="7" height="7" fill="#0F172A" rx="1.5" />
-      <rect x="48" y="78" width="7" height="7" fill="#0F172A" rx="1.5" />
-      <rect x="62" y="86" width="7" height="7" fill="#0F172A" rx="1.5" />
-      <rect x="48" y="98" width="7" height="7" fill="#0F172A" rx="1.5" />
-      <rect x="78" y="78" width="10" height="10" fill="#0F172A" rx="2" />
-      <rect x="96" y="92" width="12" height="12" fill="#0F172A" rx="2" />
+/** Counts from zero to `to` the first time it is seen. */
+function Counter({ to, suffix = '', kilo = false }: { to: number; suffix?: string; kilo?: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, margin: '-12%' });
+  const reduced = useReducedMotion();
+  const [value, setValue] = useState(0);
 
-      {/* Center Shield / Brand Badge */}
-      <rect x="43" y="43" width="34" height="34" fill="#FACC15" rx="7" stroke="#0F172A" strokeWidth="2.5" />
-      <text
-        x="60"
-        y="65"
-        fill="#0F172A"
-        fontSize="13"
-        fontWeight="900"
-        textAnchor="middle"
-        fontFamily="system-ui, sans-serif"
+  useEffect(() => {
+    if (!inView) return;
+    if (reduced || to === 0) {
+      setValue(to);
+      return;
+    }
+    let frame = 0;
+    const started = performance.now();
+    const duration = 1500;
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - started) / duration);
+      setValue(to * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [inView, to, reduced]);
+
+  const shown = kilo ? `${Math.round(value / 1000)}K` : Math.round(value).toLocaleString('en-IN');
+
+  return (
+    <span ref={ref}>
+      {shown}
+      {suffix}
+    </span>
+  );
+}
+
+/** Edge-to-edge ticker. The row is duplicated so the loop never shows a seam. */
+function Marquee({
+  children,
+  reverse = false,
+  duration = 38,
+}: {
+  children: React.ReactNode;
+  reverse?: boolean;
+  duration?: number;
+}) {
+  const reduced = useReducedMotion();
+  return (
+    <div className="overflow-hidden">
+      <motion.div
+        className="flex w-max items-center"
+        animate={reduced ? undefined : { x: reverse ? ['-50%', '0%'] : ['0%', '-50%'] }}
+        transition={{ duration, ease: 'linear', repeat: Infinity }}
       >
-        RQ
-      </text>
+        {/* Two wrapped copies rather than two loose ones, so the duplicated
+            children never collide on React keys. */}
+        <div className="flex items-center gap-3 pr-3">{children}</div>
+        <div className="flex items-center gap-3 pr-3" aria-hidden="true">
+          {children}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+/** Slowly rotating dot field behind the closing call to action. */
+function ParticleRing() {
+  const reduced = useReducedMotion();
+  const dots = useMemo(() => {
+    const out: { x: number; y: number; r: number; o: number }[] = [];
+    for (let i = 0; i < 820; i += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 118 + Math.sqrt(Math.random()) * 132;
+      out.push({
+        x: 250 + Math.cos(angle) * radius,
+        y: 250 + Math.sin(angle) * radius,
+        r: Math.random() * 1.2 + 0.25,
+        o: Math.random() * 0.5 + 0.08,
+      });
+    }
+    return out;
+  }, []);
+
+  return (
+    <motion.svg
+      viewBox="0 0 500 500"
+      className="pointer-events-none absolute left-1/2 top-1/2 h-[min(118vw,780px)] w-[min(118vw,780px)] -translate-x-1/2 -translate-y-1/2"
+      animate={reduced ? undefined : { rotate: 360 }}
+      transition={{ duration: 190, ease: 'linear', repeat: Infinity }}
+      aria-hidden="true"
+    >
+      {dots.map((d, i) => (
+        <circle key={i} cx={d.x} cy={d.y} r={d.r} fill="#FFFFFF" opacity={d.o} />
+      ))}
+    </motion.svg>
+  );
+}
+
+/** Decorative QR mark. Deterministic, and not a scannable code. */
+function QrGlyph({ size = 96, color = '#FFFFFF' }: { size?: number; color?: string }) {
+  const cells = useMemo(() => {
+    const grid: boolean[][] = [];
+    let seed = 7;
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+    for (let r = 0; r < 11; r += 1) {
+      grid.push(Array.from({ length: 11 }, () => rand() > 0.48));
+    }
+    return grid;
+  }, []);
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 11 11" aria-hidden="true">
+      {cells.map((row, r) =>
+        row.map((on, c) =>
+          on ? <rect key={`${r}-${c}`} x={c} y={r} width={0.86} height={0.86} fill={color} /> : null
+        )
+      )}
+      {[
+        [0, 0],
+        [8, 0],
+        [0, 8],
+      ].map(([x, y]) => (
+        <g key={`${x}-${y}`}>
+          <rect x={x} y={y} width={3} height={3} fill={color} />
+          <rect x={x + 0.75} y={y + 0.75} width={1.5} height={1.5} fill={INK} />
+        </g>
+      ))}
     </svg>
   );
 }
 
-// ── Master Component ───────────────────────────────────────────────────────
+// ── Page ───────────────────────────────────────────────────────────────────
 
 export default function LandingPageMaster({
   onStart,
   onLogin,
   onOpenDistributorDashboard,
   onOpenCheckout,
+  onOpenJoinUs,
   isEmbeddedInDashboard = false,
 }: LandingPageMasterProps) {
   const { isLoggedIn, profile } = useAuth();
+  const reduced = useReducedMotion();
 
   // Navigation
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   // Cart state persisted
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -486,59 +676,36 @@ export default function LandingPageMaster({
     }
   });
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [quickViewProduct, setQuickViewProduct] = useState<ProductItem | null>(null);
+  const [cartNotice, setCartNotice] = useState<{ name: string; qty: number } | null>(null);
 
   useEffect(() => {
     try {
       localStorage.setItem('namoqr-cart', JSON.stringify(cart));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [cart]);
 
-  // Scroll reveal — one observer for every [data-reveal] on the page. Each
-  // element is unobserved the moment it lands, so nothing is watched twice and
-  // scrolling back up doesn't replay the animation.
   useEffect(() => {
-    const els = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]'));
-    if (!els.length) return;
-
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      els.forEach((el) => el.classList.add('is-revealed'));
-      return;
-    }
-
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          entry.target.classList.add('is-revealed');
-          io.unobserve(entry.target);
-        });
-      },
-      { threshold: 0.12, rootMargin: '0px 0px -8% 0px' }
-    );
-
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, []);
+    if (!cartNotice) return;
+    const timeout = window.setTimeout(() => setCartNotice(null), 3200);
+    return () => window.clearTimeout(timeout);
+  }, [cartNotice]);
 
   // Category filter
-  const [activeCategory, setActiveCategory] = useState<'All' | 'Vehicle' | 'Home' | 'Family' | 'Travel'>('All');
+  const [activeCategory, setActiveCategory] =
+    useState<'All' | 'Vehicle' | 'Home' | 'Family' | 'Travel'>('All');
 
-  // How it works active step
+  // How it works — driven by the pinned track's scroll progress on desktop.
   const [activeHiwStep, setActiveHiwStep] = useState(0);
 
-  // Hero interactive state
-  const [selectedAssetId, setSelectedAssetId] = useState<string>('asset-1');
-  const [simulatedAlertActive, setSimulatedAlertActive] = useState(false);
-
-
-  // Interactive Live Demo Simulator state
+  // Interactive scan demo
   const [demoActionAlert, setDemoActionAlert] = useState<string | null>(null);
 
   // FAQ accordion state
   const [expandedFaqId, setExpandedFaqId] = useState<string | null>(FAQS[0].id);
 
-  // Partner Modal State
+  // Partner modal state
   const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
   const [partnerForm, setPartnerForm] = useState({
     name: '',
@@ -550,7 +717,81 @@ export default function LandingPageMaster({
   const [partnerSubmitted, setPartnerSubmitted] = useState(false);
   const [userAppStatus, setUserAppStatus] = useState<DistributorApplication | null>(null);
 
-  // Google Font Injection
+  // ── "Join us" service-provider sign-up ──────────────────────────────────
+  // The navbar dropdown picks a service type, the #join-section form collects
+  // the provider's details, and the application lands in the admin's
+  // Communication directory (inactive until approved).
+  const [isJoinMenuOpen, setIsJoinMenuOpen] = useState(false);
+  const [joinForm, setJoinForm] = useState({
+    serviceType: SERVICE_TYPES[0].slug,
+    label: '',
+    phone: '',
+    email: '',
+    city: '',
+    notes: '',
+    categories: [] as string[],
+  });
+  const [joinSubmitting, setJoinSubmitting] = useState(false);
+  const [joinSubmitted, setJoinSubmitted] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+
+  // ── Scroll rigs ─────────────────────────────────────────────────────────
+  // Page progress bar.
+  const { scrollYProgress: pageProgress, scrollY } = useScroll();
+  const progressScale = useSpring(pageProgress, { stiffness: 140, damping: 30, mass: 0.3 });
+
+  useMotionValueEvent(scrollY, 'change', (v) => {
+    const past = v > 24;
+    setIsScrolled((prev) => (prev === past ? prev : past));
+  });
+
+  // Hero: the backdrop drifts down and grows while the copy floats up and out.
+  const heroRef = useRef<HTMLElement>(null);
+  const { scrollYProgress: heroProgress } = useScroll({
+    target: heroRef,
+    offset: ['start start', 'end start'],
+  });
+  const heroImageY = useTransform(heroProgress, [0, 1], ['0%', '24%']);
+  const heroImageScale = useTransform(heroProgress, [0, 1], [1.06, 1.28]);
+  const heroCopyY = useTransform(heroProgress, [0, 1], [0, 140]);
+  const heroScrimOpacity = useTransform(heroProgress, [0, 1], [0.26, 0.62]);
+
+  // Pinned "how it works" track.
+  const stepsTrackRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress: stepsProgress } = useScroll({
+    target: stepsTrackRef,
+    offset: ['start start', 'end end'],
+  });
+  const stepsLineHeight = useTransform(stepsProgress, [0, 1], ['0%', '100%']);
+
+  useMotionValueEvent(stepsProgress, 'change', (v) => {
+    // Below `lg` the track is display:none, so progress can arrive as NaN —
+    // clamping without a finite check would index the step array with NaN.
+    const raw = Math.floor(v * HOW_IT_WORKS_STEPS.length);
+    const next = Number.isFinite(raw)
+      ? Math.min(HOW_IT_WORKS_STEPS.length - 1, Math.max(0, raw))
+      : 0;
+    setActiveHiwStep((prev) => (prev === next ? prev : next));
+  });
+
+  // Closing call to action: the ring block eases in as it centres.
+  const ctaRef = useRef<HTMLElement>(null);
+  const { scrollYProgress: ctaProgress } = useScroll({
+    target: ctaRef,
+    offset: ['start end', 'center center'],
+  });
+  const ctaRingScale = useTransform(ctaProgress, [0, 1], [0.72, 1]);
+  const ctaRingOpacity = useTransform(ctaProgress, [0, 0.6], [0, 1]);
+
+  // Footer watermark drifts as the page bottoms out.
+  const footerRef = useRef<HTMLElement>(null);
+  const { scrollYProgress: footerProgress } = useScroll({
+    target: footerRef,
+    offset: ['start end', 'end end'],
+  });
+  const watermarkY = useTransform(footerProgress, [0, 1], [70, -10]);
+
+  // Google Font injection
   useEffect(() => {
     const link = document.createElement('link');
     link.href =
@@ -581,15 +822,7 @@ export default function LandingPageMaster({
 
   const handleSmoothScroll = (targetId: string) => {
     setIsMobileMenuOpen(false);
-    const element = document.getElementById(targetId);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
-  const handleTestPing = () => {
-    setSimulatedAlertActive(true);
-    setTimeout(() => setSimulatedAlertActive(false), 2600);
+    document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleToggleFaq = (faqId: string) => {
@@ -606,30 +839,22 @@ export default function LandingPageMaster({
       }
       return [...prev, { product, qty }];
     });
-    setIsCartOpen(true);
-  };
-
-  const buyNow = (product: ProductItem) => {
-    addToCart(product, 1);
-    openCheckout();
+    setCartNotice({ name: product.name, qty });
   };
 
   const openCheckout = () => {
     setIsCartOpen(false);
-    if (onOpenCheckout) {
-      onOpenCheckout();
-    } else {
-      onStart?.();
-    }
+    if (onOpenCheckout) onOpenCheckout();
+    else onStart?.();
   };
 
   const handleDemoTrigger = (actionType: 'parking' | 'gps' | 'emergency') => {
     if (actionType === 'parking') {
-      setDemoActionAlert('📱 Parking issue alert sent! Owner notified via WhatsApp + SMS.');
+      setDemoActionAlert('Parking issue alert sent. Owner notified on WhatsApp and SMS.');
     } else if (actionType === 'gps') {
-      setDemoActionAlert('📍 GPS coordinates shared securely with the tag owner.');
+      setDemoActionAlert('Location shared securely with the tag owner.');
     } else {
-      setDemoActionAlert('🚨 Emergency alert dispatched to owner + 3 designated responders.');
+      setDemoActionAlert('Emergency alert dispatched to the owner and 3 backup contacts.');
     }
     setTimeout(() => setDemoActionAlert(null), 3500);
   };
@@ -637,7 +862,6 @@ export default function LandingPageMaster({
   const handlePartnerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!partnerForm.name || !partnerForm.phone || !partnerForm.city) return;
-
     try {
       await saveDistributorApplication({
         userId: profile?.id,
@@ -654,1531 +878,1877 @@ export default function LandingPageMaster({
     }
   };
 
-  const filteredProducts = useMemo(() => {
-    if (activeCategory === 'All') return PRODUCTS;
-    return PRODUCTS.filter((p) => p.category === activeCategory);
-  }, [activeCategory]);
+  const joinServiceType = useMemo(
+    () => SERVICE_TYPES.find((t) => t.slug === joinForm.serviceType) || SERVICE_TYPES[0],
+    [joinForm.serviceType]
+  );
+  const joinServiceMeta = getServiceMeta(joinForm.serviceType);
 
-  const cartSubtotal = cart.reduce((sum, i) => sum + i.product.price * i.qty, 0);
-
-  const renderAssetIcon = (icon: AssetMockupRow['icon']) => {
-    switch (icon) {
-      case 'car':
-        return <Car size={15} className="text-amber-500" />;
-      case 'laptop':
-        return <Laptop size={15} className="text-blue-500" />;
-      case 'dog':
-        return <Dog size={15} className="text-emerald-500" />;
-      case 'luggage':
-        return <Luggage size={15} className="text-purple-500" />;
-      default:
-        return <Key size={15} className="text-amber-500" />;
-    }
+  /** Navbar dropdown -> pick the service type and scroll the form into view. */
+  const handleJoinSelect = (slug: string) => {
+    setIsJoinMenuOpen(false);
+    setJoinForm((prev) => ({ ...prev, serviceType: slug }));
+    setJoinSubmitted(false);
+    setJoinError(null);
+    onOpenJoinUs?.();
   };
 
+  const toggleJoinCategory = (value: string) => {
+    setJoinForm((prev) => ({
+      ...prev,
+      categories: prev.categories.includes(value)
+        ? prev.categories.filter((c) => c !== value)
+        : [...prev.categories, value],
+    }));
+  };
+
+  /** Name, phone and city are what the admin needs to verify a provider. */
+  const joinFormIsValid = Boolean(
+    joinForm.label.trim() && joinForm.phone.trim() && joinForm.city.trim()
+  );
+
+  const resetJoinForm = () => {
+    setJoinSubmitted(false);
+    setJoinError(null);
+    // The service type survives, so listing a second branch is one field away.
+    setJoinForm((prev) => ({
+      serviceType: prev.serviceType,
+      label: '',
+      phone: '',
+      email: '',
+      city: '',
+      notes: '',
+      categories: [],
+    }));
+  };
+
+  const handleJoinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!joinFormIsValid) return;
+
+    setJoinSubmitting(true);
+    setJoinError(null);
+    const type = joinServiceType;
+    const saved = await submitProviderApplication({
+      // The legacy label is what the bespoke car/bike scan screen looks providers
+      // up by, so it stays authoritative alongside the slug.
+      category: type.legacy || type.label,
+      serviceType: type.slug,
+      categories: joinForm.categories,
+      label: joinForm.label.trim(),
+      phone: joinForm.phone.trim(),
+      email: joinForm.email.trim(),
+      city: joinForm.city.trim(),
+      notes: joinForm.notes.trim(),
+    });
+    setJoinSubmitting(false);
+
+    if (saved) setJoinSubmitted(true);
+    else setJoinError("We couldn't submit your application just now. Please try again in a moment.");
+  };
+
+  const filteredProducts = useMemo(
+    () => (activeCategory === 'All' ? PRODUCTS : PRODUCTS.filter((p) => p.category === activeCategory)),
+    [activeCategory]
+  );
+
+  const cartSubtotal = cart.reduce((sum, i) => sum + i.product.price * i.qty, 0);
+  const cartCount = cart.reduce((s, i) => s + i.qty, 0);
+  const activeStep = HOW_IT_WORKS_STEPS[activeHiwStep] ?? HOW_IT_WORKS_STEPS[0];
+
+  const NAV_LINKS = [
+    { id: 'products-section', label: 'Products' },
+    { id: 'hiw-section', label: 'How it works' },
+    { id: 'pricing-section', label: 'Pricing' },
+    { id: 'distributor-section', label: 'Franchise' },
+    { id: 'faq-section', label: 'FAQ' },
+  ];
+
   return (
-    <div className="min-h-screen bg-white text-slate-950 font-sans selection:bg-amber-400 selection:text-black">
-      
-      {/* ── 1. NAVBAR (FULL-WIDTH NON-FLOATING HEADER) ─────────────── */}
-      <header className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b border-slate-200/90 transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
-          
-          {/* Brand Logo */}
+    <div className="min-h-screen bg-white font-sans text-[#0B0B0C] antialiased selection:bg-[#0B0B0C] selection:text-white">
+
+      {/* ── Page scroll progress ──────────────────────────────────────── */}
+      <motion.div
+        style={{ scaleX: progressScale }}
+        className="fixed inset-x-0 top-0 z-[80] h-[2px] origin-left bg-[#F6C000]"
+        aria-hidden="true"
+      />
+
+      {/* ── 1. NAVBAR — transparent over the hero, glass once you move ── */}
+      <header
+        className={`fixed inset-x-0 top-0 z-[70] transition-all duration-500 ${
+          isScrolled ? 'bg-[#0B0B0C]/85 backdrop-blur-xl border-b border-white/10' : 'bg-transparent'
+        }`}
+      >
+        <div className="mx-auto flex max-w-[1400px] items-center justify-between px-5 py-4 sm:px-8 lg:px-12">
           <button
-            onClick={() => handleSmoothScroll('hero-section')}
-            className="flex items-center group cursor-pointer focus:outline-hidden"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="flex cursor-pointer items-center focus:outline-hidden"
+            aria-label="RapiQR home"
           >
-            <img
-              src={logoForWhiteBg}
-              alt="RapiQR Smart Safety"
-              className="h-8 sm:h-9 w-auto object-contain group-hover:scale-105 transition-transform"
-            />
+            <img src={darkBgLogo} alt="RapiQR" className="h-7 w-auto object-contain sm:h-8" />
           </button>
 
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-6 lg:gap-8 text-xs font-bold text-slate-700">
-            <button
-              onClick={() => handleSmoothScroll('hiw-section')}
-              className="hover:text-slate-950 transition-colors cursor-pointer"
+          <nav className="hidden items-center gap-8 text-[13px] font-medium text-white/70 lg:flex">
+            {NAV_LINKS.map((link) => (
+              <button
+                key={link.id}
+                onClick={() => handleSmoothScroll(link.id)}
+                className="cursor-pointer transition-colors hover:text-white"
+              >
+                {link.label}
+              </button>
+            ))}
+
+            {/* Join Us — the full service catalogue, so a provider can pick
+                what they do before the form even loads. */}
+            <div
+              className="relative"
+              onMouseEnter={() => setIsJoinMenuOpen(true)}
+              onMouseLeave={() => setIsJoinMenuOpen(false)}
             >
-              How It Works
-            </button>
-            <button
-              onClick={() => handleSmoothScroll('products-section')}
-              className="hover:text-slate-950 transition-colors cursor-pointer"
-            >
-              Products &amp; Uses
-            </button>
-            <button
-              onClick={() => handleSmoothScroll('demo-section')}
-              className="hover:text-slate-950 transition-colors cursor-pointer"
-            >
-              Live Scan Demo
-            </button>
-            <button
-              onClick={() => handleSmoothScroll('distributor-section')}
-              className="hover:text-slate-950 transition-colors cursor-pointer"
-            >
-              Franchise
-            </button>
-            <button
-              onClick={() => handleSmoothScroll('pricing-section')}
-              className="hover:text-slate-950 transition-colors cursor-pointer"
-            >
-              Pricing
-            </button>
-            <button
-              onClick={() => handleSmoothScroll('faq-section')}
-              className="hover:text-slate-950 transition-colors cursor-pointer"
-            >
-              FAQ
-            </button>
+              <button
+                onClick={() => onOpenJoinUs?.()}
+                aria-haspopup="true"
+                aria-expanded={isJoinMenuOpen}
+                className="flex cursor-pointer items-center gap-1.5 transition-colors hover:text-white"
+              >
+                Join us
+                <ChevronDown
+                  size={13}
+                  className={`transition-transform duration-300 ${isJoinMenuOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              <AnimatePresence>
+                {isJoinMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    transition={{ duration: 0.25, ease: EASE }}
+                    className="absolute left-1/2 top-full z-50 -translate-x-1/2 pt-4"
+                  >
+                    <div className="w-[640px] max-w-[calc(100vw-3rem)] overflow-hidden rounded-2xl border border-black/5 bg-white shadow-[0_30px_80px_-20px_rgba(0,0,0,0.45)]">
+                      <div className="border-b border-black/5 px-6 py-4">
+                        <p className="text-[13px] font-semibold text-[#0B0B0C]">
+                          Become a RapiQR service partner
+                        </p>
+                        <p className="mt-0.5 text-[12px] text-black/45">
+                          Pick what you do — we route matching scans to you.
+                        </p>
+                      </div>
+
+                      <div className="grid max-h-[58vh] grid-cols-3 gap-0.5 overflow-y-auto p-2">
+                        {SERVICE_TYPES.map((type) => {
+                          const m = getServiceMeta(type.slug);
+                          return (
+                            <button
+                              key={type.slug}
+                              onClick={() => handleJoinSelect(type.slug)}
+                              className="group/item flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-black/[0.04]"
+                            >
+                              <span
+                                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                                style={{ background: m.bg, color: m.color }}
+                              >
+                                <m.Icon size={14} />
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block truncate text-[12px] font-semibold text-[#0B0B0C]">
+                                  {type.label}
+                                </span>
+                                <span className="block truncate text-[10px] text-black/40">Provider</span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <button
+                        onClick={() => handleJoinSelect(joinForm.serviceType)}
+                        className="flex w-full cursor-pointer items-center justify-center gap-2 border-t border-black/5 bg-[#0B0B0C] px-6 py-3.5 text-[12px] font-semibold text-white transition-colors hover:bg-black"
+                      >
+                        Open the partner application
+                        <ArrowRight size={13} style={{ color: '#F6C000' }} />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </nav>
 
-          {/* Actions & Cart */}
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden items-center gap-5 lg:flex">
             <button
               onClick={() => setIsCartOpen(true)}
-              className="p-2 rounded-full hover:bg-slate-100 text-slate-800 relative transition-colors cursor-pointer"
-              aria-label="Open Shopping Cart"
+              className="relative cursor-pointer p-2 text-white/70 transition-colors hover:text-white"
+              aria-label="Open cart"
             >
               <ShoppingBag size={18} />
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-amber-400 text-slate-950 font-black text-[9px] rounded-full flex items-center justify-center shadow-xs">
-                {cart.length > 0 ? cart.reduce((s, i) => s + i.qty, 0) : 1}
-              </span>
+              {cartCount > 0 && (
+                <span
+                  className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-[#0B0B0C]"
+                  style={{ background: '#F6C000' }}
+                >
+                  {cartCount}
+                </span>
+              )}
             </button>
 
             {isEmbeddedInDashboard ? (
               <button
                 onClick={onOpenCheckout}
-                className="px-4 py-2 text-xs font-black text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all flex items-center gap-2 shadow-xs cursor-pointer active:scale-95"
+                className="cursor-pointer rounded-full bg-white px-6 py-2.5 text-[13px] font-semibold text-[#0B0B0C] transition-transform hover:scale-[1.03] active:scale-95"
               >
-                <Sparkles size={14} />
-                <span>Order New Tags</span>
+                Order new tags
               </button>
             ) : (
               <>
                 <button
                   onClick={onLogin}
-                  className="text-xs font-bold text-slate-700 hover:text-slate-950 transition-colors cursor-pointer"
+                  className="cursor-pointer text-[13px] font-medium text-white/70 transition-colors hover:text-white"
                 >
-                  Sign In
+                  Log in
                 </button>
                 <button
                   onClick={onStart || onOpenCheckout}
-                  className="px-5 py-2.5 text-xs font-black text-white bg-slate-950 hover:bg-slate-850 rounded-full transition-all flex items-center gap-2 shadow-sm hover:shadow-md group cursor-pointer active:scale-95"
+                  className="cursor-pointer rounded-full bg-white px-6 py-2.5 text-[13px] font-semibold text-[#0B0B0C] transition-transform hover:scale-[1.03] active:scale-95"
                 >
-                  <span>Get Protected</span>
-                  <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform text-amber-400" />
+                  Get started
                 </button>
               </>
             )}
           </div>
 
-          {/* Mobile menu trigger */}
-          <div className="flex md:hidden items-center gap-2">
+          {/* Mobile triggers */}
+          <div className="flex items-center gap-1 lg:hidden">
             <button
               onClick={() => setIsCartOpen(true)}
-              className="p-2 rounded-lg bg-slate-100 text-slate-800 relative"
+              className="relative p-2 text-white"
+              aria-label="Open cart"
             >
-              <ShoppingBag size={17} />
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 text-slate-950 font-bold text-[9px] rounded-full flex items-center justify-center">
-                {cart.length > 0 ? cart.reduce((s, i) => s + i.qty, 0) : 1}
-              </span>
+              <ShoppingBag size={18} />
+              {cartCount > 0 && (
+                <span
+                  className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-[#0B0B0C]"
+                  style={{ background: '#F6C000' }}
+                >
+                  {cartCount}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-2 text-slate-700 hover:text-black rounded-lg focus:outline-hidden"
-              aria-label="Toggle navigation menu"
+              className="p-2 text-white"
+              aria-label="Toggle navigation"
             >
               {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
         </div>
-
-        {/* Mobile Navigation Drawer */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-200 bg-white px-5 pt-3 pb-6 space-y-3 shadow-xl animate-fade-in text-left">
-            <button onClick={() => { setIsMobileMenuOpen(false); handleSmoothScroll('hiw-section'); }} className="block w-full py-2 text-sm font-bold text-slate-800">
-              How It Works
-            </button>
-            <button onClick={() => { setIsMobileMenuOpen(false); handleSmoothScroll('products-section'); }} className="block w-full py-2 text-sm font-bold text-slate-800">
-              Products &amp; Uses
-            </button>
-            <button onClick={() => { setIsMobileMenuOpen(false); handleSmoothScroll('demo-section'); }} className="block w-full py-2 text-sm font-bold text-slate-800">
-              Live Scan Demo
-            </button>
-            <button onClick={() => { setIsMobileMenuOpen(false); handleSmoothScroll('distributor-section'); }} className="block w-full py-2 text-sm font-bold text-slate-800">
-              Franchise Opportunity
-            </button>
-            <button onClick={() => { setIsMobileMenuOpen(false); handleSmoothScroll('pricing-section'); }} className="block w-full py-2 text-sm font-bold text-slate-800">
-              Pricing Plans
-            </button>
-            <button onClick={() => { setIsMobileMenuOpen(false); handleSmoothScroll('faq-section'); }} className="block w-full py-2 text-sm font-bold text-slate-800">
-              Frequently Asked Questions
-            </button>
-
-            <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
-              <button
-                onClick={() => { setIsMobileMenuOpen(false); onLogin?.(); }}
-                className="w-full py-3 text-center text-xs font-bold text-slate-800 bg-slate-100 rounded-xl"
-              >
-                Sign In to Dashboard
-              </button>
-              <button
-                onClick={() => { setIsMobileMenuOpen(false); onStart?.(); }}
-                className="w-full py-3 text-center text-xs font-black text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-xl shadow-xs"
-              >
-                Get Started Now →
-              </button>
-            </div>
-          </div>
-        )}
       </header>
 
-      {/* ── 2. HERO SECTION (MINIMALIST CLEAN CANVAS WITH ANIMATED FLOW ARROWS) ── */}
-      <section id="hero-section" className="relative pt-8 pb-16 sm:pt-12 sm:pb-24 overflow-hidden bg-white text-slate-950 min-h-[640px] lg:min-h-[700px] flex items-center justify-center border-b border-slate-100">
-        
-        {/* Crisp subtle dot grid pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.035] pointer-events-none"
-          style={{
-            backgroundImage: 'radial-gradient(#000 1.2px, transparent 1.2px)',
-            backgroundSize: '24px 24px',
-          }}
-        />
-
-        {/* ── UNIFIED HERO CANVAS CONTAINER ── */}
-        <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 z-10">
-          
-          {/* Animated Connecting Flow Lines with Directional Arrows */}
-          <svg className="absolute inset-0 w-full h-full pointer-events-none hidden lg:block z-0" viewBox="0 0 1200 640" fill="none" preserveAspectRatio="none">
-            <defs>
-              <marker id="hero-arrow-gold" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#F59E0B" />
-              </marker>
-              <linearGradient id="flow-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.4" />
-                <stop offset="50%" stopColor="#F59E0B" stopOpacity="0.95" />
-                <stop offset="100%" stopColor="#F59E0B" stopOpacity="0.4" />
-              </linearGradient>
-            </defs>
-
-            {/* Flow Curve 1: Left Finder Scanner ➔ Center QR Hub */}
-            <path
-              d="M 270 230 C 370 200, 430 250, 500 260"
-              stroke="url(#flow-gradient)"
-              strokeWidth="2.5"
-              strokeDasharray="6 6"
-              className="animate-flow-line"
-              markerEnd="url(#hero-arrow-gold)"
-            />
-
-            {/* Flow Curve 2: Center QR Hub ➔ Right Owner Alert */}
-            <path
-              d="M 700 260 C 770 250, 830 200, 930 230"
-              stroke="url(#flow-gradient)"
-              strokeWidth="2.5"
-              strokeDasharray="6 6"
-              className="animate-flow-line"
-              markerEnd="url(#hero-arrow-gold)"
-            />
-
-            {/* Animated Pulsing Node Anchors */}
-            <circle cx="270" cy="230" r="5" fill="#F59E0B" className="animate-pulse" />
-            <circle cx="500" cy="260" r="5" fill="#F59E0B" className="animate-pulse" />
-            <circle cx="700" cy="260" r="5" fill="#F59E0B" className="animate-pulse" />
-            <circle cx="930" cy="230" r="5" fill="#F59E0B" className="animate-pulse" />
-          </svg>
-
-          {/* ── LEFT FLOATING CARD: Step 1 Public Scan (Finder) ── */}
-          <div className="hidden lg:block absolute top-12 left-4 xl:left-8 z-20 w-[240px] xl:w-[260px] bg-white rounded-3xl p-4 border border-slate-200/90 shadow-xl shadow-slate-900/5 text-left hover:scale-105 transition-transform duration-300">
-            <div className="flex items-center justify-between mb-2.5">
-              <div className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-slate-950 text-amber-400 text-[10px] font-black grid place-items-center">
-                  01
-                </span>
-                <span className="font-extrabold text-xs text-slate-900">Finder Camera</span>
-              </div>
-              <span className="text-[9px] font-black bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md">
-                0.18s Scan
-              </span>
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 mb-2">
-              <div className="flex items-center justify-between text-[11px] font-bold text-slate-800 mb-1">
-                <span>🚗 Porsche 911 GT3</span>
-                <span className="text-emerald-600 text-[10px]">● Scanned</span>
-              </div>
-              <p className="text-[10px] text-slate-500 leading-snug">
-                Zero app or registration required for finders.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-              <span>Routing through secure IVR...</span>
-            </div>
-          </div>
-
-          {/* ── RIGHT FLOATING CARD: Step 2 Masked Alert (Protected Owner) ── */}
-          <div className="hidden lg:block absolute top-12 right-4 xl:right-8 z-20 w-[240px] xl:w-[260px] bg-white rounded-3xl p-4 border border-slate-200/90 shadow-xl shadow-slate-900/5 text-left hover:scale-105 transition-transform duration-300">
-            <div className="flex items-center justify-between mb-2.5">
-              <div className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white text-[10px] font-black grid place-items-center">
-                  02
-                </span>
-                <span className="font-extrabold text-xs text-slate-900">Protected Owner</span>
-              </div>
-              <span className="text-[9px] font-black bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
-                100% Masked
-              </span>
-            </div>
-
-            <div className="space-y-1.5 mb-2">
-              <div className="p-2 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-[11px] font-bold text-slate-800">
-                <span className="flex items-center gap-1.5">📞 Cloud IVR Call</span>
-                <span className="text-emerald-600 text-xs">✓</span>
-              </div>
-              <div className="p-2 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-[11px] font-bold text-slate-800">
-                <span className="flex items-center gap-1.5">💬 WhatsApp SOS</span>
-                <span className="text-emerald-600 text-xs">✓</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
-              <span>Mobile Number:</span>
-              <span className="text-slate-800 font-mono font-bold">●●●●●●8921</span>
-            </div>
-          </div>
-
-          {/* ── CENTRAL HERO CONTENT (CLEAN & BALANCED) ── */}
-          <div className="relative z-10 max-w-2xl sm:max-w-3xl mx-auto text-center py-4 sm:py-6">
-            
-            {/* Top Pill & Safety Proof */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black bg-slate-100 text-slate-900 border border-slate-200 shadow-xs mb-4">
-              <span>🇮🇳</span>
-              <span>India's 1st Smartest QR Security Tag</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            </div>
-
-            {/* Central Main Headline */}
-            <h1 className="text-4xl sm:text-6xl lg:text-[66px] font-black text-slate-950 tracking-tight leading-[1.08]">
-              India's 1st Smartest <br className="hidden sm:inline" />
-              <span className="bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 bg-clip-text text-transparent">QR Security</span> &amp; Safety Hub
-            </h1>
-
-            <p className="text-sm sm:text-base text-slate-600 font-medium max-w-xl mx-auto mt-4 leading-relaxed">
-              Instant 0.18s camera scan connects finders via masked IVR calls, WhatsApp SOS &amp; live GPS — without ever revealing your personal mobile number.
-            </p>
-
-            {/* Zero Exposure Switcher & Integrations */}
-            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mt-6">
-              <div className="flex items-center gap-2 bg-slate-50 px-3.5 py-1.5 rounded-full border border-slate-200 shadow-xs text-xs font-bold text-slate-800">
-                <span>100% Number Private</span>
-                <span className="w-7 h-4 bg-emerald-500 rounded-full flex items-center p-0.5 justify-end">
-                  <span className="w-3 h-3 bg-white rounded-full shadow-xs" />
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
-                <span className="px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 shadow-xs">WhatsApp SOS</span>
-                <span className="px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 shadow-xs">Masked IVR</span>
-                <span className="px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 shadow-xs">Live GPS</span>
-              </div>
-            </div>
-
-            {/* High-Converting Dual CTA Buttons */}
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-              <button
-                onClick={onStart || onOpenCheckout}
-                className="px-8 py-4 rounded-full bg-slate-950 hover:bg-slate-850 text-white font-black text-sm shadow-xl hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center gap-2.5 group"
-              >
-                <span>Order Smart QR Tag</span>
-                <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform text-amber-400" />
-              </button>
-
-              <button
-                onClick={() => handleSmoothScroll('demo-section')}
-                className="px-6 py-4 rounded-full bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 font-bold text-sm shadow-sm hover:border-slate-300 transition-all cursor-pointer flex items-center gap-2"
-              >
-                <Smartphone size={16} className="text-amber-500" />
-                <span>Try Live Demo</span>
-              </button>
-            </div>
-
-            {/* Trust Micro-Bullets */}
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs text-slate-500 font-semibold">
-              <span className="flex items-center gap-1.5">🚚 Free 48h Delivery</span>
-              <span className="flex items-center gap-1.5">🛡️ 3-Year 3M Adhesive</span>
-              <span className="flex items-center gap-1.5">⚡ Zero App Needed</span>
-            </div>
-
-          </div>
-
-          {/* ── MOBILE ADAPTATION: Horizontal Cards Row for small screens ── */}
-          <div className="lg:hidden mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm text-left">
-              <div className="font-extrabold text-xs text-slate-950 mb-1">01. 📱 Instant Scan (Finder)</div>
-              <p className="text-[11px] text-slate-500">0.18s instant camera scan with zero app downloads.</p>
-            </div>
-            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm text-left">
-              <div className="font-extrabold text-xs text-slate-950 mb-1">02. 🔒 Masked IVR Alert (Owner)</div>
-              <p className="text-[11px] text-slate-500">Connects calls seamlessly while keeping your phone number 100% private.</p>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* ── 3. BENEFIT TRUST STRIP (THEME: SLEEK OBSIDIAN BLACK) ───────── */}
-      <section className="py-8 bg-slate-950 text-white border-y border-slate-800 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center sm:text-left">
-            <div className="flex items-center gap-3.5 justify-center sm:justify-start">
-              <div className="w-11 h-11 rounded-2xl bg-amber-400/10 border border-amber-400/25 text-amber-400 flex items-center justify-center shrink-0 shadow-xs">
-                <Truck size={20} />
-              </div>
-              <div>
-                <div className="font-extrabold text-sm text-white">Free Standard Delivery</div>
-                <div className="text-xs text-slate-400">Tracked shipping across India</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3.5 justify-center sm:justify-start">
-              <div className="w-11 h-11 rounded-2xl bg-amber-400/10 border border-amber-400/25 text-amber-400 flex items-center justify-center shrink-0 shadow-xs">
-                <Shield size={20} />
-              </div>
-              <div>
-                <div className="font-extrabold text-sm text-white">Live Scan Alerts</div>
-                <div className="text-xs text-slate-400">WhatsApp, SMS &amp; email</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3.5 justify-center sm:justify-start">
-              <div className="w-11 h-11 rounded-2xl bg-amber-400/10 border border-amber-400/25 text-amber-400 flex items-center justify-center shrink-0 shadow-xs">
-                <Lock size={20} />
-              </div>
-              <div>
-                <div className="font-extrabold text-sm text-white">100% Number Privacy</div>
-                <div className="text-xs text-slate-400">Virtual IVR call masking</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3.5 justify-center sm:justify-start">
-              <div className="w-11 h-11 rounded-2xl bg-amber-400/10 border border-amber-400/25 text-amber-400 flex items-center justify-center shrink-0 shadow-xs">
-                <Zap size={20} />
-              </div>
-              <div>
-                <div className="font-extrabold text-sm text-white">Zero App Needed</div>
-                <div className="text-xs text-slate-400">Standard camera scan</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 4. PRODUCTS & STOREFRONT SECTION (THEME: CRISP PURE WHITE) ─── */}
-      <section id="products-section" className="py-20 sm:py-28 bg-white text-slate-950">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          {/* Section Header */}
-          <div className="text-center max-w-3xl mx-auto mb-14" data-reveal>
-            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-amber-50 text-amber-950 border border-amber-300 mb-3 shadow-xs">
-              <ShoppingBag size={13} className="text-amber-600" />
-              <span>Smart QR Safety Catalog</span>
-            </div>
-            <h2 className="text-3xl sm:text-5xl font-black text-slate-950 tracking-tight leading-tight">
-              One QR. Lifetime Protection.
-            </h2>
-            <p className="text-slate-600 text-sm sm:text-base mt-3 max-w-xl mx-auto">
-              Buy once, activate in 10 seconds. Automotive-grade 3M adhesive with ₹0 recurring subscription fees.
-            </p>
-
-            {/* Elevated Category Filter Pills */}
-            <div className="flex flex-wrap justify-center gap-2 sm:gap-2.5 mt-8">
-              {[
-                { key: 'All', label: 'All Products', icon: '✨' },
-                { key: 'Vehicle', label: 'Vehicles & Bikes', icon: '🚗' },
-                { key: 'Home', label: 'Home & Gates', icon: '🏠' },
-                { key: 'Family', label: 'Pets & Family', icon: '🐾' },
-                { key: 'Travel', label: 'Travel & Luggage', icon: '✈️' },
-              ].map((cat) => (
-                <button
-                  key={cat.key}
-                  onClick={() => setActiveCategory(cat.key as any)}
-                  className={`flex items-center gap-1.5 px-4 sm:px-5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                    activeCategory === cat.key
-                      ? 'bg-slate-950 text-white shadow-md scale-105'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200/60'
-                  }`}
+      {/* ── Mobile drawer ───────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3, ease: EASE }}
+            className="fixed inset-0 z-[69] flex flex-col bg-[#0B0B0C] px-6 pb-10 pt-24 lg:hidden"
+          >
+            <div className="flex-1 overflow-y-auto">
+              {[...NAV_LINKS, { id: 'join-section', label: 'Join us' }].map((link, i) => (
+                <motion.button
+                  key={link.id}
+                  initial={{ opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.06 * i, duration: 0.5, ease: EASE }}
+                  onClick={() => link.id === 'join-section' ? onOpenJoinUs?.() : handleSmoothScroll(link.id)}
+                  className="block w-full border-b border-white/10 py-5 text-left text-2xl font-light tracking-tight text-white"
                 >
-                  <span>{cat.icon}</span>
-                  <span>{cat.label}</span>
-                </button>
+                  {link.label}
+                </motion.button>
               ))}
             </div>
-          </div>
 
-          {/* Product Cards Grid - Clean & Simple */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
-              <div
-                data-reveal
-                key={product.id}
-                className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-xs hover:shadow-lg hover:border-amber-300 transition-all duration-200 flex flex-col justify-between group"
+            <div className="mt-8 flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onLogin?.();
+                }}
+                className="w-full rounded-full border border-white/20 py-3.5 text-sm font-medium text-white"
               >
-                <div>
-                  {/* Media Frame */}
-                  <div className="relative h-48 bg-slate-50 overflow-hidden flex items-center justify-center p-4">
+                Log in
+              </button>
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  (onStart || onOpenCheckout)?.();
+                }}
+                className="w-full rounded-full bg-white py-3.5 text-sm font-semibold text-[#0B0B0C]"
+              >
+                Get started
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── 2. HERO — photographic backdrop, parallaxed ─────────────────── */}
+      <section
+        ref={heroRef}
+        id="hero-section"
+        className="relative flex min-h-[100svh] items-center justify-center overflow-hidden bg-[#0B0B0C]"
+      >
+        <motion.img
+          src={HERO_BG}
+          alt=""
+          aria-hidden="true"
+          style={reduced ? undefined : { y: heroImageY, scale: heroImageScale }}
+          /* Held slightly out of focus on purpose: it reads as depth behind the
+             headline instead of competing with it, the way the reference hero's
+             shallow-DOF macro shot does. */
+          className="absolute inset-0 h-full w-full object-cover object-center blur-[1px]"
+        />
+        {/* Scrim: dark enough for white type at AA, and it deepens on scroll. */}
+        <motion.div
+          style={reduced ? undefined : { opacity: heroScrimOpacity }}
+          className="absolute inset-0 bg-[#0B0B0C]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0C]/75 via-[#0B0B0C]/15 to-[#0B0B0C]/85" />
+
+        <motion.div
+          style={reduced ? undefined : { y: heroCopyY }}
+          className="relative z-10 mx-auto max-w-4xl px-6 pb-20 pt-32 text-center sm:pb-28"
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: EASE }}
+            className="mb-6 text-[10px] font-medium uppercase tracking-[0.2em] text-white/85"
+          >
+            Built for safer everyday journeys
+          </motion.div>
+
+          <h1 className="mx-auto max-w-3xl text-[clamp(2.5rem,6vw,5.6rem)] font-medium leading-[0.94] tracking-[-0.045em] text-white drop-shadow-[0_3px_24px_rgba(0,0,0,0.5)]">
+            <SplitWords text="India's 1st" delay={0.1} animateOnLoad />{' '}
+            <span className="text-[#F6C000]">
+              <SplitWords text="smartest" delay={0.22} animateOnLoad />
+            </span>
+            <br />
+            <SplitWords text="QR safety platform" delay={0.34} animateOnLoad />
+          </h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.9, delay: 0.7, ease: EASE }}
+            className="mx-auto mt-8 max-w-md text-[15px] font-light leading-relaxed text-white/85 sm:text-base"
+          >
+            One smart scan helps people reach you instantly, while your phone number stays private.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.9, delay: 0.85, ease: EASE }}
+            className="mt-9 flex flex-col items-center gap-4"
+          >
+            <motion.button
+              onClick={onStart || onOpenCheckout}
+              whileHover={reduced ? undefined : { y: -3 }}
+              whileTap={reduced ? undefined : { scale: 0.97 }}
+              transition={{ duration: 0.25, ease: EASE }}
+              className="group flex cursor-pointer items-center gap-6 rounded-md bg-white px-10 py-5 text-[15px] font-semibold text-[#0B0B0C] shadow-[0_16px_40px_-18px_rgba(0,0,0,0.8)]"
+            >
+              Get your tag
+              <ArrowRight
+                size={18}
+                className="transition-transform duration-300 group-hover:translate-x-1.5"
+                style={{ color: '#C79E00' }}
+              />
+            </motion.button>
+            <p className="text-[12px] font-light text-white/75">Ships in 2–3 days. No app required.</p>
+          </motion.div>
+        </motion.div>
+
+        {/* Scroll cue */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.6, duration: 1 }}
+          className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2"
+          aria-hidden="true"
+        >
+          <motion.div
+            animate={reduced ? undefined : { y: [0, 9, 0] }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+            className="flex h-9 w-[22px] items-start justify-center rounded-full border border-white/25 pt-2"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
+          </motion.div>
+        </motion.div>
+      </section>
+
+      {/* ── 3. STATS BAND ───────────────────────────────────────────────── */}
+      <section className="border-t border-white/10 bg-[#0B0B0C] py-16 sm:py-24">
+        <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
+          <div className="grid grid-cols-2 gap-y-12 md:grid-cols-4">
+            {STATS.map((stat, i) => (
+              <Reveal
+                key={stat.label}
+                delay={i * 0.09}
+                className={`px-2 text-center ${i > 0 ? 'md:border-l md:border-white/10' : ''}`}
+              >
+                <div className="text-[clamp(2.2rem,5vw,3.6rem)] font-light leading-none tracking-[-0.04em] text-white">
+                  <Counter to={stat.value} suffix={stat.suffix} kilo={stat.kilo} />
+                </div>
+                <div className="mt-3 text-[11px] font-light uppercase tracking-[0.16em] text-white/40">
+                  {stat.label}
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 5. CATEGORY TICKER ──────────────────────────────────────────── */}
+      <section className="overflow-hidden border-y border-white/10 bg-[#0B0B0C] py-6">
+        <Marquee duration={44}>
+          {BADGE_ITEMS.map((item) => (
+            <span
+              key={`a-${item.label}`}
+              className="flex items-center gap-2.5 whitespace-nowrap rounded-full border border-white/10 px-5 py-2.5 text-[13px] font-light text-white/55"
+            >
+              <item.icon size={15} className="text-white/35" />
+              {item.label}
+            </span>
+          ))}
+        </Marquee>
+      </section>
+
+      {/* ── 6. PRODUCTS — tabs + horizontal rail ────────────────────────── */}
+      <section id="products-section" className="bg-[#F4F1EC] py-24 sm:py-32">
+        <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
+          <Reveal className="flex flex-col gap-8 border-b border-black/10 pb-10 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-xl">
+              <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.18em] text-black/40">
+                The RapiQR collection
+              </p>
+              <h2 className="text-[clamp(2rem,4.2vw,3.4rem)] font-medium leading-[1.02] tracking-[-0.04em]">
+                <SplitWords text="Protection, made personal" />
+              </h2>
+              <p className="mt-4 max-w-lg text-[15px] font-light leading-relaxed text-black/50">
+                Choose a purpose-built tag for the things that move through your day.
+                Every one includes lifetime validity and private contact routing.
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-5 text-[11px] uppercase tracking-[0.14em] text-black/40">
+              <span><strong className="text-black">{PRODUCTS.length}</strong> tag styles</span>
+              <span className="h-5 w-px bg-black/15" />
+              <span><strong className="text-black">∞</strong> validity</span>
+            </div>
+          </Reveal>
+
+          {/* Tabs */}
+          <Reveal delay={0.12} className="mt-10 flex flex-wrap justify-center gap-2">
+            {(['All', 'Vehicle', 'Home', 'Family', 'Travel'] as const).map((cat) => {
+              const on = activeCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={`relative cursor-pointer rounded-full px-5 py-2 text-[13px] font-medium transition-colors ${
+                    on ? 'text-white' : 'text-black/55 hover:text-black'
+                  }`}
+                >
+                  {on && (
+                    <motion.span
+                      layoutId="product-tab"
+                      transition={{ duration: 0.45, ease: EASE }}
+                      className="absolute inset-0 rounded-full bg-[#0B0B0C]"
+                    />
+                  )}
+                  <span className="relative z-10">{cat}</span>
+                </button>
+              );
+            })}
+          </Reveal>
+        </div>
+
+        {/* Product grid */}
+        <div className="relative mt-12 px-6 sm:px-10">
+          <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+            <AnimatePresence mode="popLayout">
+              {filteredProducts.map((product, i) => (
+                <motion.article
+                  key={product.id}
+                  layout
+                  initial={reduced ? undefined : { opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.7, delay: i * 0.07, ease: EASE }}
+                  className="group relative flex h-full flex-col overflow-hidden rounded-[1.75rem] bg-[#0B0B0C] shadow-[0_24px_60px_-28px_rgba(0,0,0,0.65)]"
+                >
+                  <div className="relative aspect-[16/9] overflow-hidden">
                     <img
                       src={product.img}
                       alt={product.name}
-                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                      className="h-full w-full object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
                     />
-                    <span className="absolute top-3 left-3 px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-400 text-slate-950 shadow-xs">
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0C] via-[#0B0B0C]/10 to-transparent" />
+                    <span className="absolute left-5 top-5 rounded-full border border-white/15 bg-black/40 px-3 py-1 text-[11px] font-light text-white/80 backdrop-blur-sm">
                       {product.badge}
                     </span>
-                    <span className="absolute top-3 right-3 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900/80 text-white">
-                      {Math.round(((product.mrp - product.price) / product.mrp) * 100)}% OFF
+                    <span className="absolute bottom-5 left-5 text-[11px] font-medium uppercase tracking-[0.14em] text-white/55">
+                      {product.category}
                     </span>
                   </div>
 
-                  {/* Details */}
-                  <div className="p-5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 block mb-1">
-                      {product.category}
-                    </span>
-                    <h3 className="font-bold text-base text-slate-950 mb-1.5 group-hover:text-amber-600 transition-colors">
-                      {product.name}
-                    </h3>
-                    <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-4">
+                  <div className="p-6 pt-2 text-white sm:p-7 sm:pt-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <h3 className="text-xl font-medium tracking-[-0.02em]">{product.name}</h3>
+                      <div className="shrink-0 text-right">
+                        <div className="text-lg font-medium">₹{product.price}</div>
+                        <div className="text-[11px] font-light text-white/35 line-through">
+                          ₹{product.mrp}
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="mt-2.5 text-[13px] font-light leading-relaxed text-white/55">
                       {product.desc}
                     </p>
 
-                    {/* Price */}
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-xl font-black text-slate-950">₹{product.price}</span>
-                      <span className="text-xs text-slate-400 line-through font-medium">₹{product.mrp}</span>
-                      <span className="ml-auto text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
-                        Lifetime Valid
-                      </span>
+                    <ul className="mt-5 space-y-2">
+                      {product.features.map((f) => (
+                        <li key={f} className="flex items-start gap-2 text-[12px] font-light text-white/60">
+                          <Check size={13} className="mt-[3px] shrink-0" style={{ color: '#F6C000' }} />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="mt-6 flex items-center gap-2">
+                      <button
+                        onClick={() => addToCart(product)}
+                        className="flex-1 cursor-pointer rounded-full bg-white py-3 text-[13px] font-semibold text-[#0B0B0C] transition-transform hover:scale-[1.02] active:scale-95"
+                      >
+                        Add to cart
+                      </button>
+                      <button
+                        onClick={() => {
+                          addToCart(product, 1);
+                          openCheckout();
+                        }}
+                        className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/20 text-white transition-colors hover:bg-white/10"
+                        aria-label={`Buy ${product.name} now`}
+                      >
+                        <ArrowUpRight size={17} />
+                      </button>
                     </div>
-                  </div>
-                </div>
 
-                {/* Footer Action */}
-                <div className="p-5 pt-0">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => buyNow(product)}
-                      className="flex-1 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-850 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                    >
-                      <span>Buy Now</span>
-                      <ArrowRight size={13} className="text-amber-400" />
-                    </button>
-                    <button
-                      onClick={() => addToCart(product)}
-                      className="p-2.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold transition-colors cursor-pointer"
-                      aria-label="Add to cart"
-                      title="Add to cart"
-                    >
-                      <Plus size={15} />
-                    </button>
+                    {product.rating && (
+                      <div className="mt-4 flex items-center gap-1.5 text-[11px] font-light text-white/35">
+                        <Star size={12} style={{ color: '#F6C000' }} fill="#F6C000" />
+                        {product.rating} · {product.reviewsCount?.toLocaleString('en-IN')} owners
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Bottom Trust Assurance Strip */}
-          <div className="mt-14 pt-8 border-t border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-4 text-center sm:text-left">
-            <div className="flex items-center gap-2.5 justify-center sm:justify-start">
-              <span className="text-lg">🚚</span>
-              <span className="text-xs font-bold text-slate-700">Free 48h Dispatch in India</span>
-            </div>
-            <div className="flex items-center gap-2.5 justify-center sm:justify-start">
-              <span className="text-lg">🛡️</span>
-              <span className="text-xs font-bold text-slate-700">3-Year Weatherproof Guarantee</span>
-            </div>
-            <div className="flex items-center gap-2.5 justify-center sm:justify-start">
-              <span className="text-lg">🔒</span>
-              <span className="text-xs font-bold text-slate-700">100% Masked Number Proxy</span>
-            </div>
-            <div className="flex items-center gap-2.5 justify-center sm:justify-start">
-              <span className="text-lg">⚡</span>
-              <span className="text-xs font-bold text-slate-700">Zero App Required for Finders</span>
-            </div>
+                </motion.article>
+              ))}
+            </AnimatePresence>
           </div>
 
         </div>
       </section>
 
-      {/* ── 5. HOW IT WORKS FLOW WITH ARROWS & CLEAN BOXES (THEME: SLEEK OBSIDIAN) ─── */}
-      <section id="hiw-section" className="py-20 sm:py-28 bg-[#0B0F19] text-white border-y border-slate-800/80 relative overflow-hidden">
-        
-        {/* Subtle background tech pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.03] pointer-events-none"
-          style={{
-            backgroundImage: 'radial-gradient(#FFF 1px, transparent 1px)',
-            backgroundSize: '24px 24px',
-          }}
-        />
+      {/* ── 7. HOW IT WORKS — pinned, scroll-driven on desktop ──────────── */}
+      <section id="hiw-section" className="bg-[#F4F1EC]">
+        {/* Desktop: a tall track whose progress drives the pinned panel. */}
+        <div ref={stepsTrackRef} className="relative hidden h-[420vh] lg:block">
+          <div className="sticky top-0 flex h-screen items-center overflow-hidden">
+            <div className="mx-auto grid w-full max-w-[1400px] grid-cols-2 items-center gap-16 px-10">
+              {/* Left: the list */}
+              <div>
+                <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-black/40">
+                  How it works
+                </p>
+                <h2 className="max-w-md text-[clamp(2rem,3.4vw,3rem)] font-medium leading-[1.06] tracking-[-0.035em]">
+                  Getting protected takes about four minutes
+                </h2>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          {/* Header */}
-          <div className="text-center max-w-3xl mx-auto mb-16" data-reveal>
-            <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-black bg-amber-400 text-slate-950 shadow-md mb-3">
-              <Zap size={13} className="text-slate-950" />
-              <span>Interactive Safety Pipeline</span>
+                <div className="relative mt-12 pl-8">
+                  {/* Rail + progress fill. The fill is the one saturated colour
+                      in the section, and it earns it: it is the read-out for how
+                      far through the story you have scrolled. */}
+                  <div className="absolute left-0 top-1 h-[calc(100%-0.5rem)] w-px bg-black/10">
+                    <motion.div style={{ height: stepsLineHeight }} className="w-px origin-top">
+                      <div className="h-full w-px" style={{ background: '#F6C000' }} />
+                    </motion.div>
+                  </div>
+
+                  <ul className="space-y-7">
+                    {HOW_IT_WORKS_STEPS.map((step, i) => {
+                      const on = i === activeHiwStep;
+                      return (
+                        <li key={step.step} className="relative">
+                          <span
+                            className={`absolute -left-8 top-2 h-2 w-2 -translate-x-[3.5px] rounded-full transition-all duration-500 ${
+                              on ? 'scale-150' : 'scale-100'
+                            }`}
+                            style={{ background: on ? '#F6C000' : 'rgba(0,0,0,0.18)' }}
+                          />
+                          <motion.div
+                            animate={{ opacity: on ? 1 : 0.32 }}
+                            transition={{ duration: 0.45, ease: EASE }}
+                          >
+                            <h3 className="text-xl font-medium tracking-[-0.02em]">
+                              <span className="mr-3 text-[13px] font-light text-black/35">
+                                0{step.step}
+                              </span>
+                              {step.title}
+                            </h3>
+                            <AnimatePresence initial={false}>
+                              {on && (
+                                <motion.p
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.45, ease: EASE }}
+                                  className="overflow-hidden text-[14px] font-light leading-relaxed text-black/55"
+                                >
+                                  <span className="block pt-2">{step.body}</span>
+                                </motion.p>
+                              )}
+                            </AnimatePresence>
+                          </motion.div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </div>
+
+              {/* Right: the image, crossfading with the active step */}
+              <div className="relative aspect-square overflow-hidden rounded-[2rem] bg-[#0B0B0C]">
+                <AnimatePresence mode="wait">
+                  <motion.img
+                    key={activeStep.img}
+                    src={activeStep.img}
+                    alt={activeStep.title}
+                    initial={{ opacity: 0, scale: 1.06 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.7, ease: EASE }}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                </AnimatePresence>
+
+                <div className="absolute bottom-6 left-6 flex items-center gap-2 rounded-full border border-white/15 bg-black/40 px-4 py-2 text-[12px] font-light text-white/85 backdrop-blur-md">
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#F6C000' }} />
+                  {activeStep.badge}
+                </div>
+              </div>
             </div>
-            <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
-              How RapiQR Works in 5 Steps
-            </h2>
-            <p className="text-slate-400 text-sm sm:text-base font-medium mt-2 max-w-xl mx-auto">
-              From unboxing to lifetime safety — everything is automated with zero app downloads.
-            </p>
           </div>
+        </div>
 
-          {/* 5-Step Clean Boxes Flow Connected by Animated Arrows */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 relative items-stretch">
-            {HOW_IT_WORKS_STEPS.map((step, idx) => (
-              <div key={step.step} data-reveal className="relative flex flex-col">
-                
-                {/* Premium Obsidian Step Box */}
-                <div className="h-full bg-slate-900/90 text-white rounded-3xl p-5 border border-slate-800 shadow-2xl flex flex-col justify-between relative group hover:border-amber-400 hover:shadow-amber-500/10 hover:-translate-y-2 transition-all duration-300">
-                  
-                  <div>
-                    {/* Top Row: Number Badge & Tag */}
-                    <div className="flex items-center justify-between mb-3.5">
-                      <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center shadow-md shadow-amber-400/20">
-                        0{step.step}
-                      </div>
-                      <span className="text-[10px] font-black text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2.5 py-0.5 rounded-md">
-                        {step.badge}
-                      </span>
-                    </div>
+        {/* Mobile: the same story, stacked. Pinning on a phone fights the
+            browser's own scroll chrome, so it is not worth the jank. */}
+        <div className="px-6 py-24 lg:hidden">
+          <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-black/40">
+            How it works
+          </p>
+          <h2 className="text-[clamp(1.9rem,7vw,2.4rem)] font-medium leading-[1.08] tracking-[-0.035em]">
+            Getting protected takes about four minutes
+          </h2>
 
-                    {/* Step Image Frame */}
-                    <div className="h-36 rounded-2xl bg-slate-950 overflow-hidden mb-4 border border-slate-700/60 shadow-inner relative group-hover:border-amber-400/50 transition-colors">
-                      <img
-                        src={step.img}
-                        alt={step.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent pointer-events-none" />
-                    </div>
-
-                    {/* Text Details */}
-                    <h3 className="font-black text-sm sm:text-base text-white mb-1.5 group-hover:text-amber-300 transition-colors">
-                      {step.title}
-                    </h3>
-                    <p className="text-xs text-slate-300 leading-relaxed font-normal">
+          <div className="mt-12 space-y-8">
+            {HOW_IT_WORKS_STEPS.map((step, i) => (
+              <Reveal key={step.step} delay={i * 0.05}>
+                <div className="overflow-hidden rounded-3xl bg-[#0B0B0C]">
+                  <img src={step.img} alt={step.title} className="aspect-4/3 w-full object-cover" />
+                  <div className="p-6 text-white">
+                    <span className="text-[12px] font-light text-white/35">0{step.step}</span>
+                    <h3 className="mt-1 text-lg font-medium">{step.title}</h3>
+                    <p className="mt-2 text-[13px] font-light leading-relaxed text-white/50">
                       {step.body}
                     </p>
                   </div>
-
-                  {/* Step Footer Indicator */}
-                  <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400 font-semibold">
-                    <span>Phase 0{step.step}</span>
-                    <span className="text-amber-400 flex items-center gap-1 font-bold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                      <span>Live Setup</span>
-                    </span>
-                  </div>
                 </div>
-
-                {/* Connecting Flow Arrow Between Boxes (Visible on Desktop) with Animated Pulse */}
-                {idx < HOW_IT_WORKS_STEPS.length - 1 && (
-                  <div className="hidden lg:flex absolute -right-4 top-1/2 -translate-y-1/2 z-30 w-8 h-8 rounded-full bg-amber-400 text-slate-950 items-center justify-center shadow-xl border-2 border-amber-300 pointer-events-none group-hover:scale-110 transition-transform">
-                    <ArrowRight size={15} className="stroke-[3] animate-pulse" />
-                  </div>
-                )}
-
-              </div>
+              </Reveal>
             ))}
           </div>
-
-          {/* Bottom Journey Summary Banner */}
-          <div className="mt-12 p-6 rounded-3xl bg-slate-900 text-white border border-slate-800 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-5">
-            <div className="flex items-center gap-4 text-center sm:text-left">
-              <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-lg shrink-0 shadow-md">
-                ✓
-              </div>
-              <div>
-                <div className="font-extrabold text-sm sm:text-base text-white">
-                  100% Zero App &amp; Zero Number Exposure Guaranteed
-                </div>
-                <div className="text-xs text-slate-400 mt-0.5">
-                  Anyone scans with their native camera to immediately initiate encrypted proxy communication.
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={onOpenCheckout}
-              className="px-7 py-3 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm transition-all cursor-pointer whitespace-nowrap shadow-lg hover:scale-105 active:scale-95 flex items-center gap-2"
-            >
-              <span>Order Your Safety Kit</span>
-              <ArrowRight size={15} />
-            </button>
-          </div>
-
         </div>
       </section>
 
-    
-
-      {/* ── 8. INFRASTRUCTURE & STATS (THEME: WARM RADIANT GOLDEN YELLOW) ── */}
-      <section id="infrastructure-section" className="py-24 sm:py-32 bg-gradient-to-b from-[#FFFDF0] via-[#FEF08A] to-[#FACC15] text-slate-950 relative border-t border-amber-300">
-        
-        {/* Background Grid */}
-        <div
-          className="absolute inset-0 opacity-[0.05] pointer-events-none"
-          style={{
-            backgroundImage: 'radial-gradient(#000 1px, transparent 1px)',
-            backgroundSize: '32px 32px',
-          }}
-        />
-
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          {/* Section Header */}
-          <div className="max-w-3xl mb-16">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black bg-slate-950 text-amber-400 shadow-md mb-4">
-              <span>High-Availability Cloud Network</span>
-            </div>
-
-            <h2 className="text-3xl sm:text-5xl font-black text-slate-950 tracking-tight leading-tight mb-4">
-              Built on ultra-reliable infrastructure <br className="hidden sm:inline" />
-              <span>for zero-delay safety.</span>
+      {/* ── 9. LIVE SCAN DEMO ───────────────────────────────────────────── */}
+      <section id="demo-section" className="relative overflow-hidden bg-[#0B0B0C] py-24 sm:py-32">
+        <div className="relative mx-auto max-w-3xl px-6 text-center">
+          <Reveal>
+            <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em] text-white">
+              <SplitWords text="See what a finder sees" />
             </h2>
-            <p className="text-base sm:text-lg text-slate-800 font-medium">
-              When accidents or parking emergencies happen, every millisecond counts. 
-              Our distributed architecture guarantees immediate connection.
+            <p className="mx-auto mt-4 max-w-md text-[15px] font-light text-white/50">
+              This is the page that opens on their phone. Nothing to install, and no
+              number anywhere on it.
             </p>
-          </div>
+          </Reveal>
 
-          {/* 4 Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-20">
-            {INFRASTRUCTURE_CARDS.map((card, idx) => (
-              <div
-                data-reveal
-                key={idx}
-                className="p-6 rounded-3xl bg-slate-950 text-white border border-slate-800 shadow-xl hover:border-amber-400 transition-all duration-300 group hover:-translate-y-1"
-              >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-base text-slate-950 mb-5 group-hover:scale-110 transition-transform shadow-md"
-                  style={{ backgroundColor: card.color }}
-                >
-                  {card.letter}
-                </div>
-
-                <h3 className="text-base font-bold text-white mb-2 group-hover:text-amber-300 transition-colors">
-                  {card.title}
-                </h3>
-
-                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-                  {card.description}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {/* Stats Bar */}
-          <div className="pt-12 border-t border-amber-400/60 grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left divide-y md:divide-y-0 md:divide-x divide-amber-400/60">
-            <div className="pt-6 md:pt-0">
-              <div className="text-4xl sm:text-5xl font-black text-slate-950 font-sans tracking-tight mb-1">
-                0
-              </div>
-              <div className="text-sm font-bold text-slate-900 mb-0.5">
-                Apps to install
-              </div>
-              <div className="text-xs text-slate-700 font-medium">
-                The finder opens a link, nothing else
-              </div>
-            </div>
-
-            <div className="pt-6 md:pt-0 md:pl-8">
-              <div className="text-4xl sm:text-5xl font-black text-slate-950 font-sans tracking-tight mb-1">
-                3
-              </div>
-              <div className="text-sm font-bold text-slate-900 mb-0.5">
-                Alert channels per scan
-              </div>
-              <div className="text-xs text-slate-700 font-medium">
-                WhatsApp, SMS and email, together
-              </div>
-            </div>
-
-            <div className="pt-6 md:pt-0 md:pl-8">
-              <div className="text-4xl sm:text-5xl font-black text-slate-950 font-sans tracking-tight mb-1">
-                6
-              </div>
-              <div className="text-sm font-bold text-slate-900 mb-0.5">
-                Tag types available
-              </div>
-              <div className="text-xs text-slate-700 font-medium">
-                Car, bike, home, pet, kids and luggage
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* ── 9. PRICING BUNDLES SECTION (THEME: CRISP PURE WHITE) ──────── */}
-      <section id="pricing-section" className="py-20 sm:py-28 bg-white text-slate-950 border-t border-slate-200/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          <div className="text-center max-w-2xl mx-auto mb-16" data-reveal>
-            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-amber-50 text-amber-950 border border-amber-300 mb-3 shadow-xs">
-              <Sparkles size={13} className="text-amber-600" />
-              <span>Safety Plans &amp; Pricing</span>
-            </div>
-            <h2 className="text-3xl sm:text-5xl font-black text-slate-950 tracking-tight">
-              Pick Your Safety Pack
-            </h2>
-            <p className="text-slate-600 text-sm sm:text-base mt-2">
-              Lifetime validity with ₹0 recurring subscription fees. Contact our team for customized volume pricing.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            
-            {/* Plan 1 */}
-            <div className="rounded-3xl p-7 bg-slate-50 border border-slate-200 flex flex-col justify-between hover:shadow-lg transition-all">
-              <div>
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Solo Starter Pack</span>
-                <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-3xl font-extrabold text-slate-950">Contact Us</span>
-                </div>
-                <p className="text-xs text-slate-500 mt-2">Single vehicle or personal asset safety tag</p>
-
-                <ul className="mt-6 space-y-3 text-xs text-slate-700">
-                  <li className="flex items-center gap-2">
-                    <Check size={15} className="text-amber-500 shrink-0" />
-                    <span>1x 3M Weatherproof Smart Sticker</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check size={15} className="text-amber-500 shrink-0" />
-                    <span>Masked call &amp; WhatsApp alerts</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check size={15} className="text-amber-500 shrink-0" />
-                    <span>Lifetime cloud dashboard access</span>
-                  </li>
-                </ul>
-              </div>
-
-              <button
-                onClick={() => {
-                  setPartnerForm((prev) => ({ ...prev, tier: 'Retail Kit (50 Units)' }));
-                  setIsPartnerModalOpen(true);
-                }}
-                className="mt-8 w-full py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-xs"
-              >
-                <span>Contact for Pricing</span>
-                <ArrowRight size={14} className="text-amber-400" />
-              </button>
-            </div>
-
-            {/* Plan 2: Best Value */}
-            <div className="rounded-3xl p-7 bg-slate-950 text-white border-2 border-amber-400 shadow-xl flex flex-col justify-between relative transform md:-translate-y-2">
-              <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3.5 py-1 bg-amber-400 text-slate-950 font-black text-[11px] rounded-full uppercase tracking-wide shadow-sm">
-                Most Popular Pack
-              </span>
-              <div>
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Family Trio Bundle</span>
-                <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-3xl font-extrabold text-white">Contact Us</span>
-                </div>
-                <p className="text-xs text-slate-400 mt-2">3 Tags for car, bike, and home gate or pets</p>
-
-                <ul className="mt-6 space-y-3 text-xs text-slate-300">
-                  <li className="flex items-center gap-2">
-                    <Check size={15} className="text-amber-400 shrink-0" />
-                    <span>3x Multi-Category Smart Tags</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check size={15} className="text-amber-400 shrink-0" />
-                    <span>Multi-responder emergency safety tree</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check size={15} className="text-amber-400 shrink-0" />
-                    <span>Free priority 48h doorstep shipping</span>
-                  </li>
-                </ul>
-              </div>
-
-              <button
-                onClick={() => {
-                  setPartnerForm((prev) => ({ ...prev, tier: 'Retail Kit (50 Units)' }));
-                  setIsPartnerModalOpen(true);
-                }}
-                className="mt-8 w-full py-3.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-colors cursor-pointer shadow-md flex items-center justify-center gap-2"
-              >
-                <span>Contact for Pricing</span>
-                <ArrowRight size={14} className="text-slate-950" />
-              </button>
-            </div>
-
-            {/* Plan 3 */}
-            <div className="rounded-3xl p-7 bg-slate-50 border border-slate-200 flex flex-col justify-between hover:shadow-lg transition-all">
-              <div>
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Society &amp; Fleet</span>
-                <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-3xl font-extrabold text-slate-950">Contact Us</span>
-                </div>
-                <p className="text-xs text-slate-500 mt-2">Bulk tags for apartments, schools &amp; logistics</p>
-
-                <ul className="mt-6 space-y-3 text-xs text-slate-700">
-                  <li className="flex items-center gap-2">
-                    <Check size={15} className="text-amber-500 shrink-0" />
-                    <span>Custom branded logo &amp; colors</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check size={15} className="text-amber-500 shrink-0" />
-                    <span>Admin master fleet dashboard</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check size={15} className="text-amber-500 shrink-0" />
-                    <span>Dedicated account relationship manager</span>
-                  </li>
-                </ul>
-              </div>
-
-              <button
-                onClick={() => {
-                  setPartnerForm((prev) => ({ ...prev, tier: 'State Partner (2500+ Units)' }));
-                  setIsPartnerModalOpen(true);
-                }}
-                className="mt-8 w-full py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-xs"
-              >
-                <span>Inquire Bulk Quote</span>
-                <ArrowRight size={14} className="text-amber-400" />
-              </button>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-      {/* ── 10. DISTRIBUTORSHIP & FRANCHISE OPPORTUNITY (THEME: SLEEK OBSIDIAN BLACK) ─── */}
-      <section id="distributor-section" className="py-24 sm:py-32 bg-slate-950 text-white border-y border-amber-400/30 relative overflow-hidden">
-        
-        {/* Background Ambient Glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          {/* Header */}
-          <div className="text-center max-w-3xl mx-auto mb-16" data-reveal>
-            <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-black bg-amber-400/10 text-amber-400 border border-amber-400/30 uppercase tracking-wider mb-4 shadow-sm">
-              <span>Franchise &amp; Retail Partnership</span>
-            </div>
-            <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
-              Earn 40% to 60% Margins as a RapiQR Distributor
-            </h2>
-            <p className="text-slate-400 text-sm sm:text-base mt-3 max-w-2xl mx-auto">
-              Partner with India's fastest-growing smart QR safety brand. Supply local garages, auto accessory stores, gated societies, and retail networks in your city.
-            </p>
-          </div>
-
-          {/* 3 Distributor Tier Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch mb-16">
-            {DISTRIBUTOR_TIERS.map((tier) => (
-              <div
-                key={tier.id}
-                className={`rounded-3xl p-7 sm:p-8 flex flex-col justify-between transition-all duration-300 relative group hover:-translate-y-1.5 ${
-                  tier.isPopular
-                    ? 'bg-slate-900 border-2 border-amber-400 shadow-2xl ring-4 ring-amber-400/20'
-                    : 'bg-slate-900/60 border border-slate-800 hover:border-amber-400/50 shadow-xl'
-                }`}
-              >
-                {tier.isPopular && (
-                  <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 bg-amber-400 text-slate-950 font-black text-[11px] rounded-full uppercase tracking-wider shadow-md">
-                    🔥 Exclusive Territory
+          <Reveal delay={0.15} className="mt-12">
+            <div className="mx-auto max-w-md overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] p-2 backdrop-blur-sm">
+              <div className="rounded-[1.6rem] bg-[#111113] p-6">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                  <div className="flex items-center gap-2.5">
+                    <QrGlyph size={26} color="#FFFFFF" />
+                    <span className="text-[13px] font-medium text-white">Tag RQ-4821</span>
+                  </div>
+                  <span className="flex items-center gap-1.5 text-[11px] font-light text-white/45">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                    Active
                   </span>
-                )}
-
-                <div>
-                  {/* Top Details */}
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] font-black text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2.5 py-1 rounded-md">
-                      {tier.badge}
-                    </span>
-                    <span className="text-xs font-bold text-slate-400">{tier.minUnits}</span>
-                  </div>
-
-                  <h3 className="text-xl sm:text-2xl font-black text-white mb-2 group-hover:text-amber-400 transition-colors">
-                    {tier.name}
-                  </h3>
-                  <p className="text-xs text-slate-400 leading-relaxed mb-6">
-                    {tier.desc}
-                  </p>
-
-                  {/* Margin & Pricing Box */}
-                  <div className="bg-slate-950/80 rounded-2xl p-4 border border-slate-800 mb-6">
-                    <div className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mb-1">
-                      Distributor Margin
-                    </div>
-                    <div className="text-2xl font-black text-amber-400 mb-1">
-                      {tier.margin}
-                    </div>
-                    <div className="text-xs font-semibold text-slate-300">
-                      Pricing: <span className="text-white font-bold">{tier.priceDisplay}</span>
-                    </div>
-                  </div>
-
-                  {/* Feature Highlights */}
-                  <div className="space-y-2.5 mb-6">
-                    {tier.features.map((feat, fIdx) => (
-                      <div key={fIdx} className="flex items-start gap-2 text-xs text-slate-300 font-medium">
-                        <CheckCircle2 size={14} className="text-amber-400 shrink-0 mt-0.5" />
-                        <span>{feat}</span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
 
-                {/* Card CTA */}
-                <button
-                  onClick={() => {
-                    const tierName =
-                      tier.id === 'retailer-starter'
-                        ? 'Retail Kit (50 Units)'
-                        : tier.id === 'city-franchise'
-                        ? 'City Franchise (500 Units)'
-                        : 'State Partner (2500+ Units)';
-                    setPartnerForm((prev) => ({ ...prev, tier: tierName }));
-                    setIsPartnerModalOpen(true);
-                  }}
-                  className={`w-full py-3.5 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-95 ${
-                    tier.isPopular
-                      ? 'bg-amber-400 hover:bg-amber-300 text-slate-950'
-                      : 'bg-white hover:bg-slate-100 text-slate-950'
+                <p className="py-5 text-[13px] font-light text-white/45">
+                  Something wrong with this vehicle? Tell the owner.
+                </p>
+
+                <div className="grid gap-2">
+                  {[
+                    { key: 'parking' as const, label: 'Notify for parking issue', Icon: Car },
+                    { key: 'gps' as const, label: 'Share my location', Icon: MapPin },
+                    { key: 'emergency' as const, label: 'Report an emergency', Icon: Bell },
+                  ].map(({ key, label, Icon }) => (
+                    <button
+                      key={key}
+                      onClick={() => handleDemoTrigger(key)}
+                      className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3.5 text-left text-[13px] font-light text-white/80 transition-colors hover:border-white/25 hover:bg-white/[0.07]"
+                    >
+                      <Icon size={15} className="text-white/40" />
+                      {label}
+                      <ArrowRight size={13} className="ml-auto text-white/25" />
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-5 flex items-center justify-center gap-2 border-t border-white/10 pt-4 text-[11px] font-light text-white/30">
+                  <Lock size={11} />
+                  Owner number hidden — call routes through a masked line
+                </div>
+              </div>
+            </div>
+          </Reveal>
+
+          {/* Toast */}
+          <div className="pointer-events-none fixed inset-x-0 bottom-8 z-[90] flex justify-center px-6">
+            <AnimatePresence>
+              {demoActionAlert && (
+                <motion.div
+                  initial={{ opacity: 0, y: 24, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 16, scale: 0.97 }}
+                  transition={{ duration: 0.45, ease: EASE }}
+                  className="flex max-w-sm items-start gap-3 rounded-2xl bg-white px-5 py-4 text-left shadow-[0_25px_60px_-20px_rgba(0,0,0,0.6)]"
+                >
+                  <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-emerald-600" />
+                  <span className="text-[13px] font-light leading-snug text-[#0B0B0C]">
+                    {demoActionAlert}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Partner services on call */}
+          <Reveal delay={0.25} className="mt-14">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {SERVICE_TYPES.slice(0, 9).map((type) => {
+                const m = getServiceMeta(type.slug);
+                return (
+                  <span
+                    key={type.slug}
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10"
+                    style={{ background: 'rgba(255,255,255,0.04)', color: m.color }}
+                    title={type.label}
+                  >
+                    <m.Icon size={15} />
+                  </span>
+                );
+              })}
+            </div>
+            <p className="mt-5 text-[12px] font-light text-white/35">
+              And {SERVICE_TYPES.length - 9} more partner services reachable from the same scan.
+            </p>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── 10. PHOTO WALL ──────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden bg-[#0B0B0C] py-24 sm:py-32">
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+          <Reveal>
+            <h2 className="max-w-md px-6 text-center text-[clamp(1.8rem,4.6vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em] text-white drop-shadow-[0_4px_30px_rgba(0,0,0,0.9)]">
+              Protected by RapiQR
+            </h2>
+          </Reveal>
+        </div>
+
+        <div className="relative z-10 grid grid-cols-3 gap-3 px-3 opacity-45 sm:gap-4 sm:px-4">
+          {MOSAIC_COLUMNS.map((column, ci) => (
+            <Parallax key={ci} distance={ci === 1 ? 90 : 45}>
+              {/* Spacing lives inside Parallax: its outer element only carries
+                  the scroll ref, the inner one is what actually moves. */}
+              <div className="space-y-3 sm:space-y-4">
+                {column.map((img, ri) => (
+                  <div
+                    key={`${ci}-${ri}`}
+                    className="overflow-hidden rounded-xl border border-white/5 sm:rounded-2xl"
+                  >
+                    <img src={img} alt="" aria-hidden="true" className="aspect-4/3 w-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            </Parallax>
+          ))}
+        </div>
+
+        <div className="pointer-events-none absolute inset-0 z-[15] bg-gradient-to-b from-[#0B0B0C] via-[#0B0B0C]/55 to-[#0B0B0C]" />
+      </section>
+
+      {/* ── 11. PRICING ─────────────────────────────────────────────────── */}
+      <section id="pricing-section" className="bg-white py-24 sm:py-32">
+        <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
+          <Reveal className="text-center">
+            <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em]">
+              <SplitWords text="Pick your pack" />
+            </h2>
+            <p className="mx-auto mt-4 max-w-lg text-[15px] font-light text-black/50">
+              Lifetime validity, no recurring subscription. Talk to us for volume pricing.
+            </p>
+          </Reveal>
+
+          <div className="mx-auto mt-16 grid max-w-5xl gap-5 md:grid-cols-3">
+            {PRICING_PLANS.map((plan, i) => (
+              <Reveal key={plan.id} delay={i * 0.1}>
+                <motion.div
+                  whileHover={reduced ? undefined : { y: -6 }}
+                  transition={{ duration: 0.4, ease: EASE }}
+                  className={`flex h-full flex-col justify-between rounded-3xl p-8 ${
+                    plan.featured
+                      ? 'bg-[#0B0B0C] text-white'
+                      : 'border border-black/10 bg-white text-[#0B0B0C]'
                   }`}
                 >
-                  <span>{tier.ctaText}</span>
-                  <ArrowRight size={14} />
-                </button>
-              </div>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`text-[11px] font-light uppercase tracking-[0.16em] ${
+                          plan.featured ? 'text-white/40' : 'text-black/40'
+                        }`}
+                      >
+                        {plan.name}
+                      </span>
+                      {plan.featured && (
+                        <span
+                          className="rounded-full px-2.5 py-1 text-[10px] font-semibold text-[#0B0B0C]"
+                          style={{ background: '#F6C000' }}
+                        >
+                          Popular
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-5 text-[2rem] font-light tracking-[-0.04em]">Contact us</div>
+                    <p
+                      className={`mt-2 text-[13px] font-light ${
+                        plan.featured ? 'text-white/45' : 'text-black/45'
+                      }`}
+                    >
+                      {plan.desc}
+                    </p>
+
+                    <ul className="mt-8 space-y-3">
+                      {plan.features.map((f) => (
+                        <li
+                          key={f}
+                          className={`flex items-start gap-2.5 text-[13px] font-light ${
+                            plan.featured ? 'text-white/70' : 'text-black/60'
+                          }`}
+                        >
+                          <Check size={14} className="mt-[3px] shrink-0" style={{ color: '#C79E00' }} />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setPartnerForm((prev) => ({ ...prev, tier: plan.tier }));
+                      setIsPartnerModalOpen(true);
+                    }}
+                    className={`mt-10 flex w-full cursor-pointer items-center justify-center gap-2 rounded-full py-3.5 text-[13px] font-semibold transition-transform hover:scale-[1.02] active:scale-95 ${
+                      plan.featured
+                        ? 'bg-white text-[#0B0B0C]'
+                        : 'bg-[#0B0B0C] text-white'
+                    }`}
+                  >
+                    {plan.cta}
+                    <ArrowRight size={14} />
+                  </button>
+                </motion.div>
+              </Reveal>
             ))}
           </div>
-
-          {/* Bottom Franchise Guarantee Strip */}
-          <div className="pt-8 border-t border-slate-800 grid grid-cols-2 md:grid-cols-4 gap-6 text-center sm:text-left">
-            <div className="flex items-center gap-3 justify-center sm:justify-start">
-              <span className="text-2xl">💰</span>
-              <div>
-                <div className="text-xs font-bold text-white">0% Royalty Fees</div>
-                <div className="text-[11px] text-slate-400">Keep 100% of your earnings</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 justify-center sm:justify-start">
-              <span className="text-2xl">📍</span>
-              <div>
-                <div className="text-xs font-bold text-white">Exclusive Territory Protection</div>
-                <div className="text-[11px] text-slate-400">No competing dealers in your city</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 justify-center sm:justify-start">
-              <span className="text-2xl">⚡</span>
-              <div>
-                <div className="text-xs font-bold text-white">24h Quick Onboarding</div>
-                <div className="text-[11px] text-slate-400">Start selling within 1 day</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 justify-center sm:justify-start">
-              <span className="text-2xl">📦</span>
-              <div>
-                <div className="text-xs font-bold text-white">Doorstep Pan-India Logistics</div>
-                <div className="text-[11px] text-slate-400">Priority insured 48h shipping</div>
-              </div>
-            </div>
-          </div>
-
         </div>
       </section>
 
-      {/* ── 13. FAQ ACCORDION SECTION (THEME: WARM SAND YELLOW) ────────── */}
-      <section id="faq-section" className="py-24 sm:py-32 bg-gradient-to-b from-[#FFFDF2] to-[#FEF9C3] text-slate-950 relative border-t border-amber-300">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          {/* Header */}
-          <div className="mb-14 flex flex-col sm:flex-row sm:items-end justify-between gap-6">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-slate-950 text-amber-400 mb-3 shadow-xs">
-                <HelpCircle size={13} className="text-amber-400" />
-                <span>Got Questions?</span>
-              </div>
-              <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-slate-950">
-                Frequently asked questions
-              </h2>
-              <p className="text-sm sm:text-base text-slate-800 font-medium mt-2">
-                Everything you need to know about safety tags, proxy calling, and privacy.
-              </p>
-            </div>
+      {/* ── 12. JOIN US — service-provider application ───────────────────── */}
+      {false && <section id="join-section" className="bg-[#F4F1EC] py-24 sm:py-32">
+        <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
+          <Reveal className="mx-auto max-w-2xl text-center">
+            <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-black/40">
+              Join us
+            </p>
+            <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em]">
+              <SplitWords text="Become a service partner" />
+            </h2>
+            <p className="mt-4 text-[15px] font-light leading-relaxed text-black/50">
+              Ambulance, towing, mechanic, plumber, vet, security — whatever you do, get
+              listed once and take masked calls the moment a nearby tag is scanned.
+            </p>
+          </Reveal>
 
-            <a
-              href="mailto:support@rapiqr.com"
-              className="self-start sm:self-auto px-5 py-2.5 text-xs font-bold text-slate-950 bg-white border border-slate-200 hover:bg-amber-100 rounded-full transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
-            >
-              <MessageCircle size={14} className="text-amber-600" />
-              <span>Contact Support</span>
-            </a>
+          <div className="mt-14 grid items-stretch gap-5 lg:grid-cols-2">
+            {/* Visual panel, retinted to the service picked in the navbar */}
+            <Reveal className="h-full">
+              <div className="relative flex h-full min-h-[420px] flex-col justify-end overflow-hidden rounded-3xl bg-[#0B0B0C]">
+                <img
+                  src={stepImg4}
+                  alt="A RapiQR scan reaching a nearby service partner"
+                  className="absolute inset-0 h-full w-full object-cover opacity-40"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0C] via-[#0B0B0C]/75 to-[#0B0B0C]/25" />
+
+                <div className="relative p-8 text-white sm:p-10">
+                  <div className="inline-flex items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-3.5 py-2.5 backdrop-blur-sm">
+                    <span
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                      style={{ background: joinServiceMeta.bg, color: joinServiceMeta.color }}
+                    >
+                      <joinServiceMeta.Icon size={16} />
+                    </span>
+                    <span>
+                      <span className="block text-[10px] font-light uppercase tracking-[0.14em] text-white/50">
+                        Applying as
+                      </span>
+                      <span className="block text-[13px] font-medium">
+                        {joinServiceType.label} provider
+                      </span>
+                    </span>
+                  </div>
+
+                  <h3 className="mt-7 max-w-sm text-2xl font-medium leading-snug tracking-[-0.02em]">
+                    Your number stays private. The work still finds you.
+                  </h3>
+
+                  <ul className="mt-6 space-y-3.5">
+                    {JOIN_BENEFITS.map((line) => (
+                      <li
+                        key={line}
+                        className="flex items-start gap-2.5 text-[13px] font-light leading-relaxed text-white/70"
+                      >
+                        <CheckCircle2 size={15} className="mt-0.5 shrink-0" style={{ color: '#F6C000' }} />
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </Reveal>
+
+            {/* Application form */}
+            <Reveal delay={0.12} className="h-full">
+              <div className="h-full rounded-3xl border border-black/8 bg-white p-7 sm:p-9">
+                {joinSubmitted ? (
+                  <div className="flex h-full flex-col items-center justify-center py-10 text-center">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
+                      <CheckCircle2 size={26} className="text-emerald-600" />
+                    </div>
+                    <h3 className="mt-5 text-xl font-medium">Application received</h3>
+                    <p className="mt-3 max-w-sm text-[14px] font-light leading-relaxed text-black/55">
+                      Thank you, <span className="font-medium text-[#0B0B0C]">{joinForm.label}</span>.
+                      Your <span className="font-medium text-[#0B0B0C]">{joinServiceType.label}</span>{' '}
+                      listing for <span className="font-medium text-[#0B0B0C]">{joinForm.city}</span> is
+                      pending review. We will call you on{' '}
+                      <span className="font-medium text-[#0B0B0C]">{joinForm.phone}</span> once it is
+                      approved.
+                    </p>
+                    <button
+                      onClick={resetJoinForm}
+                      className="mt-7 cursor-pointer rounded-full bg-black/5 px-6 py-3 text-[13px] font-medium text-black/70 transition-colors hover:bg-black/10"
+                    >
+                      Submit another provider
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleJoinSubmit} className="space-y-5">
+                    <div>
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                        Service type
+                      </label>
+                      <select
+                        value={joinForm.serviceType}
+                        onChange={(e) => setJoinForm({ ...joinForm, serviceType: e.target.value })}
+                        className="w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                      >
+                        {SERVICE_TYPES.map((t) => (
+                          <option key={t.slug} value={t.slug}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                        Provider / business name *
+                      </label>
+                      <input
+                        value={joinForm.label}
+                        onChange={(e) => setJoinForm({ ...joinForm, label: e.target.value })}
+                        placeholder={joinServiceMeta.placeholder}
+                        className="w-full rounded-xl border border-black/12 px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                      />
+                    </div>
+
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                          Phone *
+                        </label>
+                        <PhoneInputWithCountry
+                          value={joinForm.phone}
+                          onChange={(full) => setJoinForm({ ...joinForm, phone: full })}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                          City / service area *
+                        </label>
+                        <input
+                          value={joinForm.city}
+                          onChange={(e) => setJoinForm({ ...joinForm, city: e.target.value })}
+                          placeholder="e.g. Pune"
+                          className="w-full rounded-xl border border-black/12 px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                        Email
+                      </label>
+                      <div className="relative">
+                        <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-black/30" />
+                        <input
+                          type="email"
+                          value={joinForm.email}
+                          onChange={(e) => setJoinForm({ ...joinForm, email: e.target.value })}
+                          placeholder="you@company.com"
+                          className="w-full rounded-xl border border-black/12 py-3 pl-11 pr-4 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-2.5 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                        Categories you cover
+                        <span className="ml-2 normal-case tracking-normal text-black/30">
+                          — leave empty to cover all
+                        </span>
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {STICKER_CATEGORIES.map((c) => {
+                          const on = joinForm.categories.includes(c.value);
+                          return (
+                            <button
+                              key={c.value}
+                              type="button"
+                              onClick={() => toggleJoinCategory(c.value)}
+                              className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-4 py-2 text-[12px] font-light transition-all ${
+                                on
+                                  ? 'border-[#0B0B0C] bg-[#0B0B0C] text-white'
+                                  : 'border-black/12 text-black/60 hover:border-black/35'
+                              }`}
+                            >
+                              {on && <Check size={11} />} {c.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                        Anything else we should know
+                      </label>
+                      <textarea
+                        value={joinForm.notes}
+                        onChange={(e) => setJoinForm({ ...joinForm, notes: e.target.value })}
+                        rows={3}
+                        placeholder="Hours, coverage radius, fleet size, licence number…"
+                        className="w-full resize-none rounded-xl border border-black/12 px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                      />
+                    </div>
+
+                    {joinError && (
+                      <p className="rounded-xl bg-red-50 px-4 py-3 text-[13px] font-light text-red-700">
+                        {joinError}
+                      </p>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={joinSubmitting || !joinFormIsValid}
+                      className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#0B0B0C] py-4 text-[13px] font-semibold text-white transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      {joinSubmitting ? (
+                        <>
+                          <Loader2 size={15} className="animate-spin" /> Submitting…
+                        </>
+                      ) : (
+                        <>
+                          Submit application
+                          <ArrowRight size={14} style={{ color: '#F6C000' }} />
+                        </>
+                      )}
+                    </button>
+
+                    <p className="text-center text-[11px] font-light text-black/35">
+                      We verify every provider before listing. No fee to apply.
+                    </p>
+                  </form>
+                )}
+              </div>
+            </Reveal>
+          </div>
+        </div>
+      </section>}
+
+      {/* ── 13. FRANCHISE ───────────────────────────────────────────────── */}
+      <section id="distributor-section" className="bg-[#0B0B0C] py-24 text-white sm:py-32">
+        <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
+          <Reveal className="max-w-2xl">
+            <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-white/40">
+              Franchise
+            </p>
+            <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em]">
+              <SplitWords text="Sell RapiQR in your city" />
+            </h2>
+            <p className="mt-4 text-[15px] font-light leading-relaxed text-white/50">
+              Retail kits, exclusive city territories and state-level master rights — with
+              dealer dashboards, restock in a click and local leads routed to you.
+            </p>
+          </Reveal>
+
+          <div className="mt-14 grid gap-5 lg:grid-cols-3">
+            {DISTRIBUTOR_TIERS.map((tier, i) => (
+              <Reveal key={tier.id} delay={i * 0.1}>
+                <motion.div
+                  whileHover={reduced ? undefined : { y: -6 }}
+                  transition={{ duration: 0.4, ease: EASE }}
+                  className={`flex h-full flex-col justify-between rounded-3xl p-8 ${
+                    tier.isPopular ? 'bg-white text-[#0B0B0C]' : 'border border-white/12 bg-white/[0.03]'
+                  }`}
+                >
+                  <div>
+                    <span
+                      className={`text-[11px] font-light uppercase tracking-[0.16em] ${
+                        tier.isPopular ? 'text-black/40' : 'text-white/40'
+                      }`}
+                    >
+                      {tier.badge}
+                    </span>
+                    <h3 className="mt-4 text-xl font-medium tracking-[-0.02em]">{tier.name}</h3>
+                    <p
+                      className={`mt-2.5 text-[13px] font-light leading-relaxed ${
+                        tier.isPopular ? 'text-black/50' : 'text-white/45'
+                      }`}
+                    >
+                      {tier.desc}
+                    </p>
+
+                    <div
+                      className={`mt-6 flex items-center gap-4 border-y py-4 text-[12px] font-light ${
+                        tier.isPopular ? 'border-black/10 text-black/60' : 'border-white/10 text-white/55'
+                      }`}
+                    >
+                      <span>{tier.minUnits}</span>
+                      <span className={tier.isPopular ? 'text-black/20' : 'text-white/20'}>·</span>
+                      <span className="font-medium">{tier.margin}</span>
+                    </div>
+
+                    <ul className="mt-6 space-y-3">
+                      {tier.features.map((f) => (
+                        <li
+                          key={f}
+                          className={`flex items-start gap-2.5 text-[13px] font-light ${
+                            tier.isPopular ? 'text-black/60' : 'text-white/55'
+                          }`}
+                        >
+                          <Check
+                            size={14}
+                            className="mt-[3px] shrink-0"
+                            style={{ color: tier.isPopular ? '#C79E00' : '#F6C000' }}
+                          />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setPartnerForm((prev) => ({
+                        ...prev,
+                        tier:
+                          tier.id === 'retailer-starter'
+                            ? 'Retail Kit (50 Units)'
+                            : tier.id === 'city-franchise'
+                              ? 'City Franchise (300 Units)'
+                              : 'State Partner (2500+ Units)',
+                      }));
+                      setIsPartnerModalOpen(true);
+                    }}
+                    className={`mt-10 flex w-full cursor-pointer items-center justify-center gap-2 rounded-full py-3.5 text-[13px] font-semibold transition-transform hover:scale-[1.02] active:scale-95 ${
+                      tier.isPopular ? 'bg-[#0B0B0C] text-white' : 'bg-white text-[#0B0B0C]'
+                    }`}
+                  >
+                    {tier.ctaText}
+                    <ArrowRight size={14} />
+                  </button>
+                </motion.div>
+              </Reveal>
+            ))}
           </div>
 
-          {/* Accordion Items */}
-          <div className="divide-y divide-slate-200 bg-white rounded-3xl p-6 sm:p-8 border border-amber-200/80 shadow-md">
-            {FAQS.map((faq) => {
-              const isExpanded = expandedFaqId === faq.id;
+          {isLoggedIn && userAppStatus?.status === 'approved' && (
+            <Reveal delay={0.2} className="mt-10">
+              <button
+                onClick={onOpenDistributorDashboard}
+                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.04] py-4 text-[13px] font-medium text-white transition-colors hover:bg-white/10"
+              >
+                <Zap size={15} style={{ color: '#F6C000' }} />
+                Your distributor dashboard is unlocked — open it
+              </button>
+            </Reveal>
+          )}
+        </div>
+      </section>
+
+      {/* ── 14. FAQ — full-bleed rows ───────────────────────────────────── */}
+      <section id="faq-section" className="bg-white py-24 sm:py-32">
+        <div className="mx-auto max-w-[1100px] px-6 sm:px-10">
+          <Reveal className="mb-14">
+            <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em]">
+              <SplitWords text="Questions, answered" />
+            </h2>
+          </Reveal>
+
+          <div className="border-t border-black/12">
+            {FAQS.map((faq, i) => {
+              const open = expandedFaqId === faq.id;
               return (
-                <div key={faq.id} className="py-5">
-                  <button
-                    onClick={() => handleToggleFaq(faq.id)}
-                    className="w-full flex items-center justify-between text-left gap-4 group cursor-pointer focus:outline-hidden"
-                    aria-expanded={isExpanded}
-                  >
-                    <span className={`text-base sm:text-lg font-bold transition-colors ${
-                      isExpanded ? 'text-amber-600' : 'text-slate-900 group-hover:text-amber-600'
-                    }`}>
-                      {faq.question}
-                    </span>
+                <Reveal key={faq.id} delay={i * 0.05} y={16}>
+                  <div className="border-b border-black/12">
+                    <button
+                      onClick={() => handleToggleFaq(faq.id)}
+                      aria-expanded={open}
+                      className="group flex w-full cursor-pointer items-center justify-between gap-6 py-7 text-left"
+                    >
+                      <span className="text-[clamp(1.05rem,2.2vw,1.5rem)] font-light leading-snug tracking-[-0.02em] transition-colors group-hover:text-black/60">
+                        {faq.question}
+                      </span>
+                      <motion.span
+                        animate={{ rotate: open ? 45 : 0 }}
+                        transition={{ duration: 0.35, ease: EASE }}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-black/12 text-black/50"
+                      >
+                        <Plus size={15} />
+                      </motion.span>
+                    </button>
 
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-                      isExpanded ? 'bg-amber-400 text-slate-950' : 'bg-slate-100 text-slate-600 group-hover:bg-amber-100'
-                    }`}>
-                      {isExpanded ? <Minus size={16} /> : <Plus size={16} />}
-                    </div>
-                  </button>
-
-                  {isExpanded && (
-                    <div className="mt-3 pr-10 text-sm sm:text-base text-slate-600 leading-relaxed animate-fade-in">
-                      {faq.answer}
-                    </div>
-                  )}
-                </div>
+                    <AnimatePresence initial={false}>
+                      {open && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.45, ease: EASE }}
+                          className="overflow-hidden"
+                        >
+                          <p className="max-w-2xl pb-8 text-[14px] font-light leading-relaxed text-black/55">
+                            {faq.answer}
+                          </p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </Reveal>
               );
             })}
           </div>
-
         </div>
       </section>
 
-      {/* ── 14. CTA BANNER SECTION (THEME: SLEEK OBSIDIAN BLACK) ───────── */}
-      <section className="py-16 sm:py-24 bg-slate-950 text-white border-t border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative rounded-3xl p-8 sm:p-16 overflow-hidden bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 shadow-2xl border border-amber-300 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
-            
-            {/* Ambient Lighting */}
-            <div className="absolute top-0 right-0 w-96 h-96 bg-white/25 rounded-full blur-3xl pointer-events-none" />
+      {/* ── 15. CLOSING CALL TO ACTION ──────────────────────────────────── */}
+      <section
+        ref={ctaRef}
+        className="relative flex min-h-[80vh] items-center justify-center overflow-hidden bg-[#0B0B0C] py-28"
+      >
+        <motion.div
+          style={reduced ? undefined : { scale: ctaRingScale, opacity: ctaRingOpacity }}
+          className="absolute inset-0"
+        >
+          <ParticleRing />
+        </motion.div>
 
-            {/* Content */}
-            <div className="relative max-w-xl text-slate-950">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-slate-950 text-amber-400 mb-4 shadow-sm">
-                <Sparkles size={13} className="text-amber-400" />
-                <span>Instant Dispatch &amp; Activation</span>
-              </div>
+        <div className="relative z-10 mx-auto max-w-2xl px-6 text-center">
+          <h2 className="text-[clamp(2rem,5.4vw,3.8rem)] font-medium leading-[1.03] tracking-[-0.035em] text-white">
+            <SplitWords text="Protect your first" />
+            <br />
+            <SplitWords text="asset today" delay={0.14} />
+          </h2>
 
-              <h2 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight mb-3">
-                Your safety protection <br className="hidden sm:inline" />
-                is seconds away.
-              </h2>
+          <Reveal delay={0.3}>
+            <p className="mx-auto mt-6 max-w-md text-[15px] font-light text-white/50">
+              Weatherproof tag, masked calls, lifetime dashboard. No subscription.
+            </p>
 
-              <p className="text-base sm:text-lg font-bold text-slate-900/90 leading-relaxed">
-                Order your weatherproof smart tag kit today. Free 48-hour delivery with 3-year durability guarantee.
-              </p>
-            </div>
-
-            {/* CTA Button */}
-            <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
-              <button
-                onClick={onStart || onOpenCheckout}
-                className="px-9 py-4 bg-slate-950 hover:bg-slate-850 text-white font-black text-sm rounded-full transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-950/40 hover:scale-105 active:scale-95 cursor-pointer"
-              >
-                <span>Get Started Now</span>
-                <ArrowRight size={16} className="text-amber-400" />
-              </button>
-            </div>
-
-          </div>
+            <button
+              onClick={onStart || onOpenCheckout}
+              className="group mt-10 inline-flex cursor-pointer items-center gap-2.5 rounded-full bg-white px-9 py-4 text-sm font-semibold text-[#0B0B0C] transition-transform hover:scale-[1.04] active:scale-95"
+            >
+              Get started
+              <ArrowRight
+                size={15}
+                className="transition-transform group-hover:translate-x-1"
+                style={{ color: '#C79E00' }}
+              />
+            </button>
+          </Reveal>
         </div>
       </section>
 
-      {/* ── 15. DARK FOOTER WITH WATERMARK ──────────────────────────── */}
-      <footer className="relative bg-slate-950 text-white overflow-hidden pt-16 pb-12 sm:pt-20 sm:pb-16 border-t border-slate-900">
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10">
-          
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-10 pb-16 border-b border-slate-850">
-            
-            {/* Brand Column */}
-            <div className="md:col-span-5 space-y-4">
-              <div className="flex items-center gap-2.5">
-                <img
-                  src={darkBgLogo}
-                  alt="RapiQR Smart Safety"
-                  className="h-8 sm:h-9 w-auto object-contain"
-                />
-              </div>
-
-              <p className="text-sm text-slate-400 max-w-sm leading-relaxed">
-                Universal Smart QR safety ecosystem. Protecting thousands of vehicles, valuables, 
-                pets, and families with instant masked telephony and live scan alerts.
+      {/* ── 16. FOOTER ──────────────────────────────────────────────────── */}
+      <footer
+        ref={footerRef}
+        className="relative overflow-hidden border-t border-white/10 bg-[#0B0B0C] pb-40 pt-20 text-white"
+      >
+        <div className="relative z-10 mx-auto max-w-[1400px] px-6 sm:px-10">
+          <div className="grid gap-12 pb-16 md:grid-cols-12">
+            <div className="space-y-5 md:col-span-4">
+              <img src={darkBgLogo} alt="RapiQR" className="h-8 w-auto object-contain" />
+              <p className="max-w-xs text-[13px] font-light leading-relaxed text-white/45">
+                A universal smart QR safety layer for vehicles, valuables, pets and families —
+                with masked telephony and instant scan alerts.
               </p>
-
-              <div className="flex items-center gap-2 text-xs text-slate-400 pt-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>All proxy gateway nodes operational</span>
+              <div className="flex items-center gap-2 pt-1 text-[12px] font-light text-white/40">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                All proxy gateway nodes operational
               </div>
             </div>
 
-            {/* Links Grid */}
-            <div className="md:col-span-7 grid grid-cols-2 sm:grid-cols-3 gap-8 text-xs sm:text-sm">
-              
-              <div className="space-y-3">
-                <div className="font-bold text-white uppercase tracking-wider text-[11px] text-amber-400">
+            <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 md:col-span-8">
+              <div className="space-y-3.5">
+                <div className="text-[11px] font-light uppercase tracking-[0.16em] text-white/35">
                   Products
                 </div>
-                <ul className="space-y-2 text-slate-400">
-                  <li>
-                    <button onClick={onOpenCheckout} className="hover:text-white transition-colors cursor-pointer">
-                      Vehicle Safety Plates
-                    </button>
-                  </li>
-                  <li>
-                    <button onClick={onOpenCheckout} className="hover:text-white transition-colors cursor-pointer">
-                      Valuables &amp; Bag Tags
-                    </button>
-                  </li>
-                  <li>
-                    <button onClick={onOpenCheckout} className="hover:text-white transition-colors cursor-pointer">
-                      Pet Smart Collars
-                    </button>
-                  </li>
-                  <li>
-                    <button onClick={onOpenCheckout} className="hover:text-white transition-colors cursor-pointer">
-                      Custom Enterprise Tags
-                    </button>
-                  </li>
+                <ul className="space-y-2.5 text-[13px] font-light text-white/55">
+                  {PRODUCTS.map((p) => (
+                    <li key={p.id}>
+                      <button
+                        onClick={onOpenCheckout}
+                        className="cursor-pointer text-left transition-colors hover:text-white"
+                      >
+                        {p.name}
+                      </button>
+                    </li>
+                  ))}
                 </ul>
               </div>
 
-              <div className="space-y-3">
-                <div className="font-bold text-white uppercase tracking-wider text-[11px] text-amber-400">
+              <div className="space-y-3.5">
+                <div className="text-[11px] font-light uppercase tracking-[0.16em] text-white/35">
                   Platform
                 </div>
-                <ul className="space-y-2 text-slate-400">
+                <ul className="space-y-2.5 text-[13px] font-light text-white/55">
                   <li>
-                    <button onClick={onLogin} className="hover:text-white transition-colors cursor-pointer">
-                      Client Dashboard
+                    <button onClick={onLogin} className="cursor-pointer transition-colors hover:text-white">
+                      Client dashboard
                     </button>
                   </li>
                   <li>
                     <button
                       onClick={() => setIsPartnerModalOpen(true)}
-                      className="hover:text-white transition-colors cursor-pointer"
+                      className="cursor-pointer text-left transition-colors hover:text-white"
                     >
-                      Distributor Portal
+                      Distributor portal
                     </button>
                   </li>
                   <li>
-                    <a href="#privacy-section" className="hover:text-white transition-colors">
-                      Privacy Architecture
-                    </a>
+                    <button
+                      onClick={() => handleSmoothScroll('join-section')}
+                      className="cursor-pointer text-left transition-colors hover:text-white"
+                    >
+                      Service partners
+                    </button>
                   </li>
                   <li>
-                    <a href="#faq-section" className="hover:text-white transition-colors">
-                      Help Center &amp; FAQ
-                    </a>
+                    <button
+                      onClick={() => handleSmoothScroll('demo-section')}
+                      className="cursor-pointer text-left transition-colors hover:text-white"
+                    >
+                      Live scan demo
+                    </button>
                   </li>
                 </ul>
               </div>
 
-              <div className="space-y-3">
-                <div className="font-bold text-white uppercase tracking-wider text-[11px] text-amber-400">
-                  Legal &amp; Trust
+              <div className="space-y-3.5">
+                <div className="text-[11px] font-light uppercase tracking-[0.16em] text-white/35">
+                  Company
                 </div>
-                <ul className="space-y-2 text-slate-400">
+                <ul className="space-y-2.5 text-[13px] font-light text-white/55">
                   <li>
-                    <span className="hover:text-white transition-colors cursor-pointer">
-                      Privacy Policy
-                    </span>
+                    <button
+                      onClick={() => handleSmoothScroll('hiw-section')}
+                      className="cursor-pointer text-left transition-colors hover:text-white"
+                    >
+                      How it works
+                    </button>
                   </li>
                   <li>
-                    <span className="hover:text-white transition-colors cursor-pointer">
-                      Terms of Service
-                    </span>
+                    <button
+                      onClick={() => handleSmoothScroll('pricing-section')}
+                      className="cursor-pointer text-left transition-colors hover:text-white"
+                    >
+                      Pricing
+                    </button>
                   </li>
                   <li>
-                    <span className="hover:text-white transition-colors cursor-pointer">
-                      Security Whitepaper
-                    </span>
+                    <button
+                      onClick={() => handleSmoothScroll('distributor-section')}
+                      className="cursor-pointer text-left transition-colors hover:text-white"
+                    >
+                      Franchise
+                    </button>
                   </li>
                   <li>
-                    <span className="hover:text-white transition-colors cursor-pointer">
-                      3-Year Warranty
-                    </span>
+                    <button
+                      onClick={() => handleSmoothScroll('faq-section')}
+                      className="cursor-pointer text-left transition-colors hover:text-white"
+                    >
+                      Help &amp; FAQ
+                    </button>
                   </li>
                 </ul>
               </div>
 
+              <div className="space-y-3.5">
+                <div className="text-[11px] font-light uppercase tracking-[0.16em] text-white/35">
+                  Legal
+                </div>
+                <ul className="space-y-2.5 text-[13px] font-light text-white/55">
+                  <li>Privacy policy</li>
+                  <li>Terms of service</li>
+                  <li>Security whitepaper</li>
+                  <li>3-year warranty</li>
+                </ul>
+              </div>
             </div>
-
           </div>
 
-          <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
-            <div>
-              © {new Date().getFullYear()} RapiQR Inc. All rights reserved.
-            </div>
-            <div className="flex items-center gap-6">
-              <span>Crafted with precision for instant asset safety</span>
-            </div>
+          <div className="flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-[12px] font-light text-white/35 sm:flex-row">
+            <span>© {new Date().getFullYear()} RapiQR. All rights reserved.</span>
+            <span className="flex items-center gap-2">
+              <Shield size={12} />
+              Your number is never rendered on a scan page
+            </span>
           </div>
-
         </div>
 
-        {/* Giant Watermark Typography at bottom */}
-        <div className="absolute -bottom-10 sm:-bottom-16 left-1/2 -translate-x-1/2 select-none pointer-events-none opacity-[0.03] text-[120px] sm:text-[220px] lg:text-[280px] font-black tracking-tighter text-white whitespace-nowrap uppercase font-sans">
-          RAPIQR
-        </div>
+        {/* Watermark drifts as the page bottoms out */}
+        <motion.div
+          style={reduced ? undefined : { y: watermarkY }}
+          className="pointer-events-none absolute inset-x-0 bottom-0 select-none text-center"
+          aria-hidden="true"
+        >
+          <span className="block whitespace-nowrap text-[clamp(5rem,20vw,17rem)] font-medium leading-none tracking-[-0.05em] text-white/[0.045]">
+            RAPIQR
+          </span>
+        </motion.div>
       </footer>
 
-      {/* ── 16. CART DRAWER ─────────────────────────────────────────── */}
-      {isCartOpen && (
-        <div className="fixed inset-0 z-[500] flex justify-end animate-fade-in">
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs" onClick={() => setIsCartOpen(false)} />
-          <div className="relative w-full max-w-md bg-white h-full shadow-2xl z-10 flex flex-col justify-between p-6 overflow-y-auto">
-            <div>
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                <div className="flex items-center gap-2 font-bold text-lg text-slate-900">
-                  <ShoppingBag size={19} className="text-amber-500" />
-                  <span>Your Safety Kit Cart</span>
+      {/* ── 17. ADD-TO-CART CONFIRMATION ───────────────────────────────── */}
+      <AnimatePresence>
+        {cartNotice && (
+          <motion.div
+            initial={{ opacity: 0, x: 28, y: 12 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, x: 28, y: 12 }}
+            transition={{ duration: 0.35, ease: EASE }}
+            className="fixed bottom-5 right-5 z-[520] flex w-[min(360px,calc(100vw-2.5rem))] items-center gap-3 rounded-2xl border border-black/8 bg-white p-4 shadow-[0_20px_55px_-18px_rgba(0,0,0,0.45)]"
+            role="status"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0B0B0C] text-[#F6C000]">
+              <Check size={17} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-semibold text-[#0B0B0C]">Added to your cart</p>
+              <p className="mt-0.5 truncate text-[12px] font-light text-black/50">
+                {cartNotice.qty > 1 ? `${cartNotice.qty} × ` : ''}{cartNotice.name}
+              </p>
+            </div>
+            <button
+              onClick={() => setIsCartOpen(true)}
+              className="shrink-0 cursor-pointer text-[12px] font-semibold text-black/60 underline underline-offset-4 transition-colors hover:text-black"
+            >
+              View cart
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── 18. CART DRAWER ─────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {isCartOpen && (
+          /* The wrapper is a motion component so its removal defers unmount and
+             the backdrop and panel below get to play their exit. */
+          <motion.div key="cart" className="fixed inset-0 z-[500] flex justify-end">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={() => setIsCartOpen(false)}
+            />
+            <motion.aside
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ duration: 0.45, ease: EASE }}
+              className="relative z-10 flex h-full w-full max-w-md flex-col justify-between overflow-y-auto bg-white p-7"
+            >
+              <div>
+                <div className="flex items-center justify-between border-b border-black/8 pb-5">
+                  <span className="text-lg font-medium tracking-[-0.02em]">Your cart</span>
+                  <button
+                    onClick={() => setIsCartOpen(false)}
+                    className="cursor-pointer rounded-full p-2 transition-colors hover:bg-black/5"
+                    aria-label="Close cart"
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
-                <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-slate-100 rounded-full">
-                  <X size={18} />
-                </button>
+
+                {cart.length === 0 ? (
+                  <div className="py-20 text-center">
+                    <ShoppingBag size={36} className="mx-auto mb-4 text-black/15" />
+                    <p className="text-[14px] font-medium">Your cart is empty</p>
+                    <p className="mt-1 text-[12px] font-light text-black/40">
+                      Add a tag to start protecting something.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-5 space-y-5">
+                    {cart.map((item) => (
+                      <div key={item.product.id} className="flex items-center gap-4">
+                        <img
+                          src={item.product.img}
+                          alt={item.product.name}
+                          className="h-16 w-16 rounded-xl object-cover"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <h4 className="truncate text-[13px] font-medium">{item.product.name}</h4>
+                          <div className="mt-1 text-[13px] font-light text-black/50">
+                            ₹{item.product.price}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-full border border-black/10 p-1">
+                          <button
+                            onClick={() =>
+                              setCart((prev) =>
+                                prev
+                                  .map((i) =>
+                                    i.product.id === item.product.id ? { ...i, qty: i.qty - 1 } : i
+                                  )
+                                  .filter((i) => i.qty > 0)
+                              )
+                            }
+                            className="cursor-pointer rounded-full p-1.5 transition-colors hover:bg-black/5"
+                            aria-label="Decrease quantity"
+                          >
+                            <Minus size={12} />
+                          </button>
+                          <span className="min-w-4 text-center text-[12px] font-medium">{item.qty}</span>
+                          <button
+                            onClick={() =>
+                              setCart((prev) =>
+                                prev.map((i) =>
+                                  i.product.id === item.product.id ? { ...i, qty: i.qty + 1 } : i
+                                )
+                              )
+                            }
+                            className="cursor-pointer rounded-full p-1.5 transition-colors hover:bg-black/5"
+                            aria-label="Increase quantity"
+                          >
+                            <Plus size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {cart.length === 0 ? (
-                <div className="py-16 text-center text-slate-400">
-                  <ShoppingBag size={40} className="mx-auto mb-3 opacity-30 text-amber-500" />
-                  <p className="font-semibold text-slate-800 text-sm">Your cart is empty</p>
-                  <p className="text-xs text-slate-400 mt-1">Add items from the store to protect your assets</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100 mt-4 space-y-4">
-                  {cart.map((item) => (
-                    <div key={item.product.id} className="pt-4 flex items-center justify-between gap-3">
-                      <img src={item.product.img} alt={item.product.name} className="w-14 h-14 rounded-xl object-cover border border-slate-100" />
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-xs text-slate-900 truncate">{item.product.name}</h4>
-                        <div className="text-xs font-bold text-slate-950 mt-1">₹{item.product.price}</div>
-                      </div>
-                      <div className="flex items-center gap-2 border border-slate-200 rounded-lg p-1">
-                        <button
-                          onClick={() => {
-                            setCart((prev) =>
-                              prev
-                                .map((i) => (i.product.id === item.product.id ? { ...i, qty: i.qty - 1 } : i))
-                                .filter((i) => i.qty > 0)
-                            );
-                          }}
-                          className="p-1 hover:bg-slate-100 rounded-sm"
-                        >
-                          <Minus size={12} />
-                        </button>
-                        <span className="text-xs font-bold px-1">{item.qty}</span>
-                        <button
-                          onClick={() => {
-                            setCart((prev) =>
-                              prev.map((i) => (i.product.id === item.product.id ? { ...i, qty: i.qty + 1 } : i))
-                            );
-                          }}
-                          className="p-1 hover:bg-slate-100 rounded-sm"
-                        >
-                          <Plus size={12} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+              {cart.length > 0 && (
+                <div className="border-t border-black/8 pt-5">
+                  <div className="mb-5 flex items-center justify-between text-base font-medium">
+                    <span>Subtotal</span>
+                    <span>₹{cartSubtotal}</span>
+                  </div>
+                  <button
+                    onClick={openCheckout}
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#0B0B0C] py-4 text-[13px] font-semibold text-white transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                  >
+                    Proceed to checkout
+                    <ArrowRight size={14} style={{ color: '#F6C000' }} />
+                  </button>
                 </div>
               )}
-            </div>
+            </motion.aside>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            {cart.length > 0 && (
-              <div className="pt-4 border-t border-slate-100">
-                <div className="flex items-center justify-between text-base font-black text-slate-950 mb-4">
-                  <span>Subtotal:</span>
-                  <span>₹{cartSubtotal}</span>
-                </div>
-                <button
-                  onClick={() => {
-                    setIsCartOpen(false);
-                    if (onOpenCheckout) onOpenCheckout();
-                    else onStart?.();
-                  }}
-                  className="w-full py-3.5 rounded-xl bg-slate-950 hover:bg-slate-850 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-colors cursor-pointer"
-                >
-                  <span>Proceed to Checkout</span>
-                  <ArrowRight size={14} className="text-amber-400" />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── 17. DISTRIBUTORSHIP APPLICATION MODAL ───────────────────── */}
-      {isPartnerModalOpen && (
-        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto relative border border-gray-100 p-6 sm:p-8 text-left">
-            <button
-              onClick={() => { setIsPartnerModalOpen(false); setPartnerSubmitted(false); }}
-              className="absolute top-5 right-5 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors cursor-pointer"
+      {/* ── 18. DISTRIBUTOR APPLICATION MODAL ───────────────────────────── */}
+      <AnimatePresence>
+        {isPartnerModalOpen && (
+          <motion.div
+            key="partner-modal"
+            className="fixed inset-0 z-[600] flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => {
+                setIsPartnerModalOpen(false);
+                setPartnerSubmitted(false);
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 24, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.98 }}
+              transition={{ duration: 0.4, ease: EASE }}
+              className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-7 text-left sm:p-9"
             >
-              <X size={18} />
-            </button>
+              <button
+                onClick={() => {
+                  setIsPartnerModalOpen(false);
+                  setPartnerSubmitted(false);
+                }}
+                className="absolute right-5 top-5 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/5 text-black/50 transition-colors hover:bg-black/10"
+                aria-label="Close"
+              >
+                <X size={17} />
+              </button>
 
-            {userAppStatus?.status === 'approved' ? (
-              <div className="py-6 text-center space-y-4">
-                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-2xl font-bold">
-                  ✓
-                </div>
-                <h3 className="text-2xl font-black text-gray-900">Distributor Verified &amp; Approved!</h3>
-                <p className="text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
-                  Congratulations <span className="font-bold text-gray-900">{profile?.fullName || userAppStatus.userName}</span>. Your franchise application has been verified by the admin owner. Your Distributor Dashboard is unlocked.
-                </p>
-                <div className="pt-2">
+              {userAppStatus?.status === 'approved' ? (
+                <div className="space-y-5 py-6 text-center">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
+                    <CheckCircle2 size={26} className="text-emerald-600" />
+                  </div>
+                  <h3 className="text-2xl font-medium tracking-[-0.02em]">Distributor approved</h3>
+                  <p className="mx-auto max-w-xs text-[13px] font-light leading-relaxed text-black/55">
+                    Congratulations{' '}
+                    <span className="font-medium text-[#0B0B0C]">
+                      {profile?.fullName || userAppStatus.userName}
+                    </span>
+                    . Your franchise application has been verified and your distributor dashboard
+                    is unlocked.
+                  </p>
                   <button
                     onClick={() => {
                       setIsPartnerModalOpen(false);
-                      if (onOpenDistributorDashboard) onOpenDistributorDashboard();
+                      onOpenDistributorDashboard?.();
                     }}
-                    className="w-full py-3.5 rounded-xl font-black bg-amber-500 text-gray-950 hover:bg-amber-400 transition-all text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer"
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#0B0B0C] py-3.5 text-[13px] font-semibold text-white"
                   >
-                    Open Distributor Dashboard <ArrowRight size={16} />
+                    Open distributor dashboard <ArrowRight size={15} />
                   </button>
                 </div>
-              </div>
-            ) : (userAppStatus?.status === 'pending' || partnerSubmitted) ? (
-              <div className="py-6 text-center space-y-4">
-                <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto text-2xl font-bold animate-pulse">
-                  ⏳
-                </div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-100 text-amber-900 uppercase tracking-wider">
-                  Request Sent to Owner
-                </div>
-                <h3 className="text-2xl font-black text-gray-900">Pending Admin Verification</h3>
-                <p className="text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
-                  Thank you <span className="font-bold text-gray-900">{partnerForm.name || userAppStatus?.userName || 'Partner'}</span>. Your distributor application request has been sent to the system owner.
-                </p>
-                <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-600 font-medium text-left space-y-1.5">
-                  <div className="flex justify-between"><span>City / Territory:</span> <span className="font-bold text-gray-900">{partnerForm.city || userAppStatus?.city || 'Pune'}</span></div>
-                  <div className="flex justify-between"><span>Package Tier:</span> <span className="font-bold text-amber-600">{partnerForm.tier || userAppStatus?.tier}</span></div>
-                  <div className="flex justify-between"><span>Verification Status:</span> <span className="font-bold text-amber-600">Pending Review ⏳</span></div>
-                </div>
-                <p className="text-[11px] text-gray-400 italic">
-                  Once the admin owner verifies your request, your Distributor Dashboard will be unlocked automatically.
-                </p>
-                <button
-                  onClick={() => { setIsPartnerModalOpen(false); setPartnerSubmitted(false); }}
-                  className="px-6 py-2.5 rounded-xl font-bold bg-gray-900 text-white text-xs inline-block cursor-pointer"
-                >
-                  Close Window
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
-                    <Zap size={20} />
+              ) : userAppStatus?.status === 'pending' || partnerSubmitted ? (
+                <div className="space-y-5 py-6 text-center">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-black/5">
+                    <Loader2 size={24} className="animate-spin text-black/40" />
                   </div>
-                  <div>
-                    <h3 className="text-xl font-black text-gray-900">Become a Partner</h3>
-                    <p className="text-xs text-gray-500">Apply for RapiQR Distributorship &amp; Franchise</p>
-                  </div>
-                </div>
-
-                <form onSubmit={handlePartnerSubmit} className="space-y-4 pt-2">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Full Name / Company Name</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Ramesh Auto Accessories"
-                      value={partnerForm.name}
-                      onChange={e => setPartnerForm({ ...partnerForm, name: e.target.value })}
-                      className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-amber-500"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">Phone / WhatsApp Number</label>
-                      <PhoneInputWithCountry
-                        required
-                        value={partnerForm.phone}
-                        onChange={full => setPartnerForm({ ...partnerForm, phone: full })}
-                      />
+                  <h3 className="text-2xl font-medium tracking-[-0.02em]">Pending verification</h3>
+                  <p className="mx-auto max-w-xs text-[13px] font-light leading-relaxed text-black/55">
+                    Thank you{' '}
+                    <span className="font-medium text-[#0B0B0C]">
+                      {partnerForm.name || userAppStatus?.userName || 'partner'}
+                    </span>
+                    . Your application has been sent to the RapiQR team.
+                  </p>
+                  <div className="space-y-2.5 rounded-2xl bg-black/[0.03] p-4 text-left text-[12px] font-light text-black/55">
+                    <div className="flex justify-between">
+                      <span>City / territory</span>
+                      <span className="font-medium text-[#0B0B0C]">
+                        {partnerForm.city || userAppStatus?.city || '—'}
+                      </span>
                     </div>
+                    <div className="flex justify-between">
+                      <span>Package tier</span>
+                      <span className="font-medium text-[#0B0B0C]">
+                        {partnerForm.tier || userAppStatus?.tier}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Status</span>
+                      <span className="font-medium text-[#0B0B0C]">Pending review</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsPartnerModalOpen(false);
+                      setPartnerSubmitted(false);
+                    }}
+                    className="cursor-pointer rounded-full bg-black/5 px-6 py-3 text-[13px] font-medium text-black/70 transition-colors hover:bg-black/10"
+                  >
+                    Close
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-6 flex items-center gap-3">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-black/[0.04]">
+                      <Handshake size={19} className="text-black/60" />
+                    </span>
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">City &amp; State</label>
+                      <h3 className="text-xl font-medium tracking-[-0.02em]">Become a partner</h3>
+                      <p className="text-[12px] font-light text-black/45">
+                        Apply for a RapiQR distributorship or franchise
+                      </p>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handlePartnerSubmit} className="space-y-4">
+                    <div>
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                        Full name / company
+                      </label>
                       <input
                         type="text"
                         required
-                        placeholder="e.g. Pune, Maharashtra"
-                        value={partnerForm.city}
-                        onChange={e => setPartnerForm({ ...partnerForm, city: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-amber-500"
+                        placeholder="e.g. Ramesh Auto Accessories"
+                        value={partnerForm.name}
+                        onChange={(e) => setPartnerForm({ ...partnerForm, name: e.target.value })}
+                        className="w-full rounded-xl border border-black/12 px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
                       />
                     </div>
-                  </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Business Type</label>
-                    <select
-                      value={partnerForm.business}
-                      onChange={e => setPartnerForm({ ...partnerForm, business: e.target.value })}
-                      className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-amber-500"
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                          Phone / WhatsApp
+                        </label>
+                        <PhoneInputWithCountry
+                          required
+                          value={partnerForm.phone}
+                          onChange={(full) => setPartnerForm({ ...partnerForm, phone: full })}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                          City &amp; state
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Pune, Maharashtra"
+                          value={partnerForm.city}
+                          onChange={(e) => setPartnerForm({ ...partnerForm, city: e.target.value })}
+                          className="w-full rounded-xl border border-black/12 px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                        Business type
+                      </label>
+                      <select
+                        value={partnerForm.business}
+                        onChange={(e) => setPartnerForm({ ...partnerForm, business: e.target.value })}
+                        className="w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                      >
+                        <option value="Auto Accessories Shop">Auto accessories / helmet shop</option>
+                        <option value="Car Dealership / Service Center">
+                          Car dealership / service centre
+                        </option>
+                        <option value="Security Agency / Society Admin">
+                          Security agency / society admin
+                        </option>
+                        <option value="Retail Store / Gift Shop">Retail store / general merchant</option>
+                        <option value="Individual Reseller">Individual reseller</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                        Interested package
+                      </label>
+                      <select
+                        value={partnerForm.tier}
+                        onChange={(e) => setPartnerForm({ ...partnerForm, tier: e.target.value })}
+                        className="w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                      >
+                        <option value="Retail Kit (50 Units)">Retail partner kit (50 stickers)</option>
+                        <option value="City Franchise (300 Units)">
+                          City master franchise (300 stickers)
+                        </option>
+                        <option value="State Partner (2500+ Units)">
+                          State master partner (2,500+ stickers)
+                        </option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#0B0B0C] py-4 text-[13px] font-semibold text-white transition-transform hover:scale-[1.01] active:scale-[0.99]"
                     >
-                      <option value="Auto Accessories Shop">Auto Accessories / Helmet Shop</option>
-                      <option value="Car Dealership / Service Center">Car Dealership / Service Center</option>
-                      <option value="Security Agency / Society Admin">Security Agency / Housing Society Admin</option>
-                      <option value="Retail Store / Gift Shop">Retail Store / General Merchant</option>
-                      <option value="Individual Reseller">Individual Reseller / Entrepreneur</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Interested Partner Package</label>
-                    <select
-                      value={partnerForm.tier}
-                      onChange={e => setPartnerForm({ ...partnerForm, tier: e.target.value })}
-                      className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-amber-500"
-                    >
-                      <option value="Retail Kit (50 Units)">Retail Partner Kit (50 Stickers - 45% Margin)</option>
-                      <option value="City Franchise (300 Units)">City Master Franchise (300 Stickers + Exclusive Lock)</option>
-                    </select>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-3.5 rounded-xl font-bold bg-amber-500 text-gray-950 text-xs flex items-center justify-center gap-2 hover:bg-amber-600 transition-all shadow-md mt-4 cursor-pointer"
-                  >
-                    Submit Partner Application <ArrowRight size={14} />
-                  </button>
-                </form>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
+                      Submit application
+                      <ArrowRight size={14} style={{ color: '#F6C000' }} />
+                    </button>
+                  </form>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

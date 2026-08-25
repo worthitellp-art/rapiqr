@@ -1164,9 +1164,12 @@ export async function getCommunicationProvidersFromDb() {
     const attempt = (columns: string) =>
       supabase.from('communication').select(columns).order('created_at', { ascending: false });
 
-    let { data, error } = await attempt('id, category, service_type, categories, label, phone, active, created_at');
+    let { data, error } = await attempt('id, category, service_type, categories, label, phone, active, email, city, notes, created_at');
 
-    // Pre-migration database — fall back to the columns that have always existed.
+    // Pre-migration database — drop one migration's columns per retry, newest first.
+    if (error && /column .* does not exist/i.test(error.message || '')) {
+      ({ data, error } = await attempt('id, category, service_type, categories, label, phone, active, created_at'));
+    }
     if (error && /column .* does not exist/i.test(error.message || '')) {
       ({ data, error } = await attempt('id, category, label, phone, active, created_at'));
     }
@@ -1192,6 +1195,11 @@ export async function saveCommunicationProviderToDb(provider: {
   label: string;
   phone: string;
   active?: boolean;
+  /** Applicant details, present only on rows that came from the public "Join us"
+   *  form. Carried through so approving an application doesn't erase them. */
+  email?: string | null;
+  city?: string | null;
+  notes?: string | null;
 }) {
   if (isApiBackendConfigured) {
     try {
@@ -1213,6 +1221,9 @@ export async function saveCommunicationProviderToDb(provider: {
     };
     if (provider.serviceType) payload.service_type = provider.serviceType;
     if (provider.categories) payload.categories = provider.categories;
+    if (provider.email !== undefined) payload.email = provider.email;
+    if (provider.city !== undefined) payload.city = provider.city;
+    if (provider.notes !== undefined) payload.notes = provider.notes;
     if (provider.id && typeof provider.id === 'string' && provider.id.includes('-')) {
       payload.id = provider.id;
     }
@@ -1220,7 +1231,16 @@ export async function saveCommunicationProviderToDb(provider: {
     const attempt = (columns: string) =>
       supabase.from('communication').upsert(payload).select(columns);
 
-    let { data, error } = await attempt('id, category, service_type, categories, label, phone, active, created_at');
+    let { data, error } = await attempt('id, category, service_type, categories, label, phone, active, email, city, notes, created_at');
+
+    // Server/sql/provider_applications.sql hasn't been run yet — retry without
+    // the applicant columns.
+    if (error && /column .* does not exist/i.test(error.message || '')) {
+      delete payload.email;
+      delete payload.city;
+      delete payload.notes;
+      ({ data, error } = await attempt('id, category, service_type, categories, label, phone, active, created_at'));
+    }
 
     // Server/sql/service_providers.sql hasn't been run yet — retry without the
     // new columns so adding a provider still works, just without scoping.
@@ -1234,6 +1254,77 @@ export async function saveCommunicationProviderToDb(provider: {
     return data;
   } catch (err) {
     console.warn('Supabase save communication provider error:', err);
+    return null;
+  }
+}
+
+export interface ProviderApplication {
+  /** Legacy label of the service type ("Ambulance", "Towing", ...). */
+  category: string;
+  /** Service type slug matched by the scan page's SERVICE_PROVIDER buttons. */
+  serviceType: string;
+  /** Sticker categories this provider can serve. Empty = every category. */
+  categories?: string[];
+  /** Business / provider name. */
+  label: string;
+  phone: string;
+  email?: string;
+  city?: string;
+  notes?: string;
+}
+
+/**
+ * Submit a public "Join us" service-provider application.
+ *
+ * It lands in the same `communication` directory the admin manages, but with
+ * `active: false` — the scan page only ever reads active rows, so nothing goes
+ * live until the admin approves it in Admin -> Communication.
+ */
+export async function submitProviderApplication(application: ProviderApplication) {
+  if (isApiBackendConfigured) {
+    try {
+      const res = await apiClient.helplines.apply(application);
+      return res.data ? [res.data] : null;
+    } catch (err) {
+      console.warn('Backend provider application error (falling back to Supabase):', err);
+    }
+  }
+  if (!isSupabaseConfigured) return null;
+  try {
+    const payload: any = {
+      category: application.category,
+      label: application.label,
+      phone: application.phone,
+      active: false,
+      service_type: application.serviceType,
+      categories: application.categories || [],
+      email: application.email || null,
+      city: application.city || null,
+      notes: application.notes || null,
+    };
+
+    const attempt = () => supabase.from('communication').insert(payload).select('id');
+
+    let { data, error } = await attempt();
+
+    // Neither migration is guaranteed to have run — drop the newest column set
+    // and retry, so an application still reaches the admin either way.
+    if (error && /column .* does not exist/i.test(error.message || '')) {
+      delete payload.email;
+      delete payload.city;
+      delete payload.notes;
+      ({ data, error } = await attempt());
+    }
+    if (error && /column .* does not exist/i.test(error.message || '')) {
+      delete payload.service_type;
+      delete payload.categories;
+      ({ data, error } = await attempt());
+    }
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.warn('Supabase provider application error:', err);
     return null;
   }
 }

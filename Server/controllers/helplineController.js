@@ -26,6 +26,39 @@ class HelplineController {
   }
 
   /**
+   * Public: a service provider applying through the landing page "Join us" form.
+   *
+   * The row lands in the same `communication` directory the admin manages, but
+   * INACTIVE — `getActive` filters on `active = true`, so an application is
+   * never dialled by a scan page until the admin approves it in
+   * Admin -> Communication by flipping it to Active.
+   */
+  static async apply(req, res) {
+    try {
+      const { category, serviceType, categories, label, phone, email, city, notes } = req.body || {};
+      if (!category || !label || !phone) {
+        return res.status(400).json({ success: false, error: 'category, label and phone are required' });
+      }
+      const data = await HelplineModel.create({
+        category,
+        serviceType,
+        categories,
+        label,
+        phone,
+        email,
+        city,
+        notes,
+        active: false, // pending admin approval
+      });
+      logger.rowInserted('communication', data.id, { category, label, source: 'public_application' });
+      return res.json({ success: true, data });
+    } catch (err) {
+      logger.error('HELPLINE_APPLY', 'Failed to submit provider application', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
    * Admin: full management list, including inactive helplines.
    */
   static async getAll(req, res) {
@@ -40,11 +73,11 @@ class HelplineController {
 
   static async create(req, res) {
     try {
-      const { category, serviceType, categories, label, phone, active } = req.body || {};
+      const { category, serviceType, categories, label, phone, active, email, city, notes } = req.body || {};
       if (!category || !label || !phone) {
         return res.status(400).json({ success: false, error: 'category, label and phone are required' });
       }
-      const data = await HelplineModel.create({ category, serviceType, categories, label, phone, active });
+      const data = await HelplineModel.create({ category, serviceType, categories, label, phone, active, email, city, notes });
       logger.rowInserted('communication', data.id, { category, label });
       return res.json({ success: true, data });
     } catch (err) {

@@ -1,6 +1,8 @@
 -- Service Providers: extends the existing `communication` helpline directory so a
 -- provider can be matched by SERVICE TYPE and restricted to specific sticker
--- CATEGORIES. Run this once in the Supabase SQL editor.
+-- CATEGORIES. Run this once in the Supabase SQL editor. If the `communication`
+-- table does not exist yet, run Server/sql/provider_applications.sql first — it
+-- creates the table with the full column set and makes the ALTERs below no-ops.
 --
 -- Until it runs, HelplineModel degrades gracefully (Server/models/helplineModel.js):
 -- it detects the missing columns, falls back to the legacy SELECT, and every

@@ -1,13 +1,46 @@
 const { supabaseAdmin } = require('../config/db');
 
-/* `service_type` and `categories` arrive with Server/sql/service_providers.sql.
-   Until that migration is run the columns don't exist, so every select is tried
-   with them once and then permanently downgraded to the legacy column set —
-   same "degrade, don't crash" posture as MessageModel. */
-const SELECT = 'id, category, service_type, categories, label, phone, active, created_at';
-const LEGACY_SELECT = 'id, category, label, phone, active, created_at';
+/* The table grew in two migrations, and neither is guaranteed to have run:
+     - `service_type` / `categories`  -> Server/sql/service_providers.sql
+     - `email` / `city` / `notes`     -> Server/sql/provider_applications.sql
+   Every select is tried with the widest column set once and then permanently
+   downgraded one migration at a time — same "degrade, don't crash" posture as
+   MessageModel. */
+const BASE_COLUMNS = ['id', 'category', 'label', 'phone', 'active', 'created_at'];
+const SERVICE_COLUMNS = ['service_type', 'categories'];
+/* Filled by the public "Join us" application form on the landing page; rows the
+   admin adds by hand leave them null. */
+const APPLICANT_COLUMNS = ['email', 'city', 'notes'];
 
 let hasServiceColumns = true;
+let hasApplicantColumns = true;
+
+function buildSelect() {
+  return [
+    ...BASE_COLUMNS,
+    ...(hasServiceColumns ? SERVICE_COLUMNS : []),
+    ...(hasApplicantColumns ? APPLICANT_COLUMNS : []),
+  ].join(', ');
+}
+
+/**
+ * Turn off the newest column set still in play, newest migration first.
+ * Returns false once only the legacy columns are left and there is nothing
+ * more to give up — the caller should then surface the real error.
+ */
+function downgrade() {
+  if (hasApplicantColumns) {
+    console.warn('HelplineModel: email/city/notes columns missing — run Server/sql/provider_applications.sql. Applicant details will not be stored.');
+    hasApplicantColumns = false;
+    return true;
+  }
+  if (hasServiceColumns) {
+    console.warn('HelplineModel: service_type/categories columns missing — run Server/sql/service_providers.sql. Falling back to legacy columns.');
+    hasServiceColumns = false;
+    return true;
+  }
+  return false;
+}
 
 function isMissingColumnError(error) {
   if (!error) return false;
@@ -34,22 +67,19 @@ function normalize(row) {
     // An empty list means "every sticker category", which is what pre-migration
     // rows are — never an accidental "matches nothing".
     categories: Array.isArray(row.categories) ? row.categories : [],
+    email: row.email || null,
+    city: row.city || null,
+    notes: row.notes || null,
   };
 }
 
-/** Runs `build(select)` with the new columns, retrying on the legacy set once. */
+/** Runs `build(select)`, dropping one un-migrated column set per retry. */
 async function selectWithFallback(build) {
-  if (hasServiceColumns) {
-    const { data, error } = await build(SELECT);
+  for (;;) {
+    const { data, error } = await build(buildSelect());
     if (!error) return (data || []).map(normalize);
-    if (!isMissingColumnError(error)) throw error;
-    console.warn('HelplineModel: service_type/categories columns missing — run Server/sql/service_providers.sql. Falling back to legacy columns.');
-    hasServiceColumns = false;
+    if (!isMissingColumnError(error) || !downgrade()) throw error;
   }
-
-  const { data, error } = await build(LEGACY_SELECT);
-  if (error) throw error;
-  return (data || []).map(normalize);
 }
 
 class HelplineModel {
@@ -109,23 +139,27 @@ class HelplineModel {
     }
   }
 
-  static async create({ category, serviceType, categories, label, phone, active = true }) {
+  static async create({ category, serviceType, categories, label, phone, active = true, email, city, notes }) {
     const payload = { category, label, phone, active };
     if (hasServiceColumns) {
       payload.service_type = slugify(serviceType || category);
       payload.categories = Array.isArray(categories) ? categories : [];
     }
+    if (hasApplicantColumns) {
+      payload.email = email || null;
+      payload.city = city || null;
+      payload.notes = notes || null;
+    }
 
     const { data, error } = await supabaseAdmin
       .from('communication')
       .insert(payload)
-      .select(hasServiceColumns ? SELECT : LEGACY_SELECT)
+      .select(buildSelect())
       .single();
 
     if (error) {
-      if (!isMissingColumnError(error)) throw error;
-      hasServiceColumns = false;
-      return HelplineModel.create({ category, serviceType, categories, label, phone, active });
+      if (!isMissingColumnError(error) || !downgrade()) throw error;
+      return HelplineModel.create({ category, serviceType, categories, label, phone, active, email, city, notes });
     }
     return normalize(data);
   }
@@ -140,17 +174,21 @@ class HelplineModel {
       if (updates.serviceType !== undefined) payload.service_type = slugify(updates.serviceType);
       if (updates.categories !== undefined) payload.categories = Array.isArray(updates.categories) ? updates.categories : [];
     }
+    if (hasApplicantColumns) {
+      if (updates.email !== undefined) payload.email = updates.email;
+      if (updates.city !== undefined) payload.city = updates.city;
+      if (updates.notes !== undefined) payload.notes = updates.notes;
+    }
 
     const { data, error } = await supabaseAdmin
       .from('communication')
       .update(payload)
       .eq('id', id)
-      .select(hasServiceColumns ? SELECT : LEGACY_SELECT)
+      .select(buildSelect())
       .single();
 
     if (error) {
-      if (!isMissingColumnError(error)) throw error;
-      hasServiceColumns = false;
+      if (!isMissingColumnError(error) || !downgrade()) throw error;
       return HelplineModel.update(id, updates);
     }
     return normalize(data);

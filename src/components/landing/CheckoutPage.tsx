@@ -492,14 +492,14 @@ export default function CheckoutPage({
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-16">
+    <div className="min-h-screen bg-[#F4F1EC] font-sans text-slate-900 pb-16">
       
       {/* ── TOP HEADER BAR ── */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
+      <header className="sticky top-0 z-40 border-b border-black/8 bg-[#F4F1EC]/95 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:h-20 sm:px-6">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-950 transition-colors cursor-pointer"
+            className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-600 transition-colors hover:text-slate-950"
             aria-label="Back to shop"
           >
             <ArrowLeft size={17} />
@@ -508,7 +508,7 @@ export default function CheckoutPage({
           </button>
 
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-400 text-slate-950 font-black text-sm flex items-center justify-center shadow-xs">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-400 text-sm font-black text-slate-950 shadow-xs">
               R
             </div>
             <span className="font-extrabold text-lg sm:text-xl text-slate-950 tracking-tight">
@@ -517,7 +517,7 @@ export default function CheckoutPage({
             </span>
           </div>
 
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
             <Lock size={12} className="text-emerald-600" />
             <span className="hidden sm:inline">256-BIT SSL SECURE</span>
             <span className="sm:hidden">SECURE</span>
@@ -526,7 +526,7 @@ export default function CheckoutPage({
       </header>
 
       {/* ── PAGE CONTENT ── */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-8">
+      <main className="mx-auto max-w-6xl px-4 pt-8 sm:px-6 sm:pt-10">
         
         {/* ── EMPTY CART STATE ── */}
         {cart.length === 0 && step !== 'success' && (
@@ -550,7 +550,7 @@ export default function CheckoutPage({
 
         {/* ── ACTIVE CHECKOUT GRID ── */}
         {cart.length > 0 && step === 'details' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12 lg:gap-10">
             
             {/* ── LEFT COLUMN: FORM DETAILS (7 COLS) ── */}
             <div className="lg:col-span-7 space-y-6">
@@ -582,7 +582,7 @@ export default function CheckoutPage({
               <form onSubmit={handleSubmit} className="space-y-6">
                 
                 {/* ── 1. Contact Information ── */}
-                <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+                <div className="space-y-4 rounded-2xl border border-black/8 bg-white p-6 shadow-sm sm:p-7">
                   <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
                     <span className="w-6 h-6 rounded-full bg-slate-950 text-amber-300 text-xs font-black flex items-center justify-center">
                       1
@@ -633,7 +633,7 @@ export default function CheckoutPage({
                 </div>
 
                 {/* ── 2. Shipping Address ── */}
-                <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+                <div className="space-y-4 rounded-2xl border border-black/8 bg-white p-6 shadow-sm sm:p-7">
                   <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
                     <span className="w-6 h-6 rounded-full bg-slate-950 text-amber-300 text-xs font-black flex items-center justify-center">
                       2
@@ -719,7 +719,7 @@ export default function CheckoutPage({
                 </div>
 
                 {/* ── 3. Delivery Method ── */}
-                <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+                <div className="space-y-4 rounded-2xl border border-black/8 bg-white p-6 shadow-sm sm:p-7">
                   <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
                     <span className="w-6 h-6 rounded-full bg-slate-950 text-amber-300 text-xs font-black flex items-center justify-center">
                       3
@@ -777,7 +777,7 @@ export default function CheckoutPage({
                 </div>
 
                 {/* ── 4. Payment Method ── */}
-                <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+                <div className="space-y-4 rounded-2xl border border-black/8 bg-white p-6 shadow-sm sm:p-7">
                   <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
                     <span className="w-6 h-6 rounded-full bg-slate-950 text-amber-300 text-xs font-black flex items-center justify-center">
                       4
@@ -841,7 +841,7 @@ export default function CheckoutPage({
 
             {/* ── RIGHT COLUMN: FINAL BILLING SUMMARY (5 COLS) ── */}
             <div className="lg:col-span-5">
-              <div className="sticky top-28 bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+              <div className="sticky top-28 space-y-6 rounded-2xl border border-black/8 bg-white p-6 shadow-sm sm:p-7">
                 
                 <div className="flex items-center justify-between pb-4 border-b border-slate-100">
                   <div className="flex items-center gap-2 font-black text-slate-950 text-base">

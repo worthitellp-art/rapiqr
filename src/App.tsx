@@ -6,6 +6,7 @@ import AuthCallback from './pages/AuthCallback';
 
 const LandingPageMaster = lazy(() => import('./components/landing/LandingPageMaster'));
 const CheckoutPage = lazy(() => import('./components/landing/CheckoutPage'));
+const JoinUsPage = lazy(() => import('./components/landing/JoinUsPage'));
 const QRFleetDashboard = lazy(() => import('./components/dashboard/admin'));
 const ClientDashboard = lazy(() => import('./components/ClientDashboard'));
 const ScanPage = lazy(() => import('./components/scan/ScanPage'));
@@ -62,19 +63,20 @@ function MainAppContent() {
   const [adminModalOpen, setAdminModalOpen] = useState(() => isAdminUrl());
 
   // Restore page from localStorage, but only non-scan pages
-  const [page, setPage] = useState<'landing' | 'dashboard' | 'scan' | 'distributor' | 'checkout'>(() => {
+  const [page, setPage] = useState<'landing' | 'dashboard' | 'scan' | 'distributor' | 'checkout' | 'join'>(() => {
     if (isScanUrl()) return 'scan';
     try {
       const saved = localStorage.getItem('repiqr-current-page') || localStorage.getItem('namoqr-current-page');
       if (saved === 'dashboard') return 'dashboard';
       if (saved === 'distributor') return 'distributor';
       if (saved === 'checkout') return 'checkout';
+      if (saved === 'join') return 'join';
     } catch { /* ignore */ }
     return 'landing';
   });
 
   // Persist page to localStorage whenever it changes
-  const navigateTo = (next: 'landing' | 'dashboard' | 'scan' | 'distributor' | 'checkout') => {
+  const navigateTo = (next: 'landing' | 'dashboard' | 'scan' | 'distributor' | 'checkout' | 'join') => {
     try {
       if (next === 'landing') {
         localStorage.removeItem('repiqr-current-page');
@@ -219,6 +221,14 @@ function MainAppContent() {
     );
   }
 
+  if (page === 'join') {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <JoinUsPage onBack={() => navigateTo('landing')} />
+      </Suspense>
+    );
+  }
+
   return (
     <Suspense fallback={<PageLoader />}>
       <div className="min-h-screen bg-[#FAFAFC] text-[#0A0D14]">
@@ -227,6 +237,7 @@ function MainAppContent() {
           onLogin={() => handleOpenAuth('login')}
           onOpenDistributorDashboard={() => navigateTo('distributor')}
           onOpenCheckout={() => navigateTo('checkout')}
+          onOpenJoinUs={() => navigateTo('join')}
         />
         <AuthModal
           isOpen={authModalOpen}

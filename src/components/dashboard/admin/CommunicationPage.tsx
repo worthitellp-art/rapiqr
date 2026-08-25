@@ -1,14 +1,11 @@
 import type React from "react";
 import { useState, useEffect } from "react";
-import {
-  Plus, Trash2, Phone, Wrench, Battery, Truck, Settings, Users, Ambulance, ShieldAlert,
-  Car, Lightbulb, AlertTriangle, Stethoscope, Droplets, Zap, KeyRound, MoveVertical,
-  Package, PackageOpen, Shield, Headset, Check,
-} from "lucide-react";
+import { Plus, Trash2, Phone, AlertTriangle, Check, Mail, MapPin } from "lucide-react";
 import { useLocalStorage } from "./useLocalStorage";
 import { getCommunicationProvidersFromDb, saveCommunicationProviderToDb, deleteCommunicationProviderFromDb } from "../../../lib/supabaseService";
 import PhoneInputWithCountry from "../../common/PhoneInputWithCountry";
 import { SERVICE_TYPES, slugifyService } from "../../scan/tileActions";
+import { getServiceMeta } from "../../scan/serviceMeta";
 import { STICKER_CATEGORIES } from "../../../stickerModules";
 
 /**
@@ -23,31 +20,6 @@ import { STICKER_CATEGORIES } from "../../../stickerModules";
  * (getAdminContacts("Towing")). Changing it would break the car template.
  */
 
-const SERVICE_META: Record<string, { icon: React.ReactNode; color: string; bg: string; placeholder: string }> = {
-  ambulance:       { icon: <Ambulance size={14} />,     color: "#DC2626", bg: "#FDEAEA", placeholder: "e.g. City Ambulance Service" },
-  towing:          { icon: <Truck size={14} />,          color: "#DC2626", bg: "#FDEAEA", placeholder: "e.g. Highway Towing 24x7" },
-  mechanic:        { icon: <Settings size={14} />,       color: "#B8863F", bg: "#FBF3E4", placeholder: "e.g. Mobile Mechanic Near Me" },
-  flat_tire:       { icon: <Wrench size={14} />,         color: "#B8863F", bg: "#FBF3E4", placeholder: "e.g. Puncture Repair Service" },
-  battery:         { icon: <Battery size={14} />,        color: "#B8863F", bg: "#FBF3E4", placeholder: "e.g. Battery Jumpstart Helpline" },
-  fuel:            { icon: <Truck size={14} />,          color: "#5C78DF", bg: "#E8EDFF", placeholder: "e.g. Emergency Fuel Delivery" },
-  parking:         { icon: <Car size={14} />,            color: "#5C78DF", bg: "#E8EDFF", placeholder: "e.g. Parking Enforcement Helpline" },
-  police:          { icon: <ShieldAlert size={14} />,    color: "#7B7FD1", bg: "#EDEDFB", placeholder: "e.g. Local Police Control Room" },
-  theft:           { icon: <AlertTriangle size={14} />,  color: "#DC2626", bg: "#FDEAEA", placeholder: "e.g. Anti-Theft Rapid Response" },
-  headlights:      { icon: <Lightbulb size={14} />,      color: "#B8863F", bg: "#FBF3E4", placeholder: "e.g. Roadside Light Assist" },
-  family:          { icon: <Users size={14} />,          color: "#2E9E5B", bg: "#E9F9EF", placeholder: "e.g. Father, Mother, Sibling" },
-  veterinarian:    { icon: <Stethoscope size={14} />,    color: "#2E9E5B", bg: "#E9F9EF", placeholder: "e.g. 24x7 Pet Clinic" },
-  plumber:         { icon: <Droplets size={14} />,       color: "#5C78DF", bg: "#E8EDFF", placeholder: "e.g. Emergency Plumbing Service" },
-  electrician:     { icon: <Zap size={14} />,            color: "#B8863F", bg: "#FBF3E4", placeholder: "e.g. On-Call Electrician" },
-  locksmith:       { icon: <KeyRound size={14} />,       color: "#B8863F", bg: "#FBF3E4", placeholder: "e.g. 24x7 Locksmith" },
-  lift_technician: { icon: <MoveVertical size={14} />,   color: "#5C78DF", bg: "#E8EDFF", placeholder: "e.g. Otis Lift Support" },
-  courier:         { icon: <Package size={14} />,        color: "#5C78DF", bg: "#E8EDFF", placeholder: "e.g. Blue Dart Pickup Desk" },
-  lost_found:      { icon: <PackageOpen size={14} />,    color: "#7B7FD1", bg: "#EDEDFB", placeholder: "e.g. Airport Lost & Found" },
-  security:        { icon: <Shield size={14} />,         color: "#7B7FD1", bg: "#EDEDFB", placeholder: "e.g. Society Security Desk" },
-  support:         { icon: <Headset size={14} />,        color: "#17181A", bg: "#F3F3F4", placeholder: "e.g. RepiQR Support Desk" },
-};
-
-const FALLBACK_META = { icon: <Phone size={14} />, color: "#777B80", bg: "#F3F3F4", placeholder: "e.g. Provider Name" };
-
 /** The service type a stored row belongs to, tolerating pre-migration rows. */
 function providerSlug(p: any): string {
   return slugifyService(p?.service_type || p?.category);
@@ -61,7 +33,7 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
   const [categories, setCategories] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const meta = SERVICE_META[serviceType] || FALLBACK_META;
+  const meta = getServiceMeta(serviceType);
 
   const announce = () => {
     window.dispatchEvent(new Event("repiqr-helplines-updated"));
@@ -227,12 +199,12 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
       {grouped.length > 0 || orphans.length > 0 ? (
         <div className="space-y-3">
           {grouped.map(({ type, items }) => {
-            const m = SERVICE_META[type.slug] || FALLBACK_META;
+            const m = getServiceMeta(type.slug);
             return (
               <div key={type.slug} className="bg-white border border-[#E5E5E7] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
                 <div className="px-5 py-3 border-b border-[#E5E5E7] bg-[#F7F7F8] flex items-center gap-2.5">
                   <div className="w-6 h-6 rounded-[4px] flex items-center justify-center" style={{ background: m.bg, color: m.color }}>
-                    {m.icon}
+                    <m.Icon size={14} />
                   </div>
                   <span className="text-xs font-extrabold text-[#17181A] uppercase tracking-wider">{type.label}</span>
                   <span className="text-[10px] text-[#777B80] font-semibold bg-[#F3F3F4] px-1.5 py-0.5 rounded-[4px]">{items.length}</span>
@@ -242,6 +214,9 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
                 {items.map((p: any) => {
                   const scope: string[] = Array.isArray(p.categories) ? p.categories : [];
                   const inactive = p.active === false;
+                  // A row that came in through the landing page "Join us" form: still
+                  // inactive and carrying the contact details the applicant typed.
+                  const isApplication = inactive && Boolean(p.email || p.city || p.notes);
                   return (
                     <div
                       key={p.id}
@@ -249,11 +224,25 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-8 h-8 rounded-[4px] flex items-center justify-center flex-shrink-0" style={{ background: m.bg, color: m.color }}>
-                          {m.icon}
+                          <m.Icon size={14} />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-[#17181A] truncate">{p.label}</p>
+                          <p className="text-xs font-bold text-[#17181A] truncate flex items-center gap-1.5">
+                            {p.label}
+                            {isApplication && (
+                              <span className="px-1.5 py-0.5 rounded-[3px] bg-[#FBF3E4] text-[#B8863F] text-[9px] font-extrabold uppercase tracking-wider flex-shrink-0">
+                                Applied
+                              </span>
+                            )}
+                          </p>
                           <p className="text-[11px] text-[#777B80] font-mono font-semibold mt-0.5">{p.phone}</p>
+                          {(p.city || p.email) && (
+                            <p className="text-[10px] text-[#777B80] font-semibold mt-1 flex items-center gap-2.5 flex-wrap">
+                              {p.city && <span className="flex items-center gap-1"><MapPin size={10} /> {p.city}</span>}
+                              {p.email && <span className="flex items-center gap-1"><Mail size={10} /> {p.email}</span>}
+                            </p>
+                          )}
+                          {p.notes && <p className="text-[10px] text-[#777B80] mt-1 line-clamp-2">{p.notes}</p>}
                           <p className="text-[10px] text-[#9CA0A6] font-semibold mt-1">
                             {scope.length === 0
                               ? "All categories"
@@ -271,7 +260,7 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
                               : "bg-[#E9F9EF] border-[#2E9E5B]/30 text-[#2E9E5B] hover:bg-[#D7F2E2]"
                           }`}
                         >
-                          {inactive ? "Inactive" : "Active"}
+                          {inactive ? (isApplication ? "Approve" : "Inactive") : "Active"}
                         </button>
                         <button
                           onClick={() => handleRemove(p.id)}

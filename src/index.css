@@ -258,3 +258,14 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
   }
 }
 
+/* Drag/swipe rails that keep their own scrollbar out of the layout — the arrow
+   buttons and the snap points are the affordance instead. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
