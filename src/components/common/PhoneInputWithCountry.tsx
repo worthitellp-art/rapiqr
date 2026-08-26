@@ -142,7 +142,10 @@ export default function PhoneInputWithCountry({
           placeholder={placeholder}
           disabled={disabled}
           maxLength={10}
-          className="w-full bg-transparent px-2.5 py-2.5 text-xs font-mono font-bold text-gray-900 outline-none placeholder:text-gray-400 placeholder:font-normal"
+          /* 16px on phones — below that, focusing a field makes iOS Safari zoom
+             the page in and leave it there, which breaks every layout that
+             embeds this control (checkout, the partner form, the dashboard). */
+          className="w-full bg-transparent px-2.5 py-2.5 text-[16px] font-mono font-bold text-gray-900 outline-none placeholder:text-gray-400 placeholder:font-normal sm:text-xs"
         />
 
         {/* 10-Digit Counter / Indicator */}

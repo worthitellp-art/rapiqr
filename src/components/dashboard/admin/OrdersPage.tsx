@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import {
   ShoppingBag, Search, Package, Truck, CheckCircle2, XCircle, Clock,
-  Phone, Mail, MapPin, IndianRupee, CreditCard, Trash2, AlertTriangle, Loader2
+  Phone, Mail, MapPin, IndianRupee, CreditCard, Trash2, AlertTriangle, Loader2,
+  RefreshCw, ExternalLink
 } from "lucide-react";
-import { apiClient } from "../../../lib/apiClient";
+import { apiClient, OrderTracking } from "../../../lib/apiClient";
 import { fmtDateTime } from "./helpers";
 
 interface OrderItem { name: string; qty: number; price: number }
@@ -30,6 +31,7 @@ interface Order {
   status: "placed" | "shipped" | "delivered" | "cancelled";
   shippingAddress?: { address?: string; city?: string; state?: string; pincode?: string } | null;
   payment?: OrderPayment | null;
+  shiprocket?: OrderTracking | null;
   createdAt: string;
 }
 
@@ -63,6 +65,9 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
   const [loadError, setLoadError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: "single"; order: Order } | { type: "all" } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [shipping, setShipping] = useState(false);
+  const [refreshingTrack, setRefreshingTrack] = useState(false);
+  const [shipError, setShipError] = useState<string | null>(null);
 
   const loadOrders = async () => {
     setLoading(true);
@@ -98,6 +103,50 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
     } finally {
       setUpdatingStatus(false);
       setTimeout(() => setToast(null), 2500);
+    }
+  };
+
+  /** Replace one order everywhere it's held (list + inspector) after a server round-trip. */
+  const applyOrder = (updated: Order) => {
+    setOrders((prev) => prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o)));
+    setSelectedOrder((prev) => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev));
+  };
+
+  const handleCreateShipment = async (order: Order) => {
+    setShipping(true);
+    setShipError(null);
+    try {
+      const res = await apiClient.shiprocket.createShipment(order.id);
+      if (res?.success && res.data) {
+        applyOrder(res.data as Order);
+        setToast(`Shipment booked for ${order.id}${res.data.shiprocket?.awbCode ? ` — AWB ${res.data.shiprocket.awbCode}` : ""}.`);
+        setTimeout(() => setToast(null), 3000);
+      } else {
+        setShipError(res?.error || "Shiprocket rejected the shipment request.");
+      }
+    } catch (err: any) {
+      setShipError(err?.message || "Failed to reach Shiprocket.");
+    } finally {
+      setShipping(false);
+    }
+  };
+
+  const handleRefreshTracking = async (order: Order) => {
+    setRefreshingTrack(true);
+    setShipError(null);
+    try {
+      const res = await apiClient.shiprocket.track(order.id);
+      if (res?.success && res.data) {
+        applyOrder(res.data as Order);
+        setToast(`Tracking refreshed for ${order.id}.`);
+        setTimeout(() => setToast(null), 2500);
+      } else {
+        setShipError("Shiprocket returned no tracking for this shipment yet.");
+      }
+    } catch (err: any) {
+      setShipError(err?.message || "Failed to fetch tracking.");
+    } finally {
+      setRefreshingTrack(false);
     }
   };
 
@@ -264,7 +313,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                 return (
                   <div
                     key={order.id}
-                    onClick={() => setSelectedOrder(order)}
+                    onClick={() => { setSelectedOrder(order); setShipError(null); }}
                     className={`bg-white p-5 border transition-all cursor-pointer hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] ${
                       selectedOrder?.id === order.id ? "border-[#5C78DF] ring-2 ring-[#5C78DF]/15" : "border-[#E5E5E7]"
                     }`}
@@ -323,6 +372,11 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                           <Package size={12} className="text-[#9CA0A6]" />
                           {order.deliveryMethod}
                         </span>
+                        {order.shiprocket?.awbCode && (
+                          <span className="text-[10px] font-mono text-[#5271D5] mt-0.5 block truncate">
+                            {order.shiprocket.courierName ? `${order.shiprocket.courierName} · ` : ""}{order.shiprocket.awbCode}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -463,6 +517,95 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                   <div className="flex justify-between text-[#777B80]"><span>Subtotal</span><span className="font-mono">₹{selectedOrder.subtotal.toLocaleString("en-IN")}</span></div>
                   <div className="flex justify-between text-[#777B80]"><span>Delivery</span><span className="font-mono">{selectedOrder.deliveryFee ? `₹${selectedOrder.deliveryFee}` : "Free"}</span></div>
                   <div className="flex justify-between font-black text-[#17181A] text-[13.5px] pt-1 border-t border-[#E5E5E7]"><span>Total</span><span className="font-mono">₹{selectedOrder.total.toLocaleString("en-IN")}</span></div>
+                </div>
+
+                {/* ── Shiprocket: book the courier, then follow it ── */}
+                <div className="pt-2 border-t border-[#F3F3F4] space-y-2">
+                  <label className="text-[11px] font-semibold text-[#777B80] uppercase tracking-wide block">Delivery (Shiprocket)</label>
+
+                  {selectedOrder.shiprocket?.shipmentId ? (
+                    <div className="bg-[#F7F7F8] border border-[#E5E5E7] rounded-[4px] p-2.5 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[#777B80]">Courier</span>
+                        <span className="font-semibold text-[#17181A] truncate">{selectedOrder.shiprocket.courierName || "Assigning…"}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[#777B80]">AWB</span>
+                        <span className="font-mono text-[10.5px] text-[#17181A] truncate">{selectedOrder.shiprocket.awbCode || "Pending"}</span>
+                      </div>
+                      {selectedOrder.shiprocket.currentStatus && (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[#777B80]">Courier Status</span>
+                          <span className="px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase bg-[#E8EDFF] text-[#5271D5]">
+                            {selectedOrder.shiprocket.currentStatus}
+                          </span>
+                        </div>
+                      )}
+                      {selectedOrder.shiprocket.etd && (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[#777B80]">Expected</span>
+                          <span className="text-[#17181A]">{selectedOrder.shiprocket.etd}</span>
+                        </div>
+                      )}
+
+                      {!!selectedOrder.shiprocket.timeline?.length && (
+                        <div className="pt-2 mt-1 border-t border-[#E5E5E7] space-y-2 max-h-44 overflow-y-auto">
+                          {[...selectedOrder.shiprocket.timeline].reverse().map((ev, i) => (
+                            <div key={`${ev.status}-${ev.at}-${i}`} className="flex gap-2">
+                              <span className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${i === 0 ? "bg-[#5271D5]" : "bg-[#D5D6D9]"}`} />
+                              <div className="min-w-0">
+                                <div className="text-[11.5px] font-semibold text-[#17181A]">{ev.status}</div>
+                                <div className="text-[10.5px] text-[#9CA0A6] font-mono truncate">
+                                  {[ev.at ? fmtDateTime(ev.at) : null, ev.location].filter(Boolean).join(" · ")}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 pt-2">
+                        <button
+                          onClick={() => handleRefreshTracking(selectedOrder)}
+                          disabled={refreshingTrack}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-[4px] text-[11px] font-bold bg-[#17181A] text-white hover:bg-[#2A2B2E] transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          <RefreshCw size={12} className={refreshingTrack ? "animate-spin" : ""} />
+                          {refreshingTrack ? "Refreshing…" : "Refresh Tracking"}
+                        </button>
+                        {selectedOrder.shiprocket.trackingUrl && (
+                          <a
+                            href={selectedOrder.shiprocket.trackingUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-[4px] text-[11px] font-bold bg-[#F7F7F8] text-[#17181A] border border-[#E5E5E7] hover:bg-[#F3F3F4] transition-colors"
+                          >
+                            <ExternalLink size={12} />
+                            Open
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ) : selectedOrder.status === "cancelled" ? (
+                    <p className="text-[11.5px] text-[#9CA0A6]">This order was cancelled — no shipment to book.</p>
+                  ) : selectedOrder.payment?.status !== "paid" && selectedOrder.paymentMethod !== "cod" ? (
+                    <p className="text-[11.5px] text-[#B8863F] bg-[#FBF3E4] rounded-[4px] p-2.5">
+                      Payment hasn't been confirmed yet. Book the shipment once this order shows as Paid (or switch it to COD).
+                    </p>
+                  ) : (
+                    <button
+                      onClick={() => handleCreateShipment(selectedOrder)}
+                      disabled={shipping}
+                      className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-[4px] text-[12px] font-bold bg-[#5C78DF] text-white hover:bg-[#4B66C9] transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {shipping ? <Loader2 size={13} className="animate-spin" /> : <Truck size={13} />}
+                      {shipping ? "Booking courier…" : "Book Shipment via Shiprocket"}
+                    </button>
+                  )}
+
+                  {shipError && (
+                    <p className="text-[11px] text-[#DC2626] bg-[#FDEAEA] rounded-[4px] p-2.5 leading-relaxed">{shipError}</p>
+                  )}
                 </div>
 
                 <div className="pt-2 border-t border-[#F3F3F4] space-y-2">

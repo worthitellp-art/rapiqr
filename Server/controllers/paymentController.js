@@ -108,6 +108,96 @@ class PaymentController {
       return res.status(500).json({ success: false, error: err.message });
     }
   }
+
+  /**
+   * POST /api/webhooks/razorpay — the authoritative record of what was charged.
+   *
+   * /verify above only runs while the customer's browser is still on the success
+   * handler. A closed tab, a dropped connection, or a UPI app that takes its time
+   * confirming all leave money captured at Razorpay and an order stuck on
+   * "Awaiting Payment" here. This webhook closes that window: Razorpay retries it
+   * for 24 hours, so the order gets marked paid regardless of what the browser did.
+   *
+   * Public by necessity, authenticated by an HMAC over the raw request body with
+   * the secret configured on the webhook in the Razorpay dashboard. With
+   * RAZORPAY_WEBHOOK_SECRET unset it FAILS CLOSED — nothing may mark an order
+   * paid without a signature we can check.
+   */
+  static async webhook(req, res) {
+    const secret = (process.env.RAZORPAY_WEBHOOK_SECRET || '').trim();
+    if (!secret) {
+      logger.warn('RAZORPAY_WEBHOOK', 'Payment event received but RAZORPAY_WEBHOOK_SECRET is not set — refusing.');
+      return res.status(503).json({ success: false, error: 'Webhook not configured' });
+    }
+
+    const header = req.get('x-razorpay-signature') || '';
+    const raw = req.rawBody;
+    if (!raw) {
+      logger.warn('RAZORPAY_WEBHOOK', 'No raw body captured — cannot verify signature.');
+      return res.sendStatus(400);
+    }
+
+    const expected = crypto.createHmac('sha256', secret).update(raw).digest('hex');
+    if (header.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(header), Buffer.from(expected))) {
+      logger.warn('RAZORPAY_WEBHOOK', 'Rejected a payment event with an invalid signature.');
+      return res.sendStatus(403);
+    }
+
+    try {
+      const event = req.body?.event || '';
+      const entity = req.body?.payload?.payment?.entity || req.body?.payload?.order?.entity || {};
+
+      // We stamp our own order id into `notes` when opening the Razorpay order
+      // (see createOrder), so prefer it and fall back to a lookup by their id.
+      const rapiqrOrderId = entity?.notes?.rapiqrOrderId;
+      const order = rapiqrOrderId
+        ? await OrderModel.getById(rapiqrOrderId)
+        : await OrderModel.getByRazorpayOrderId(entity?.order_id || entity?.id || '');
+
+      if (!order) {
+        logger.warn('RAZORPAY_WEBHOOK', `${event} for an unknown order (${rapiqrOrderId || entity?.order_id || 'no id'}) — ignored.`);
+        return res.sendStatus(200);
+      }
+
+      if (event === 'payment.captured' || event === 'order.paid') {
+        // Idempotent: Razorpay redelivers, and /verify may have already won the
+        // race. A second capture event must never rewrite a settled payment.
+        if (order.payment?.status === 'paid') return res.sendStatus(200);
+
+        await OrderModel.attachPaymentInfo(order.id, {
+          ...(order.payment || {}),
+          status: 'paid',
+          razorpayOrderId: entity.order_id || order.payment?.razorpayOrderId,
+          razorpayPaymentId: entity.id,
+          amount: entity.amount ?? order.payment?.amount,
+          currency: entity.currency || 'INR',
+          method: entity.method || null,
+          paidAt: new Date().toISOString(),
+          source: 'webhook',
+        });
+        logger.event('PAYMENT', '✅', `Payment captured via webhook for order ${order.id} (${entity.id})`);
+      } else if (event === 'payment.failed') {
+        // Never downgrade a paid order — a customer whose first attempt failed
+        // and second succeeded can have the events arrive out of order.
+        if (order.payment?.status !== 'paid') {
+          await OrderModel.attachPaymentInfo(order.id, {
+            ...(order.payment || {}),
+            status: 'failed',
+            razorpayPaymentId: entity.id,
+            failureReason: entity.error_description || entity.error_reason || null,
+          });
+          logger.warn('RAZORPAY_WEBHOOK', `Payment failed for order ${order.id}: ${entity.error_description || 'no reason given'}`);
+        }
+      }
+
+      return res.sendStatus(200);
+    } catch (err) {
+      logger.error('RAZORPAY_WEBHOOK', 'Failed to process a payment event', err);
+      // 200 regardless: Razorpay disables an endpoint that keeps erroring, and
+      // the retry would hit the same bug anyway.
+      return res.sendStatus(200);
+    }
+  }
 }
 
 module.exports = PaymentController;

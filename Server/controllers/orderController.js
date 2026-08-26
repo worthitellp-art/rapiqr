@@ -1,4 +1,5 @@
 const OrderModel = require('../models/orderModel');
+const ShiprocketController = require('./shiprocketController');
 const { logger } = require('../middleware/loggerMiddleware');
 
 class OrderController {
@@ -29,6 +30,57 @@ class OrderController {
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('ORDER_MINE', 'Failed to fetch order history', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * GET /api/orders/:id/track — the buyer's own delivery status.
+   *
+   * The Shiprocket track route is admin-only (it also exposes wallet and pickup
+   * config), so customers need their own way in. Scoped to the caller's own
+   * orders; admins may track any.
+   *
+   * Refreshes from the courier when there's a shipment, but never fails the
+   * request over it: a Shiprocket outage should still show the customer the
+   * status and timeline we already have stored.
+   */
+  static async track(req, res) {
+    try {
+      const { id } = req.params;
+      const order = await OrderModel.getById(id);
+      if (!order) {
+        return res.status(404).json({ success: false, error: 'Order not found' });
+      }
+
+      const isOwner = order.userId && order.userId === req.user?.id;
+      const isAdmin = req.user?.role === 'admin';
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ success: false, error: 'This order belongs to another account.' });
+      }
+
+      let current = order;
+      if (order.shiprocket?.shipmentId) {
+        try {
+          current = (await ShiprocketController.refreshTracking(order)) || order;
+        } catch (err) {
+          logger.warn('ORDER_TRACK', `Live tracking refresh failed for ${id}, serving stored tracking: ${err.message}`);
+        }
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          id: current.id,
+          status: current.status,
+          payment: current.payment,
+          deliveryMethod: current.deliveryMethod,
+          createdAt: current.createdAt,
+          shiprocket: current.shiprocket || null,
+        },
+      });
+    } catch (err) {
+      logger.error('ORDER_TRACK', `Failed to track order: ${req.params.id}`, err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

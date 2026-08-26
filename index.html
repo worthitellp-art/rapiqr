@@ -2,7 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover lets the page fill a notched screen edge to edge, and
+         is what makes env(safe-area-inset-*) report real values instead of 0.
+         Without it every safe-area rule in the app (chat composer, mobile nav
+         drawer, cart, toasts) silently computed to its fallback. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>RapiQR - Smart Safety QR Tags</title>
     <link rel="icon" type="image/png" href="/src/assets/REPIQR ICON .png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">

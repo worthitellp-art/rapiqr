@@ -80,4 +80,65 @@ async function callShiprocketApi(method, apiPath, body = null) {
   return res;
 }
 
-module.exports = { getShiprocketCredentials, getShiprocketToken, callShiprocketApi };
+/**
+ * Shiprocket reports a courier's own status vocabulary — which varies by
+ * courier and is far wider than the four states an order row can hold. Collapse
+ * it to one of ours, and keep the raw label for display so the customer still
+ * sees "Out for delivery" rather than a flat "Shipped".
+ *
+ * Anything unrecognised maps to `null`, meaning "leave the order status alone":
+ * a courier inventing a new label must never silently move an order backwards.
+ */
+function mapShiprocketStatus(rawStatus) {
+  const s = String(rawStatus || '').trim().toUpperCase();
+  if (!s) return null;
+
+  // RTO first: "RTO DELIVERED" means the parcel got back to US, not to the
+  // customer, and matching on DELIVERED first would mark it a successful delivery.
+  if (s.includes('RTO') || s.includes('RETURN')) return 'cancelled';
+  if (s.includes('CANCEL')) return 'cancelled';              // CANCELED / CANCELLED
+  if (s.includes('UNDELIVERED')) return 'shipped';           // failed attempt — still in the courier's hands
+  if (s.includes('DELIVERED')) return 'delivered';
+  if (
+    s.includes('PICKED') || s.includes('PICKUP') || s.includes('TRANSIT') ||
+    s.includes('OUT FOR DELIVERY') || s.includes('SHIPPED') || s.includes('DISPATCH') ||
+    s.includes('UNDELIVERED') || s.includes('REACHED') || s.includes('MANIFEST')
+  ) return 'shipped';
+
+  return null;
+}
+
+/**
+ * Flatten a Shiprocket tracking response into the shape we store and render.
+ * The v1 API nests it as { [shipmentId]: { tracking_data: {...} } }; a webhook
+ * posts the same information flat. Accept either.
+ */
+function normalizeTracking(raw) {
+  const data = raw?.tracking_data || raw || {};
+  const activities = data.shipment_track_activities || data.scans || [];
+  const track = Array.isArray(data.shipment_track) ? data.shipment_track[0] : data.shipment_track;
+
+  return {
+    currentStatus: data.current_status || data.shipment_status || track?.current_status || null,
+    etd: data.etd || track?.edd || null,
+    awbCode: data.awb || track?.awb_code || null,
+    courierName: data.courier_name || track?.courier_name || null,
+    trackingUrl: data.track_url || data.awb_data?.track_url || null,
+    events: activities
+      .map((a) => ({
+        status: a.status || a['sr-status-label'] || a.activity || '',
+        at: a.date || a.updated_date || a.timestamp || null,
+        location: a.location || null,
+        note: a.activity || a.status || null,
+      }))
+      .filter((e) => e.status),
+  };
+}
+
+module.exports = {
+  getShiprocketCredentials,
+  getShiprocketToken,
+  callShiprocketApi,
+  mapShiprocketStatus,
+  normalizeTracking,
+};

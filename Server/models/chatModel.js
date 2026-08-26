@@ -2,6 +2,30 @@ const { supabaseAdmin } = require('../config/db');
 
 const SESSION_SELECT = 'id, qr_code_id, owner_id, customer_token, customer_name, vehicle_label, status, last_message_at, last_message_preview, unread_owner_count, unread_customer_count, created_at';
 
+const MESSAGE_BASE = 'id, session_id, sender_type, sender_id, body, created_at, read_at';
+const MESSAGE_RICH = `${MESSAGE_BASE}, delivered_at, attachment_url, attachment_type, attachment_name, attachment_width, attachment_height`;
+
+/**
+ * Whether Server/sql/chat_attachments.sql has been run against this database.
+ *
+ * Probed once on the first message read and remembered, so an un-migrated
+ * deployment pays a single failed query rather than one per request. Until it
+ * runs, images still work — insertMessage carries the URL in `body` instead,
+ * and the client renders a bare image URL as a picture regardless.
+ */
+let richColumns = null;
+
+async function messageSelect() {
+  if (richColumns !== null) return richColumns ? MESSAGE_RICH : MESSAGE_BASE;
+
+  const { error } = await supabaseAdmin.from('chat_messages').select(MESSAGE_RICH).limit(1);
+  richColumns = !error;
+  if (!richColumns) {
+    console.warn('ChatModel: chat_messages is missing the attachment columns — run Server/sql/chat_attachments.sql for image metadata. Images still work via the message body until then.');
+  }
+  return richColumns ? MESSAGE_RICH : MESSAGE_BASE;
+}
+
 // In-memory fallback stores to guarantee zero chat downtime if database constraints or network lag occur
 const inMemorySessions = new Map(); // sessionId -> session object
 const inMemoryMessages = new Map(); // sessionId -> array of message objects
@@ -184,7 +208,7 @@ class ChatModel {
     try {
       const { data, error } = await supabaseAdmin
         .from('chat_messages')
-        .select('id, session_id, sender_type, sender_id, body, created_at, read_at')
+        .select(await messageSelect())
         .eq('session_id', sessionId)
         .order('created_at', { ascending: true });
 
@@ -205,37 +229,58 @@ class ChatModel {
 
   /**
    * Insert a message and bump the parent session's preview/unread counters.
+   *
+   * `attachment` is optional: { url, type, name, width, height }.
+   *
+   * Only the message insert is awaited. The session counter bump is a second
+   * round-trip that nothing on the sending path is waiting to read, and the
+   * caller broadcasts as soon as this resolves — awaiting it too put a whole
+   * extra database latency between pressing send and the bubble turning solid.
+   * The in-memory session copy is updated synchronously below, so the inbox
+   * preview is already correct for anyone reading it before the write lands.
    */
-  static async insertMessage({ sessionId, senderType, senderId, body }) {
+  static async insertMessage({ sessionId, senderType, senderId, body, attachment = null }) {
     const createdAt = new Date().toISOString();
     const bumpUnreadKey = senderType === 'owner' ? 'unread_customer_count' : 'unread_owner_count';
+    const preview = attachment ? (body ? `📷 ${body}` : '📷 Photo') : String(body).slice(0, 140);
+
+    // Resolve the column set before building the payload: on an un-migrated
+    // database the attachment has to ride along inside `body` instead.
+    const select = await messageSelect();
+    const hasRich = richColumns;
+
+    let storedBody = body;
+    if (attachment && !hasRich) {
+      storedBody = body ? `${body}\n${attachment.url}` : attachment.url;
+    }
+
+    const payload = {
+      session_id: sessionId,
+      sender_type: senderType,
+      sender_id: senderId || null,
+      body: storedBody,
+    };
+    if (attachment && hasRich) {
+      payload.attachment_url = attachment.url;
+      payload.attachment_type = attachment.type || null;
+      payload.attachment_name = attachment.name || null;
+      payload.attachment_width = attachment.width || null;
+      payload.attachment_height = attachment.height || null;
+    }
 
     let savedMessage = null;
     try {
       const { data: message, error } = await supabaseAdmin
         .from('chat_messages')
-        .insert({
-          session_id: sessionId,
-          sender_type: senderType,
-          sender_id: senderId || null,
-          body,
-        })
-        .select('id, session_id, sender_type, sender_id, body, created_at, read_at')
+        .insert(payload)
+        .select(select)
         .maybeSingle();
 
       if (!error && message) {
         savedMessage = message;
+      } else if (error) {
+        console.warn('ChatModel.insertMessage DB insert warning:', error.message);
       }
-
-      const session = await this.getSessionById(sessionId);
-      await supabaseAdmin
-        .from('chat_sessions')
-        .update({
-          last_message_at: createdAt,
-          last_message_preview: String(body).slice(0, 140),
-          [bumpUnreadKey]: (session?.[bumpUnreadKey] || 0) + 1,
-        })
-        .eq('id', sessionId);
     } catch (err) {
       console.warn('ChatModel.insertMessage DB Error (using in-memory):', err.message);
     }
@@ -246,9 +291,18 @@ class ChatModel {
         session_id: sessionId,
         sender_type: senderType,
         sender_id: senderId || null,
-        body,
+        body: storedBody,
         created_at: createdAt,
         read_at: null,
+        ...(attachment && hasRich
+          ? {
+              attachment_url: attachment.url,
+              attachment_type: attachment.type || null,
+              attachment_name: attachment.name || null,
+              attachment_width: attachment.width || null,
+              attachment_height: attachment.height || null,
+            }
+          : {}),
       };
     }
 
@@ -258,28 +312,71 @@ class ChatModel {
     inMemoryMessages.set(sessionId, msgs);
 
     const cachedSession = inMemorySessions.get(sessionId);
+    const nextUnread = (cachedSession?.[bumpUnreadKey] || 0) + 1;
     if (cachedSession) {
       cachedSession.last_message_at = createdAt;
-      cachedSession.last_message_preview = String(body).slice(0, 140);
-      cachedSession[bumpUnreadKey] = (cachedSession[bumpUnreadKey] || 0) + 1;
+      cachedSession.last_message_preview = preview;
+      cachedSession[bumpUnreadKey] = nextUnread;
       inMemorySessions.set(sessionId, cachedSession);
     }
 
+    // Fire-and-forget — see the note above.
+    supabaseAdmin
+      .from('chat_sessions')
+      .update({ last_message_at: createdAt, last_message_preview: preview, [bumpUnreadKey]: nextUnread })
+      .eq('id', sessionId)
+      .then(({ error }) => {
+        if (error) console.warn('ChatModel.insertMessage session bump warning:', error.message);
+      });
+
     return savedMessage;
+  }
+
+  /** Second tick: the recipient's socket was in the room when this was broadcast. */
+  static async markDelivered(messageId) {
+    const at = new Date().toISOString();
+    if (richColumns) {
+      supabaseAdmin
+        .from('chat_messages')
+        .update({ delivered_at: at })
+        .eq('id', messageId)
+        .then(({ error }) => {
+          if (error) console.warn('ChatModel.markDelivered warning:', error.message);
+        });
+    }
+    return at;
   }
 
   static async markRead(sessionId, readerType) {
     try {
       const unreadKey = readerType === 'owner' ? 'unread_owner_count' : 'unread_customer_count';
+      // Whoever is reading, it's the OTHER side's messages that just became read —
+      // the double tick renders on the sender's own bubbles.
+      const peerType = readerType === 'owner' ? 'customer' : 'owner';
+      const readAt = new Date().toISOString();
+
       await supabaseAdmin
         .from('chat_sessions')
         .update({ [unreadKey]: 0 })
         .eq('id', sessionId);
 
+      // Without this the read tick only ever existed as a live socket event:
+      // it looked right until either side reloaded, then every message the peer
+      // had already read came back showing a single "sent" tick forever.
+      await supabaseAdmin
+        .from('chat_messages')
+        .update({ read_at: readAt })
+        .eq('session_id', sessionId)
+        .eq('sender_type', peerType)
+        .is('read_at', null);
+
       const cached = inMemorySessions.get(sessionId);
       if (cached) {
         cached[unreadKey] = 0;
         inMemorySessions.set(sessionId, cached);
+      }
+      for (const m of inMemoryMessages.get(sessionId) || []) {
+        if (m.sender_type === peerType && !m.read_at) m.read_at = readAt;
       }
       return true;
     } catch (err) {

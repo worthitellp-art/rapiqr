@@ -4,9 +4,43 @@ const ProductModel = require('../models/productModel');
 const { supabaseAdmin } = require('../config/db');
 const { notifyOwner } = require('../services/notificationService');
 const { logger } = require('../middleware/loggerMiddleware');
-const { getIo, getOnlineOwners } = require('../sockets/chatSocket');
+const { getIo, getOnlineOwners, markDeliveredIfPeerPresent } = require('../sockets/chatSocket');
 
 const APP_URL = process.env.APP_URL || 'https://rapiqr.worthitellp.workers.dev';
+
+const CHAT_BUCKET = 'chat-uploads';
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif'];
+/** Post-compression ceiling. The client downscales before upload; this is the backstop. */
+const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
+
+/**
+ * Create the attachments bucket on first use rather than making it a manual
+ * setup step — a fresh deployment (or a new Supabase project) then supports
+ * image upload with no dashboard clicking. Memoized: the check costs one API
+ * call per process, not one per upload.
+ */
+let bucketReady = null;
+async function ensureChatBucket() {
+  if (bucketReady) return bucketReady;
+  bucketReady = (async () => {
+    const { data } = await supabaseAdmin.storage.listBuckets();
+    if ((data || []).some((b) => b.name === CHAT_BUCKET)) return true;
+
+    const { error } = await supabaseAdmin.storage.createBucket(CHAT_BUCKET, {
+      public: true,
+      fileSizeLimit: '10MB',
+      allowedMimeTypes: ALLOWED_IMAGE_TYPES,
+    });
+    // A parallel first request may have won the race — that's a success, not a failure.
+    if (error && !/already exists/i.test(error.message)) throw error;
+    logger.event('CHAT', '🗂️', `Created the "${CHAT_BUCKET}" storage bucket for chat images`);
+    return true;
+  })().catch((err) => {
+    bucketReady = null; // let the next upload retry rather than failing forever
+    throw err;
+  });
+  return bucketReady;
+}
 
 async function isOwnerOfSession(req, session) {
   if (!req.user) return false;
@@ -31,7 +65,123 @@ function isCustomerOfSession(req, session) {
   return Boolean(headerToken && headerToken === session.customer_token);
 }
 
+/**
+ * Push a freshly-saved message everywhere it needs to go: the live session room,
+ * the owner's inbox room, and — when a visitor sent it — the owner's phone.
+ * Shared by the REST send and the attachment upload so the two can't drift.
+ */
+async function fanOutMessage(session, message, isOwner, previewText) {
+  const io = getIo();
+  io?.to(`session:${session.id}`).emit('new_message', message);
+
+  let ownerId = session.owner_id;
+  let product = null;
+  if (session.qr_code_id) {
+    product = await ProductModel.getByQrCodeId(session.qr_code_id).catch(() => null);
+    if (!ownerId && product?.user_id) ownerId = product.user_id;
+  }
+  if (ownerId) {
+    io?.to(`owner:${ownerId}`).emit('new_message', message);
+    io?.to(`owner:${ownerId}`).emit('inbox_updated', { sessionId: session.id, message, session });
+  }
+
+  markDeliveredIfPeerPresent(session.id, message, isOwner ? 'owner' : 'customer');
+
+  if (!isOwner && product?.details?.ownerPhone) {
+    notifyOwner({
+      type: 'CHAT_MESSAGE',
+      ownerPhone: product.details.ownerPhone,
+      data: {
+        label: session.vehicle_label || product?.name || 'your vehicle',
+        message: previewText,
+        link: `${APP_URL}/#/dashboard?tab=chat`,
+      },
+      eventId: session.id,
+    }).catch((err) => logger.error('CHAT_MESSAGE', 'Failed to notify owner', err));
+  }
+}
+
 class ChatController {
+  /**
+   * POST /api/chat/sessions/:id/attachments — send an image into a thread.
+   *
+   * Takes a base64 data URL rather than multipart: the client already has the
+   * image in a canvas to downscale it, so it hands over exactly the bytes it
+   * produced, and the server needs no upload middleware. The client compresses
+   * first; MAX_ATTACHMENT_BYTES is the backstop for anything that didn't.
+   */
+  static async sendAttachment(req, res) {
+    try {
+      const session = await ChatModel.getSessionById(req.params.id);
+      if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+
+      const isOwner = await isOwnerOfSession(req, session);
+      if (!isOwner && !isCustomerOfSession(req, session)) {
+        return res.status(403).json({ success: false, error: 'Forbidden' });
+      }
+
+      const { image, name, width, height, caption, clientId } = req.body || {};
+      if (!image) return res.status(400).json({ success: false, error: 'image (base64 data URL) is required' });
+
+      const mimeMatch = String(image).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/);
+      const contentType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      if (!ALLOWED_IMAGE_TYPES.includes(contentType)) {
+        return res.status(400).json({ success: false, error: `Unsupported image type: ${contentType}` });
+      }
+
+      const buffer = Buffer.from(mimeMatch ? String(image).split(',')[1] : String(image), 'base64');
+      if (!buffer.length) return res.status(400).json({ success: false, error: 'The image data was empty or malformed.' });
+      if (buffer.length > MAX_ATTACHMENT_BYTES) {
+        return res.status(413).json({
+          success: false,
+          error: `That image is ${(buffer.length / 1024 / 1024).toFixed(1)} MB — the limit is ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB.`,
+        });
+      }
+
+      await ensureChatBucket();
+
+      const ext = (contentType.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+      // Random filename, not the user's: an uploader must not be able to pick a
+      // path in a public bucket, and two people sending "photo.jpg" must not collide.
+      const path = `${session.id}/${crypto.randomUUID()}.${ext}`;
+
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from(CHAT_BUCKET)
+        .upload(path, buffer, { contentType, upsert: false });
+      if (uploadError) throw uploadError;
+
+      const { data: pub } = supabaseAdmin.storage.from(CHAT_BUCKET).getPublicUrl(path);
+
+      const message = await ChatModel.insertMessage({
+        sessionId: session.id,
+        senderType: isOwner ? 'owner' : 'customer',
+        senderId: isOwner ? req.user.id : null,
+        body: String(caption || '').trim(),
+        attachment: {
+          url: pub.publicUrl,
+          type: contentType,
+          name: String(name || '').slice(0, 120) || `image.${ext}`,
+          width: Number(width) || null,
+          height: Number(height) || null,
+        },
+      });
+      if (!message) return res.status(500).json({ success: false, error: 'Failed to save the image message' });
+
+      // Carry the sender's temporary id on the broadcast. Their own socket
+      // receives the fan-out before this HTTP response returns, and without an
+      // id to match on, the pending bubble and the broadcast are two different
+      // messages as far as the client can tell — the photo appeared twice.
+      const broadcast = clientId ? { ...message, client_id: clientId } : message;
+      await fanOutMessage(session, broadcast, isOwner, caption ? `📷 ${caption}` : '📷 Photo');
+
+      logger.event('CHAT', '📷', `Image sent in session ${session.id} (${(buffer.length / 1024).toFixed(0)} KB)`);
+      return res.json({ success: true, data: broadcast });
+    } catch (err) {
+      logger.error('CHAT_ATTACHMENT', 'Failed to send chat image', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
   /**
    * Start (or resume) the open RepiChat thread for a scanned QR code. The
    * scanning visitor has no account, so they're identified purely by an opaque
@@ -134,36 +284,12 @@ class ChatController {
       });
       if (!message) return res.status(500).json({ success: false, error: 'Failed to save message' });
 
-      getIo()?.to(`session:${session.id}`).emit('new_message', message);
+      // Same echo as the socket path — see sendAttachment.
+      const clientId = req.body?.clientId;
+      const broadcast = clientId ? { ...message, client_id: clientId } : message;
+      await fanOutMessage(session, broadcast, isOwner, text);
 
-      let ownerId = session.owner_id;
-      let product = null;
-      if (session.qr_code_id) {
-        product = await ProductModel.getByQrCodeId(session.qr_code_id).catch(() => null);
-        if (!ownerId && product?.user_id) ownerId = product.user_id;
-      }
-      if (ownerId) {
-        getIo()?.to(`owner:${ownerId}`).emit('new_message', message);
-        getIo()?.to(`owner:${ownerId}`).emit('inbox_updated', { sessionId: session.id, message, session });
-      }
-
-      // If the customer sent it, notify the owner on WhatsApp with the direct link
-      if (!isOwner && product?.details?.ownerPhone) {
-        const ownerPhone = product.details.ownerPhone;
-        const label = session.vehicle_label || product?.name || 'your vehicle';
-        notifyOwner({
-          type: 'CHAT_MESSAGE',
-          ownerPhone,
-          data: {
-            label,
-            message: text,
-            link: `${APP_URL}/#/dashboard?tab=chat`,
-          },
-          eventId: session.id,
-        }).catch((err) => logger.error('CHAT_MESSAGE', 'Failed to notify owner', err));
-      }
-
-      return res.json({ success: true, data: message });
+      return res.json({ success: true, data: broadcast });
     } catch (err) {
       logger.error('CHAT_SEND', 'Failed to send chat message', err);
       return res.status(500).json({ success: false, error: err.message });

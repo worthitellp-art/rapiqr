@@ -15,6 +15,7 @@ router.get('/admin/online-owners', verifyToken, verifyAdmin, ChatController.list
 // Both sides — authorized per-request via req.user (owner) or x-customer-token (customer)
 router.get('/sessions/:id/messages', optionalAuth, ChatController.getMessages);
 router.post('/sessions/:id/messages', optionalAuth, ChatController.sendMessageRest);
+router.post('/sessions/:id/attachments', optionalAuth, ChatController.sendAttachment);
 router.patch('/sessions/:id/read', optionalAuth, ChatController.markRead);
 
 // Owner-only: end the conversation

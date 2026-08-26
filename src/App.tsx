@@ -61,6 +61,7 @@ function MainAppContent() {
   const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login');
   const [dashboardMode, setDashboardMode] = useState<'admin' | null>(null);
   const [adminModalOpen, setAdminModalOpen] = useState(() => isAdminUrl());
+  const [joinServiceType, setJoinServiceType] = useState<string | undefined>();
 
   // Restore page from localStorage, but only non-scan pages
   const [page, setPage] = useState<'landing' | 'dashboard' | 'scan' | 'distributor' | 'checkout' | 'join'>(() => {
@@ -224,7 +225,7 @@ function MainAppContent() {
   if (page === 'join') {
     return (
       <Suspense fallback={<PageLoader />}>
-        <JoinUsPage onBack={() => navigateTo('landing')} />
+        <JoinUsPage onBack={() => navigateTo('landing')} initialServiceType={joinServiceType} />
       </Suspense>
     );
   }
@@ -237,7 +238,10 @@ function MainAppContent() {
           onLogin={() => handleOpenAuth('login')}
           onOpenDistributorDashboard={() => navigateTo('distributor')}
           onOpenCheckout={() => navigateTo('checkout')}
-          onOpenJoinUs={() => navigateTo('join')}
+          onOpenJoinUs={(serviceType) => {
+            setJoinServiceType(serviceType);
+            navigateTo('join');
+          }}
         />
         <AuthModal
           isOpen={authModalOpen}

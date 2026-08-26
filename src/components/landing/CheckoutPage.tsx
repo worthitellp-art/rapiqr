@@ -357,44 +357,41 @@ export default function CheckoutPage({
       return;
     }
 
+    // The Razorpay order MUST come from our server. It is what ties the payment
+    // to order `newOrderId`, and its id is half of the signature we verify
+    // afterwards. Opening checkout without one takes real money for a payment
+    // nothing can attribute, verify, or refund — so a failure here stops the
+    // flow rather than falling back to an unattributed charge.
     let rpData: {
       keyId: string;
-      razorpayOrderId?: string;
+      razorpayOrderId: string;
       amount: number;
       currency: string;
     } | null = null;
+    let rpError = '';
     try {
       const rpRes = await apiClient.payments.createOrder(newOrderId);
       if (
         rpRes?.data?.keyId &&
+        rpRes.data.razorpayOrderId &&
         Number.isFinite(rpRes.data.amount) &&
         rpRes.data.amount > 0
       ) {
         rpData = rpRes.data;
+      } else {
+        rpError = rpRes?.error || '';
       }
     } catch (err: any) {
-      console.warn(
-        'Backend Razorpay order creation failed, using client Razorpay gateway:',
-        err
-      );
+      console.error('Failed to open a Razorpay order for', newOrderId, err);
+      rpError = err?.message || '';
     }
 
     if (!rpData) {
-      const fallbackAmount = Math.round(total * 100);
-      if (!Number.isFinite(fallbackAmount) || fallbackAmount <= 0) {
-        setStep('details');
-        setError(
-          "We couldn't determine a valid amount to charge. Please try again or contact support."
-        );
-        return;
-      }
-      const testKey =
-        import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TPxmqU5mM69f1a';
-      rpData = {
-        keyId: testKey,
-        amount: fallbackAmount,
-        currency: 'INR',
-      };
+      setStep('details');
+      setError(
+        `${rpError || "We couldn't reach the payment gateway."} Your order ${newOrderId} has been saved — nothing was charged. Please try paying again in a moment.`
+      );
+      return;
     }
 
     const rzpOptions: any = {
@@ -411,25 +408,23 @@ export default function CheckoutPage({
       },
       theme: { color: '#FACC15' },
       handler: async (response: any) => {
-        if (rpData?.razorpayOrderId) {
-          try {
-            const verifyRes = await apiClient.payments.verify({
-              orderId: newOrderId,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            });
-            if (!verifyRes?.success)
-              throw new Error(verifyRes?.error || 'Payment verification failed');
-          } catch (err: any) {
-            setStep('details');
-            setError(
-              `${
-                err?.message || 'Payment verification failed.'
-              } If money was deducted, contact support with your order ID: ${newOrderId}`
-            );
-            return;
-          }
+        try {
+          const verifyRes = await apiClient.payments.verify({
+            orderId: newOrderId,
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+          });
+          if (!verifyRes?.success)
+            throw new Error(verifyRes?.error || 'Payment verification failed');
+        } catch (err: any) {
+          setStep('details');
+          setError(
+            `${
+              err?.message || 'Payment verification failed.'
+            } If money was deducted it will be reconciled automatically — quote order ID ${newOrderId} if you need to contact support.`
+          );
+          return;
         }
 
         setOrderId(newOrderId);
@@ -448,9 +443,7 @@ export default function CheckoutPage({
       },
     };
 
-    if (rpData.razorpayOrderId) {
-      rzpOptions.order_id = rpData.razorpayOrderId;
-    }
+    rzpOptions.order_id = rpData.razorpayOrderId;
 
     const rzp = new window.Razorpay(rzpOptions);
 

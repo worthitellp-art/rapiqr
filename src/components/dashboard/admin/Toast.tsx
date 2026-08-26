@@ -10,7 +10,7 @@ export default function Toast({ msg }: { msg: string | null }) {
   if (!msg) return null;
   return (
     <div
-      className="fixed bottom-6 right-6 z-[200] flex items-center gap-2.5 px-4 py-3 rounded-[4px] text-sm font-semibold text-white"
+      className="fixed bottom-[max(1.5rem,calc(env(safe-area-inset-bottom)+0.5rem))] right-6 z-[200] flex items-center gap-2.5 px-4 py-3 rounded-[4px] text-sm font-semibold text-white"
       style={{
         background: "#17181A",
         transform: visible ? "translateY(0) scale(1)" : "translateY(8px) scale(0.96)",

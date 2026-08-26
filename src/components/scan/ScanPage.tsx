@@ -2863,7 +2863,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         {phase === "emergency" && (
           <button
             onClick={() => setAiChatOpen(true)}
-            className="fixed bottom-5 right-5 z-40 bg-gradient-to-br from-violet-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs px-4 py-3 rounded-full shadow-2xl flex items-center gap-2 border-2 border-white/30 active:scale-95 transition-all cursor-pointer"
+            className="fixed bottom-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))] right-5 z-40 bg-gradient-to-br from-violet-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs px-4 py-3 rounded-full shadow-2xl flex items-center gap-2 border-2 border-white/30 active:scale-95 transition-all cursor-pointer"
             aria-label="Open the RepiQR assistant"
           >
             <Sparkles size={17} />

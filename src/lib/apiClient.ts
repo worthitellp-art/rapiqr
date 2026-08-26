@@ -125,6 +125,16 @@ export interface ChatMessage {
   body: string;
   created_at: string;
   read_at: string | null;
+  /** Set once the peer's socket was in the room — the second tick. */
+  delivered_at?: string | null;
+  /** Echoed back on our own send so the optimistic bubble can be matched exactly. */
+  client_id?: string;
+  /** Image attachment (see Server/sql/chat_attachments.sql). */
+  attachment_url?: string | null;
+  attachment_type?: string | null;
+  attachment_name?: string | null;
+  attachment_width?: number | null;
+  attachment_height?: number | null;
 }
 
 export interface ChatSession {
@@ -140,6 +150,26 @@ export interface ChatSession {
   unread_owner_count: number;
   unread_customer_count: number;
   created_at: string;
+}
+
+/** Courier tracking stored on an order — see Server/sql/orders_fulfillment.sql */
+export interface OrderTrackingEvent {
+  status: string;
+  at: string | null;
+  location: string | null;
+  note: string | null;
+}
+
+export interface OrderTracking {
+  orderId?: number | string;
+  shipmentId?: number | string;
+  awbCode?: string | null;
+  courierName?: string | null;
+  trackingUrl?: string | null;
+  currentStatus?: string | null;
+  etd?: string | null;
+  lastUpdatedAt?: string | null;
+  timeline?: OrderTrackingEvent[];
 }
 
 export interface OnlineOwner {
@@ -456,12 +486,12 @@ export const apiClient = {
       }
     },
 
-    async sendMessage(sessionId: string, body: string, customerToken?: string) {
+    async sendMessage(sessionId: string, body: string, customerToken?: string, clientId?: string) {
       try {
         return await request<{ success: boolean; data: ChatMessage }>(`/chat/sessions/${sessionId}/messages`, {
           method: 'POST',
           headers: customerToken ? { 'x-customer-token': customerToken } : undefined,
-          body: JSON.stringify({ body }),
+          body: JSON.stringify({ body, clientId }),
         });
       } catch {
         const localMsg: ChatMessage = {
@@ -475,6 +505,28 @@ export const apiClient = {
         };
         return { success: true, data: localMsg };
       }
+    },
+
+    /**
+     * Send an image into a thread. `image` is a base64 data URL — the caller
+     * downscales/compresses first (see `prepareImage` in RepiChat), so what's
+     * uploaded is what will be displayed rather than a 12MP phone original.
+     * Unlike the other chat calls this one does NOT swallow failures: a photo
+     * that silently vanished would be worse than an error the user can retry.
+     */
+    async sendAttachment(
+      sessionId: string,
+      payload: { image: string; name?: string; width?: number; height?: number; caption?: string; clientId?: string },
+      customerToken?: string
+    ) {
+      return request<{ success: boolean; data: ChatMessage; error?: string }>(
+        `/chat/sessions/${sessionId}/attachments`,
+        {
+          method: 'POST',
+          headers: customerToken ? { 'x-customer-token': customerToken } : undefined,
+          body: JSON.stringify(payload),
+        }
+      );
     },
 
     async listOwnerSessions() {
@@ -533,6 +585,25 @@ export const apiClient = {
       return request<{ success: boolean; data: any[] }>('/orders/mine', {
         method: 'GET',
       });
+    },
+
+    /**
+     * The buyer's own delivery status. Refreshes from the courier server-side
+     * and returns the folded-in result, so calling this also persists the
+     * tracking onto the order for the admin console to see.
+     */
+    async track(id: string) {
+      return request<{
+        success: boolean;
+        data: {
+          id: string;
+          status: 'placed' | 'shipped' | 'delivered' | 'cancelled';
+          payment?: any;
+          deliveryMethod?: string;
+          createdAt?: string;
+          shiprocket?: OrderTracking | null;
+        };
+      }>(`/orders/${encodeURIComponent(id)}/track`, { method: 'GET' });
     },
 
     // Admin: every order placed via checkout

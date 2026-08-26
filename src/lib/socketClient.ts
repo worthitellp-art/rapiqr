@@ -25,13 +25,24 @@ function getSocket(): Socket {
     socket = io(SOCKET_ORIGIN, {
       autoConnect: false,
       withCredentials: true,
-      transports: ['polling', 'websocket'],
-      reconnectionAttempts: 3,
-      timeout: 5000,
+      // WebSocket first. The default order opens an HTTP long-poll, then
+      // upgrades — two extra round trips before the first message can move,
+      // which on a phone is most of the perceived "chat is slow". Polling stays
+      // in the list as the fallback for networks that block WebSocket.
+      transports: ['websocket', 'polling'],
+      // Reconnect for as long as the tab is open. Giving up after three tries
+      // left the chat permanently on the REST fallback after one tunnel or
+      // lift ride — no live messages, no typing, no read ticks, and nothing to
+      // tell the user why. Backoff caps at 10s so a long outage doesn't spin.
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 500,
+      reconnectionDelayMax: 10000,
+      randomizationFactor: 0.5,
+      timeout: 8000,
     });
 
     socket.on('connect_error', (err) => {
-      console.warn('Socket connection fallback active (using REST transport):', err.message);
+      console.warn('RepiChat socket connect failed, retrying (REST fallback active meanwhile):', err.message);
     });
   }
   return socket;

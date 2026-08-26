@@ -8,6 +8,7 @@ import {
   useInView,
   useMotionValueEvent,
   useReducedMotion,
+  type MotionValue,
 } from 'framer-motion';
 import {
   ArrowRight,
@@ -58,12 +59,38 @@ import stepImg3 from '../../../assets/landing-step-3.webp';
 import stepImg4 from '../../../assets/landing-step-4.webp';
 import stepImg5 from '../../../assets/landing-step-5.webp';
 import darkBgLogo from '../../../assets/darkbglogo.png';
-import heroImage from '../../../assets/hero.png';
+/* JPEG, not the source PNGs. These are photographs — PNG stored them losslessly
+   at 1.24 MB and 1.29 MB, and this is the hero's largest-contentful-paint, so
+   that was 2.5 MB standing between a visitor and their first view of the page.
+   Same pixels, 164 KB the pair. Regenerate with docs/hero-media.md. */
+import heroImage from '../../../assets/hero-bg.jpg';
+import heroImagePortrait from '../../../assets/hero-bg-portrait.jpg';
+/* hero-bg.mp4, not bg.mp4. The source master is 1920×1080 at 17 Mbps with its
+   moov atom written last, so a browser had to download nearly all 16 MB before
+   it could show a single frame. This is the web encode: same 1080p, H.264 High
+   at 2.2 Mbps, audio stripped, moov moved to the front — 2.1 MB, and it starts
+   playing while it streams.
 
-/* Hero backdrop. A photograph rather than a video: it parallaxes and scales on
-   scroll, which reads as motion without shipping a 20 MB asset. Served from
-   /public, so swapping the file swaps the hero with no code change. */
-const HERO_BG = heroImage;
+   It also loops properly. The source cuts hard at the wrap (its first and last
+   frames differ by 61/255), so the encode fades up from black at the head and
+   down to black at the tail; both ends now match and the seam is invisible.
+   That dip to black is the loop, and it is deliberate — see docs/hero-media.md.
+   Only the file imported here ships in the build. */
+import heroVideo from '../../../assets/hero-bg.mp4';
+
+/* Hero backdrop.
+ *
+ * Two crops of the same scene rather than one: hero.png is landscape (1717×916)
+ * and gets letterboxed into a phone's tall viewport, cropping the subject out.
+ * resbg.png is the portrait cut (849×1852) and is what a phone should get.
+ * `<picture>` picks between them on orientation, so the browser downloads
+ * exactly one — choosing in JS would download the wrong one first.
+ *
+ * The video is an enhancement layered on top and is never on the critical path;
+ * see HeroBackdrop for when it is allowed to load at all. */
+const HERO_BG_LANDSCAPE = heroImage;
+const HERO_BG_PORTRAIT = heroImagePortrait;
+const HERO_VIDEO = heroVideo;
 
 /* ──────────────────────────────────────────────────────────────────────────
    PALETTE
@@ -80,7 +107,7 @@ export interface LandingPageMasterProps {
   onLogin?: () => void;
   onOpenDistributorDashboard?: () => void;
   onOpenCheckout?: () => void;
-  onOpenJoinUs?: () => void;
+  onOpenJoinUs?: (serviceType?: string) => void;
   isEmbeddedInDashboard?: boolean;
 }
 
@@ -367,7 +394,7 @@ const PRICING_PLANS = [
 const FAQS: FaqItem[] = [
   {
     id: 'faq-1',
-    question: 'How does the RapiQR tag protect my personal phone number?',
+    question: 'How does the RepiQR tag protect my personal phone number?',
     answer:
       'When someone scans your QR tag, they interact with a secure proxy page. When they tap "Call Owner", our telecom cloud connects both parties through a masked virtual line. Neither your number nor theirs is ever revealed to the other.',
   },
@@ -552,6 +579,242 @@ function Counter({ to, suffix = '', kilo = false }: { to: number; suffix?: strin
 }
 
 /** Edge-to-edge ticker. The row is duplicated so the loop never shows a seam. */
+/**
+ * Freeze the page behind a full-screen overlay.
+ *
+ * Without this, opening the nav drawer, the cart or the application modal on a
+ * phone left the landing page scrolling underneath: a swipe over the overlay
+ * moved the page, and closing it dropped the reader somewhere they never chose
+ * to go. `position: fixed` is what actually stops iOS Safari — `overflow:
+ * hidden` alone does not — so the scroll offset is captured, applied as a
+ * negative offset to keep the view still, and restored on close.
+ *
+ * Compensating for the scrollbar's width keeps desktop from shifting sideways
+ * as the bar disappears.
+ */
+function useBodyScrollLock(locked: boolean) {
+  useEffect(() => {
+    if (!locked) return;
+
+    const { body } = document;
+    const scrollY = window.scrollY;
+    const gutter = window.innerWidth - document.documentElement.clientWidth;
+    const previous = {
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+      paddingRight: body.style.paddingRight,
+    };
+
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.width = '100%';
+    if (gutter > 0) body.style.paddingRight = `${gutter}px`;
+
+    return () => {
+      body.style.position = previous.position;
+      body.style.top = previous.top;
+      body.style.width = previous.width;
+      body.style.paddingRight = previous.paddingRight;
+      // Jump straight back — a smooth restore would animate the whole page.
+      window.scrollTo({ top: scrollY, behavior: 'instant' as ScrollBehavior });
+    };
+  }, [locked]);
+}
+
+/**
+ * The hero backdrop: a responsive still that paints immediately, with the
+ * video fading in over it only once it can actually play.
+ *
+ * The still is the load-bearing part. It is what the first paint shows, what
+ * the largest-contentful-paint is measured against, and what stays on screen
+ * for anyone the video never reaches. The video is decoration on top — if it
+ * loads late, or never, the hero is still finished and correct.
+ *
+ * The video is deliberately NOT loaded for everyone:
+ *
+ *  - `prefers-reduced-motion` — a looping backdrop is exactly what that asks
+ *    us not to play.
+ *  - Save-Data, or a connection reporting 2g/3g — background decoration must
+ *    never spend someone's data allowance.
+ *  - Coarse pointers / narrow viewports — phones get the still. At the file's
+ *    current size this is the difference between a hero that appears at once
+ *    and one that hijacks the connection for several seconds.
+ *
+ * Even when it is allowed, the fetch waits for an idle callback so it starts
+ * after the page is interactive rather than competing with it, and playback is
+ * suspended whenever the hero is off screen or the tab is hidden — decoding
+ * video nobody can see is the usual reason a landing page scrolls badly.
+ *
+ * The still and the video are NOT the same footage, so the two must never be
+ * visible together — see the hand-over effect below for how that is avoided.
+ */
+/** How long the video takes to reach full opacity while parked on its black frame 0. */
+const HERO_VIDEO_FADE_MS = 500;
+
+function HeroBackdrop({
+  reduced,
+  parallaxY,
+  parallaxScale,
+}: {
+  reduced: boolean | null;
+  parallaxY: MotionValue<string> | MotionValue<number>;
+  parallaxScale: MotionValue<number>;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const [wantsVideo, setWantsVideo] = useState(false);
+  /** Opaque, but still parked on its black first frame. */
+  const [videoVisible, setVideoVisible] = useState(false);
+  /** Cleared to run — only once the fade above has finished. */
+  const [videoPlaying, setVideoPlaying] = useState(false);
+
+  // Decide once, on the client, whether this visitor should get the video.
+  useEffect(() => {
+    if (reduced) return;
+
+    const connection = (navigator as Navigator & {
+      connection?: { saveData?: boolean; effectiveType?: string };
+    }).connection;
+    if (connection?.saveData) return;
+    if (connection?.effectiveType && /(^|-)(2g|3g)$/.test(connection.effectiveType)) return;
+
+    // Pointer type separates a phone from a small desktop window better than
+    // width alone: resizing a laptop browser shouldn't drop the video.
+    const isPhone =
+      window.matchMedia('(pointer: coarse)').matches && window.matchMedia('(max-width: 1023px)').matches;
+    if (isPhone) return;
+
+    setWantsVideo(true);
+  }, [reduced]);
+
+  // Attach the source only when idle, so the fetch never competes with the
+  // first paint. `preload="none"` plus no `src` means nothing is requested
+  // until this runs.
+  useEffect(() => {
+    if (!wantsVideo) return;
+    const video = videoRef.current;
+    if (!video || video.src) return;
+
+    const start = () => {
+      video.src = HERO_VIDEO;
+      video.load();
+    };
+    const idle = window.requestIdleCallback
+      ? window.requestIdleCallback(start, { timeout: 2500 })
+      : window.setTimeout(start, 900);
+
+    return () => {
+      if (window.cancelIdleCallback) window.cancelIdleCallback(idle as number);
+      else clearTimeout(idle as number);
+    };
+  }, [wantsVideo]);
+
+  /**
+   * Hand over from the still to the video without ever showing both.
+   *
+   * The still and the video are different footage — a different car, framing and
+   * lighting — so cross-dissolving them showed two pictures at once and read as
+   * a glitch. The fix is to only ever fade while the video has nothing to show:
+   * its first frame is encoded pure black, so we bring it up to full opacity
+   * while it is still PAUSED on that frame. All the viewer sees is the still
+   * dimming to black. Playback starts once the fade is over, revealing the
+   * video out of that black exactly as the loop itself does.
+   */
+  useEffect(() => {
+    if (!videoVisible || videoPlaying) return;
+    const t = setTimeout(() => setVideoPlaying(true), HERO_VIDEO_FADE_MS + 80);
+    return () => clearTimeout(t);
+  }, [videoVisible, videoPlaying]);
+
+  // Play only while the hero is actually on screen and the tab is focused.
+  useEffect(() => {
+    if (!videoPlaying) return;
+    const video = videoRef.current;
+    const section = sectionRef.current;
+    if (!video || !section) return;
+
+    let onScreen = true;
+    const sync = () => {
+      if (onScreen && document.visibilityState === 'visible') void video.play().catch(() => {});
+      else video.pause();
+    };
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        onScreen = entry.isIntersecting;
+        sync();
+      },
+      { threshold: 0.01 }
+    );
+    observer.observe(section);
+    document.addEventListener('visibilitychange', sync);
+    sync();
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }, [videoPlaying]);
+
+  const parallax = reduced ? undefined : { y: parallaxY, scale: parallaxScale };
+
+  return (
+    <div ref={sectionRef} className="absolute inset-0 overflow-hidden">
+      <motion.div style={parallax} className="absolute inset-0">
+        <picture>
+          {/* Portrait viewports get the tall crop; everything else the wide one.
+              Only the matching source is ever fetched. */}
+          <source media="(orientation: portrait)" srcSet={HERO_BG_PORTRAIT} />
+          <img
+            src={HERO_BG_LANDSCAPE}
+            alt=""
+            aria-hidden="true"
+            /* The hero image IS the largest contentful paint — it must be
+               eager and high priority, never lazy. */
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            /* Held slightly out of focus on purpose: it reads as depth behind
+               the headline instead of competing with it. */
+            className="absolute inset-0 h-full w-full object-cover object-center blur-[1px]"
+          />
+        </picture>
+
+        {wantsVideo && (
+          <video
+            ref={videoRef}
+            muted
+            loop
+            playsInline
+            preload="none"
+            aria-hidden="true"
+            tabIndex={-1}
+            /* Enough is buffered to show frame 0 — which is black. Become
+               opaque now, while there is still nothing to see. */
+            onCanPlay={() => setVideoVisible(true)}
+            /* If the file fails or stalls, fall back to the still underneath —
+               no error state is needed because nothing is missing without it. */
+            onError={() => {
+              setVideoVisible(false);
+              setVideoPlaying(false);
+            }}
+            /* No blur here, unlike the still. The still is deliberately softened
+               so it sits behind the headline; the video is the real subject once
+               it takes over, and blurring it was throwing away the detail the
+               higher-bitrate encode exists to deliver. The swap happens through
+               black, so the difference in sharpness is never seen mid-fade. */
+            style={{ transitionDuration: `${HERO_VIDEO_FADE_MS}ms` }}
+            className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity ease-out ${
+              videoVisible ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
 function Marquee({
   children,
   reverse = false,
@@ -745,6 +1008,23 @@ export default function LandingPageMaster({
     setIsScrolled((prev) => (prev === past ? prev : past));
   });
 
+  // Any of the three full-screen overlays holds the page still behind it.
+  useBodyScrollLock(isMobileMenuOpen || isCartOpen || isPartnerModalOpen);
+
+  // Escape closes whatever is on top. A drawer you can only dismiss by finding
+  // the right X is a phone problem first, but it costs nothing to fix for all.
+  useEffect(() => {
+    if (!isMobileMenuOpen && !isCartOpen && !isPartnerModalOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (isPartnerModalOpen) setIsPartnerModalOpen(false);
+      else if (isCartOpen) setIsCartOpen(false);
+      else setIsMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isMobileMenuOpen, isCartOpen, isPartnerModalOpen]);
+
   // Hero: the backdrop drifts down and grows while the copy floats up and out.
   const heroRef = useRef<HTMLElement>(null);
   const { scrollYProgress: heroProgress } = useScroll({
@@ -822,7 +1102,15 @@ export default function LandingPageMaster({
 
   const handleSmoothScroll = (targetId: string) => {
     setIsMobileMenuOpen(false);
-    document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Closing the drawer releases the body scroll lock, which restores the
+    // offset the page was frozen at. Scrolling in this same tick would be
+    // undone by that restore, so wait for it to commit first — one frame for
+    // React to re-render, a second for the unlock's scrollTo to land.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      )
+    );
   };
 
   const handleToggleFaq = (faqId: string) => {
@@ -890,7 +1178,7 @@ export default function LandingPageMaster({
     setJoinForm((prev) => ({ ...prev, serviceType: slug }));
     setJoinSubmitted(false);
     setJoinError(null);
-    onOpenJoinUs?.();
+    onOpenJoinUs?.(slug);
   };
 
   const toggleJoinCategory = (value: string) => {
@@ -965,7 +1253,12 @@ export default function LandingPageMaster({
   ];
 
   return (
-    <div className="min-h-screen bg-white font-sans text-[#0B0B0C] antialiased selection:bg-[#0B0B0C] selection:text-white">
+    /* `overflow-x-clip` rather than `hidden`: it contains any stray horizontal
+       overflow (parallax layers, the footer watermark, the CTA particle field
+       all extend past the viewport by design) without making this element a
+       scroll container — which `hidden` would, and which silently breaks the
+       `position: sticky` the pinned How-it-works panel depends on. */
+    <div className="min-h-screen overflow-x-clip bg-white font-sans text-[#0B0B0C] antialiased selection:bg-[#0B0B0C] selection:text-white">
 
       {/* ── Page scroll progress ──────────────────────────────────────── */}
       <motion.div
@@ -984,9 +1277,9 @@ export default function LandingPageMaster({
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             className="flex cursor-pointer items-center focus:outline-hidden"
-            aria-label="RapiQR home"
+            aria-label="RepiQR home"
           >
-            <img src={darkBgLogo} alt="RapiQR" className="h-7 w-auto object-contain sm:h-8" />
+            <img src={darkBgLogo} alt="RepiQR" className="h-7 w-auto object-contain sm:h-8" />
           </button>
 
           <nav className="hidden items-center gap-8 text-[13px] font-medium text-white/70 lg:flex">
@@ -1008,7 +1301,7 @@ export default function LandingPageMaster({
               onMouseLeave={() => setIsJoinMenuOpen(false)}
             >
               <button
-                onClick={() => onOpenJoinUs?.()}
+                onClick={() => setIsJoinMenuOpen((open) => !open)}
                 aria-haspopup="true"
                 aria-expanded={isJoinMenuOpen}
                 className="flex cursor-pointer items-center gap-1.5 transition-colors hover:text-white"
@@ -1027,51 +1320,23 @@ export default function LandingPageMaster({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 8 }}
                     transition={{ duration: 0.25, ease: EASE }}
-                    className="absolute left-1/2 top-full z-50 -translate-x-1/2 pt-4"
+                    className="absolute left-1/2 top-full z-50 w-56 -translate-x-1/2 pt-4"
                   >
-                    <div className="w-[640px] max-w-[calc(100vw-3rem)] overflow-hidden rounded-2xl border border-black/5 bg-white shadow-[0_30px_80px_-20px_rgba(0,0,0,0.45)]">
-                      <div className="border-b border-black/5 px-6 py-4">
-                        <p className="text-[13px] font-semibold text-[#0B0B0C]">
-                          Become a RapiQR service partner
-                        </p>
-                        <p className="mt-0.5 text-[12px] text-black/45">
-                          Pick what you do — we route matching scans to you.
-                        </p>
+                    <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#171719] p-2 shadow-[0_20px_45px_-18px_rgba(0,0,0,0.8)]">
+                      <p className="px-3 pb-2 pt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-white/35">
+                        Choose your service
+                      </p>
+                      <div className="grid max-h-72 overflow-y-auto">
+                        {SERVICE_TYPES.filter((type) => type.slug !== 'police').map((type) => (
+                          <button
+                            key={type.slug}
+                            onClick={() => handleJoinSelect(type.slug)}
+                            className="cursor-pointer rounded-xl px-3 py-2.5 text-left text-[13px] font-light text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                          >
+                            {type.label}
+                          </button>
+                        ))}
                       </div>
-
-                      <div className="grid max-h-[58vh] grid-cols-3 gap-0.5 overflow-y-auto p-2">
-                        {SERVICE_TYPES.map((type) => {
-                          const m = getServiceMeta(type.slug);
-                          return (
-                            <button
-                              key={type.slug}
-                              onClick={() => handleJoinSelect(type.slug)}
-                              className="group/item flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-black/[0.04]"
-                            >
-                              <span
-                                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-                                style={{ background: m.bg, color: m.color }}
-                              >
-                                <m.Icon size={14} />
-                              </span>
-                              <span className="min-w-0">
-                                <span className="block truncate text-[12px] font-semibold text-[#0B0B0C]">
-                                  {type.label}
-                                </span>
-                                <span className="block truncate text-[10px] text-black/40">Provider</span>
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <button
-                        onClick={() => handleJoinSelect(joinForm.serviceType)}
-                        className="flex w-full cursor-pointer items-center justify-center gap-2 border-t border-black/5 bg-[#0B0B0C] px-6 py-3.5 text-[12px] font-semibold text-white transition-colors hover:bg-black"
-                      >
-                        Open the partner application
-                        <ArrowRight size={13} style={{ color: '#F6C000' }} />
-                      </button>
                     </div>
                   </motion.div>
                 )}
@@ -1157,9 +1422,12 @@ export default function LandingPageMaster({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3, ease: EASE }}
-            className="fixed inset-0 z-[69] flex flex-col bg-[#0B0B0C] px-6 pb-10 pt-24 lg:hidden"
+            /* Safe-area padding on both ends: the top clears the notch under the
+               fixed header, the bottom keeps the two buttons off the iPhone
+               home indicator, where they were previously unreachable. */
+            className="fixed inset-0 z-[69] flex flex-col bg-[#0B0B0C] px-6 pb-[max(2.5rem,calc(env(safe-area-inset-bottom)+1.5rem))] pt-[max(6rem,calc(env(safe-area-inset-top)+4.5rem))] lg:hidden"
           >
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto overscroll-contain">
               {[...NAV_LINKS, { id: 'join-section', label: 'Join us' }].map((link, i) => (
                 <motion.button
                   key={link.id}
@@ -1204,16 +1472,7 @@ export default function LandingPageMaster({
         id="hero-section"
         className="relative flex min-h-[100svh] items-center justify-center overflow-hidden bg-[#0B0B0C]"
       >
-        <motion.img
-          src={HERO_BG}
-          alt=""
-          aria-hidden="true"
-          style={reduced ? undefined : { y: heroImageY, scale: heroImageScale }}
-          /* Held slightly out of focus on purpose: it reads as depth behind the
-             headline instead of competing with it, the way the reference hero's
-             shallow-DOF macro shot does. */
-          className="absolute inset-0 h-full w-full object-cover object-center blur-[1px]"
-        />
+        <HeroBackdrop reduced={reduced} parallaxY={heroImageY} parallaxScale={heroImageScale} />
         {/* Scrim: dark enough for white type at AA, and it deepens on scroll. */}
         <motion.div
           style={reduced ? undefined : { opacity: heroScrimOpacity }}
@@ -1263,7 +1522,7 @@ export default function LandingPageMaster({
               whileHover={reduced ? undefined : { y: -3 }}
               whileTap={reduced ? undefined : { scale: 0.97 }}
               transition={{ duration: 0.25, ease: EASE }}
-              className="group flex cursor-pointer items-center gap-6 rounded-md bg-white px-10 py-5 text-[15px] font-semibold text-[#0B0B0C] shadow-[0_16px_40px_-18px_rgba(0,0,0,0.8)]"
+              className="group flex cursor-pointer items-center gap-4 rounded-md bg-white px-8 py-4 text-[15px] font-semibold text-[#0B0B0C] shadow-[0_16px_40px_-18px_rgba(0,0,0,0.8)] sm:gap-6 sm:px-10 sm:py-5"
             >
               Get your tag
               <ArrowRight
@@ -1295,7 +1554,7 @@ export default function LandingPageMaster({
       </section>
 
       {/* ── 3. STATS BAND ───────────────────────────────────────────────── */}
-      <section className="border-t border-white/10 bg-[#0B0B0C] py-16 sm:py-24">
+      <section className="border-t border-white/10 bg-[#0B0B0C] py-14 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
           <div className="grid grid-cols-2 gap-y-12 md:grid-cols-4">
             {STATS.map((stat, i) => (
@@ -1332,12 +1591,12 @@ export default function LandingPageMaster({
       </section>
 
       {/* ── 6. PRODUCTS — tabs + horizontal rail ────────────────────────── */}
-      <section id="products-section" className="bg-[#F4F1EC] py-24 sm:py-32">
+      <section id="products-section" className="bg-[#F4F1EC] py-16 sm:py-24 lg:py-32">
         <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
           <Reveal className="flex flex-col gap-8 border-b border-black/10 pb-10 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-xl">
               <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.18em] text-black/40">
-                The RapiQR collection
+                The RepiQR collection
               </p>
               <h2 className="text-[clamp(2rem,4.2vw,3.4rem)] font-medium leading-[1.02] tracking-[-0.04em]">
                 <SplitWords text="Protection, made personal" />
@@ -1587,113 +1846,14 @@ export default function LandingPageMaster({
         </div>
       </section>
 
-      {/* ── 9. LIVE SCAN DEMO ───────────────────────────────────────────── */}
-      <section id="demo-section" className="relative overflow-hidden bg-[#0B0B0C] py-24 sm:py-32">
-        <div className="relative mx-auto max-w-3xl px-6 text-center">
-          <Reveal>
-            <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em] text-white">
-              <SplitWords text="See what a finder sees" />
-            </h2>
-            <p className="mx-auto mt-4 max-w-md text-[15px] font-light text-white/50">
-              This is the page that opens on their phone. Nothing to install, and no
-              number anywhere on it.
-            </p>
-          </Reveal>
-
-          <Reveal delay={0.15} className="mt-12">
-            <div className="mx-auto max-w-md overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] p-2 backdrop-blur-sm">
-              <div className="rounded-[1.6rem] bg-[#111113] p-6">
-                <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                  <div className="flex items-center gap-2.5">
-                    <QrGlyph size={26} color="#FFFFFF" />
-                    <span className="text-[13px] font-medium text-white">Tag RQ-4821</span>
-                  </div>
-                  <span className="flex items-center gap-1.5 text-[11px] font-light text-white/45">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                    Active
-                  </span>
-                </div>
-
-                <p className="py-5 text-[13px] font-light text-white/45">
-                  Something wrong with this vehicle? Tell the owner.
-                </p>
-
-                <div className="grid gap-2">
-                  {[
-                    { key: 'parking' as const, label: 'Notify for parking issue', Icon: Car },
-                    { key: 'gps' as const, label: 'Share my location', Icon: MapPin },
-                    { key: 'emergency' as const, label: 'Report an emergency', Icon: Bell },
-                  ].map(({ key, label, Icon }) => (
-                    <button
-                      key={key}
-                      onClick={() => handleDemoTrigger(key)}
-                      className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3.5 text-left text-[13px] font-light text-white/80 transition-colors hover:border-white/25 hover:bg-white/[0.07]"
-                    >
-                      <Icon size={15} className="text-white/40" />
-                      {label}
-                      <ArrowRight size={13} className="ml-auto text-white/25" />
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-5 flex items-center justify-center gap-2 border-t border-white/10 pt-4 text-[11px] font-light text-white/30">
-                  <Lock size={11} />
-                  Owner number hidden — call routes through a masked line
-                </div>
-              </div>
-            </div>
-          </Reveal>
-
-          {/* Toast */}
-          <div className="pointer-events-none fixed inset-x-0 bottom-8 z-[90] flex justify-center px-6">
-            <AnimatePresence>
-              {demoActionAlert && (
-                <motion.div
-                  initial={{ opacity: 0, y: 24, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 16, scale: 0.97 }}
-                  transition={{ duration: 0.45, ease: EASE }}
-                  className="flex max-w-sm items-start gap-3 rounded-2xl bg-white px-5 py-4 text-left shadow-[0_25px_60px_-20px_rgba(0,0,0,0.6)]"
-                >
-                  <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-emerald-600" />
-                  <span className="text-[13px] font-light leading-snug text-[#0B0B0C]">
-                    {demoActionAlert}
-                  </span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Partner services on call */}
-          <Reveal delay={0.25} className="mt-14">
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              {SERVICE_TYPES.slice(0, 9).map((type) => {
-                const m = getServiceMeta(type.slug);
-                return (
-                  <span
-                    key={type.slug}
-                    className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10"
-                    style={{ background: 'rgba(255,255,255,0.04)', color: m.color }}
-                    title={type.label}
-                  >
-                    <m.Icon size={15} />
-                  </span>
-                );
-              })}
-            </div>
-            <p className="mt-5 text-[12px] font-light text-white/35">
-              And {SERVICE_TYPES.length - 9} more partner services reachable from the same scan.
-            </p>
-          </Reveal>
-        </div>
-      </section>
+    
 
       {/* ── 10. PHOTO WALL ──────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-[#0B0B0C] py-24 sm:py-32">
+      <section className="relative overflow-hidden bg-[#0B0B0C] py-16 sm:py-24 lg:py-32">
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
           <Reveal>
             <h2 className="max-w-md px-6 text-center text-[clamp(1.8rem,4.6vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em] text-white drop-shadow-[0_4px_30px_rgba(0,0,0,0.9)]">
-              Protected by RapiQR
+              Protected by RepiQR
             </h2>
           </Reveal>
         </div>
@@ -1721,24 +1881,24 @@ export default function LandingPageMaster({
       </section>
 
       {/* ── 11. PRICING ─────────────────────────────────────────────────── */}
-      <section id="pricing-section" className="bg-white py-24 sm:py-32">
+      <section id="pricing-section" className="bg-white py-16 sm:py-24 lg:py-32">
         <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
           <Reveal className="text-center">
             <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em]">
-              <SplitWords text="Pick your pack" />
+              Pricing plans for every need
             </h2>
             <p className="mx-auto mt-4 max-w-lg text-[15px] font-light text-black/50">
               Lifetime validity, no recurring subscription. Talk to us for volume pricing.
             </p>
           </Reveal>
 
-          <div className="mx-auto mt-16 grid max-w-5xl gap-5 md:grid-cols-3">
+          <div className="mx-auto mt-10 grid max-w-5xl gap-5 sm:mt-16 md:grid-cols-3">
             {PRICING_PLANS.map((plan, i) => (
               <Reveal key={plan.id} delay={i * 0.1}>
                 <motion.div
                   whileHover={reduced ? undefined : { y: -6 }}
                   transition={{ duration: 0.4, ease: EASE }}
-                  className={`flex h-full flex-col justify-between rounded-3xl p-8 ${
+                  className={`flex h-full flex-col justify-between rounded-3xl p-6 sm:p-8 ${
                     plan.featured
                       ? 'bg-[#0B0B0C] text-white'
                       : 'border border-black/10 bg-white text-[#0B0B0C]'
@@ -1809,7 +1969,7 @@ export default function LandingPageMaster({
       </section>
 
       {/* ── 12. JOIN US — service-provider application ───────────────────── */}
-      {false && <section id="join-section" className="bg-[#F4F1EC] py-24 sm:py-32">
+      {false && <section id="join-section" className="bg-[#F4F1EC] py-16 sm:py-24 lg:py-32">
         <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
           <Reveal className="mx-auto max-w-2xl text-center">
             <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-black/40">
@@ -1830,7 +1990,7 @@ export default function LandingPageMaster({
               <div className="relative flex h-full min-h-[420px] flex-col justify-end overflow-hidden rounded-3xl bg-[#0B0B0C]">
                 <img
                   src={stepImg4}
-                  alt="A RapiQR scan reaching a nearby service partner"
+                  alt="A RepiQR scan reaching a nearby service partner"
                   className="absolute inset-0 h-full w-full object-cover opacity-40"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0C] via-[#0B0B0C]/75 to-[#0B0B0C]/25" />
@@ -1905,7 +2065,7 @@ export default function LandingPageMaster({
                       <select
                         value={joinForm.serviceType}
                         onChange={(e) => setJoinForm({ ...joinForm, serviceType: e.target.value })}
-                        className="w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                        className="w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#0B0B0C] sm:text-[14px]"
                       >
                         {SERVICE_TYPES.map((t) => (
                           <option key={t.slug} value={t.slug}>
@@ -1923,7 +2083,9 @@ export default function LandingPageMaster({
                         value={joinForm.label}
                         onChange={(e) => setJoinForm({ ...joinForm, label: e.target.value })}
                         placeholder={joinServiceMeta.placeholder}
-                        className="w-full rounded-xl border border-black/12 px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                        /* 16px on phones: iOS Safari zooms the whole page when a
+                           focused field is smaller, and never zooms back out. */
+                        className="w-full rounded-xl border border-black/12 px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#0B0B0C] sm:text-[14px]"
                       />
                     </div>
 
@@ -1945,7 +2107,9 @@ export default function LandingPageMaster({
                           value={joinForm.city}
                           onChange={(e) => setJoinForm({ ...joinForm, city: e.target.value })}
                           placeholder="e.g. Pune"
-                          className="w-full rounded-xl border border-black/12 px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                          /* 16px on phones: iOS Safari zooms the whole page when a
+                           focused field is smaller, and never zooms back out. */
+                        className="w-full rounded-xl border border-black/12 px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#0B0B0C] sm:text-[14px]"
                         />
                       </div>
                     </div>
@@ -2042,14 +2206,14 @@ export default function LandingPageMaster({
       </section>}
 
       {/* ── 13. FRANCHISE ───────────────────────────────────────────────── */}
-      <section id="distributor-section" className="bg-[#0B0B0C] py-24 text-white sm:py-32">
+      <section id="distributor-section" className="bg-[#0B0B0C] py-16 text-white sm:py-24 lg:py-32">
         <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
           <Reveal className="max-w-2xl">
             <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-white/40">
               Franchise
             </p>
             <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em]">
-              <SplitWords text="Sell RapiQR in your city" />
+              Become a RepiQR distributor
             </h2>
             <p className="mt-4 text-[15px] font-light leading-relaxed text-white/50">
               Retail kits, exclusive city territories and state-level master rights — with
@@ -2057,13 +2221,13 @@ export default function LandingPageMaster({
             </p>
           </Reveal>
 
-          <div className="mt-14 grid gap-5 lg:grid-cols-3">
+          <div className="mt-10 grid gap-5 sm:mt-14 lg:grid-cols-3">
             {DISTRIBUTOR_TIERS.map((tier, i) => (
               <Reveal key={tier.id} delay={i * 0.1}>
                 <motion.div
                   whileHover={reduced ? undefined : { y: -6 }}
                   transition={{ duration: 0.4, ease: EASE }}
-                  className={`flex h-full flex-col justify-between rounded-3xl p-8 ${
+                  className={`flex h-full flex-col justify-between rounded-3xl p-6 sm:p-8 ${
                     tier.isPopular ? 'bg-white text-[#0B0B0C]' : 'border border-white/12 bg-white/[0.03]'
                   }`}
                 >
@@ -2153,11 +2317,11 @@ export default function LandingPageMaster({
       </section>
 
       {/* ── 14. FAQ — full-bleed rows ───────────────────────────────────── */}
-      <section id="faq-section" className="bg-white py-24 sm:py-32">
+      <section id="faq-section" className="bg-white py-16 sm:py-24 lg:py-32">
         <div className="mx-auto max-w-[1100px] px-6 sm:px-10">
-          <Reveal className="mb-14">
+          <Reveal className="mb-8 sm:mb-14">
             <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em]">
-              <SplitWords text="Questions, answered" />
+              Frequently asked questions
             </h2>
           </Reveal>
 
@@ -2170,7 +2334,7 @@ export default function LandingPageMaster({
                     <button
                       onClick={() => handleToggleFaq(faq.id)}
                       aria-expanded={open}
-                      className="group flex w-full cursor-pointer items-center justify-between gap-6 py-7 text-left"
+                      className="group flex w-full cursor-pointer items-center justify-between gap-4 py-5 text-left sm:gap-6 sm:py-7"
                     >
                       <span className="text-[clamp(1.05rem,2.2vw,1.5rem)] font-light leading-snug tracking-[-0.02em] transition-colors group-hover:text-black/60">
                         {faq.question}
@@ -2210,7 +2374,7 @@ export default function LandingPageMaster({
       {/* ── 15. CLOSING CALL TO ACTION ──────────────────────────────────── */}
       <section
         ref={ctaRef}
-        className="relative flex min-h-[80vh] items-center justify-center overflow-hidden bg-[#0B0B0C] py-28"
+        className="relative flex min-h-[80vh] items-center justify-center overflow-hidden bg-[#0B0B0C] py-20 sm:py-28"
       >
         <motion.div
           style={reduced ? undefined : { scale: ctaRingScale, opacity: ctaRingOpacity }}
@@ -2221,9 +2385,9 @@ export default function LandingPageMaster({
 
         <div className="relative z-10 mx-auto max-w-2xl px-6 text-center">
           <h2 className="text-[clamp(2rem,5.4vw,3.8rem)] font-medium leading-[1.03] tracking-[-0.035em] text-white">
-            <SplitWords text="Protect your first" />
+            Get Your
             <br />
-            <SplitWords text="asset today" delay={0.14} />
+            RepiQR tag today
           </h2>
 
           <Reveal delay={0.3}>
@@ -2249,12 +2413,12 @@ export default function LandingPageMaster({
       {/* ── 16. FOOTER ──────────────────────────────────────────────────── */}
       <footer
         ref={footerRef}
-        className="relative overflow-hidden border-t border-white/10 bg-[#0B0B0C] pb-40 pt-20 text-white"
+        className="relative overflow-hidden border-t border-white/10 bg-[#0B0B0C] pb-32 pt-14 text-white sm:pb-40 sm:pt-20"
       >
         <div className="relative z-10 mx-auto max-w-[1400px] px-6 sm:px-10">
           <div className="grid gap-12 pb-16 md:grid-cols-12">
             <div className="space-y-5 md:col-span-4">
-              <img src={darkBgLogo} alt="RapiQR" className="h-8 w-auto object-contain" />
+              <img src={darkBgLogo} alt="RepiQR" className="h-8 w-auto object-contain" />
               <p className="max-w-xs text-[13px] font-light leading-relaxed text-white/45">
                 A universal smart QR safety layer for vehicles, valuables, pets and families —
                 with masked telephony and instant scan alerts.
@@ -2376,7 +2540,7 @@ export default function LandingPageMaster({
           </div>
 
           <div className="flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-[12px] font-light text-white/35 sm:flex-row">
-            <span>© {new Date().getFullYear()} RapiQR. All rights reserved.</span>
+            <span>© {new Date().getFullYear()} RepiQR. All rights reserved.</span>
             <span className="flex items-center gap-2">
               <Shield size={12} />
               Your number is never rendered on a scan page
@@ -2391,7 +2555,7 @@ export default function LandingPageMaster({
           aria-hidden="true"
         >
           <span className="block whitespace-nowrap text-[clamp(5rem,20vw,17rem)] font-medium leading-none tracking-[-0.05em] text-white/[0.045]">
-            RAPIQR
+            RepiQR
           </span>
         </motion.div>
       </footer>
@@ -2404,7 +2568,7 @@ export default function LandingPageMaster({
             animate={{ opacity: 1, x: 0, y: 0 }}
             exit={{ opacity: 0, x: 28, y: 12 }}
             transition={{ duration: 0.35, ease: EASE }}
-            className="fixed bottom-5 right-5 z-[520] flex w-[min(360px,calc(100vw-2.5rem))] items-center gap-3 rounded-2xl border border-black/8 bg-white p-4 shadow-[0_20px_55px_-18px_rgba(0,0,0,0.45)]"
+            className="fixed bottom-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))] right-5 z-[520] flex w-[min(360px,calc(100vw-2.5rem))] items-center gap-3 rounded-2xl border border-black/8 bg-white p-4 shadow-[0_20px_55px_-18px_rgba(0,0,0,0.45)]"
             role="status"
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0B0B0C] text-[#F6C000]">
@@ -2445,7 +2609,10 @@ export default function LandingPageMaster({
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ duration: 0.45, ease: EASE }}
-              className="relative z-10 flex h-full w-full max-w-md flex-col justify-between overflow-y-auto bg-white p-7"
+              /* Full-bleed on a phone, a panel from tablet up. The scroller is
+                 the whole aside, so its bottom padding is what lifts the
+                 checkout button clear of the home indicator. */
+              className="relative z-10 flex h-full w-full max-w-md flex-col justify-between overflow-y-auto overscroll-contain bg-white px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-7 sm:pb-[max(1.75rem,env(safe-area-inset-bottom))]"
             >
               <div>
                 <div className="flex items-center justify-between border-b border-black/8 pb-5">
@@ -2610,7 +2777,7 @@ export default function LandingPageMaster({
                     <span className="font-medium text-[#0B0B0C]">
                       {partnerForm.name || userAppStatus?.userName || 'partner'}
                     </span>
-                    . Your application has been sent to the RapiQR team.
+                    . Your application has been sent to the RepiQR team.
                   </p>
                   <div className="space-y-2.5 rounded-2xl bg-black/[0.03] p-4 text-left text-[12px] font-light text-black/55">
                     <div className="flex justify-between">
@@ -2649,7 +2816,7 @@ export default function LandingPageMaster({
                     <div>
                       <h3 className="text-xl font-medium tracking-[-0.02em]">Become a partner</h3>
                       <p className="text-[12px] font-light text-black/45">
-                        Apply for a RapiQR distributorship or franchise
+                        Apply for a RepiQR distributorship or franchise
                       </p>
                     </div>
                   </div>
@@ -2665,7 +2832,9 @@ export default function LandingPageMaster({
                         placeholder="e.g. Ramesh Auto Accessories"
                         value={partnerForm.name}
                         onChange={(e) => setPartnerForm({ ...partnerForm, name: e.target.value })}
-                        className="w-full rounded-xl border border-black/12 px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                        /* 16px on phones: iOS Safari zooms the whole page when a
+                           focused field is smaller, and never zooms back out. */
+                        className="w-full rounded-xl border border-black/12 px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#0B0B0C] sm:text-[14px]"
                       />
                     </div>
 
@@ -2690,7 +2859,9 @@ export default function LandingPageMaster({
                           placeholder="e.g. Pune, Maharashtra"
                           value={partnerForm.city}
                           onChange={(e) => setPartnerForm({ ...partnerForm, city: e.target.value })}
-                          className="w-full rounded-xl border border-black/12 px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                          /* 16px on phones: iOS Safari zooms the whole page when a
+                           focused field is smaller, and never zooms back out. */
+                        className="w-full rounded-xl border border-black/12 px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#0B0B0C] sm:text-[14px]"
                         />
                       </div>
                     </div>
@@ -2702,7 +2873,7 @@ export default function LandingPageMaster({
                       <select
                         value={partnerForm.business}
                         onChange={(e) => setPartnerForm({ ...partnerForm, business: e.target.value })}
-                        className="w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                        className="w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#0B0B0C] sm:text-[14px]"
                       >
                         <option value="Auto Accessories Shop">Auto accessories / helmet shop</option>
                         <option value="Car Dealership / Service Center">
@@ -2723,7 +2894,7 @@ export default function LandingPageMaster({
                       <select
                         value={partnerForm.tier}
                         onChange={(e) => setPartnerForm({ ...partnerForm, tier: e.target.value })}
-                        className="w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                        className="w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#0B0B0C] sm:text-[14px]"
                       >
                         <option value="Retail Kit (50 Units)">Retail partner kit (50 stickers)</option>
                         <option value="City Franchise (300 Units)">

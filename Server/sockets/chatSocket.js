@@ -67,6 +67,12 @@ async function resolveIdentity(auth) {
 
 /**
  * True when this identity is allowed to read/write the given session.
+ *
+ * For an owner this can cost two lookups (session, then the product behind the
+ * QR). `authorize` below memoizes the answer per socket so that price is paid
+ * once per thread rather than on every typing ping — at one keystroke per event
+ * the uncached version turned a fast connection into a queue of database round
+ * trips, which is the opposite of what a typing indicator is for.
  */
 async function canAccessSession(identity, sessionId) {
   if (identity.type === 'customer') return identity.sessionId === sessionId;
@@ -82,12 +88,65 @@ async function canAccessSession(identity, sessionId) {
   return false;
 }
 
+/**
+ * Memoized access check, scoped to one socket connection.
+ *
+ * Only positive answers are cached. A denial stays un-cached so that a session
+ * whose ownership is being resolved concurrently (an unclaimed sticker being
+ * adopted by the account that just opened it) isn't locked out for the life of
+ * the connection — and caching lives and dies with the socket, so revoked
+ * access is at most one reconnect away.
+ */
+async function authorize(socket, sessionId) {
+  if (typeof sessionId !== 'string' || !sessionId) return false;
+  if (!socket.allowedSessions) socket.allowedSessions = new Set();
+  if (socket.allowedSessions.has(sessionId)) return true;
+
+  const ok = await canAccessSession(socket.identity, sessionId);
+  if (ok) socket.allowedSessions.add(sessionId);
+  return ok;
+}
+
+/**
+ * Turn the sender's single tick into a double one when the other side is
+ * actually holding the thread open.
+ *
+ * "Delivered" here means a socket belonging to the peer is in the session room
+ * at the moment of the broadcast — the honest meaning of the second tick, and
+ * something we can answer locally without another database read. If nobody is
+ * there the message simply stays on one tick until they open it, at which point
+ * `mark_read` overtakes it with the read receipt anyway.
+ */
+async function markDeliveredIfPeerPresent(sessionId, message, senderType) {
+  if (!io) return;
+  try {
+    const sockets = await io.in(`session:${sessionId}`).fetchSockets();
+    const peerPresent = sockets.some((s) => s.data?.identityType !== senderType && s.data?.identityType);
+    if (!peerPresent) return;
+
+    const deliveredAt = await ChatModel.markDelivered(message.id);
+    io.to(`session:${sessionId}`).emit('delivered', { sessionId, messageId: message.id, deliveredAt });
+  } catch {
+    /* presence is a nicety — never let it break a send */
+  }
+}
+
 function initChatSocket(httpServer, allowedOrigins) {
   io = new Server(httpServer, {
     cors: {
       origin: allowedOrigins,
       credentials: true,
     },
+    // Let a client open on WebSocket directly instead of forcing the HTTP
+    // long-poll handshake first and upgrading afterwards — that upgrade dance
+    // costs a round trip on every connect, which is felt most on the mobile
+    // connections this chat mostly runs on. Polling stays available for
+    // networks that block WebSocket outright.
+    transports: ['websocket', 'polling'],
+    // A phone that walks out of signal should be noticed in seconds, not the
+    // default ~45s, so the peer's "online" dot and typing state stay truthful.
+    pingInterval: 20000,
+    pingTimeout: 10000,
   });
 
   io.use(async (socket, next) => {
@@ -100,6 +159,10 @@ function initChatSocket(httpServer, allowedOrigins) {
   io.on('connection', (socket) => {
     const room = (sessionId) => `session:${sessionId}`;
 
+    // `data` is the part of a socket that fetchSockets() can see across the
+    // adapter — markDeliveredIfPeerPresent reads it to tell the two sides apart.
+    socket.data.identityType = socket.identity.type;
+
     if (socket.identity.type === 'owner') {
       markOwnerOnline(socket.identity.ownerId);
       socket.join(`owner:${socket.identity.ownerId}`);
@@ -107,16 +170,16 @@ function initChatSocket(httpServer, allowedOrigins) {
     }
 
     socket.on('join_session', async (sessionId, ack) => {
-      if (typeof sessionId !== 'string' || !(await canAccessSession(socket.identity, sessionId))) {
+      if (!(await authorize(socket, sessionId))) {
         return typeof ack === 'function' && ack({ success: false, error: 'Forbidden' });
       }
       socket.join(room(sessionId));
       typeof ack === 'function' && ack({ success: true });
     });
 
-    socket.on('send_message', async ({ sessionId, body } = {}, ack) => {
+    socket.on('send_message', async ({ sessionId, body, clientId } = {}, ack) => {
       const text = String(body || '').trim();
-      if (!sessionId || !text || !(await canAccessSession(socket.identity, sessionId))) {
+      if (!sessionId || !text || !(await authorize(socket, sessionId))) {
         return typeof ack === 'function' && ack({ success: false, error: 'Forbidden or empty message' });
       }
 
@@ -130,8 +193,15 @@ function initChatSocket(httpServer, allowedOrigins) {
         return typeof ack === 'function' && ack({ success: false, error: 'Failed to save message' });
       }
 
-      io.to(room(sessionId)).emit('new_message', message);
-      typeof ack === 'function' && ack({ success: true, message });
+      // The sender's own optimistic bubble is matched back by clientId rather
+      // than by body text — two identical messages ("ok", "ok") are a normal
+      // thing to send, and text matching collapsed them into one.
+      const broadcast = clientId ? { ...message, client_id: clientId } : message;
+
+      io.to(room(sessionId)).emit('new_message', broadcast);
+      typeof ack === 'function' && ack({ success: true, message: broadcast });
+
+      markDeliveredIfPeerPresent(sessionId, message, socket.identity.type);
 
       // Notify the owner's personal room in real time for their dashboard inbox
       ChatModel.getSessionById(sessionId).then(async (session) => {
@@ -165,12 +235,12 @@ function initChatSocket(httpServer, allowedOrigins) {
     });
 
     socket.on('typing', async ({ sessionId, isTyping } = {}) => {
-      if (!sessionId || !(await canAccessSession(socket.identity, sessionId))) return;
+      if (!(await authorize(socket, sessionId))) return;
       socket.to(room(sessionId)).emit('typing', { sessionId, isTyping: Boolean(isTyping), from: socket.identity.type });
     });
 
     socket.on('mark_read', async ({ sessionId } = {}) => {
-      if (!sessionId || !(await canAccessSession(socket.identity, sessionId))) return;
+      if (!(await authorize(socket, sessionId))) return;
       await ChatModel.markRead(sessionId, socket.identity.type);
       socket.to(room(sessionId)).emit('read', { sessionId, by: socket.identity.type });
     });
@@ -188,4 +258,4 @@ function getIo() {
   return io;
 }
 
-module.exports = { initChatSocket, getIo, getOnlineOwners };
+module.exports = { initChatSocket, getIo, getOnlineOwners, markDeliveredIfPeerPresent };

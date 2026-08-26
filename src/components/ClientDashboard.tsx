@@ -78,6 +78,12 @@ const NAV_ITEMS: { id: TabId; label: string; icon: React.ComponentType<{ size?: 
   { id: 'support', label: 'Support & Help', icon: LifeBuoy },
 ];
 
+/**
+ * The customer-facing view of an order's four fulfillment states. `cancelled`
+ * has no place on a progress line, so those cards skip the stepper entirely.
+ */
+const DELIVERY_STEPS: string[] = ['Ordered', 'Shipped', 'Delivered'];
+
 type ModalState =
   | { type: 'editDetails'; sticker: DashboardSticker }
   | { type: 'editContacts'; sticker: DashboardSticker }
@@ -403,6 +409,39 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
     return () => { cancelled = true; };
   }, [activeTab]);
 
+  // ─── DELIVERY TRACKING (per order, fetched on demand) ───
+  // Expanding a card asks the server for live courier tracking; the server folds
+  // the result back onto the order, so what's shown here is also what the admin
+  // console sees. Kept per-order so opening one card doesn't clear another.
+  const [trackOpen, setTrackOpen] = useState<Record<string, boolean>>({});
+  const [trackData, setTrackData] = useState<Record<string, any>>({});
+  const [trackLoading, setTrackLoading] = useState<Record<string, boolean>>({});
+  const [trackError, setTrackError] = useState<Record<string, string>>({});
+
+  const handleTrackOrder = useCallback(async (orderId: string) => {
+    const isOpen = trackOpen[orderId];
+    setTrackOpen((prev) => ({ ...prev, [orderId]: !isOpen }));
+    if (isOpen) return;
+
+    setTrackLoading((prev) => ({ ...prev, [orderId]: true }));
+    setTrackError((prev) => ({ ...prev, [orderId]: '' }));
+    try {
+      const res = await apiClient.orders.track(orderId);
+      if (res?.success && res.data) {
+        setTrackData((prev) => ({ ...prev, [orderId]: res.data }));
+        // The refresh may have advanced the fulfillment status — keep the card's
+        // badge in step rather than showing a stale one above fresh tracking.
+        setMyOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: res.data.status, shiprocket: res.data.shiprocket } : o)));
+      } else {
+        setTrackError((prev) => ({ ...prev, [orderId]: 'No tracking available yet.' }));
+      }
+    } catch (err: any) {
+      setTrackError((prev) => ({ ...prev, [orderId]: err?.message || 'Could not fetch tracking right now.' }));
+    } finally {
+      setTrackLoading((prev) => ({ ...prev, [orderId]: false }));
+    }
+  }, [trackOpen]);
+
   // ─── LIVE VISITOR CHAT SESSIONS STATE ───
   const [ownerSessions, setOwnerSessions] = useState<ChatSession[]>([]);
   const [ownerSessionsLoading, setOwnerSessionsLoading] = useState(false);
@@ -533,20 +572,19 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
   // ─── DASHBOARD PREPARATION SPLASH LOADING ANIMATION ───
   if (isPreparing) {
     return (
-      <div className="fixed inset-0 bg-[#0F172A] z-50 flex flex-col items-center justify-center font-body p-6 text-center animate-fade-in">
-        <div className="mb-6 relative">
-          <AppLogo variant="dark" className="h-10 w-auto mx-auto object-contain" />
-        </div>
-
-        <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mb-2">
-          Preparing your dashboard
-        </h2>
-        <p className="text-xs sm:text-sm text-slate-400 max-w-sm font-medium leading-relaxed">
-          Synchronizing safety stickers, emergency contacts, and protection settings...
-        </p>
-
-        <div className="w-48 h-1 bg-slate-800 rounded-full overflow-hidden mt-7">
-          <div className="h-full bg-amber-400 rounded-full animate-pulse w-full" />
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#111315] px-6 font-body text-center text-white animate-fade-in">
+        <div className="flex w-full max-w-sm flex-col items-center">
+          <AppLogo variant="dark" className="mb-7 h-9 w-auto object-contain" />
+          <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-full border border-[#F6C000]/25 bg-[#F6C000]/10">
+            <Loader2 size={22} className="animate-spin text-[#F6C000]" />
+          </div>
+          <h2 className="text-lg font-semibold tracking-tight sm:text-xl">Preparing your dashboard</h2>
+          <p className="mt-2 max-w-xs text-xs font-medium leading-relaxed text-white/45 sm:text-sm">
+            Synchronizing safety stickers, emergency contacts, and protection settings...
+          </p>
+          <div className="mt-7 h-1 w-44 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full w-full rounded-full bg-[#F6C000] animate-pulse" />
+          </div>
         </div>
       </div>
     );
@@ -1196,6 +1234,92 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                               </div>
                             ))}
                           </div>
+
+                          {/* ── Delivery progress ── */}
+                          {o.status !== 'cancelled' && (
+                            <div className="mt-3 pt-3 border-t border-[#F3F3F4]">
+                              <div className="flex items-center">
+                                {DELIVERY_STEPS.map((stepLabel, idx) => {
+                                  const reached = idx <= DELIVERY_STEPS.indexOf(
+                                    o.status === 'delivered' ? 'Delivered' : o.status === 'shipped' ? 'Shipped' : 'Ordered'
+                                  );
+                                  return (
+                                    <React.Fragment key={stepLabel}>
+                                      {idx > 0 && (
+                                        <div className={`h-[2px] flex-1 ${reached ? 'bg-[#2E9E5B]' : 'bg-[#EAEAEC]'}`} />
+                                      )}
+                                      <div className="flex flex-col items-center gap-1 shrink-0">
+                                        <div className={`w-[18px] h-[18px] rounded-full flex items-center justify-center ${reached ? 'bg-[#2E9E5B] text-white' : 'bg-[#EAEAEC] text-[#9EA0AA]'}`}>
+                                          {reached ? <CheckCircle2 size={12} /> : <div className="w-1.5 h-1.5 rounded-full bg-current" />}
+                                        </div>
+                                        <span className={`text-[10.5px] font-semibold ${reached ? 'text-[#17181C]' : 'text-[#9EA0AA]'}`}>{stepLabel}</span>
+                                      </div>
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </div>
+
+                              {(o.shiprocket?.awbCode || o.shiprocket?.courierName) && (
+                                <p className="text-[12px] text-[#777B80] mt-3">
+                                  {o.shiprocket.courierName || 'Courier'}
+                                  {o.shiprocket.awbCode && <> · AWB <span className="font-mono text-[#17181C]">{o.shiprocket.awbCode}</span></>}
+                                  {o.shiprocket.etd && <> · Expected <span className="text-[#17181C]">{o.shiprocket.etd}</span></>}
+                                </p>
+                              )}
+
+                              <div className="flex items-center gap-2 mt-3">
+                                <button
+                                  onClick={() => handleTrackOrder(o.id)}
+                                  disabled={trackLoading[o.id]}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[12px] font-semibold bg-[#F7F7F8] text-[#17181C] border border-[#EAEAEC] hover:bg-[#EFEFF0] transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                  {trackLoading[o.id]
+                                    ? <Loader2 size={13} className="animate-spin" />
+                                    : <RefreshCcw size={13} className="text-[#F6C000]" />}
+                                  {trackLoading[o.id] ? 'Checking…' : trackOpen[o.id] ? 'Hide tracking' : 'Track delivery'}
+                                </button>
+                                {o.shiprocket?.trackingUrl && (
+                                  <a
+                                    href={o.shiprocket.trackingUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[12px] font-semibold text-[#777B80] hover:text-[#17181C] transition-colors"
+                                  >
+                                    Courier site
+                                    <ArrowRight size={12} />
+                                  </a>
+                                )}
+                              </div>
+
+                              {trackOpen[o.id] && (
+                                <div className="mt-3 pt-3 border-t border-[#F3F3F4]">
+                                  {trackError[o.id] ? (
+                                    <p className="text-[12.5px] text-[#777B80]">{trackError[o.id]}</p>
+                                  ) : !(trackData[o.id]?.shiprocket?.timeline || []).length ? (
+                                    <p className="text-[12.5px] text-[#777B80]">
+                                      {o.status === 'placed'
+                                        ? "We're preparing your order. Tracking appears here as soon as it's handed to the courier."
+                                        : 'No courier scans reported yet — check back shortly.'}
+                                    </p>
+                                  ) : (
+                                    <div className="space-y-2.5">
+                                      {[...trackData[o.id].shiprocket.timeline].reverse().map((ev: any, i: number) => (
+                                        <div key={`${ev.status}-${ev.at}-${i}`} className="flex gap-2.5">
+                                          <span className={`mt-[5px] w-2 h-2 rounded-full shrink-0 ${i === 0 ? 'bg-[#2E9E5B]' : 'bg-[#D5D6D9]'}`} />
+                                          <div className="min-w-0">
+                                            <div className="text-[12.5px] font-semibold text-[#17181C]">{ev.status}</div>
+                                            <div className="text-[11px] text-[#9EA0AA]">
+                                              {[ev.at ? new Date(ev.at).toLocaleString('en-IN') : null, ev.location].filter(Boolean).join(' · ')}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -1339,7 +1463,7 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
       )}
 
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-[120] bg-[#17181C] text-white px-4 py-2.5 rounded-[9px] shadow-lg font-mono text-[13px] border border-[#F6C000]">
+        <div className="fixed bottom-[max(1.5rem,calc(env(safe-area-inset-bottom)+0.5rem))] right-6 z-[120] bg-[#17181C] text-white px-4 py-2.5 rounded-[9px] shadow-lg font-mono text-[13px] border border-[#F6C000]">
           {toastMsg}
         </div>
       )}
