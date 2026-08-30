@@ -1,5 +1,5 @@
 const QrModel = require('../models/qrModel');
-const { supabaseAdmin } = require('../config/db');
+const { uploadPublicFile } = require('../services/storageService');
 const { logger } = require('../middleware/loggerMiddleware');
 const { sendSms } = require('../services/smsService');
 const { createOtp, verifyOtp } = require('../services/phoneVerificationService');
@@ -82,14 +82,7 @@ class QrController {
       const buffer = Buffer.from(base64, 'base64');
 
       const fileName = `stickers/${id}.${ext}`;
-      const { error: uploadError } = await supabaseAdmin.storage
-        .from('Stickers')
-        .upload(fileName, buffer, { upsert: true, contentType });
-
-      if (uploadError) throw uploadError;
-
-      const { data: pub } = supabaseAdmin.storage.from('Stickers').getPublicUrl(fileName);
-      const publicUrl = pub.publicUrl;
+      const publicUrl = await uploadPublicFile(fileName, buffer, contentType);
 
       const saved = await QrModel.saveStickerImage(id, publicUrl);
       logger.rowUpdated('qr_codes', id, { action: 'sticker_image_linked', sticker_image: publicUrl });

@@ -1,28 +1,28 @@
-const { supabaseAdmin } = require('../config/db');
+const ShopProduct = require('./schemas/ShopProduct');
 
-function toApi(row) {
-  if (!row) return null;
+function toApi(doc) {
+  if (!doc) return null;
   return {
-    id: row.id,
-    name: row.name,
-    category: row.category,
-    badge: row.badge,
-    description: row.description,
-    features: row.features || [],
-    price: row.price,
-    mrp: row.mrp,
-    imageUrl: row.image_url,
-    rating: row.rating,
-    reviewsCount: row.reviews_count,
-    sku: row.sku,
-    weightGrams: row.weight_grams,
-    lengthCm: row.length_cm,
-    breadthCm: row.breadth_cm,
-    heightCm: row.height_cm,
-    isActive: row.is_active,
-    sortOrder: row.sort_order,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    id: String(doc._id),
+    name: doc.name,
+    category: doc.category,
+    badge: doc.badge,
+    description: doc.description,
+    features: doc.features || [],
+    price: doc.price,
+    mrp: doc.mrp,
+    imageUrl: doc.image_url,
+    rating: doc.rating,
+    reviewsCount: doc.reviews_count,
+    sku: doc.sku,
+    weightGrams: doc.weight_grams,
+    lengthCm: doc.length_cm,
+    breadthCm: doc.breadth_cm,
+    heightCm: doc.height_cm,
+    isActive: doc.is_active,
+    sortOrder: doc.sort_order,
+    createdAt: doc.created_at,
+    updatedAt: doc.updated_at,
   };
 }
 
@@ -45,74 +45,40 @@ function toRow(product) {
   if (product.heightCm !== undefined) row.height_cm = product.heightCm;
   if (product.isActive !== undefined) row.is_active = product.isActive;
   if (product.sortOrder !== undefined) row.sort_order = product.sortOrder;
+  row.updated_at = new Date();
   return row;
 }
 
 class ShopProductModel {
   /** Public storefront listing — active products only, in display order */
   static async getAllActive() {
-    const { data, error } = await supabaseAdmin
-      .from('shop_products')
-      .select('*')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true });
-
-    if (error) throw error;
-    return (data || []).map(toApi);
+    const docs = await ShopProduct.find({ is_active: true }).sort({ sort_order: 1 }).lean();
+    return docs.map(toApi);
   }
 
   /** Admin listing — every product, active or not */
   static async getAllAdmin() {
-    const { data, error } = await supabaseAdmin
-      .from('shop_products')
-      .select('*')
-      .order('sort_order', { ascending: true });
-
-    if (error) throw error;
-    return (data || []).map(toApi);
+    const docs = await ShopProduct.find().sort({ sort_order: 1 }).lean();
+    return docs.map(toApi);
   }
 
   static async getById(id) {
-    const { data, error } = await supabaseAdmin
-      .from('shop_products')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) throw error;
-    return toApi(data);
+    const doc = await ShopProduct.findById(id).lean();
+    return toApi(doc);
   }
 
   static async create(product) {
-    const { data, error } = await supabaseAdmin
-      .from('shop_products')
-      .insert(toRow(product))
-      .select()
-      .single();
-
-    if (error) throw error;
-    return toApi(data);
+    const doc = await ShopProduct.create(toRow(product));
+    return toApi(doc);
   }
 
   static async update(id, updates) {
-    const { data, error } = await supabaseAdmin
-      .from('shop_products')
-      .update(toRow(updates))
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return toApi(data);
+    const doc = await ShopProduct.findByIdAndUpdate(id, { $set: toRow(updates) }, { new: true }).lean();
+    return toApi(doc);
   }
 
   static async remove(id) {
-    const { error } = await supabaseAdmin
-      .from('shop_products')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
+    await ShopProduct.findByIdAndDelete(id);
     return true;
   }
 }

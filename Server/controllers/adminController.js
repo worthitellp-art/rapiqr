@@ -1,11 +1,11 @@
 const UserModel = require('../models/userModel');
 const ProductModel = require('../models/productModel');
 const MessageModel = require('../models/messageModel');
-const { supabaseAdmin } = require('../config/db');
+const Sticker = require('../models/schemas/Sticker');
 const { logger } = require('../middleware/loggerMiddleware');
 const { sendEmail } = require('../services/emailService');
-
-const FRONTEND_ORIGIN = (process.env.FRONTEND_URL || 'https://rapiqr.worthitellp.workers.dev').replace(/\/+$/, '');
+const { createResetLink } = require('../services/passwordResetService');
+const { deleteUserAccount } = require('../services/accountDeletionService');
 
 class AdminController {
   /**
@@ -17,11 +17,12 @@ class AdminController {
       const { search } = req.query;
       const users = await UserModel.searchAll(search, 1000);
 
-      const { data: counts } = await supabaseAdmin.from('products').select('user_id');
+      const counts = await Sticker.aggregate([
+        { $match: { user_id: { $ne: null } } },
+        { $group: { _id: '$user_id', count: { $sum: 1 } } },
+      ]);
       const countMap = {};
-      (counts || []).forEach((r) => {
-        if (r.user_id) countMap[r.user_id] = (countMap[r.user_id] || 0) + 1;
-      });
+      counts.forEach((r) => { countMap[String(r._id)] = r.count; });
 
       const data = users.map((u) => ({ ...u, stickerCount: countMap[u.id] || 0 }));
       return res.json({ success: true, data });
@@ -67,8 +68,8 @@ class AdminController {
   }
 
   /**
-   * Lost-access support: generate a Supabase password recovery link for a user
-   * (e.g. they lost the phone with their authenticator app and can't sign in to
+   * Lost-access support: generate a password recovery link for a user (e.g.
+   * they lost the phone with their authenticator app and can't sign in to
    * change anything themselves) and email it to them. If SMTP isn't configured,
    * the link is still returned so the admin can relay it through another channel.
    * POST /api/admin/users/:id/reset-password
@@ -79,14 +80,7 @@ class AdminController {
       const profile = await UserModel.findById(id);
       if (!profile) return res.status(404).json({ success: false, error: 'User not found' });
 
-      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'recovery',
-        email: profile.email,
-        options: { redirectTo: `${FRONTEND_ORIGIN}/reset-password` },
-      });
-      if (error) return res.status(500).json({ success: false, error: error.message });
-
-      const actionLink = data?.properties?.action_link || null;
+      const actionLink = await createResetLink(profile);
 
       const emailResult = await sendEmail({
         to: profile.email,
@@ -161,69 +155,10 @@ class AdminController {
         return res.status(403).json({ success: false, error: 'Administrator accounts cannot be deleted' });
       }
 
-      // 1. Unlink orders so FK constraints don't block user deletion
-      try {
-        await supabaseAdmin.from('orders').update({ user_id: null }).eq('user_id', id);
-      } catch (orderErr) {
-        logger.warn('ADMIN_USER_DELETE', `Orders update skipped for ${id}: ${orderErr.message}`);
-      }
-
-      // 2. Clean up chat messages and chat sessions owned by this user
-      try {
-        const { data: userSessions } = await supabaseAdmin
-          .from('chat_sessions')
-          .select('id')
-          .eq('owner_id', id);
-
-        if (userSessions && userSessions.length > 0) {
-          const sessionIds = userSessions.map((s) => s.id);
-          await supabaseAdmin.from('chat_messages').delete().in('session_id', sessionIds);
-        }
-        await supabaseAdmin.from('chat_sessions').delete().eq('owner_id', id);
-      } catch (chatErr) {
-        logger.warn('ADMIN_USER_DELETE', `Chat cleanup skipped for ${id}: ${chatErr.message}`);
-      }
-
-      // 3. Unlink QR codes
-      try {
-        await supabaseAdmin.from('qr_codes').update({ user_id: null }).eq('user_id', id);
-      } catch (qrErr) {
-        logger.warn('ADMIN_USER_DELETE', `QR codes unlink skipped for ${id}: ${qrErr.message}`);
-      }
-
-      // 4. Unlink or delete products owned by this user
-      try {
-        await supabaseAdmin.from('products').update({ user_id: null, assigned_to: 'Unassigned' }).eq('user_id', id);
-      } catch (productErr) {
-        logger.warn('ADMIN_USER_DELETE', `Products update skipped for ${id}: ${productErr.message}`);
-      }
-
-      // 5. Unlink distributor applications
-      try {
-        await supabaseAdmin.from('distributor_applications').update({ user_id: null }).eq('user_id', id);
-      } catch (distErr) {
-        logger.warn('ADMIN_USER_DELETE', `Distributor applications update skipped for ${id}: ${distErr.message}`);
-      }
-
-      // 6. Delete profile record from public.profiles
-      try {
-        const { error: profileErr } = await supabaseAdmin.from('profiles').delete().eq('id', id);
-        if (profileErr) {
-          logger.warn('ADMIN_USER_DELETE', `Profile delete warning for ${id}: ${profileErr.message}`);
-        }
-      } catch (profileErr) {
-        logger.warn('ADMIN_USER_DELETE', `Profile delete skipped for ${id}: ${profileErr.message}`);
-      }
-
-      // 7. Delete auth user from Supabase Auth auth.users
-      try {
-        const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(id);
-        if (authErr) {
-          logger.warn('ADMIN_USER_DELETE', `Auth delete warning for user ${id}: ${authErr.message}`);
-        }
-      } catch (authErr) {
-        logger.warn('ADMIN_USER_DELETE', `Auth delete skipped for user ${id}: ${authErr.message}`);
-      }
+      // Same cascading unlink/delete used by the self-service "delete my
+      // account" flow (unlink orders/stickers/distributor apps, clean up
+      // chat sessions, then delete the account itself).
+      await deleteUserAccount(id);
 
       const userEmail = profile?.email || id;
       logger.security('ADMIN_USER_DELETED', `Admin ${req.user.email} deleted user account ${userEmail}`, {

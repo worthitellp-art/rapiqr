@@ -1,38 +1,56 @@
-const { supabaseAdmin } = require('../config/db');
+const Sticker = require('./schemas/Sticker');
+const ChatSession = require('./schemas/ChatSession');
+const ChatMessage = require('./schemas/ChatMessage');
+const Alert = require('./schemas/Alert');
+const User = require('./schemas/User');
+const { deleteFiles, listKeys } = require('../services/storageService');
 const { normalizePhone, isSamePhone } = require('../utils/phone');
+
+// Fields safe to return from the PUBLIC scan/activate/record-scan endpoints —
+// deliberately excludes user_id/name/assigned_to/vehicle_number/details, which
+// hold the owner's PII (phone, email, address, blood group, emergency
+// contacts). Sticker merges the old qr_codes + products tables into one
+// document; without this whitelist, an unauthenticated caller who knows a
+// sticker's ID could pull a stranger's medical/contact details straight off
+// GET /api/qr/:id or the activate/scan response.
+const PUBLIC_QR_FIELDS = '_id client_id status scans_count last_scanned_at template_name fg_color bg_color sticker_image category created_at';
+
+function toPublicQr(doc) {
+  if (!doc) return null;
+  return {
+    id: doc._id,
+    client_id: doc.client_id,
+    status: doc.status,
+    scans_count: doc.scans_count,
+    last_scanned_at: doc.last_scanned_at,
+    template_name: doc.template_name,
+    fg_color: doc.fg_color,
+    bg_color: doc.bg_color,
+    sticker_image: doc.sticker_image,
+    category: doc.category,
+    created_at: doc.created_at,
+  };
+}
 
 /**
  * Which account (if any) an activation should link the sticker to.
  *
- * The activate route is public and takes `userId` straight from the request
- * body, so this used to bind the row to whoever happened to be signed in. When
- * a sticker is registered on somebody else's behalf — an admin or a shop
- * activating a customer's tag — that locked the row to the wrong account, and
- * autoClaimByPhone only ever considers `user_id IS NULL`. The real owner could
- * refresh their dashboard forever and never see it.
- *
- * So: keep the link only when we cannot prove it belongs to someone else.
- * An account with no verified number yet is activating its own sticker (the
+ * An account with no verified phone yet is activating its own sticker (the
  * long-standing case, and the one ScanPage relies on), so that still links.
  * An account whose verified number contradicts the number being registered is
  * acting for a third party, so the row is left unclaimed for auto-claim to
- * hand to the person who actually owns that number.
+ * hand to the person who actually owns that number. Admins manage the fleet
+ * and should never claim personal ownership of customer stickers.
  */
 async function resolveOwnerId(userId, ownerPhone) {
   if (!userId) return null;
   if (!normalizePhone(ownerPhone)) return null;
 
   try {
-    const { data } = await supabaseAdmin
-      .from('profiles')
-      .select('phone_number, role')
-      .eq('id', userId)
-      .maybeSingle();
+    const account = await User.findById(userId).select('phone_number role').lean();
+    if (account?.role === 'admin') return null;
 
-    // Admins manage the fleet and should never claim personal ownership of customer stickers
-    if (data?.role === 'admin') return null;
-
-    const accountPhone = data?.phone_number;
+    const accountPhone = account?.phone_number;
     if (!normalizePhone(accountPhone)) return null;
     return isSamePhone(accountPhone, ownerPhone) ? userId : null;
   } catch (err) {
@@ -43,32 +61,29 @@ async function resolveOwnerId(userId, ownerPhone) {
 
 class QrModel {
   /**
-   * Fetch QR codes list
+   * Admin fleet view — owner info is on the same document now (previously a
+   * join against a separate `products` table).
    */
   static async getAll(limit = 100) {
     try {
-      // Embeds the linked products row (via the qr_code_id FK) so the admin
-      // fleet view can show the owner phone/name a client registered on
-      // activation — previously this only selected qr_codes columns, so the
-      // admin dashboard could never see who a sticker belonged to.
-      const { data, error } = await supabaseAdmin
-        .from('qr_codes')
-        .select('id, client_id, status, scans_count, last_scanned_at, template_name, fg_color, bg_color, sticker_image, category, created_at, products(name, assigned_to, status, details)')
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (error) throw error;
-      return (data || []).map((row) => {
-        const product = Array.isArray(row.products) ? row.products[0] : row.products;
-        const { products, ...rest } = row;
-        return {
-          ...rest,
-          owner_phone: product?.details?.ownerPhone || null,
-          owner_email: product?.details?.ownerEmail || null,
-          owner_name: product?.name || product?.assigned_to || null,
-          product_status: product?.status || null,
-        };
-      });
+      const docs = await Sticker.find().sort({ created_at: -1 }).limit(limit).lean();
+      return docs.map((doc) => ({
+        id: doc._id,
+        client_id: doc.client_id,
+        status: doc.status,
+        scans_count: doc.scans_count,
+        last_scanned_at: doc.last_scanned_at,
+        template_name: doc.template_name,
+        fg_color: doc.fg_color,
+        bg_color: doc.bg_color,
+        sticker_image: doc.sticker_image,
+        category: doc.category,
+        created_at: doc.created_at,
+        owner_phone: doc.details?.ownerPhone || null,
+        owner_email: doc.details?.ownerEmail || null,
+        owner_name: doc.name || doc.assigned_to || null,
+        product_status: doc.status,
+      }));
     } catch (err) {
       console.error('QrModel.getAll Error:', err);
       return [];
@@ -76,18 +91,12 @@ class QrModel {
   }
 
   /**
-   * Fetch QR code by ID
+   * PUBLIC lookup (unauthenticated scan page) — see PUBLIC_QR_FIELDS.
    */
   static async getById(qrId) {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('qr_codes')
-        .select('*')
-        .eq('id', qrId)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
+      const doc = await Sticker.findById(qrId).select(PUBLIC_QR_FIELDS).lean();
+      return toPublicQr(doc);
     } catch (err) {
       console.error(`QrModel.getById (${qrId}) Error:`, err);
       return null;
@@ -95,31 +104,36 @@ class QrModel {
   }
 
   /**
-   * Save or Update QR Code record (including sticker image and colors)
+   * Save or update a QR code fleet record (colors/template/status). Only
+   * touches qr-side fields via $set, so an admin editing a batch's template
+   * can never clobber an owner's details/user_id sitting on the same document.
    */
   static async save(qrData) {
     try {
+      const id = qrData.id || qrData.client_id;
+      if (!id) return null;
+
       const payload = {
-        id: qrData.id,
-        client_id: qrData.clientId || qrData.client_id || qrData.id || 'UNASSIGNED',
+        client_id: qrData.clientId || qrData.client_id || id || 'UNASSIGNED',
         status: qrData.status || 'inactive',
-        scans_count: qrData.scansCount || qrData.scans_count || 0,
+        scans_count: qrData.scansCount ?? qrData.scans_count ?? 0,
         template_name: qrData.templateName || qrData.template_name || 'Standard Badge',
         category: qrData.category || 'car',
         fg_color: qrData.fgColor || qrData.fg_color || 'D9581F',
         bg_color: qrData.bgColor || qrData.bg_color || 'FFFFFF',
         sticker_image: qrData.stickerImage || qrData.sticker_image || null,
-        created_at: qrData.createdAt || qrData.created_at || new Date().toISOString()
       };
 
-      const { data, error } = await supabaseAdmin
-        .from('qr_codes')
-        .upsert(payload, { onConflict: 'id' })
-        .select()
-        .maybeSingle();
+      const doc = await Sticker.findByIdAndUpdate(
+        id,
+        {
+          $set: payload,
+          $setOnInsert: { created_at: qrData.createdAt || qrData.created_at || new Date() },
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      ).select(PUBLIC_QR_FIELDS).lean();
 
-      if (error) throw error;
-      return data;
+      return toPublicQr(doc);
     } catch (err) {
       console.error('QrModel.save Error:', err);
       return null;
@@ -131,15 +145,11 @@ class QrModel {
    */
   static async saveStickerImage(qrId, stickerImage) {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('qr_codes')
-        .update({ sticker_image: stickerImage })
-        .eq('id', qrId)
-        .select('id, sticker_image')
-        .single();
-
-      if (error) throw error;
-      return data;
+      const doc = await Sticker.findByIdAndUpdate(qrId, { $set: { sticker_image: stickerImage } }, { new: true })
+        .select('_id sticker_image')
+        .lean();
+      if (!doc) return null;
+      return { id: doc._id, sticker_image: doc.sticker_image };
     } catch (err) {
       console.error(`QrModel.saveStickerImage (${qrId}) Error:`, err);
       return null;
@@ -147,42 +157,28 @@ class QrModel {
   }
 
   /**
-   * Activate QR Code
-   * Updates qr_codes status to active and upserts a products record
+   * Activate QR Code — writes the qr-side status and the product-side
+   * ownership/details in one atomic update (previously two writes against
+   * two tables), then returns only the public-safe fleet fields. Does not
+   * swallow errors: a missing sticker or a write failure must propagate so
+   * the controller never reports success:true on a failed activation.
    */
   static async activate(qrId, activationData) {
-    // Intentionally does not catch-and-return-null like the other methods here:
-    // a swallowed error here previously let the controller report success:true
-    // on a failed write (task.md #4/#13/#14) — real failures must propagate.
-    const payload = {
-      status: 'active'
-    };
+    const current = await Sticker.findById(qrId).select('details user_id category').lean();
+    if (!current) {
+      throw new Error(`QR code ${qrId} not found`);
+    }
 
-    const { data, error } = await supabaseAdmin
-      .from('qr_codes')
-      .update(payload)
-      .eq('id', qrId)
-      .select()
-      .single();
+    const update = { status: 'active' };
 
-    if (error) throw error;
-
-    // Upsert product record for user dashboard
     if (activationData.ownerName || activationData.ownerPhone) {
-      // This is an upsert on qr_code_id, so a re-activation rewrites whatever is
-      // already there. Read it first: the owner who claimed this sticker and the
-      // emergency contacts they curated must survive a second activation, which
-      // previously reset user_id to null and replaced details wholesale.
-      const { data: existing } = await supabaseAdmin
-        .from('products')
-        .select('user_id, details')
-        .eq('qr_code_id', qrId)
-        .maybeSingle();
-
+      // Read-modify-write on `details`: the owner who claimed this sticker and
+      // the emergency contacts they curated must survive a second activation,
+      // not get reset to null and replaced wholesale.
       const requestedUserId = activationData.userId || activationData.user_id || null;
       const ownerId = await resolveOwnerId(requestedUserId, activationData.ownerPhone);
 
-      const details = { ...(existing?.details || {}) };
+      const details = { ...(current.details || {}) };
       if (activationData.ownerPhone) details.ownerPhone = activationData.ownerPhone;
       if (activationData.ownerEmail) details.ownerEmail = activationData.ownerEmail;
       if (Array.isArray(activationData.emergencyContacts) && activationData.emergencyContacts.length) {
@@ -193,50 +189,36 @@ class QrModel {
       if (activationData.bloodGroup) details.bloodGroup = activationData.bloodGroup;
       if (activationData.allergies) details.allergies = activationData.allergies;
       if (activationData.address) details.address = activationData.address;
-      details.activatedAt = details.activatedAt || new Date().toISOString();
+      details.activatedAt = details.activatedAt || new Date();
 
-      const productPayload = {
-        qr_code_id: qrId,
-        // A confirmed owner wins; otherwise keep whoever already holds it rather
-        // than dropping the claim back to null on every re-activation.
-        user_id: ownerId || existing?.user_id || null,
-        category: activationData.category || data?.category || 'car',
-        name: activationData.ownerName || 'Vehicle Owner',
-        status: 'active',
-        assigned_to: activationData.ownerName || 'Vehicle Owner',
-        details,
-      };
-
-      const { error: productError } = await supabaseAdmin
-        .from('products')
-        .upsert(productPayload, { onConflict: 'qr_code_id' });
-
-      if (productError) throw productError;
+      update.details = details;
+      update.category = activationData.category || current.category || 'car';
+      update.name = activationData.ownerName || 'Vehicle Owner';
+      update.assigned_to = activationData.ownerName || 'Vehicle Owner';
+      // A confirmed owner wins; otherwise keep whoever already holds it rather
+      // than dropping the claim back to null on every re-activation.
+      update.user_id = ownerId || current.user_id || null;
     }
 
-    return data;
+    const doc = await Sticker.findByIdAndUpdate(qrId, { $set: update }, { new: true })
+      .select(PUBLIC_QR_FIELDS)
+      .lean();
+
+    return toPublicQr(doc);
   }
 
   /**
-   * Increment Scan Count
+   * Increment Scan Count — atomic, avoiding the read-then-write race the old
+   * Postgres version had between fetching scans_count and writing it back.
    */
   static async recordScan(qrId) {
     try {
-      const current = await this.getById(qrId);
-      const newCount = (current?.scans_count || 0) + 1;
-
-      const { data, error } = await supabaseAdmin
-        .from('qr_codes')
-        .update({
-          scans_count: newCount,
-          last_scanned_at: new Date().toISOString()
-        })
-        .eq('id', qrId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      const doc = await Sticker.findByIdAndUpdate(
+        qrId,
+        { $inc: { scans_count: 1 }, $set: { last_scanned_at: new Date() } },
+        { new: true }
+      ).select(PUBLIC_QR_FIELDS).lean();
+      return toPublicQr(doc);
     } catch (err) {
       console.error(`QrModel.recordScan (${qrId}) Error:`, err);
       return null;
@@ -244,84 +226,48 @@ class QrModel {
   }
 
   /**
-   * Delete QR Code record and everything that references it.
-   * chat_sessions/chat_messages and reports (alerts) hold a qr_code_id FK with no
-   * ON DELETE CASCADE, so deleting qr_codes first throws a foreign-key violation —
-   * this used to be caught and swallowed (returning null), which let the controller
-   * report success:true while the row was never actually removed from Supabase.
-   * Errors here now propagate so the caller gets a real failure instead of a lie.
+   * Delete a QR Code record and everything that references it. Errors
+   * propagate (not caught-and-swallowed) so the caller gets a real failure
+   * instead of a false success.
    */
   static async delete(qrId) {
-    const { data: sessions, error: sessionsFetchError } = await supabaseAdmin
-      .from('chat_sessions')
-      .select('id')
-      .eq('qr_code_id', qrId);
-    if (sessionsFetchError) throw sessionsFetchError;
-
-    const sessionIds = (sessions || []).map((s) => s.id);
+    const sessions = await ChatSession.find({ qr_code_id: qrId }).select('_id').lean();
+    const sessionIds = sessions.map((s) => s._id);
     if (sessionIds.length > 0) {
-      const { error: messagesError } = await supabaseAdmin.from('chat_messages').delete().in('session_id', sessionIds);
-      if (messagesError) throw messagesError;
-      const { error: sessionsError } = await supabaseAdmin.from('chat_sessions').delete().eq('qr_code_id', qrId);
-      if (sessionsError) throw sessionsError;
+      await ChatMessage.deleteMany({ session_id: { $in: sessionIds } });
+      await ChatSession.deleteMany({ qr_code_id: qrId });
     }
 
-    const { error: reportsError } = await supabaseAdmin.from('reports').delete().eq('qr_code_id', qrId);
-    if (reportsError) throw reportsError;
+    await Alert.deleteMany({ sticker_id: qrId });
 
-    const { error: productsError } = await supabaseAdmin.from('products').delete().eq('qr_code_id', qrId);
-    if (productsError) throw productsError;
-
-    const { data, error } = await supabaseAdmin
-      .from('qr_codes')
-      .delete()
-      .eq('id', qrId)
-      .select()
-      .maybeSingle();
-
-    if (error) throw error;
+    const doc = await Sticker.findByIdAndDelete(qrId).select(PUBLIC_QR_FIELDS).lean();
 
     // Best-effort: also drop the uploaded sticker image so a deleted QR doesn't
-    // leave an orphaned file behind in the "Stickers" bucket forever. Matches the
-    // upload naming convention in qrController.saveStickerImage (stickers/<id>.<ext>);
-    // removing a key that doesn't exist is a silent no-op, so both extensions are
-    // safe to try without knowing which one (if any) was actually uploaded.
+    // leave an orphaned file behind in storage forever.
     try {
-      await supabaseAdmin.storage.from('Stickers').remove([`stickers/${qrId}.png`, `stickers/${qrId}.avif`]);
+      await deleteFiles([`stickers/${qrId}.png`, `stickers/${qrId}.avif`]);
     } catch (err) {
       console.warn(`QrModel.delete (${qrId}): sticker image cleanup failed:`, err);
     }
 
-    return data;
+    return toPublicQr(doc);
   }
 
   /**
-   * Delete all QR Code records and their dependents (see delete() above for why
-   * this cannot swallow errors).
+   * Delete all QR Code records and their dependents (see delete() above for
+   * why this cannot swallow errors).
    */
   static async deleteAll() {
-    const { error: messagesError } = await supabaseAdmin.from('chat_messages').delete().not('id', 'is', null);
-    if (messagesError) throw messagesError;
+    await ChatMessage.deleteMany({});
+    await ChatSession.deleteMany({});
+    await Alert.deleteMany({});
+    await Sticker.deleteMany({});
 
-    const { error: sessionsError } = await supabaseAdmin.from('chat_sessions').delete().not('id', 'is', null);
-    if (sessionsError) throw sessionsError;
-
-    const { error: reportsError } = await supabaseAdmin.from('reports').delete().not('id', 'is', null);
-    if (reportsError) throw reportsError;
-
-    const { error: productsError } = await supabaseAdmin.from('products').delete().not('id', 'is', null);
-    if (productsError) throw productsError;
-
-    const { error } = await supabaseAdmin.from('qr_codes').delete().not('id', 'is', null);
-    if (error) throw error;
-
-    // Best-effort: clear every uploaded sticker image too, so "Clear all" doesn't
-    // leave the whole bucket full of orphaned files with no QR record left to own them.
+    // Best-effort: clear every uploaded sticker image too, so "Clear all"
+    // doesn't leave storage full of orphaned files with no record left to own them.
     try {
-      const { data: files } = await supabaseAdmin.storage.from('Stickers').list('stickers');
-      if (files && files.length > 0) {
-        await supabaseAdmin.storage.from('Stickers').remove(files.map((f) => `stickers/${f.name}`));
-      }
+      const keys = await listKeys('stickers/');
+      if (keys.length > 0) await deleteFiles(keys);
     } catch (err) {
       console.warn('QrModel.deleteAll: sticker image cleanup failed:', err);
     }

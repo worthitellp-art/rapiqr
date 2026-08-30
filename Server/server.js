@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const path = require('path');
 const http = require('http');
 const { requestLogger, logger } = require('./middleware/loggerMiddleware');
+const { connectDB } = require('./config/db');
 
 // Single project-wide env file lives at the repo root (shared with Vite) —
 // see .env.example for the documented template.
@@ -107,14 +108,22 @@ app.use((err, req, res, next) => {
 const httpServer = http.createServer(app);
 initChatSocket(httpServer, ALLOWED_ORIGINS);
 
-// Start Server
-httpServer.listen(PORT, () => {
-  console.log('\n==================================================');
-  logger.event('SERVER', '🚀', `RapiQR Backend Server running securely on port ${PORT}`);
-  logger.event('SERVER', '🌐', `Expected Frontend Origin: ${FRONTEND_ORIGIN}`);
-  logger.event('SERVER', '📡', `Health Check URL: http://localhost:${PORT}/api/health${process.env.APP_URL ? ` (production: ${process.env.APP_URL}/api/health)` : ''}`);
-  logger.event('SERVER', '📊', 'Live Console Request & Event Logging ENABLED');
-  logger.event('SERVER', '💬', 'RepiChat (Socket.io) ENABLED');
-  logger.event('SERVER', '🔍', 'Waiting for frontend connection... a 🎉 FRONTEND_CONNECTED log will appear when the site reaches this API');
-  console.log('==================================================\n');
-});
+// Start Server — connect to MongoDB first so no request is served without a DB.
+connectDB()
+  .then(() => {
+    logger.event('SERVER', '🍃', 'MongoDB connection established');
+    httpServer.listen(PORT, () => {
+      console.log('\n==================================================');
+      logger.event('SERVER', '🚀', `RapiQR Backend Server running securely on port ${PORT}`);
+      logger.event('SERVER', '🌐', `Expected Frontend Origin: ${FRONTEND_ORIGIN}`);
+      logger.event('SERVER', '📡', `Health Check URL: http://localhost:${PORT}/api/health${process.env.APP_URL ? ` (production: ${process.env.APP_URL}/api/health)` : ''}`);
+      logger.event('SERVER', '📊', 'Live Console Request & Event Logging ENABLED');
+      logger.event('SERVER', '💬', 'RepiChat (Socket.io) ENABLED');
+      logger.event('SERVER', '🔍', 'Waiting for frontend connection... a 🎉 FRONTEND_CONNECTED log will appear when the site reaches this API');
+      console.log('==================================================\n');
+    });
+  })
+  .catch((err) => {
+    logger.error('SERVER', 'Failed to connect to MongoDB — refusing to start', err);
+    process.exit(1);
+  });

@@ -1,52 +1,4 @@
-const { supabaseAdmin } = require('../config/db');
-
-/* The table grew in two migrations, and neither is guaranteed to have run:
-     - `service_type` / `categories`  -> Server/sql/service_providers.sql
-     - `email` / `city` / `notes`     -> Server/sql/provider_applications.sql
-   Every select is tried with the widest column set once and then permanently
-   downgraded one migration at a time — same "degrade, don't crash" posture as
-   MessageModel. */
-const BASE_COLUMNS = ['id', 'category', 'label', 'phone', 'active', 'created_at'];
-const SERVICE_COLUMNS = ['service_type', 'categories'];
-/* Filled by the public "Join us" application form on the landing page; rows the
-   admin adds by hand leave them null. */
-const APPLICANT_COLUMNS = ['email', 'city', 'notes'];
-
-let hasServiceColumns = true;
-let hasApplicantColumns = true;
-
-function buildSelect() {
-  return [
-    ...BASE_COLUMNS,
-    ...(hasServiceColumns ? SERVICE_COLUMNS : []),
-    ...(hasApplicantColumns ? APPLICANT_COLUMNS : []),
-  ].join(', ');
-}
-
-/**
- * Turn off the newest column set still in play, newest migration first.
- * Returns false once only the legacy columns are left and there is nothing
- * more to give up — the caller should then surface the real error.
- */
-function downgrade() {
-  if (hasApplicantColumns) {
-    console.warn('HelplineModel: email/city/notes columns missing — run Server/sql/provider_applications.sql. Applicant details will not be stored.');
-    hasApplicantColumns = false;
-    return true;
-  }
-  if (hasServiceColumns) {
-    console.warn('HelplineModel: service_type/categories columns missing — run Server/sql/service_providers.sql. Falling back to legacy columns.');
-    hasServiceColumns = false;
-    return true;
-  }
-  return false;
-}
-
-function isMissingColumnError(error) {
-  if (!error) return false;
-  // Postgres 42703 = undefined_column; PostgREST surfaces it verbatim.
-  return error.code === '42703' || /column .* does not exist/i.test(error.message || '');
-}
+const Communication = require('./schemas/Communication');
 
 /** "Flat Tire" -> "flat_tire", so legacy rows still match a serviceType lookup. */
 function slugify(value) {
@@ -58,28 +10,22 @@ function slugify(value) {
     .replace(/^_|_$/g, '');
 }
 
-/** Fill in what the migration would have stored, so callers see one shape either way. */
-function normalize(row) {
-  if (!row) return row;
+function toApi(doc) {
+  if (!doc) return null;
   return {
-    ...row,
-    service_type: row.service_type || slugify(row.category),
-    // An empty list means "every sticker category", which is what pre-migration
-    // rows are — never an accidental "matches nothing".
-    categories: Array.isArray(row.categories) ? row.categories : [],
-    email: row.email || null,
-    city: row.city || null,
-    notes: row.notes || null,
+    id: String(doc._id),
+    category: doc.category,
+    label: doc.label,
+    phone: doc.phone,
+    active: doc.active,
+    service_type: doc.service_type || slugify(doc.category),
+    // An empty list means "every sticker category", never an accidental "matches nothing".
+    categories: Array.isArray(doc.categories) ? doc.categories : [],
+    email: doc.email || null,
+    city: doc.city || null,
+    notes: doc.notes || null,
+    created_at: doc.created_at,
   };
-}
-
-/** Runs `build(select)`, dropping one un-migrated column set per retry. */
-async function selectWithFallback(build) {
-  for (;;) {
-    const { data, error } = await build(buildSelect());
-    if (!error) return (data || []).map(normalize);
-    if (!isMissingColumnError(error) || !downgrade()) throw error;
-  }
 }
 
 class HelplineModel {
@@ -88,9 +34,8 @@ class HelplineModel {
    */
   static async getAll() {
     try {
-      return await selectWithFallback((select) =>
-        supabaseAdmin.from('communication').select(select).order('created_at', { ascending: false })
-      );
+      const docs = await Communication.find().sort({ created_at: -1 }).lean();
+      return docs.map(toApi);
     } catch (err) {
       console.error('HelplineModel.getAll Error:', err);
       return [];
@@ -109,14 +54,12 @@ class HelplineModel {
       typeof filter === 'string' || filter == null ? { category: filter } : filter;
 
     try {
-      const rows = await selectWithFallback((select) => {
-        let query = supabaseAdmin.from('communication').select(select).eq('active', true);
-        if (category) query = query.eq('category', category);
-        return query.order('created_at', { ascending: false });
-      });
+      const query = { active: true };
+      if (category) query.category = category;
+      if (serviceType) query.service_type = slugify(serviceType);
 
-      return rows.filter((row) => {
-        if (serviceType && row.service_type !== slugify(serviceType)) return false;
+      const docs = await Communication.find(query).sort({ created_at: -1 }).lean();
+      return docs.map(toApi).filter((row) => {
         // No categories set = available to every sticker category.
         if (stickerCategory && row.categories.length > 0 && !row.categories.includes(stickerCategory)) return false;
         return true;
@@ -129,10 +72,8 @@ class HelplineModel {
 
   static async getById(id) {
     try {
-      const rows = await selectWithFallback((select) =>
-        supabaseAdmin.from('communication').select(select).eq('id', id).limit(1)
-      );
-      return rows[0] || null;
+      const doc = await Communication.findById(id).lean();
+      return toApi(doc);
     } catch (err) {
       console.error(`HelplineModel.getById (${id}) Error:`, err);
       return null;
@@ -140,28 +81,18 @@ class HelplineModel {
   }
 
   static async create({ category, serviceType, categories, label, phone, active = true, email, city, notes }) {
-    const payload = { category, label, phone, active };
-    if (hasServiceColumns) {
-      payload.service_type = slugify(serviceType || category);
-      payload.categories = Array.isArray(categories) ? categories : [];
-    }
-    if (hasApplicantColumns) {
-      payload.email = email || null;
-      payload.city = city || null;
-      payload.notes = notes || null;
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from('communication')
-      .insert(payload)
-      .select(buildSelect())
-      .single();
-
-    if (error) {
-      if (!isMissingColumnError(error) || !downgrade()) throw error;
-      return HelplineModel.create({ category, serviceType, categories, label, phone, active, email, city, notes });
-    }
-    return normalize(data);
+    const doc = await Communication.create({
+      category,
+      label,
+      phone,
+      active,
+      service_type: slugify(serviceType || category),
+      categories: Array.isArray(categories) ? categories : [],
+      email: email || null,
+      city: city || null,
+      notes: notes || null,
+    });
+    return toApi(doc);
   }
 
   static async update(id, updates) {
@@ -170,33 +101,18 @@ class HelplineModel {
     if (updates.label !== undefined) payload.label = updates.label;
     if (updates.phone !== undefined) payload.phone = updates.phone;
     if (updates.active !== undefined) payload.active = updates.active;
-    if (hasServiceColumns) {
-      if (updates.serviceType !== undefined) payload.service_type = slugify(updates.serviceType);
-      if (updates.categories !== undefined) payload.categories = Array.isArray(updates.categories) ? updates.categories : [];
-    }
-    if (hasApplicantColumns) {
-      if (updates.email !== undefined) payload.email = updates.email;
-      if (updates.city !== undefined) payload.city = updates.city;
-      if (updates.notes !== undefined) payload.notes = updates.notes;
-    }
+    if (updates.serviceType !== undefined) payload.service_type = slugify(updates.serviceType);
+    if (updates.categories !== undefined) payload.categories = Array.isArray(updates.categories) ? updates.categories : [];
+    if (updates.email !== undefined) payload.email = updates.email;
+    if (updates.city !== undefined) payload.city = updates.city;
+    if (updates.notes !== undefined) payload.notes = updates.notes;
 
-    const { data, error } = await supabaseAdmin
-      .from('communication')
-      .update(payload)
-      .eq('id', id)
-      .select(buildSelect())
-      .single();
-
-    if (error) {
-      if (!isMissingColumnError(error) || !downgrade()) throw error;
-      return HelplineModel.update(id, updates);
-    }
-    return normalize(data);
+    const doc = await Communication.findByIdAndUpdate(id, { $set: payload }, { new: true }).lean();
+    return toApi(doc);
   }
 
   static async remove(id) {
-    const { error } = await supabaseAdmin.from('communication').delete().eq('id', id);
-    if (error) throw error;
+    await Communication.findByIdAndDelete(id);
     return true;
   }
 }

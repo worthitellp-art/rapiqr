@@ -1,0 +1,14 @@
+module.exports = {
+  User: require('./User'),
+  Sticker: require('./Sticker'),
+  Order: require('./Order'),
+  Alert: require('./Alert'),
+  DistributorApplication: require('./DistributorApplication'),
+  ServerLog: require('./ServerLog'),
+  SmsMessage: require('./SmsMessage'),
+  Communication: require('./Communication'),
+  ChatSession: require('./ChatSession'),
+  ChatMessage: require('./ChatMessage'),
+  ShopProduct: require('./ShopProduct'),
+  Template: require('./Template'),
+};

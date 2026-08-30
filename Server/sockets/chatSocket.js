@@ -1,6 +1,5 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
-const { supabaseAdmin } = require('../config/db');
 const { JWT_SECRET } = require('../middleware/authMiddleware');
 const ChatModel = require('../models/chatModel');
 const ProductModel = require('../models/productModel');
@@ -34,9 +33,9 @@ function getOnlineOwners() {
 
 /**
  * Resolve the connecting socket's identity from its handshake auth payload.
- * Mirrors authMiddleware.verifyToken's dual JWT/Supabase-session check for the
- * owner side; the customer side has no account at all, so it's authorized by
- * possession of the per-session customer_token minted in chatController.
+ * Mirrors authMiddleware.verifyToken's JWT check for the owner side; the
+ * customer side has no account at all, so it's authorized by possession of
+ * the per-session customer_token minted in chatController.
  */
 async function resolveIdentity(auth) {
   const { token, sessionId, customerToken } = auth || {};
@@ -45,12 +44,7 @@ async function resolveIdentity(auth) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
       return { type: 'owner', ownerId: decoded.id };
-    } catch {
-      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-      if (!error && user) {
-        return { type: 'owner', ownerId: user.id };
-      }
-    }
+    } catch { /* invalid/expired token */ }
   }
 
   if (sessionId && customerToken) {

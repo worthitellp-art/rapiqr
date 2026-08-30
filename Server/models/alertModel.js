@@ -1,15 +1,18 @@
-const { supabaseAdmin } = require('../config/db');
+const Alert = require('./schemas/Alert');
 
 class AlertModel {
   /**
-   * Log an Emergency / Parking alert into the reports table
-   * (matches the frontend's supabaseService.createReportInDb contract)
+   * Log an Emergency / Parking alert (matches the frontend's
+   * supabaseService.createReportInDb contract). `sticker_id` collapses the
+   * old separate qr_code_id/product_id — see the Alert schema note.
    */
   static async createAlert(alertPayload) {
     try {
-      const payload = {
-        qr_code_id: alertPayload.qrId || alertPayload.qr_code_id || alertPayload.vehicleId || null,
-        product_id: alertPayload.productId || alertPayload.product_id || null,
+      const stickerId = alertPayload.productId || alertPayload.product_id
+        || alertPayload.qrId || alertPayload.qr_code_id || alertPayload.vehicleId || null;
+
+      const doc = await Alert.create({
+        sticker_id: stickerId,
         product_label: alertPayload.productLabel || alertPayload.product_label || alertPayload.vehicleLabel || 'RapiQR Item',
         license_plate: alertPayload.licensePlate || alertPayload.license_plate || null,
         type: alertPayload.type || 'contact_owner',
@@ -17,17 +20,9 @@ class AlertModel {
         reporter_phone: alertPayload.reporterPhone || alertPayload.reporter_phone || null,
         location: alertPayload.location || null,
         status: alertPayload.status || 'unread',
-        created_at: new Date().toISOString()
-      };
+      });
 
-      const { data, error } = await supabaseAdmin
-        .from('reports')
-        .insert(payload)
-        .select('id, qr_code_id, status, created_at')
-        .single();
-
-      if (error) throw error;
-      return data;
+      return { id: String(doc._id), qr_code_id: doc.sticker_id, status: doc.status, created_at: doc.created_at };
     } catch (err) {
       console.error('AlertModel.createAlert Error:', err);
       // Do not fabricate a fake success object here — this is the emergency SOS
@@ -38,18 +33,24 @@ class AlertModel {
   }
 
   /**
-   * Get Alerts Log (reports table)
+   * Get Alerts Log
    */
   static async getAlerts(limit = 50) {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('reports')
-        .select('id, qr_code_id, product_id, product_label, license_plate, type, message, reporter_phone, location, status, created_at')
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (error) throw error;
-      return data || [];
+      const docs = await Alert.find().sort({ created_at: -1 }).limit(limit).lean();
+      return docs.map((d) => ({
+        id: String(d._id),
+        qr_code_id: d.sticker_id,
+        product_id: d.sticker_id,
+        product_label: d.product_label,
+        license_plate: d.license_plate,
+        type: d.type,
+        message: d.message,
+        reporter_phone: d.reporter_phone,
+        location: d.location,
+        status: d.status,
+        created_at: d.created_at,
+      }));
     } catch (err) {
       console.error('AlertModel.getAlerts Error:', err);
       return [];

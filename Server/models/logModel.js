@@ -1,59 +1,33 @@
-const { supabaseAdmin } = require('../config/db');
+const ServerLog = require('./schemas/ServerLog');
 const { getMemoryLogs, clearMemoryLogs } = require('../middleware/loggerMiddleware');
 
 class LogModel {
   /**
-   * Fetch server operational & HTTP logs from Supabase merged with live memory logs
+   * Fetch server operational & HTTP logs from the database merged with live
+   * in-memory logs (the live console tail hasn't necessarily flushed yet).
    */
   static async getLogs({ limit = 100, level = null, tag = null, category = null, event = null, userId = null, requestId = null } = {}) {
     let dbLogs = [];
+    try {
+      const query = {};
+      if (level && level !== 'ALL') query.level = level.toUpperCase();
+      if (tag) query.tag = new RegExp(String(tag).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      if (category && category !== 'ALL') query.category = category.toUpperCase();
+      if (event) query.event = event;
+      if (userId) query.user_id = userId;
+      if (requestId) query.request_id = requestId;
 
-    if (supabaseAdmin) {
-      try {
-        let query = supabaseAdmin
-          .from('server_logs')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(limit);
-
-        if (level && level !== 'ALL') {
-          query = query.eq('level', level.toUpperCase());
-        }
-
-        if (tag) {
-          query = query.ilike('tag', `%${tag}%`);
-        }
-
-        if (category && category !== 'ALL') {
-          query = query.eq('category', category.toUpperCase());
-        }
-
-        if (event) {
-          query = query.eq('event', event);
-        }
-
-        if (userId) {
-          query = query.eq('user_id', userId);
-        }
-
-        if (requestId) {
-          query = query.eq('request_id', requestId);
-        }
-
-        const { data, error } = await query;
-        if (!error && Array.isArray(data)) {
-          dbLogs = data;
-        }
-      } catch (err) {
-        // Fallback to in-memory logs
-      }
+      const docs = await ServerLog.find(query).sort({ created_at: -1 }).limit(limit).lean();
+      dbLogs = docs.map((d) => ({ ...d, id: String(d._id) }));
+    } catch (err) {
+      // Fallback to in-memory logs
     }
 
     const memLogs = getMemoryLogs({ limit, level, tag, category, event, userId, requestId }) || [];
 
     // Merge database logs and live in-memory logs
     const combined = [...dbLogs];
-    const existingIds = new Set(dbLogs.map(l => l.id || `${l.timestamp}-${l.message}`));
+    const existingIds = new Set(dbLogs.map((l) => l.id || `${l.timestamp}-${l.message}`));
 
     for (const memLog of memLogs) {
       if (!memLog) continue;
@@ -73,18 +47,16 @@ class LogModel {
   }
 
   /**
-   * Clear logs history from Supabase and memory
+   * Clear logs history from the database and memory
    */
   static async clearLogs() {
     clearMemoryLogs();
     try {
-      if (!supabaseAdmin) return true;
-      const { error } = await supabaseAdmin.from('server_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      if (error && error.code !== '42P01') throw error;
-      return true;
+      await ServerLog.deleteMany({});
     } catch (err) {
-      return true;
+      // best-effort
     }
+    return true;
   }
 }
 

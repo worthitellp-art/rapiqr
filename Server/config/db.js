@@ -1,27 +1,29 @@
-const { createClient } = require('@supabase/supabase-js');
+const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const path = require('path');
 
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://flddzslryxphugbkktkr.supabase.co';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const MONGODB_URI = process.env.MONGODB_URI;
 
-if (!supabaseServiceKey) {
-  // No silent fallback to the anon key: that key is RLS-restricted and would make
-  // admin writes fail unpredictably while looking like they succeeded (see task.md #9).
-  throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set in Server/.env — refusing to start with the anon key as a stand-in.');
+if (!MONGODB_URI) {
+  // No silent fallback: refusing to start with no database configured, same
+  // "fail loud" posture the old Supabase config used for a missing service key.
+  throw new Error('MONGODB_URI is not set in Server/.env — refusing to start with no database configured.');
 }
 
-// Server-side Supabase client with admin privileges
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-});
+mongoose.set('strictQuery', true);
+
+let connectionPromise = null;
+
+async function connectDB() {
+  if (connectionPromise) return connectionPromise;
+  connectionPromise = mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 10000 });
+  await connectionPromise;
+  return mongoose.connection;
+}
 
 module.exports = {
-  supabaseAdmin,
-  supabaseUrl
+  connectDB,
+  mongoose,
 };

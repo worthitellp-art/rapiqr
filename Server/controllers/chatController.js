@@ -1,46 +1,18 @@
 const crypto = require('crypto');
 const ChatModel = require('../models/chatModel');
+const ChatSession = require('../models/schemas/ChatSession');
+const User = require('../models/schemas/User');
 const ProductModel = require('../models/productModel');
-const { supabaseAdmin } = require('../config/db');
+const { uploadPublicFile } = require('../services/storageService');
 const { notifyOwner } = require('../services/notificationService');
 const { logger } = require('../middleware/loggerMiddleware');
 const { getIo, getOnlineOwners, markDeliveredIfPeerPresent } = require('../sockets/chatSocket');
 
 const APP_URL = process.env.APP_URL || 'https://rapiqr.worthitellp.workers.dev';
 
-const CHAT_BUCKET = 'chat-uploads';
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif'];
 /** Post-compression ceiling. The client downscales before upload; this is the backstop. */
 const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
-
-/**
- * Create the attachments bucket on first use rather than making it a manual
- * setup step — a fresh deployment (or a new Supabase project) then supports
- * image upload with no dashboard clicking. Memoized: the check costs one API
- * call per process, not one per upload.
- */
-let bucketReady = null;
-async function ensureChatBucket() {
-  if (bucketReady) return bucketReady;
-  bucketReady = (async () => {
-    const { data } = await supabaseAdmin.storage.listBuckets();
-    if ((data || []).some((b) => b.name === CHAT_BUCKET)) return true;
-
-    const { error } = await supabaseAdmin.storage.createBucket(CHAT_BUCKET, {
-      public: true,
-      fileSizeLimit: '10MB',
-      allowedMimeTypes: ALLOWED_IMAGE_TYPES,
-    });
-    // A parallel first request may have won the race — that's a success, not a failure.
-    if (error && !/already exists/i.test(error.message)) throw error;
-    logger.event('CHAT', '🗂️', `Created the "${CHAT_BUCKET}" storage bucket for chat images`);
-    return true;
-  })().catch((err) => {
-    bucketReady = null; // let the next upload retry rather than failing forever
-    throw err;
-  });
-  return bucketReady;
-}
 
 async function isOwnerOfSession(req, session) {
   if (!req.user) return false;
@@ -51,7 +23,7 @@ async function isOwnerOfSession(req, session) {
     const product = await ProductModel.getByQrCodeId(session.qr_code_id).catch(() => null);
     if (product && product.user_id === req.user.id) {
       if (!session.owner_id) {
-        supabaseAdmin.from('chat_sessions').update({ owner_id: req.user.id }).eq('id', session.id).then();
+        ChatSession.findByIdAndUpdate(session.id, { $set: { owner_id: req.user.id } }).catch(() => { /* best effort */ });
         session.owner_id = req.user.id;
       }
       return true;
@@ -138,19 +110,12 @@ class ChatController {
         });
       }
 
-      await ensureChatBucket();
-
       const ext = (contentType.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
       // Random filename, not the user's: an uploader must not be able to pick a
       // path in a public bucket, and two people sending "photo.jpg" must not collide.
-      const path = `${session.id}/${crypto.randomUUID()}.${ext}`;
+      const path = `chat-uploads/${session.id}/${crypto.randomUUID()}.${ext}`;
 
-      const { error: uploadError } = await supabaseAdmin.storage
-        .from(CHAT_BUCKET)
-        .upload(path, buffer, { contentType, upsert: false });
-      if (uploadError) throw uploadError;
-
-      const { data: pub } = supabaseAdmin.storage.from(CHAT_BUCKET).getPublicUrl(path);
+      const publicUrl = await uploadPublicFile(path, buffer, contentType);
 
       const message = await ChatModel.insertMessage({
         sessionId: session.id,
@@ -158,7 +123,7 @@ class ChatController {
         senderId: isOwner ? req.user.id : null,
         body: String(caption || '').trim(),
         attachment: {
-          url: pub.publicUrl,
+          url: publicUrl,
           type: contentType,
           name: String(name || '').slice(0, 120) || `image.${ext}`,
           width: Number(width) || null,
@@ -336,13 +301,9 @@ class ChatController {
       if (online.length === 0) return res.json({ success: true, data: [] });
 
       const ids = online.map((o) => o.ownerId);
-      const { data: profiles, error } = await supabaseAdmin
-        .from('profiles')
-        .select('id, full_name, email')
-        .in('id', ids);
-      if (error) throw error;
+      const profiles = await User.find({ _id: { $in: ids } }).select('full_name email').lean();
 
-      const profileById = new Map((profiles || []).map((p) => [p.id, p]));
+      const profileById = new Map(profiles.map((p) => [String(p._id), p]));
       const data = online.map((o) => ({
         ownerId: o.ownerId,
         connectedAt: new Date(o.connectedAt).toISOString(),

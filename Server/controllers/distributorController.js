@@ -33,11 +33,19 @@ class DistributorController {
     }
   }
 
-  /** GET /api/distributors/me — the logged-in user's own application status */
+  /**
+   * GET /api/distributors/me — the logged-in user's own application status.
+   *
+   * Looks up strictly by the caller's own identity (user_id, falling back to
+   * their account email) — a query-string `identifier` used to be accepted
+   * here and passed straight to the lookup, which let any signed-in user read
+   * a stranger's application (business name, city, phone, tier) just by
+   * guessing/knowing their email or phone number.
+   */
   static async myStatus(req, res) {
     try {
-      const identifier = req.query.identifier || req.user?.email;
-      const app = await DistributorModel.getByUser(identifier);
+      const app = (await DistributorModel.getByUserId(req.user.id))
+        || (await DistributorModel.getByUser(req.user.email));
       return res.json({ success: true, data: app });
     } catch (err) {
       logger.error('DISTRIBUTOR_STATUS', 'Failed to fetch distributor application status', err);

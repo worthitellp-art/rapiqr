@@ -3,7 +3,7 @@ const { logger } = require('../middleware/loggerMiddleware');
 
 class LogController {
   /**
-   * Get Live Server Logs from Supabase
+   * Get Live Server Logs
    */
   static async getLogs(req, res) {
     try {

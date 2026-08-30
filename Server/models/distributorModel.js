@@ -1,46 +1,42 @@
-const { supabaseAdmin } = require('../config/db');
+const DistributorApplication = require('./schemas/DistributorApplication');
+const User = require('./schemas/User');
 
-function toApi(row) {
-  if (!row) return null;
+function toApi(doc) {
+  if (!doc) return null;
   return {
-    id: row.id,
-    userId: row.user_id,
-    userName: row.user_name,
-    userEmail: row.user_email,
-    phone: row.phone,
-    city: row.city,
-    business: row.business,
-    tier: row.tier,
-    status: row.status,
-    notes: row.notes,
-    createdAt: row.created_at,
-    approvedAt: row.approved_at,
+    id: doc._id,
+    userId: doc.user_id ? String(doc.user_id) : null,
+    userName: doc.user_name,
+    userEmail: doc.user_email,
+    phone: doc.phone,
+    city: doc.city,
+    business: doc.business,
+    tier: doc.tier,
+    status: doc.status,
+    notes: doc.notes,
+    createdAt: doc.created_at,
+    approvedAt: doc.approved_at,
   };
 }
 
 class DistributorModel {
   static async getAll() {
-    const { data, error } = await supabaseAdmin
-      .from('distributor_applications')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const docs = await DistributorApplication.find().sort({ created_at: -1 }).lean();
+    return docs.map(toApi);
+  }
 
-    if (error) throw error;
-    return (data || []).map(toApi);
+  static async getByUserId(userId) {
+    if (!userId) return null;
+    const doc = await DistributorApplication.findOne({ user_id: userId }).sort({ created_at: -1 }).lean();
+    return toApi(doc);
   }
 
   static async getByUser(emailOrPhone) {
     if (!emailOrPhone) return null;
-    const { data, error } = await supabaseAdmin
-      .from('distributor_applications')
-      .select('*')
-      .or(`user_email.eq.${emailOrPhone},phone.eq.${emailOrPhone}`)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) throw error;
-    return toApi(data);
+    const doc = await DistributorApplication.findOne({
+      $or: [{ user_email: emailOrPhone }, { phone: emailOrPhone }],
+    }).sort({ created_at: -1 }).lean();
+    return toApi(doc);
   }
 
   static async create(appData) {
@@ -48,8 +44,8 @@ class DistributorModel {
     if (existing) return existing;
 
     const id = 'DIST-' + Date.now().toString().slice(-6);
-    const payload = {
-      id,
+    const doc = await DistributorApplication.create({
+      _id: id,
       user_id: appData.userId || null,
       user_name: appData.userName,
       user_email: appData.userEmail,
@@ -58,45 +54,33 @@ class DistributorModel {
       business: appData.business,
       tier: appData.tier,
       status: 'pending',
-    };
+    });
 
-    const { data, error } = await supabaseAdmin
-      .from('distributor_applications')
-      .insert(payload)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return toApi(data);
+    return toApi(doc);
   }
 
   static async updateStatus(appId, status, notes) {
-    const payload = {
-      status,
-      notes: notes || null,
-      approved_at: status === 'approved' ? new Date().toISOString() : null,
-    };
+    const doc = await DistributorApplication.findByIdAndUpdate(
+      appId,
+      {
+        $set: {
+          status,
+          notes: notes || null,
+          approved_at: status === 'approved' ? new Date() : null,
+        },
+      },
+      { new: true }
+    ).lean();
 
-    const { data, error } = await supabaseAdmin
-      .from('distributor_applications')
-      .update(payload)
-      .eq('id', appId)
-      .select()
-      .single();
-
-    if (error) throw error;
+    if (!doc) return null;
 
     // Approval grants the real distributor role on the account (task.md #17) —
     // not just a status flag on the application row.
-    if (status === 'approved' && data.user_id) {
-      const { error: roleError } = await supabaseAdmin
-        .from('profiles')
-        .update({ role: 'distributor' })
-        .eq('id', data.user_id);
-      if (roleError) throw roleError;
+    if (status === 'approved' && doc.user_id) {
+      await User.findByIdAndUpdate(doc.user_id, { $set: { role: 'distributor' } });
     }
 
-    return toApi(data);
+    return toApi(doc);
   }
 }
 

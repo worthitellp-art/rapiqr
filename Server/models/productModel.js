@@ -1,8 +1,6 @@
-const { supabaseAdmin } = require('../config/db');
+const Sticker = require('./schemas/Sticker');
+const Alert = require('./schemas/Alert');
 const { normalizePhone, isSamePhone } = require('../utils/phone');
-
-const LIST_SELECT = '*, qr_codes(id, status, scans_count, last_scanned_at, sticker_image, fg_color, bg_color)';
-const ADMIN_SEARCH_SELECT = `${LIST_SELECT}, profiles(id, email, full_name, phone_number, role)`;
 
 /**
  * The ONLY fields that hold the registering owner's own phone number, and so the
@@ -16,43 +14,73 @@ const ADMIN_SEARCH_SELECT = `${LIST_SELECT}, profiles(id, email, full_name, phon
  */
 const OWNER_PHONE_FIELDS = ['ownerPhone', 'phone', 'phoneNumber', 'owner_phone'];
 
-function ownerPhonesOf(product) {
-  const details = typeof product?.details === 'string'
-    ? (() => { try { return JSON.parse(product.details); } catch { return {}; } })()
-    : (product?.details || {});
-
+function ownerPhonesOf(sticker) {
+  const details = sticker?.details || {};
   const fromDetails = OWNER_PHONE_FIELDS.map((field) => details?.[field]);
-  const fromTopLevel = [product?.owner_phone, product?.phoneNumber, product?.phone];
-  return [...fromDetails, ...fromTopLevel].filter(Boolean);
+  return fromDetails.filter(Boolean);
+}
+
+/**
+ * Sticker docs merge the old qr_codes + products tables. `user_id` is either
+ * a plain ObjectId (unpopulated) or a populated User sub-document — this
+ * normalizes both into a flat, string-keyed shape safe to hand to a caller
+ * (and, importantly, comparable with === against a JWT's string user id).
+ */
+function toApi(doc) {
+  if (!doc) return null;
+  const owner = doc.user_id && typeof doc.user_id === 'object' ? doc.user_id : null;
+  const userId = owner ? owner._id : doc.user_id;
+
+  return {
+    id: doc._id,
+    qr_code_id: doc._id,
+    status: doc.status,
+    scans_count: doc.scans_count,
+    last_scanned_at: doc.last_scanned_at,
+    template_name: doc.template_name,
+    fg_color: doc.fg_color,
+    bg_color: doc.bg_color,
+    sticker_image: doc.sticker_image,
+    category: doc.category,
+    user_id: userId ? String(userId) : null,
+    name: doc.name,
+    assigned_to: doc.assigned_to,
+    vehicle_number: doc.vehicle_number,
+    details: doc.details || {},
+    created_at: doc.created_at,
+    profiles: owner ? {
+      id: String(owner._id),
+      email: owner.email,
+      full_name: owner.full_name,
+      phone_number: owner.phone_number,
+      role: owner.role,
+    } : null,
+  };
 }
 
 class ProductModel {
   /**
-   * Admin-only: search stickers/products across ALL users by QR code id, name,
-   * vehicle number, assigned-to, owner phone/email (from the details JSONB blob),
-   * or the linked account's own email/name/phone. Filtered in application code
-   * (rather than a PostgREST JSONB filter string) since the searchable fields span
-   * both plain columns and a JSONB blob — simpler and safer than hand-built filters
-   * at the scale this support console needs to handle.
+   * Admin-only: search stickers across ALL users by QR code id, name,
+   * vehicle number, assigned-to, owner phone/email (from `details`), or the
+   * linked account's own email/name/phone. Filtered in application code
+   * since the searchable fields span both plain fields and a nested object.
    */
   static async searchAll(query, limit = 500) {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('products')
-        .select(ADMIN_SEARCH_SELECT)
-        .order('created_at', { ascending: false })
-        .limit(limit);
+      const docs = await Sticker.find()
+        .populate('user_id', 'email full_name phone_number role')
+        .sort({ created_at: -1 })
+        .limit(limit)
+        .lean();
 
-      if (error) throw error;
-      const rows = data || [];
-
+      const rows = docs.map(toApi);
       const term = String(query || '').trim().toLowerCase();
       if (!term) return rows;
 
       const digits = term.replace(/\D/g, '');
       return rows.filter((p) => {
         const haystacks = [
-          p.qr_code_id, p.name, p.vehicle_number, p.assigned_to,
+          p.id, p.name, p.vehicle_number, p.assigned_to,
           p.details?.ownerPhone, p.details?.ownerEmail,
           p.profiles?.email, p.profiles?.full_name, p.profiles?.phone_number,
         ].filter(Boolean).map((v) => String(v).toLowerCase());
@@ -68,18 +96,12 @@ class ProductModel {
   }
 
   /**
-   * Fetch all products owned by a given user, with their linked QR code fleet record embedded.
+   * Fetch all stickers owned by a given user.
    */
   static async getAllByUser(userId) {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('products')
-        .select(LIST_SELECT)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
+      const docs = await Sticker.find({ user_id: userId }).sort({ created_at: -1 }).lean();
+      return docs.map(toApi);
     } catch (err) {
       console.error('ProductModel.getAllByUser Error:', err);
       return [];
@@ -87,40 +109,7 @@ class ProductModel {
   }
 
   static async getByQrCodeId(qrCodeId) {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('products')
-        .select(LIST_SELECT)
-        .eq('qr_code_id', qrCodeId)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
-    } catch (err) {
-      console.error(`ProductModel.getByQrCodeId (${qrCodeId}) Error:`, err);
-      return null;
-    }
-  }
-
-  /**
-   * Attach an unclaimed product (activated anonymously, e.g. via a public scan before
-   * the owner logged in) to the current user's account.
-   */
-  static async claim(productId, userId, userName) {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('products')
-        .update({ user_id: userId, assigned_to: userName || 'Self' })
-        .eq('id', productId)
-        .select(LIST_SELECT)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
-    } catch (err) {
-      console.error(`ProductModel.claim (${productId}) Error:`, err);
-      return null;
-    }
+    return this.getById(qrCodeId);
   }
 
   /**
@@ -129,12 +118,8 @@ class ProductModel {
    *
    * Two rules make a sticker belong to exactly one dashboard:
    *
-   *  1. Only `user_id IS NULL` rows are eligible. The previous query selected
-   *     `user_id.is.null,user_id.neq.<me>` — it deliberately picked up stickers that
-   *     ALREADY belonged to another account and reassigned them. With the client
-   *     dashboard re-polling every 15s, two accounts sharing a phone number would
-   *     take turns stealing the same stickers back and forth, which is why they kept
-   *     appearing and vanishing. Claiming is now one-way: unowned -> owned.
+   *  1. Only unowned rows (plus admin-held or differently-phoned rows, see
+   *     below) are eligible — claiming is one-way: unowned -> owned.
    *  2. Matching is exact on the last 10 digits, over owner-phone fields only
    *     (see OWNER_PHONE_FIELDS above).
    *
@@ -145,21 +130,18 @@ class ProductModel {
     if (!normalizePhone(phone)) return [];
 
     try {
-      const { data, error } = await supabaseAdmin
-        .from('products')
-        .select(ADMIN_SEARCH_SELECT);
+      const docs = await Sticker.find().populate('user_id', 'phone_number role').lean();
 
-      if (error) throw error;
-
-      const matches = (data || []).filter((p) => {
-        if (p.user_id === userId) return false;
+      const matches = docs.filter((p) => {
+        const ownerId = p.user_id?._id || p.user_id;
+        if (ownerId && String(ownerId) === String(userId)) return false;
 
         const matchesOwnerPhone = ownerPhonesOf(p).some((candidate) => isSamePhone(candidate, phone));
         if (!matchesOwnerPhone) return false;
 
         const isUnowned = !p.user_id;
-        const isCurrentOwnerAdmin = p.profiles?.role === 'admin';
-        const currentOwnerPhone = p.profiles?.phone_number;
+        const isCurrentOwnerAdmin = p.user_id?.role === 'admin';
+        const currentOwnerPhone = p.user_id?.phone_number;
         const isCurrentOwnerDifferentPhone = !isSamePhone(currentOwnerPhone, phone);
 
         return isUnowned || isCurrentOwnerAdmin || isCurrentOwnerDifferentPhone;
@@ -168,17 +150,12 @@ class ProductModel {
       const claimed = [];
       for (const p of matches) {
         const newAssigned = (userName && userName !== 'Self') ? userName : (p.assigned_to && p.assigned_to !== 'Self' ? p.assigned_to : 'Self');
-        const { data: updated, error: claimError } = await supabaseAdmin
-          .from('products')
-          .update({ user_id: userId, assigned_to: newAssigned })
-          .eq('id', p.id)
-          .select(LIST_SELECT)
-          .maybeSingle();
-        if (claimError) {
-          console.error(`ProductModel.autoClaimByPhone: failed to claim ${p.id}`, claimError);
-          continue;
-        }
-        if (updated) claimed.push(updated);
+        const updated = await Sticker.findByIdAndUpdate(
+          p._id,
+          { $set: { user_id: userId, assigned_to: newAssigned } },
+          { new: true }
+        ).lean();
+        if (updated) claimed.push(toApi(updated));
       }
       return claimed;
     } catch (err) {
@@ -189,19 +166,17 @@ class ProductModel {
 
   /**
    * Admin support view: which stickers register this phone as their owner phone,
-   * and who (if anyone) currently holds them. Lets the console answer "why isn't
-   * this customer's sticker showing up in their dashboard?" directly.
+   * and who (if anyone) currently holds them.
    */
   static async findByOwnerPhone(phone) {
     if (!normalizePhone(phone)) return [];
     try {
-      const { data, error } = await supabaseAdmin
-        .from('products')
-        .select(ADMIN_SEARCH_SELECT)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return (data || []).filter((p) =>
-        ownerPhonesOf(p).some((candidate) => isSamePhone(candidate, phone))
+      const docs = await Sticker.find()
+        .populate('user_id', 'email full_name phone_number role')
+        .sort({ created_at: -1 })
+        .lean();
+      return docs.map(toApi).filter((p) =>
+        ownerPhonesOf({ details: p.details }).some((candidate) => isSamePhone(candidate, phone))
       );
     } catch (err) {
       console.error('ProductModel.findByOwnerPhone Error:', err);
@@ -211,14 +186,8 @@ class ProductModel {
 
   static async getById(productId) {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('products')
-        .select(LIST_SELECT)
-        .eq('id', productId)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
+      const doc = await Sticker.findById(productId).lean();
+      return toApi(doc);
     } catch (err) {
       console.error(`ProductModel.getById (${productId}) Error:`, err);
       return null;
@@ -226,13 +195,13 @@ class ProductModel {
   }
 
   /**
-   * Edit sticker/product details. Scalar columns update directly; everything else
-   * (address, bloodGroup, allergies, ownerPhone, ownerEmail, ...) merges into the
-   * `details` JSONB blob so we never clobber fields the caller didn't send.
+   * Edit sticker details. Scalar fields update directly; everything else
+   * (address, bloodGroup, allergies, ownerPhone, ownerEmail, ...) merges into
+   * `details` so we never clobber fields the caller didn't send.
    */
   static async updateDetails(productId, updates) {
     try {
-      const current = await this.getById(productId);
+      const current = await Sticker.findById(productId).lean();
       if (!current) return null;
 
       const payload = {};
@@ -255,25 +224,10 @@ class ProductModel {
       }
       if (detailsChanged) payload.details = mergedDetails;
 
-      if (Object.keys(payload).length === 0) return current;
+      if (Object.keys(payload).length === 0) return toApi(current);
 
-      const { data, error } = await supabaseAdmin
-        .from('products')
-        .update(payload)
-        .eq('id', productId)
-        .select(LIST_SELECT)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (payload.status && data?.qr_code_id) {
-        await supabaseAdmin
-          .from('qr_codes')
-          .update({ status: payload.status === 'active' ? 'active' : 'inactive' })
-          .eq('id', data.qr_code_id);
-      }
-
-      return data;
+      const doc = await Sticker.findByIdAndUpdate(productId, { $set: payload }, { new: true }).lean();
+      return toApi(doc);
     } catch (err) {
       console.error(`ProductModel.updateDetails (${productId}) Error:`, err);
       return null;
@@ -281,25 +235,17 @@ class ProductModel {
   }
 
   /**
-   * Replace the emergency contacts list for a product.
+   * Replace the emergency contacts list for a sticker.
    * contacts: [{ name, phone }, ...]
    */
   static async updateContacts(productId, contacts) {
     try {
-      const current = await this.getById(productId);
+      const current = await Sticker.findById(productId).select('details').lean();
       if (!current) return null;
 
       const mergedDetails = { ...(current.details || {}), emergencyContacts: contacts };
-
-      const { data, error } = await supabaseAdmin
-        .from('products')
-        .update({ details: mergedDetails })
-        .eq('id', productId)
-        .select(LIST_SELECT)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
+      const doc = await Sticker.findByIdAndUpdate(productId, { $set: { details: mergedDetails } }, { new: true }).lean();
+      return toApi(doc);
     } catch (err) {
       console.error(`ProductModel.updateContacts (${productId}) Error:`, err);
       return null;
@@ -308,24 +254,8 @@ class ProductModel {
 
   static async setStatus(productId, status) {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('products')
-        .update({ status })
-        .eq('id', productId)
-        .select(LIST_SELECT)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      // Keep the fleet record's own status roughly in sync so admin views stay consistent.
-      if (data?.qr_code_id) {
-        await supabaseAdmin
-          .from('qr_codes')
-          .update({ status: status === 'active' ? 'active' : 'inactive' })
-          .eq('id', data.qr_code_id);
-      }
-
-      return data;
+      const doc = await Sticker.findByIdAndUpdate(productId, { $set: { status } }, { new: true }).lean();
+      return toApi(doc);
     } catch (err) {
       console.error(`ProductModel.setStatus (${productId}) Error:`, err);
       return null;
@@ -333,46 +263,46 @@ class ProductModel {
   }
 
   /**
-   * Transfer ownership of a sticker/product to another registered account (by email).
+   * Transfer ownership of a sticker to another registered account (by email).
    */
   static async transfer(productId, targetUserId, targetName) {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('products')
-        .update({ user_id: targetUserId, assigned_to: targetName || 'New Owner' })
-        .eq('id', productId)
-        .select(LIST_SELECT)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
+      const doc = await Sticker.findByIdAndUpdate(
+        productId,
+        { $set: { user_id: targetUserId, assigned_to: targetName || 'New Owner' } },
+        { new: true }
+      ).lean();
+      return toApi(doc);
     } catch (err) {
       console.error(`ProductModel.transfer (${productId}) Error:`, err);
       return null;
     }
   }
 
+  /**
+   * Owner self-service "delete my sticker": resets ownership/details back to
+   * unclaimed rather than deleting the underlying document — the sticker ID
+   * is a physical fleet asset (qr_codes previously, now the same document)
+   * that must stay activatable again later, the same way deleting only the
+   * `products` row (and not `qr_codes`) used to work.
+   */
   static async remove(productId) {
     try {
-      const current = await this.getById(productId);
-      if (!current) return false;
-
-      const { error } = await supabaseAdmin
-        .from('products')
-        .delete()
-        .eq('id', productId);
-
-      if (error) throw error;
-
-      // Free up the underlying QR code so it can be re-activated on a fresh product.
-      if (current.qr_code_id) {
-        await supabaseAdmin
-          .from('qr_codes')
-          .update({ status: 'inactive' })
-          .eq('id', current.qr_code_id);
-      }
-
-      return true;
+      const doc = await Sticker.findByIdAndUpdate(
+        productId,
+        {
+          $set: {
+            status: 'inactive',
+            user_id: null,
+            name: null,
+            assigned_to: null,
+            vehicle_number: null,
+            details: {},
+          },
+        },
+        { new: true }
+      ).lean();
+      return Boolean(doc);
     } catch (err) {
       console.error(`ProductModel.remove (${productId}) Error:`, err);
       return false;
@@ -380,19 +310,24 @@ class ProductModel {
   }
 
   /**
-   * Scan/alert history (reports table) for a single product, newest first.
+   * Scan/alert history for a single sticker, newest first.
    */
   static async getHistory(productId, limit = 100) {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('reports')
-        .select('id, type, message, reporter_phone, location, status, created_at')
-        .eq('product_id', productId)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (error) throw error;
-      return data || [];
+      const docs = await Alert.find({ sticker_id: productId })
+        .select('type message reporter_phone location status created_at')
+        .sort({ created_at: -1 })
+        .limit(limit)
+        .lean();
+      return docs.map((d) => ({
+        id: String(d._id),
+        type: d.type,
+        message: d.message,
+        reporter_phone: d.reporter_phone,
+        location: d.location,
+        status: d.status,
+        created_at: d.created_at,
+      }));
     } catch (err) {
       console.error(`ProductModel.getHistory (${productId}) Error:`, err);
       return [];

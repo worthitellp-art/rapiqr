@@ -9,13 +9,13 @@
  *   - Auto requestId correlation via AsyncLocalStorage
  *   - Strict data sanitization (passwords, OTPs, tokens, cards are never logged)
  *
- * Every entry is persisted to the Supabase `server_logs` table and to an
- * in-memory live buffer that powers the admin Live Logs feed.
+ * Every entry is persisted to the `ServerLog` collection and to an in-memory
+ * live buffer that powers the admin Live Logs feed.
  */
 
 const crypto = require('crypto');
 const { AsyncLocalStorage } = require('async_hooks');
-const { supabaseAdmin } = require('../config/db');
+const ServerLog = require('../models/schemas/ServerLog');
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 
@@ -192,8 +192,6 @@ function clearMemoryLogs() {
 
 /* ── Persistence ────────────────────────────────────────────────────────── */
 
-let tableExists = true;
-
 /**
  * Build the canonical structured log item and persist it.
  * @param {object} payload {
@@ -201,7 +199,7 @@ let tableExists = true;
  *   requestId, userId, resourceId, method, url, statusCode, durationMs, origin, ip
  * }
  */
-async function writeLogToSupabase(payload) {
+async function writeLogToDatabase(payload) {
   const uuid = generateUUID();
   const ctx = currentContext();
   const details = sanitize(payload.details || payload.metadata || {});
@@ -232,11 +230,9 @@ async function writeLogToSupabase(payload) {
 
   pushToMemoryBuffer(logItem);
 
-  if (!supabaseAdmin) return;
   try {
-    const { error } = await supabaseAdmin.from('server_logs').insert([{
-      id: uuid,
-      timestamp: logItem.timestamp,
+    await ServerLog.create({
+      created_at: logItem.timestamp,
       level: logItem.level,
       category: logItem.category,
       service: logItem.service,
@@ -254,15 +250,8 @@ async function writeLogToSupabase(payload) {
       user_id: logItem.user_id,
       resource_id: logItem.resource_id,
       status: logItem.status,
-      metadata: logItem.metadata
-    }]);
-
-    if (error && error.code === '42P01') {
-      if (tableExists) {
-        tableExists = false;
-        console.warn(`[${formatTimestamp()}] ⚠️  [SUPABASE_LOGS] Note: 'server_logs' table not created in Supabase yet. Live logs running in-memory.`);
-      }
-    }
+      metadata: logItem.metadata,
+    });
   } catch (err) {
     // Non-blocking catch — logging must never break the request
   }
@@ -304,7 +293,7 @@ function emit(payload) {
     console.log(line, meta.details ? JSON.stringify(sanitize(meta.details)) : '');
   }
 
-  writeLogToSupabase(payload);
+  writeLogToDatabase(payload);
 }
 
 /* ── Public logger API ──────────────────────────────────────────────────── */
@@ -435,7 +424,7 @@ function requestLogger(req, res, next) {
 module.exports = {
   requestLogger,
   logger,
-  writeLogToSupabase,
+  writeLogToDatabase,
   getMemoryLogs,
   clearMemoryLogs,
   sanitize,

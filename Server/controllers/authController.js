@@ -1,6 +1,5 @@
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
-const { supabaseAdmin } = require('../config/db');
 const UserModel = require('../models/userModel');
 const ProductModel = require('../models/productModel');
 const { JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD } = require('../middleware/authMiddleware');
@@ -9,10 +8,21 @@ const { generateSecret, verifyTOTP, buildOtpauthUrl } = require('../utils/totp')
 const { sendSms, sendWhatsApp } = require('../services/smsService');
 const { createOtp, verifyOtp } = require('../services/phoneVerificationService');
 const { normalizePhone } = require('../utils/phone');
+const { hashPassword, verifyPassword } = require('../utils/passwords');
+const { createResetLink, findUserByResetToken } = require('../services/passwordResetService');
+const { sendEmail } = require('../services/emailService');
+const { deleteUserAccount } = require('../services/accountDeletionService');
 
 // No hardcoded fallback: an unset GOOGLE_CLIENT_ID would otherwise let
 // verifyIdToken's audience check silently pass against the wrong project (task.md #7/#23).
 const googleClient = process.env.GOOGLE_CLIENT_ID ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID) : null;
+
+// A fixed bcrypt hash of a password nobody will ever type, compared against
+// on every "unknown email" sign-in so that hashing a real password only ever
+// happens on the success path — otherwise sign-in for an unknown email
+// returns instantly while a known one takes ~100ms, and that timing gap is
+// enough to enumerate which emails have accounts.
+const DUMMY_HASH = '$2a$10$CwTycUXWue0Thq9StjUM0uJ8Vp1G3XLxaR7dyx7NcgCkJ6RxYWMKa';
 
 class AuthController {
   /**
@@ -26,6 +36,9 @@ class AuthController {
         logger.warn('AUTH_SIGNUP', 'Signup attempt missing required credentials');
         return res.status(400).json({ success: false, error: 'Email or phone number, and password are required' });
       }
+      if (String(password).length < 6) {
+        return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+      }
 
       let targetEmail = (email || '').trim().toLowerCase();
       let formattedPhone = phoneNumber ? String(phoneNumber).trim() : '';
@@ -37,26 +50,31 @@ class AuthController {
 
       logger.info('AUTH_SIGNUP', `Processing signup for identity: ${targetEmail || formattedPhone}`);
 
-      // Create auth user in Supabase
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email: targetEmail,
-        password,
-        email_confirm: true,
-        user_metadata: { full_name: fullName, phone_number: formattedPhone || undefined }
-      });
-
-      if (authError) {
-        logger.warn('AUTH_SIGNUP', `Supabase user creation failed: ${authError.message}`);
-        return res.status(400).json({ success: false, error: authError.message });
+      const existing = await UserModel.findByEmail(targetEmail);
+      if (existing) {
+        logger.warn('AUTH_SIGNUP', `Signup rejected — account already exists: ${targetEmail}`);
+        return res.status(409).json({ success: false, error: 'An account with this email already exists' });
       }
 
-      const user = authData.user;
-      const profile = await UserModel.upsertProfile({
-        id: user.id,
-        email: user.email,
-        fullName: fullName || (email ? email.split('@')[0] : formattedPhone),
-        phoneNumber: formattedPhone || undefined
-      });
+      const passwordHash = await hashPassword(password);
+      const isDesignatedAdmin = targetEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
+      let profile;
+      try {
+        profile = await UserModel.createUser({
+          email: targetEmail,
+          passwordHash,
+          fullName: fullName || (email ? email.split('@')[0] : formattedPhone),
+          phoneNumber: formattedPhone || undefined,
+          role: isDesignatedAdmin ? 'admin' : 'user',
+          emailVerified: true,
+        });
+      } catch (createErr) {
+        if (createErr.code === 11000) {
+          return res.status(409).json({ success: false, error: 'An account with this email already exists' });
+        }
+        throw createErr;
+      }
 
       const token = jwt.sign(
         { id: profile.id, email: profile.email, role: profile.role },
@@ -91,25 +109,16 @@ class AuthController {
 
       logger.info('AUTH_SIGNIN', `Attempting authentication for email: ${email}`);
 
-      const { data, error } = await supabaseAdmin.auth.signInWithPassword({
-        email,
-        password
-      });
+      const authUser = await UserModel.findAuthByEmail(email);
+      const hashToCheck = authUser?.password_hash || DUMMY_HASH;
+      const passwordOk = await verifyPassword(password, hashToCheck);
 
-      if (error) {
-        logger.warn('AUTH_SIGNIN', `Authentication failed for ${email}: ${error.message}`);
-        return res.status(401).json({ success: false, error: error.message });
+      if (!authUser || !authUser.password_hash || !passwordOk) {
+        logger.warn('AUTH_SIGNIN', `Authentication failed for ${email}`);
+        return res.status(401).json({ success: false, error: 'Invalid email or password' });
       }
 
-      const user = data.user;
-      let profile = await UserModel.findById(user.id);
-      if (!profile) {
-        profile = await UserModel.upsertProfile({
-          id: user.id,
-          email: user.email,
-          fullName: user.user_metadata?.full_name || email.split('@')[0]
-        });
-      }
+      const profile = await UserModel.reconcileAdminRole(await UserModel.findById(authUser._id));
 
       const token = jwt.sign(
         { id: profile.id, email: profile.email, role: profile.role },
@@ -133,8 +142,8 @@ class AuthController {
   /**
    * Admin Fleet Panel Sign In — the ONLY way to obtain an admin-role token.
    * Validated purely against ADMIN_EMAIL / ADMIN_PASSWORD in Server/.env (never against
-   * a regular user's Supabase Auth password), so admin access can't be gained through
-   * the normal signup/signin flow no matter what a user's account role looks like.
+   * a regular user's password), so admin access can't be gained through the normal
+   * signup/signin flow no matter what a user's account role looks like.
    */
   static async adminSignIn(req, res) {
     try {
@@ -155,25 +164,18 @@ class AuthController {
         return res.status(401).json({ success: false, error: 'Invalid admin credentials.' });
       }
 
-      // Look up a real profile ONLY if the admin also has an actual Supabase Auth account
-      // under this email (e.g. they signed up normally at some point) — this just lets us
-      // reuse their real name/avatar. We never attempt to INSERT a profiles row here: its id
-      // is a foreign key into auth.users, and the admin identity is authenticated purely via
-      // ADMIN_EMAIL/ADMIN_PASSWORD above with no real auth.users row backing it, so any
-      // insert with a synthetic id would violate that FK and silently fail on every call.
+      // The admin identity is authenticated purely via ADMIN_EMAIL/ADMIN_PASSWORD above,
+      // never a stored password — reuse/create the profile row just for name/avatar/id.
       let profile = await UserModel.findByEmail(ADMIN_EMAIL);
-      if (profile && profile.role !== 'admin') {
-        profile = await UserModel.upsertProfile({ ...profile, role: 'admin' });
-      }
       if (!profile) {
-        profile = {
-          id: 'admin-' + Buffer.from(ADMIN_EMAIL).toString('hex').slice(0, 24),
+        profile = await UserModel.createUser({
           email: ADMIN_EMAIL,
-          full_name: 'Fleet Admin',
+          fullName: 'Fleet Admin',
           role: 'admin',
-          subscription_plan: 'enterprise',
-          is_subscribed: true,
-        };
+          emailVerified: true,
+        });
+      } else if (profile.role !== 'admin') {
+        profile = await UserModel.reconcileAdminRole(profile);
       }
 
       const token = jwt.sign(
@@ -196,37 +198,57 @@ class AuthController {
   }
 
   /**
-   * Google OAuth Server-Side Authentication
+   * Google OAuth Server-Side Authentication.
+   *
+   * Two supported inputs:
+   *  - `credential`/`idToken`: a Google Identity Services ID token, verified
+   *    offline via verifyIdToken — email/sub come from the verified payload.
+   *  - `token`: an OAuth access token (what the frontend's implicit-grant
+   *    popup flow actually sends). This MUST be verified against Google's
+   *    tokeninfo endpoint server-side. The client also sends a `user` object
+   *    with the profile it read from Google's userinfo endpoint, but that is
+   *    untrusted input — trusting it directly would let anyone POST an
+   *    arbitrary email (including the admin's) and receive a valid session
+   *    for that account with no proof of ownership whatsoever. Only
+   *    `fullName`/`avatarUrl` (cosmetic, not identity-bearing) are taken from it.
    */
   static async googleAuth(req, res) {
     try {
-      const { credential, idToken } = req.body;
-      const tokenToVerify = credential || idToken;
+      const { credential, idToken, token: accessToken } = req.body || {};
+      const idTokenToVerify = credential || idToken;
 
-      if (tokenToVerify && !googleClient) {
+      if ((idTokenToVerify || accessToken) && !googleClient) {
         return res.status(503).json({ success: false, error: 'Google sign-in is not configured on the server' });
       }
 
-      let email, fullName, avatarUrl, sub;
+      let email, sub;
+      let fullName = req.body?.user?.fullName || req.body?.user?.name;
+      let avatarUrl = req.body?.user?.avatarUrl || req.body?.user?.picture;
 
-      if (tokenToVerify) {
+      if (idTokenToVerify) {
         const ticket = await googleClient.verifyIdToken({
-          idToken: tokenToVerify,
+          idToken: idTokenToVerify,
           audience: process.env.GOOGLE_CLIENT_ID
         });
         const payload = ticket.getPayload();
         email = payload.email;
-        fullName = payload.name;
-        avatarUrl = payload.picture;
         sub = payload.sub;
-      } else if (req.body.user) {
-        email = req.body.user.email;
-        fullName = req.body.user.fullName || req.body.user.name;
-        avatarUrl = req.body.user.avatarUrl;
-        sub = req.body.user.id;
+        fullName = payload.name || fullName;
+        avatarUrl = payload.picture || avatarUrl;
+      } else if (accessToken) {
+        const tokenInfo = await googleClient.getTokenInfo(accessToken);
+        if (tokenInfo.aud !== process.env.GOOGLE_CLIENT_ID) {
+          logger.security('AUTH_GOOGLE_TOKEN_AUD_MISMATCH', `Google access token audience did not match this app (aud=${tokenInfo.aud})`);
+          return res.status(401).json({ success: false, error: 'Invalid Google token' });
+        }
+        if (!tokenInfo.email || tokenInfo.email_verified === false) {
+          return res.status(401).json({ success: false, error: 'This Google account\'s email is not verified' });
+        }
+        email = tokenInfo.email;
+        sub = tokenInfo.sub || tokenInfo.user_id || null;
       } else {
-        logger.warn('AUTH_GOOGLE', 'Google Auth payload missing credentials');
-        return res.status(400).json({ success: false, error: 'Google credential or user data missing' });
+        logger.warn('AUTH_GOOGLE', 'Google Auth payload missing a verifiable credential');
+        return res.status(400).json({ success: false, error: 'A Google credential or access token is required' });
       }
 
       logger.info('AUTH_GOOGLE', `Google OAuth verification for: ${email} (sub: ${sub || 'none'})`);
@@ -235,32 +257,18 @@ class AuthController {
 
       let profile = await UserModel.findByEmail(email);
       if (!profile) {
-        // profiles.id is a uuid tied to auth.users — Google's `sub` is a decimal
-        // string and cannot go in it. Resolve (or mint) the real auth user first.
-        const userId = await UserModel.findOrCreateAuthUserId(email, { fullName, avatarUrl });
-        if (!userId) {
-          logger.error('AUTH_GOOGLE', `Could not resolve an auth user for: ${email}`);
-          return res.status(500).json({ success: false, error: 'Could not create an account for this Google user' });
-        }
-
-        // A trigger on auth.users may have already inserted the profiles row
-        // (hardcoded to role 'user'), so upsert rather than insert.
-        profile = await UserModel.upsertProfile({
-          id: userId,
+        profile = await UserModel.createUser({
           email,
           fullName: fullName || email.split('@')[0],
-          avatarUrl,
-          role: isDesignatedAdmin ? 'admin' : 'user'
+          googleId: sub || null,
+          role: isDesignatedAdmin ? 'admin' : 'user',
+          emailVerified: true,
         });
+        if (avatarUrl) {
+          profile = await UserModel.updateProfile(profile.id, { avatarUrl });
+        }
       } else if (isDesignatedAdmin && profile.role !== 'admin') {
-        profile = await UserModel.upsertProfile({
-          id: profile.id,
-          email: profile.email,
-          fullName: profile.full_name,
-          avatarUrl: profile.avatar_url,
-          phoneNumber: profile.phone_number,
-          role: 'admin'
-        });
+        profile = await UserModel.reconcileAdminRole(profile);
       }
 
       const token = jwt.sign(
@@ -287,35 +295,12 @@ class AuthController {
    */
   static async getMe(req, res) {
     try {
-      // ensureProfile backfills from auth.users when the profiles row is missing,
-      // so legacy accounts (created while the server wrote through the anon key and
-      // RLS silently dropped the insert) stop 404-ing on every dashboard load.
       const profile = await UserModel.ensureProfile(req.user.id);
       if (!profile) {
-        // adminSignIn mints a synthetic `admin-<hex>` id when ADMIN_EMAIL has no
-        // Supabase Auth account behind it; there is no profiles row to find and
-        // never will be (its id is an FK into auth.users). The credentials were
-        // already checked against ADMIN_EMAIL/ADMIN_PASSWORD to issue this token,
-        // so echo that identity back rather than logging the admin panel out.
-        if (req.user.role === 'admin' && String(req.user.id).startsWith('admin-')) {
-          return res.json({
-            success: true,
-            user: {
-              id: req.user.id,
-              email: req.user.email,
-              full_name: 'Fleet Admin',
-              role: 'admin',
-              subscription_plan: 'enterprise',
-              is_subscribed: true,
-            },
-          });
-        }
-
-        logger.warn('AUTH_ME', `No auth user behind ID: ${req.user.id}`);
-        // No auth.users row behind this token — the account was deleted, or the
-        // token carries the synthetic admin id. Either way the session is dead, so
-        // answer 401: the client signs out cleanly on 401, where a 404 left it
-        // half-authenticated with a token it had already discarded.
+        logger.warn('AUTH_ME', `No account behind ID: ${req.user.id}`);
+        // The account was deleted, or the token is stale. Answer 401: the
+        // client signs out cleanly on 401, where a 404 left it half-authenticated
+        // with a token it had already discarded.
         return res.status(401).json({ success: false, error: 'Session no longer valid — please sign in again.' });
       }
       return res.json({ success: true, user: profile });
@@ -412,7 +397,7 @@ class AuthController {
 
   /**
    * Phone verification step 2 — check the code, and only on a match does this
-   * actually write profiles.phone_number and run the phone-based auto-claim
+   * actually write the account's phone number and run the phone-based auto-claim
    * (Server/models/productModel.js autoClaimByPhone), so a sticker only ever
    * lands in a dashboard once ownership of the phone number is proven.
    */
@@ -471,9 +456,9 @@ class AuthController {
   }
 
   /**
-   * Account Settings — change password. Re-verifies the current password against
-   * Supabase Auth before applying the new one, so this can't be used to hijack an
-   * account from an already-authenticated-but-stolen JWT alone.
+   * Account Settings — change password. Re-verifies the current password before
+   * applying the new one, so this can't be used to hijack an account from an
+   * already-authenticated-but-stolen JWT alone.
    */
   static async changePassword(req, res) {
     try {
@@ -485,23 +470,81 @@ class AuthController {
         return res.status(400).json({ success: false, error: 'New password must be at least 6 characters' });
       }
 
-      const { error: verifyError } = await supabaseAdmin.auth.signInWithPassword({
-        email: req.user.email,
-        password: currentPassword,
-      });
-      if (verifyError) {
+      const authUser = await UserModel.findAuthById(req.user.id);
+      if (!authUser || !(await verifyPassword(currentPassword, authUser.password_hash))) {
         logger.security('PASSWORD_CHANGE_DENIED', `Incorrect current password for ${req.user.email}`);
         return res.status(401).json({ success: false, error: 'Current password is incorrect' });
       }
 
-      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(req.user.id, { password: newPassword });
-      if (updateError) return res.status(500).json({ success: false, error: updateError.message });
+      const newHash = await hashPassword(newPassword);
+      await UserModel.setPasswordHash(req.user.id, newHash);
 
       logger.security('PASSWORD_CHANGED', `Password changed for ${req.user.email}`);
       return res.json({ success: true, message: 'Password updated successfully' });
     } catch (err) {
       logger.error('PASSWORD_CHANGE', 'Failed to change password', err);
       return res.status(500).json({ success: false, error: err.message || 'Failed to change password' });
+    }
+  }
+
+  /**
+   * Self-service forgot-password: always answers the same way whether or not
+   * the account exists — confirming/denying that an email has an account here
+   * would itself be a data leak (email enumeration).
+   */
+  static async forgotPassword(req, res) {
+    try {
+      const { email } = req.body || {};
+      if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
+
+      const profile = await UserModel.findByEmail(email);
+      if (profile) {
+        const link = await createResetLink(profile);
+        await sendEmail({
+          to: profile.email,
+          subject: 'Reset your RapiQR password',
+          html: `<p>Hi ${profile.full_name || ''},</p><p>Click the link below to reset your RapiQR password. This link expires in 1 hour.</p><p><a href="${link}">${link}</a></p><p>If you didn't request this, you can safely ignore this email.</p>`,
+          event: 'PASSWORD_RESET_EMAIL',
+        });
+        logger.security('PASSWORD_RESET_REQUESTED', `Password reset requested for ${profile.email}`);
+      } else {
+        logger.warn('PASSWORD_RESET_REQUESTED', `Password reset requested for an email with no account`);
+      }
+
+      return res.json({ success: true, message: 'If an account exists for that email, a reset link has been sent.' });
+    } catch (err) {
+      logger.error('PASSWORD_RESET_REQUEST', 'Failed to process forgot-password request', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Self-service password reset — consumes the token minted by forgotPassword
+   * (or the admin-triggered equivalent in adminController).
+   */
+  static async resetPassword(req, res) {
+    try {
+      const { token, newPassword } = req.body || {};
+      if (!token || !newPassword) {
+        return res.status(400).json({ success: false, error: 'token and newPassword are required' });
+      }
+      if (newPassword.length < 6) {
+        return res.status(400).json({ success: false, error: 'New password must be at least 6 characters' });
+      }
+
+      const user = await findUserByResetToken(token);
+      if (!user) {
+        return res.status(400).json({ success: false, error: 'This reset link is invalid or has expired.' });
+      }
+
+      const newHash = await hashPassword(newPassword);
+      await UserModel.setPasswordHash(user._id, newHash);
+
+      logger.security('PASSWORD_RESET_COMPLETED', `Password reset completed for ${user.email}`);
+      return res.json({ success: true, message: 'Password updated. You can now sign in with your new password.' });
+    } catch (err) {
+      logger.error('PASSWORD_RESET', 'Failed to reset password', err);
+      return res.status(500).json({ success: false, error: err.message });
     }
   }
 
@@ -525,65 +568,7 @@ class AuthController {
         });
       }
 
-      // Unlink orders so FK constraints don't block user deletion
-      try {
-        await supabaseAdmin.from('orders').update({ user_id: null }).eq('user_id', targetUserId);
-      } catch (orderUnlinkError) {
-        logger.warn('ACCOUNT_DELETE', `Order unlink skipped for ${targetUserId}: ${orderUnlinkError.message}`);
-      }
-
-      // Clean up chat messages and chat sessions owned by this user
-      try {
-        const { data: userSessions } = await supabaseAdmin
-          .from('chat_sessions')
-          .select('id')
-          .eq('owner_id', targetUserId);
-
-        if (userSessions && userSessions.length > 0) {
-          const sessionIds = userSessions.map((s) => s.id);
-          await supabaseAdmin.from('chat_messages').delete().in('session_id', sessionIds);
-        }
-        await supabaseAdmin.from('chat_sessions').delete().eq('owner_id', targetUserId);
-      } catch (chatCleanError) {
-        logger.warn('ACCOUNT_DELETE', `Chat cleanup skipped for ${targetUserId}: ${chatCleanError.message}`);
-      }
-
-      // Unlink QR codes
-      try {
-        await supabaseAdmin.from('qr_codes').update({ user_id: null }).eq('user_id', targetUserId);
-      } catch (qrUnlinkError) {
-        logger.warn('ACCOUNT_DELETE', `QR codes unlink skipped for ${targetUserId}: ${qrUnlinkError.message}`);
-      }
-
-      // Unlink products owned by this user
-      try {
-        await supabaseAdmin.from('products').update({ user_id: null, assigned_to: 'Unassigned' }).eq('user_id', targetUserId);
-      } catch (productUnlinkError) {
-        logger.warn('ACCOUNT_DELETE', `Product unlink skipped for ${targetUserId}: ${productUnlinkError.message}`);
-      }
-
-      // Unlink distributor applications
-      try {
-        await supabaseAdmin.from('distributor_applications').update({ user_id: null }).eq('user_id', targetUserId);
-      } catch (distUnlinkError) {
-        logger.warn('ACCOUNT_DELETE', `Distributor applications unlink skipped for ${targetUserId}: ${distUnlinkError.message}`);
-      }
-
-      // Delete profile record from public.profiles
-      try {
-        const { error: profileDeleteError } = await supabaseAdmin.from('profiles').delete().eq('id', targetUserId);
-        if (profileDeleteError) {
-          logger.warn('ACCOUNT_DELETE', `Profile delete warning for ${targetUserId}: ${profileDeleteError.message}`);
-        }
-      } catch (profileDeleteError) {
-        logger.warn('ACCOUNT_DELETE', `Profile delete skipped for ${targetUserId}: ${profileDeleteError.message}`);
-      }
-
-      // Delete user from Supabase Auth
-      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId);
-      if (deleteError) {
-        logger.warn('ACCOUNT_DELETE', `Auth deleteUser warning for ${targetUserId}: ${deleteError.message}`);
-      }
+      await deleteUserAccount(targetUserId);
 
       logger.security('ACCOUNT_DELETED', `Account permanently deleted: ${targetUserEmail}`, { userId: targetUserId });
       return res.json({ success: true, message: 'Account permanently deleted' });
@@ -598,8 +583,7 @@ class AuthController {
    *
    * Regular accounts re-enter their current password. The admin account does not:
    * it authenticates against ADMIN_EMAIL/ADMIN_PASSWORD in Server/.env rather than
-   * a Supabase Auth password, so signInWithPassword has nothing to check it against
-   * and the re-entry step could only ever fail. See adminSignIn.
+   * a stored password, so there is nothing to re-verify. See adminSignIn.
    */
   static async changeEmail(req, res) {
     try {
@@ -613,33 +597,34 @@ class AuthController {
         return res.status(400).json({ success: false, error: 'newEmail and currentPassword are required' });
       }
 
+      const normalizedNewEmail = String(newEmail).trim().toLowerCase();
+      const collision = await UserModel.findByEmail(normalizedNewEmail);
+      if (collision && collision.id !== req.user.id) {
+        return res.status(409).json({ success: false, error: 'That email is already in use by another account.' });
+      }
+
       if (!isAdmin) {
-        const { error: verifyError } = await supabaseAdmin.auth.signInWithPassword({
-          email: req.user.email,
-          password: currentPassword,
-        });
-        if (verifyError) {
+        const authUser = await UserModel.findAuthById(req.user.id);
+        if (!authUser || !(await verifyPassword(currentPassword, authUser.password_hash))) {
           logger.security('EMAIL_CHANGE_DENIED', `Incorrect current password for ${req.user.email}`);
           return res.status(401).json({ success: false, error: 'Current password is incorrect' });
         }
       }
 
-      // Skipped for the synthetic `admin-<hex>` id, which has no auth.users row behind
-      // it at all — there the profile row (or the JWT alone) is the whole identity.
-      const hasAuthUser = !String(req.user.id).startsWith('admin-');
-      if (hasAuthUser) {
-        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(req.user.id, {
-          email: newEmail,
-          email_confirm: true,
-        });
-        if (updateError) return res.status(500).json({ success: false, error: updateError.message });
+      let updated;
+      try {
+        updated = await UserModel.updateEmail(req.user.id, normalizedNewEmail);
+      } catch (updateErr) {
+        if (updateErr.code === 11000) {
+          return res.status(409).json({ success: false, error: 'That email is already in use by another account.' });
+        }
+        throw updateErr;
       }
 
-      const updated = await UserModel.updateEmail(req.user.id, newEmail);
-      logger.security('EMAIL_CHANGED', `Email changed for account ${req.user.id}`, { from: req.user.email, to: newEmail });
+      logger.security('EMAIL_CHANGED', `Email changed for account ${req.user.id}`, { from: req.user.email, to: normalizedNewEmail });
 
       const token = jwt.sign(
-        { id: req.user.id, email: newEmail, role: req.user.role },
+        { id: req.user.id, email: normalizedNewEmail, role: req.user.role },
         JWT_SECRET,
         { expiresIn: '7d' }
       );
@@ -648,7 +633,7 @@ class AuthController {
       // this endpoint cannot rewrite the server's environment. Say so plainly rather
       // than letting the next admin login fail for no visible reason.
       const warning = String(req.user.email).toLowerCase() === ADMIN_EMAIL.toLowerCase()
-        ? `Admin login still uses ${ADMIN_EMAIL}. Update ADMIN_EMAIL in Server/.env and restart the server to sign in with ${newEmail}.`
+        ? `Admin login still uses ${ADMIN_EMAIL}. Update ADMIN_EMAIL in Server/.env and restart the server to sign in with ${normalizedNewEmail}.`
         : undefined;
 
       return res.json({ success: true, user: updated, token, warning });
@@ -718,11 +703,8 @@ class AuthController {
         return res.status(400).json({ success: false, error: 'Password is required to disable 2FA' });
       }
 
-      const { error: verifyError } = await supabaseAdmin.auth.signInWithPassword({
-        email: req.user.email,
-        password,
-      });
-      if (verifyError) {
+      const authUser = await UserModel.findAuthById(req.user.id);
+      if (!authUser || !(await verifyPassword(password, authUser.password_hash))) {
         return res.status(401).json({ success: false, error: 'Incorrect password' });
       }
 

@@ -1,52 +1,32 @@
-const { supabaseAdmin } = require('../config/db');
+const Order = require('./schemas/Order');
 
-/**
- * PostgREST answers a write against a column the table doesn't have with
- * PGRST204 and a message no one can act on. `shiprocket` is exactly that column
- * until Server/sql/orders_fulfillment.sql is run, so translate it into the
- * instruction that actually fixes it.
- */
-function rethrowWithMigrationHint(error) {
-  // PGRST204 comes back from a write ("column not found in schema cache"),
-  // 42703 from a read ("column orders.shiprocket does not exist").
-  const missingColumn = error?.code === 'PGRST204' || error?.code === '42703';
-  if (missingColumn && /shiprocket/i.test(error.message || '')) {
-    const err = new Error(
-      'The orders table has no `shiprocket` column yet — run Server/sql/orders_fulfillment.sql in the Supabase SQL editor, then retry.'
-    );
-    err.code = 'MISSING_MIGRATION';
-    throw err;
-  }
-  throw error;
-}
-
-function toApi(row) {
-  if (!row) return null;
+function toApi(doc) {
+  if (!doc) return null;
   return {
-    id: row.id,
-    userId: row.user_id,
-    name: row.name,
-    email: row.email,
-    phone: row.phone,
-    items: row.items,
-    subtotal: row.subtotal,
-    deliveryFee: row.delivery_fee,
-    total: row.total,
-    paymentMethod: row.payment_method,
-    deliveryMethod: row.delivery_method,
-    status: row.status,
-    shippingAddress: row.shipping_address,
-    shiprocket: row.shiprocket || null,
-    payment: row.payment || null,
-    createdAt: row.created_at,
+    id: doc._id,
+    userId: doc.user_id ? String(doc.user_id) : null,
+    name: doc.name,
+    email: doc.email,
+    phone: doc.phone,
+    items: doc.items,
+    subtotal: doc.subtotal,
+    deliveryFee: doc.delivery_fee,
+    total: doc.total,
+    paymentMethod: doc.payment_method,
+    deliveryMethod: doc.delivery_method,
+    status: doc.status,
+    shippingAddress: doc.shipping_address,
+    shiprocket: doc.shiprocket || null,
+    payment: doc.payment || null,
+    createdAt: doc.created_at,
   };
 }
 
 class OrderModel {
   static async create(order) {
     const id = '#NQ-' + Math.floor(100000 + Math.random() * 899999);
-    const payload = {
-      id,
+    const doc = await Order.create({
+      _id: id,
       user_id: order.userId || null,
       name: order.name,
       email: order.email,
@@ -58,114 +38,57 @@ class OrderModel {
       payment_method: order.paymentMethod || 'upi',
       delivery_method: order.deliveryMethod || 'standard',
       shipping_address: order.shippingAddress || null,
-    };
-
-    const { data, error } = await supabaseAdmin
-      .from('orders')
-      .insert(payload)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return toApi(data);
+    });
+    return toApi(doc);
   }
 
   static async getAllByUser(userId) {
-    const { data, error } = await supabaseAdmin
-      .from('orders')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return (data || []).map(toApi);
+    const docs = await Order.find({ user_id: userId }).sort({ created_at: -1 }).lean();
+    return docs.map(toApi);
   }
 
   static async getAll(limit = 500) {
-    const { data, error } = await supabaseAdmin
-      .from('orders')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
-    if (error) throw error;
-    return (data || []).map(toApi);
+    const docs = await Order.find().sort({ created_at: -1 }).limit(limit).lean();
+    return docs.map(toApi);
   }
 
   static async updateStatus(id, status) {
-    const { data, error } = await supabaseAdmin
-      .from('orders')
-      .update({ status })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return toApi(data);
+    const doc = await Order.findByIdAndUpdate(id, { $set: { status } }, { new: true }).lean();
+    return toApi(doc);
   }
 
   static async getById(id) {
-    const { data, error } = await supabaseAdmin
-      .from('orders')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) throw error;
-    return toApi(data);
+    const doc = await Order.findById(id).lean();
+    return toApi(doc);
   }
 
   /** Persist the Razorpay order/payment result on an order (see paymentController) */
   static async attachPaymentInfo(id, paymentData) {
-    const { data, error } = await supabaseAdmin
-      .from('orders')
-      .update({ payment: paymentData })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return toApi(data);
+    const update = { payment: paymentData };
+    if (paymentData?.razorpayOrderId) update.razorpayOrderId = paymentData.razorpayOrderId;
+    const doc = await Order.findByIdAndUpdate(id, { $set: update }, { new: true }).lean();
+    return toApi(doc);
   }
 
   /** Reverse lookup for the Razorpay webhook, which only knows Razorpay's own ids. */
   static async getByRazorpayOrderId(razorpayOrderId) {
-    const { data, error } = await supabaseAdmin
-      .from('orders')
-      .select('*')
-      .eq('payment->>razorpayOrderId', razorpayOrderId)
-      .maybeSingle();
-
-    if (error) throw error;
-    return toApi(data);
+    const doc = await Order.findOne({ razorpayOrderId }).lean();
+    return toApi(doc);
   }
 
   /** Reverse lookup for the Shiprocket webhook, which is keyed by AWB. */
   static async getByAwb(awbCode) {
-    const { data, error } = await supabaseAdmin
-      .from('orders')
-      .select('*')
-      .eq('shiprocket->>awbCode', awbCode)
-      .maybeSingle();
-
-    if (error) rethrowWithMigrationHint(error);
-    return toApi(data);
+    const doc = await Order.findOne({ awbCode }).lean();
+    return toApi(doc);
   }
 
   /** Persist the Shiprocket shipment result on an order and optionally flip its status */
   static async attachShiprocketInfo(id, shiprocketData, newStatus = null) {
-    const payload = { shiprocket: shiprocketData };
-    if (newStatus) payload.status = newStatus;
-
-    const { data, error } = await supabaseAdmin
-      .from('orders')
-      .update(payload)
-      .eq('id', id)
-      .select()
-      .maybeSingle();
-
-    if (error) rethrowWithMigrationHint(error);
-    return toApi(data);
+    const update = { shiprocket: shiprocketData };
+    if (shiprocketData?.awbCode) update.awbCode = shiprocketData.awbCode;
+    if (newStatus) update.status = newStatus;
+    const doc = await Order.findByIdAndUpdate(id, { $set: update }, { new: true }).lean();
+    return toApi(doc);
   }
 
   /**
@@ -178,7 +101,7 @@ class OrderModel {
    *
    * Takes the whole batch rather than one event at a time: a poll returns the
    * courier's entire scan history, and writing it row-by-row would mean a dozen
-   * read-modify-write round-trips racing each other over one JSON column.
+   * read-modify-write round-trips racing each other over one field.
    */
   static async recordDeliveryUpdate(id, patch = {}, events = [], newStatus = null) {
     const order = await OrderModel.getById(id);
@@ -199,22 +122,12 @@ class OrderModel {
   }
 
   static async delete(id) {
-    const { error } = await supabaseAdmin
-      .from('orders')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
+    await Order.findByIdAndDelete(id);
     return true;
   }
 
   static async deleteAll() {
-    const { error } = await supabaseAdmin
-      .from('orders')
-      .delete()
-      .not('id', 'is', null);
-
-    if (error) throw error;
+    await Order.deleteMany({});
     return true;
   }
 }
