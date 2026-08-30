@@ -95,11 +95,11 @@ class ProductModel {
   }
 
   /**
-   * Fetch all stickers owned by a given user.
+   * Fetch all stickers owned by a given user. Excludes soft-deleted stickers.
    */
   static async getAllByUser(userId) {
     try {
-      const docs = await Sticker.find({ user_id: userId }).sort({ created_at: -1 }).lean();
+      const docs = await Sticker.find({ user_id: userId, deleted_at: null }).sort({ created_at: -1 }).lean();
       return docs.map(toApi);
     } catch (err) {
       console.error('ProductModel.getAllByUser Error:', err);
@@ -185,7 +185,7 @@ class ProductModel {
 
   static async getById(productId) {
     try {
-      const doc = await Sticker.findById(productId).lean();
+      const doc = await Sticker.findOne({ _id: productId, deleted_at: null }).lean();
       return toApi(doc);
     } catch (err) {
       console.error(`ProductModel.getById (${productId}) Error:`, err);

@@ -233,8 +233,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
       <QuickLookModal qr={quickLookQr} onClose={() => setQuickLookQr(null)} stickerPos={stickerPos} templates={templates} />
       <RestoreStickerModal
         isOpen={restoreModalOpen} onClose={() => setRestoreModalOpen(false)}
-        qrList={qrList} setQrList={setQrList}
-        templates={templates} openQuickLook={setQuickLookQr} setToast={setToast}
+        setQrList={setQrList} openQuickLook={setQuickLookQr} setToast={setToast}
       />
       <Toast msg={toast} />
     </div>

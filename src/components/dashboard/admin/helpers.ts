@@ -43,6 +43,16 @@ export function fmtDateTime(d: string) {
   }
 }
 
+/**
+ * A sticker's own id — cryptographically random (Web Crypto's CSPRNG), unlike
+ * uid() below which uses Math.random() and a namespace small enough to be
+ * guessable. Used directly in the QR/scan URL; the backend also mints a
+ * separate hashed recovery code at creation for admin-only restore.
+ */
+export function generateStickerId(): string {
+  return crypto.randomUUID();
+}
+
 export function uid(prefix = "QR") {
   const digits = "0123456789";
   const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";

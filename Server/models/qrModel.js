@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const Sticker = require('./schemas/Sticker');
 const ChatSession = require('./schemas/ChatSession');
 const ChatMessage = require('./schemas/ChatMessage');
@@ -30,6 +31,19 @@ function toPublicQr(doc) {
   };
 }
 
+// 12 hex characters (0-9, A-F only — no ambiguous 0/O or 1/I/l) from a CSPRNG:
+// 48 bits of entropy, printed once on generation and never stored in plaintext.
+function generateRecoveryCode() {
+  return crypto.randomBytes(6).toString('hex').toUpperCase();
+}
+
+// Recovery codes are high-entropy random tokens, not user-chosen passwords —
+// a fast one-way hash (matching passwordResetService's reset-token pattern)
+// is the right tool here, not bcrypt.
+function hashRecoveryCode(rawCode) {
+  return crypto.createHash('sha256').update(String(rawCode || '').toUpperCase().trim()).digest('hex');
+}
+
 /**
  * Which account (if any) an activation should link the sticker to.
  *
@@ -60,11 +74,11 @@ async function resolveOwnerId(userId, ownerPhone) {
 class QrModel {
   /**
    * Admin fleet view — owner info is on the same document now (previously a
-   * join against a separate `products` table).
+   * join against a separate `products` table). Excludes soft-deleted stickers.
    */
   static async getAll(limit = 100) {
     try {
-      const docs = await Sticker.find().sort({ created_at: -1 }).limit(limit).lean();
+      const docs = await Sticker.find({ deleted_at: null }).sort({ created_at: -1 }).limit(limit).lean();
       return docs.map((doc) => ({
         id: doc._id,
         client_id: doc.client_id,
@@ -88,11 +102,12 @@ class QrModel {
   }
 
   /**
-   * PUBLIC lookup (unauthenticated scan page) — see PUBLIC_QR_FIELDS.
+   * PUBLIC lookup (unauthenticated scan page) — see PUBLIC_QR_FIELDS. A
+   * soft-deleted sticker reads as not-found, same as a real 404.
    */
   static async getById(qrId) {
     try {
-      const doc = await Sticker.findById(qrId).select(PUBLIC_QR_FIELDS).lean();
+      const doc = await Sticker.findOne({ _id: qrId, deleted_at: null }).select(PUBLIC_QR_FIELDS).lean();
       return toPublicQr(doc);
     } catch (err) {
       console.error(`QrModel.getById (${qrId}) Error:`, err);
@@ -104,6 +119,10 @@ class QrModel {
    * Save or update a QR code fleet record (colors/template/status). Only
    * touches qr-side fields via $set, so an admin editing a batch's template
    * can never clobber an owner's details/user_id sitting on the same document.
+   *
+   * On first creation, mints a recovery code and returns the raw value
+   * exactly once (only the SHA-256 hash is persisted) — see
+   * restoreByRecoveryCode. Editing an existing record never touches it.
    */
   static async save(qrData) {
     try {
@@ -120,16 +139,23 @@ class QrModel {
         bg_color: qrData.bgColor || qrData.bg_color || 'FFFFFF',
       };
 
-      const doc = await Sticker.findByIdAndUpdate(
-        id,
-        {
-          $set: payload,
-          $setOnInsert: { created_at: qrData.createdAt || qrData.created_at || new Date() },
-        },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
-      ).select(PUBLIC_QR_FIELDS).lean();
+      const existing = await Sticker.findById(id).select('_id').lean();
 
-      return toPublicQr(doc);
+      if (existing) {
+        const doc = await Sticker.findByIdAndUpdate(id, { $set: payload }, { new: true })
+          .select(PUBLIC_QR_FIELDS).lean();
+        return toPublicQr(doc);
+      }
+
+      const rawRecoveryCode = generateRecoveryCode();
+      const doc = await Sticker.create({
+        _id: id,
+        ...payload,
+        recovery_code_hash: hashRecoveryCode(rawRecoveryCode),
+        created_at: qrData.createdAt || qrData.created_at || new Date(),
+      });
+
+      return { ...toPublicQr(doc), recoveryCode: rawRecoveryCode };
     } catch (err) {
       console.error('QrModel.save Error:', err);
       return null;
@@ -144,7 +170,7 @@ class QrModel {
    * the controller never reports success:true on a failed activation.
    */
   static async activate(qrId, activationData) {
-    const current = await Sticker.findById(qrId).select('details user_id category').lean();
+    const current = await Sticker.findOne({ _id: qrId, deleted_at: null }).select('details user_id category').lean();
     if (!current) {
       throw new Error(`QR code ${qrId} not found`);
     }
@@ -193,8 +219,8 @@ class QrModel {
    */
   static async recordScan(qrId) {
     try {
-      const doc = await Sticker.findByIdAndUpdate(
-        qrId,
+      const doc = await Sticker.findOneAndUpdate(
+        { _id: qrId, deleted_at: null },
         { $inc: { scans_count: 1 }, $set: { last_scanned_at: new Date() } },
         { new: true }
       ).select(PUBLIC_QR_FIELDS).lean();
@@ -206,9 +232,12 @@ class QrModel {
   }
 
   /**
-   * Delete a QR Code record and everything that references it. Errors
-   * propagate (not caught-and-swallowed) so the caller gets a real failure
-   * instead of a false success.
+   * Delete a QR Code record — soft delete: sets deleted_at rather than
+   * removing the document, so its recovery_code_hash survives for a later
+   * restoreByRecoveryCode call. Chat/alert history tied to it is still hard
+   * -deleted here (that history isn't part of what recovery brings back).
+   * Errors propagate (not caught-and-swallowed) so the caller gets a real
+   * failure instead of a false success.
    */
   static async delete(qrId) {
     const sessions = await ChatSession.find({ qr_code_id: qrId }).select('_id').lean();
@@ -220,13 +249,18 @@ class QrModel {
 
     await Alert.deleteMany({ sticker_id: qrId });
 
-    const doc = await Sticker.findByIdAndDelete(qrId).select(PUBLIC_QR_FIELDS).lean();
+    const doc = await Sticker.findByIdAndUpdate(
+      qrId,
+      { $set: { deleted_at: new Date(), status: 'inactive' } },
+      { new: true }
+    ).select(PUBLIC_QR_FIELDS).lean();
     return toPublicQr(doc);
   }
 
   /**
-   * Delete all QR Code records and their dependents (see delete() above for
-   * why this cannot swallow errors).
+   * Delete all QR Code records and their dependents. An explicit bulk wipe,
+   * not a mistake-recovery scenario — unlike delete(), this really does
+   * remove everything (see deleteAll() above for why this cannot swallow errors).
    */
   static async deleteAll() {
     await ChatMessage.deleteMany({});
@@ -234,6 +268,29 @@ class QrModel {
     await Alert.deleteMany({});
     await Sticker.deleteMany({});
     return true;
+  }
+
+  /**
+   * Admin recovery: restore a soft-deleted sticker on proof of possession of
+   * its printed recovery code. `not_found` and `invalid_code` deliberately
+   * share one outcome/message upstream — telling them apart would let a
+   * caller use the response to enumerate valid sticker IDs.
+   */
+  static async restoreByRecoveryCode(id, rawRecoveryCode) {
+    if (!id || !rawRecoveryCode) return { ok: false, reason: 'missing_fields' };
+
+    const doc = await Sticker.findById(id).select('+recovery_code_hash deleted_at').lean();
+    if (!doc || !doc.recovery_code_hash) return { ok: false, reason: 'not_found' };
+    if (hashRecoveryCode(rawRecoveryCode) !== doc.recovery_code_hash) return { ok: false, reason: 'not_found' };
+    if (!doc.deleted_at) return { ok: false, reason: 'not_deleted' };
+
+    const restored = await Sticker.findByIdAndUpdate(
+      id,
+      { $set: { deleted_at: null, recovered_at: new Date() } },
+      { new: true }
+    ).select(PUBLIC_QR_FIELDS).lean();
+
+    return { ok: true, data: toPublicQr(restored) };
   }
 }
 

@@ -3,10 +3,22 @@ const { Schema, model } = require('mongoose');
 // Merged collection: was two Postgres tables (qr_codes + products), 1:1 via
 // products.qr_code_id, always read/written together — see migration plan.
 const stickerSchema = new Schema({
-  // The sticker code itself (printed on the physical sticker, used in
-  // /scan/:id) — not an auto-generated ObjectId.
+  // crypto.randomUUID() — cryptographically random, unlike the old 6-character
+  // Math.random()-based code, which had a small enough namespace (~17.6M
+  // combinations) to make enumeration/guessing a real concern.
   _id: { type: String },
   status: { type: String, enum: ['active', 'inactive', 'lost', 'replaced'], default: 'inactive' },
+  // SHA-256 hash of a server-generated recovery code, shown to the admin
+  // exactly once at creation and never stored/retrievable in plaintext.
+  // Proves possession of the physical sticker's printed backup code before
+  // a soft-deleted record can be restored — see QrModel.restoreByRecoveryCode.
+  recovery_code_hash: { type: String, default: null, select: false },
+  // Soft delete: the admin "delete" action sets this instead of removing the
+  // document, so the sticker's identity (and its recovery code hash) survive
+  // for a later recovery-code-verified restore. Excluded from public/admin
+  // listings by default.
+  deleted_at: { type: Date, default: null, index: true },
+  recovered_at: { type: Date, default: null },
   scans_count: { type: Number, default: 0 },
   last_scanned_at: { type: Date, default: null },
   template_name: { type: String, default: 'Standard Badge' },

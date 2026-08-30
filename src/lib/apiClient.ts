@@ -346,6 +346,13 @@ export const apiClient = {
       });
     },
 
+    async restoreQrCode(qrId: string, recoveryCode: string) {
+      return request<{ success: boolean; data?: any; error?: string }>(`/qr/${qrId}/restore`, {
+        method: 'POST',
+        body: JSON.stringify({ recoveryCode }),
+      });
+    },
+
     async sendActivationOtp(qrId: string, phoneNumber: string) {
       return request<{ success: boolean; simulated?: boolean; error?: string }>(`/qr/${qrId}/send-activation-otp`, {
         method: 'POST',

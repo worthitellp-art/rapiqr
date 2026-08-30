@@ -186,6 +186,39 @@ class QrController {
       return res.status(500).json({ success: false, error: err.message });
     }
   }
+
+  /**
+   * Restore a soft-deleted sticker on proof of its printed recovery code.
+   * `not_found` covers both "no such sticker" and "wrong code" so the
+   * response can't be used to enumerate valid sticker IDs.
+   */
+  static async restoreQrCode(req, res) {
+    try {
+      const { id } = req.params;
+      const { recoveryCode } = req.body || {};
+      if (!recoveryCode) {
+        return res.status(400).json({ success: false, error: 'recoveryCode is required' });
+      }
+
+      const result = await QrModel.restoreByRecoveryCode(id, recoveryCode);
+      if (!result.ok) {
+        const messages = {
+          missing_fields: 'A sticker ID and recovery code are required.',
+          not_found: 'No sticker found with that ID and recovery code.',
+          not_deleted: 'This sticker is not currently deleted — nothing to restore.',
+        };
+        logger.security('QR_RESTORE_DENIED', `Restore attempt failed for ${id} (${result.reason}) by admin ${req.user.email}`);
+        const status = result.reason === 'not_deleted' ? 400 : 404;
+        return res.status(status).json({ success: false, error: messages[result.reason] || 'Restore failed.' });
+      }
+
+      logger.security('QR_RESTORED', `Sticker ${id} restored via recovery code by admin ${req.user.email}`);
+      return res.json({ success: true, data: result.data });
+    } catch (err) {
+      logger.error('QR_RESTORE', `Failed to restore QR: ${req.params.id}`, err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
 }
 
 module.exports = QrController;

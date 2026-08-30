@@ -4,10 +4,11 @@ import { Plus, Sparkles, Download, Trash2, RefreshCw, Tag, Phone, ChevronLeft, C
 import StatusPill from "./StatusPill";
 import StickerThumb from "./StickerThumb";
 import { QrRecord, Template } from "./types";
-import { uid, qrFullUrl, fmtDate, dispatchActivationToUserDashboard } from "./helpers";
+import { uid, generateStickerId, qrFullUrl, fmtDate, dispatchActivationToUserDashboard } from "./helpers";
 import { apiClient } from "../../../lib/apiClient";
 import { STICKER_CATEGORIES, getCategoryIcon, getCategoryLabel } from "../../../stickerModules";
 import ConfirmModal from "./ConfirmModal";
+import RecoveryCodeModal from "./RecoveryCodeModal";
 import QrRowActions from "./QrRowActions";
 
 export default function QrCodesPage({
@@ -24,6 +25,7 @@ export default function QrCodesPage({
   const [bulkProgress, setBulkProgress] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<QrRecord | null>(null);
   const [clearAllOpen, setClearAllOpen] = useState(false);
+  const [recoveryModal, setRecoveryModal] = useState<{ stickerId: string; recoveryCode: string } | null>(null);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
 
@@ -52,7 +54,7 @@ export default function QrCodesPage({
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   function buildQrRecord(targetCategory: string): QrRecord {
-    const codeId = uid();
+    const codeId = generateStickerId();
     return {
       id: codeId,
       clientId: uid("CL"),
@@ -67,13 +69,19 @@ export default function QrCodesPage({
     };
   }
 
-  function handleGenerateSingle() {
+  async function handleGenerateSingle() {
     const rec = buildQrRecord(selectedCategory);
     rec.qrUrl = qrFullUrl(rec.id);
 
     setQrList((prev) => [rec, ...prev]);
-    apiClient.qr.saveQrCode({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, category: rec.category, fgColor: rec.fg, bgColor: rec.bg })
-      .catch((err) => console.warn(`Failed to save QR ${rec.id} to backend:`, err));
+    try {
+      const res = await apiClient.qr.saveQrCode({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, category: rec.category, fgColor: rec.fg, bgColor: rec.bg });
+      if (res?.data?.recoveryCode) {
+        setRecoveryModal({ stickerId: rec.id, recoveryCode: res.data.recoveryCode });
+      }
+    } catch (err) {
+      console.warn(`Failed to save QR ${rec.id} to backend:`, err);
+    }
 
     setToast(`Generated 1 ${rec.category || "Car"} Tag`);
     setTimeout(() => setToast(null), 3000);
@@ -92,13 +100,19 @@ export default function QrCodesPage({
 
     setQrList((prev) => [...batch, ...prev]);
 
+    // Each sticker's recovery code is returned exactly once by the backend at
+    // creation and never stored in plaintext — collected here so the whole
+    // batch's codes can be handed to the admin in one file immediately after.
+    const recoveryRows: [string, string][] = [];
+
     const CHUNK = 50;
     for (let i = 0; i < batch.length; i += CHUNK) {
       const slice = batch.slice(i, i + CHUNK);
       // No bulk endpoint on the backend — save one at a time.
       for (const qr of slice) {
         try {
-          await apiClient.qr.saveQrCode(qr);
+          const res = await apiClient.qr.saveQrCode(qr);
+          if (res?.data?.recoveryCode) recoveryRows.push([qr.id, res.data.recoveryCode]);
         } catch (err) {
           console.warn(`Failed to save QR ${qr.id} to backend:`, err);
         }
@@ -108,8 +122,24 @@ export default function QrCodesPage({
 
     batch.forEach((item) => dispatchActivationToUserDashboard(item));
     setBulkProgress(null);
-    setToast(`${count} QR codes generated & synced`);
-    setTimeout(() => setToast(null), 3000);
+
+    if (recoveryRows.length > 0) {
+      downloadRecoveryCodesCsv(recoveryRows);
+      setToast(`${count} QR codes generated — recovery codes downloaded, keep them safe`);
+    } else {
+      setToast(`${count} QR codes generated & synced`);
+    }
+    setTimeout(() => setToast(null), 5000);
+  }
+
+  function downloadRecoveryCodesCsv(rows: [string, string][]) {
+    const csvRows = [["Sticker ID", "Recovery Code"], ...rows];
+    const csv = csvRows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `rapiqr-recovery-codes-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
   }
 
   function downloadCsv() {
@@ -413,7 +443,8 @@ export default function QrCodesPage({
         message={
           <>
             Are you sure you want to delete <span className="font-bold text-[#17181A]">{deleteTarget?.id}</span>?
-            This cannot be undone.
+            It will disappear from the fleet list, but can be brought back later via Restore Sticker using its
+            printed recovery code.
           </>
         }
         onConfirm={async () => {
@@ -467,6 +498,12 @@ export default function QrCodesPage({
           setTimeout(() => setToast(null), 1500);
         }}
         onClose={() => setClearAllOpen(false)}
+      />
+      <RecoveryCodeModal
+        isOpen={recoveryModal !== null}
+        stickerId={recoveryModal?.stickerId || ""}
+        recoveryCode={recoveryModal?.recoveryCode || ""}
+        onClose={() => setRecoveryModal(null)}
       />
     </div>
   );
