@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { getQrCodeByIdFromDb, activateQrInDb, sendActivationNotifications } from "../../lib/supabaseService";
 import { useAuth } from "../../context/AuthContext";
 import { getStickerCategoryLabel, getCategoryIcon, getCategoryLabel } from "../../stickerModules";
 import PhoneInputWithCountry from "../common/PhoneInputWithCountry";
@@ -1193,7 +1192,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
     if (!found) {
       // Try DB lookup (async, but we'll run it and handle result)
-      getQrCodeByIdFromDb(cleanQrId).then((dbRecord) => {
+      apiClient.qr.getQrCodeById(cleanQrId).then((res) => {
+        const dbRecord = res?.data || null;
         if (dbRecord) {
           const dbFound = {
             id: dbRecord.id,
@@ -1277,11 +1277,10 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       .filter((c) => c.name.trim() && isValidContactPhone(c.phone))
       .map((c) => ({ name: c.name.trim(), relationship: c.relationship.trim() || "Contact", phone: c.phone.trim() }));
 
-    // Save to Supabase / Backend with guaranteed fallback
+    // Save to the backend, with a guaranteed local-storage fallback below.
     let activationResult: any = { success: true };
     try {
-      const res = await activateQrInDb({
-        qrId: qrData.id,
+      const res = await apiClient.qr.activateQrCode(qrData.id, {
         category: qrData.category || "car",
         ownerName: effectiveName,
         ownerPhone: fullPhone,
@@ -1291,7 +1290,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         address: regAddress.trim(),
         userId: profile?.id,
       });
-      if (res) activationResult = res;
+      if (res?.data) activationResult = res.data;
     } catch (err: any) {
       console.warn("Server activation fallback to local storage:", err);
     }
@@ -1361,7 +1360,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       setActivatingQr(false);
 
       // Fire-and-forget: confirmation + sample "what responders see" test-scan email.
-      sendActivationNotifications({
+      apiClient.notifications.sendActivationConfirmation({
         qrId: qrData.id,
         ownerName: effectiveName,
         category: qrData.category,

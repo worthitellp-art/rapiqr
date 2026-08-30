@@ -306,8 +306,8 @@ function EmailForm({ profile, refreshProfile, showToast }: any) {
   const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
   // The admin signs in against ADMIN_EMAIL/ADMIN_PASSWORD from the server env, not a
-  // Supabase Auth password — there is nothing for a re-entry check to verify, so the
-  // server skips it for admin and this form drops the field to match.
+  // stored account password — there is nothing for a re-entry check to verify, so
+  // the server skips it for admin and this form drops the field to match.
   const isAdminAccount = profile?.role === 'admin';
 
   const handleSave = async () => {

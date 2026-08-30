@@ -4,7 +4,6 @@ import { Save, Grid3X3, Lock, Unlock, Magnet, Check, ShieldCheck } from "lucide-
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
 import { qrImageUrl } from "./helpers";
 import { StickerPos } from "./types";
-import { saveTemplateToDb } from "../../../lib/supabaseService";
 
 const STICKER_SRC = stickerTemplateImg;
 const EDITOR_DISPLAY = { w: 320, h: 200 };
@@ -130,13 +129,8 @@ export default function StickerEditor({
         /* ignore */
       }
 
-      await saveTemplateToDb({
-        name: "Default Sticker Layout",
-        fgColor: "000000",
-        bgColor: "FFFFFF",
-        stickerPos: currentPos,
-        isDefault: true,
-      });
+      // NOTE: there is no /api/templates backend endpoint yet — sticker layout
+      // templates are local-only for now (localStorage above is the persistence).
 
       setSaveState("saved");
       setToast("Default sticker position saved!");

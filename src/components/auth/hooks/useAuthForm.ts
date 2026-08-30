@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import { supabase, isSupabaseConfigured, getAuthCallbackUrl } from '../../../lib/supabase';
 
 export type AuthMode = 'login' | 'signup';
 export type AuthStep = 'list' | 'email' | 'forgot';

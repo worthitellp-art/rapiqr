@@ -1,7 +1,6 @@
 import type React from "react";
 import { useState, useEffect } from "react";
 import { useAuth } from "../../../context/AuthContext";
-import { getTemplatesFromDb, getReportsFromDb, getQrCodesFromDb } from "../../../lib/supabaseService";
 import { useLocalStorage } from "./useLocalStorage";
 import { QrRecord, Template, StickerPos } from "./types";
 import { qrFullUrl } from "./helpers";
@@ -62,15 +61,15 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     if (!isAdmin) return;
     const update = () => {
-      getReportsFromDb().then((dbReports) => {
-        let combined: any[] = dbReports || [];
+      apiClient.alerts.getAlerts().then((res) => {
+        let combined: any[] = res?.data || [];
         try {
           const local = JSON.parse(localStorage.getItem("repiqr-reports") || localStorage.getItem("namoqr-reports") || "[]");
           const existingIds = new Set(combined.map((r) => r.id));
           combined = [...local.filter((r: any) => !existingIds.has(r.id)), ...combined];
         } catch { /* ignore */ }
         setUnreadAlerts(combined.filter((r: any) => r.status !== "resolved").length);
-      });
+      }).catch(() => { /* transient network error */ });
     };
     update();
     const onUpdated = () => update();
@@ -100,7 +99,8 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     if (!isAdmin) return;
     const sync = () => {
-      getQrCodesFromDb(500).then((rows) => {
+      apiClient.qr.getQrCodes(500).then((res) => {
+        const rows = res?.data;
         if (!rows) return;
         const mapped: QrRecord[] = rows.map((r: any) => ({
           id: r.id,
@@ -121,7 +121,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
           const localOnly = prev.filter((r) => !backendIds.has(r.id));
           return [...mapped, ...localOnly];
         });
-      });
+      }).catch(() => { /* transient network error */ });
     };
     sync();
     const interval = setInterval(sync, 15000);
@@ -150,25 +150,11 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
     setSearchQuery("");
   }, [page, isAdmin]);
 
-  // Sync templates & stickerPos from Supabase
-  useEffect(() => {
-    getTemplatesFromDb().then((dbTemplates) => {
-      if (dbTemplates && dbTemplates.length > 0) {
-        const mapped: Template[] = dbTemplates.map((t: any) => ({
-          id: t.id,
-          name: t.name,
-          fg: t.fg_color,
-          bg: t.bg_color,
-          logo: null,
-          stickerPos: t.sticker_pos || { x: 110, y: 40, w: 100, h: 100 },
-          isPublicDefault: t.is_default,
-        }));
-        setTemplates(mapped);
-        const defTpl = dbTemplates.find((t: any) => t.is_default);
-        if (defTpl?.sticker_pos) setStickerPos(defTpl.sticker_pos);
-      }
-    });
-  }, []);
+  // NOTE: sticker template sync previously read from a direct Supabase
+  // `templates` table with no backend endpoint behind it. There is no
+  // /api/templates route yet, so this is a no-op for now (templates are
+  // effectively local-only, same as the real behavior before this migration
+  // since that direct Supabase path was already unconfigured/dormant).
 
   return (
     <div

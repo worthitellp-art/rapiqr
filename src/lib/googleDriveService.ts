@@ -1,5 +1,5 @@
 import { QrRecord, StickerPos } from "../components/dashboard/admin/types";
-import { saveQrCodeToDb, bulkSaveQrCodesToDb } from "./supabaseService";
+import { apiClient } from "./apiClient";
 
 export interface GoogleDriveConfig {
   accessToken: string;
@@ -422,9 +422,15 @@ export async function restoreFromBackupPackage(
     } catch { /* ignore */ }
   }
 
-  // Bulk sync restored records to Supabase / Backend DB
+  // Bulk sync restored records to the backend (no bulk endpoint — loop single saves)
   if (qrItems.length > 0) {
-    await bulkSaveQrCodesToDb(qrItems);
+    for (const qr of qrItems) {
+      try {
+        await apiClient.qr.saveQrCode(qr);
+      } catch (err) {
+        console.warn(`Failed to sync restored QR ${(qr as any)?.id} to backend:`, err);
+      }
+    }
   }
 
   return { restoredCount: qrItems.length };

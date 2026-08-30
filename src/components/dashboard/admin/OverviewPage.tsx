@@ -10,7 +10,7 @@ import { QrRecord, Template } from "./types";
 import { fmtDate } from "./helpers";
 import QrRowActions from "./QrRowActions";
 import ConfirmModal from "./ConfirmModal";
-import { deleteQrCodeFromDb } from "../../../lib/supabaseService";
+import { apiClient } from "../../../lib/apiClient";
 
 interface OverviewPageProps {
   qrList: QrRecord[];
@@ -438,7 +438,7 @@ export default function OverviewPage({
           if (deleteTarget) {
             const targetId = deleteTarget.id;
             setDeleteTarget(null);
-            const deleted = await deleteQrCodeFromDb(targetId);
+            const deleted = await apiClient.qr.deleteQrCode(targetId).then((res) => res?.success).catch(() => false);
             if (!deleted) {
               setToast(`Failed to delete ${targetId} — it still exists in the database. Please try again.`);
               setTimeout(() => setToast(null), 3000);

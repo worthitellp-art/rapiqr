@@ -1,5 +1,5 @@
 import { QrRecord, StickerPos } from "./types";
-import { saveStickerImageToDb } from "../../../lib/supabaseService";
+import { apiClient } from "../../../lib/apiClient";
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
 
 const STICKER_SRC = stickerTemplateImg;
@@ -106,9 +106,18 @@ export async function compositeQrOnSticker(qrDataUrl: string, pos: StickerPos): 
   });
 }
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
 /**
- * Generate the composed sticker image for a QR record and persist it to Supabase
- * (uploads to the Stickers bucket + stores the public URL on the qr_codes row).
+ * Generate the composed sticker image for a QR record and persist it to the
+ * backend (uploads to object storage + stores the public URL on the sticker record).
  */
 export async function saveGeneratedSticker(rec: QrRecord, pos: StickerPos) {
   try {
@@ -127,7 +136,9 @@ export async function saveGeneratedSticker(rec: QrRecord, pos: StickerPos) {
     if (!qrDataUrl) return null;
     const blob = await compositeQrOnSticker(qrDataUrl, pos);
     if (!blob) return null;
-    return await saveStickerImageToDb(rec.id, blob);
+    const dataUrl = await blobToDataUrl(blob);
+    const res = await apiClient.qr.saveStickerImage(rec.id, dataUrl);
+    return res?.stickerImage || (res as any)?.data?.sticker_image || res?.data || null;
   } catch (err) {
     console.warn("Failed to save generated sticker image:", err);
     return null;

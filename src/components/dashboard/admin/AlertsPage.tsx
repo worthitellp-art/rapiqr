@@ -4,7 +4,7 @@ import { AlertTriangle, Bell, CheckCircle2, ShieldAlert, Clock, MessageSquare, P
 import StatusPill from "./StatusPill";
 import { QrRecord, Template, SystemAlertItem } from "./types";
 import { fmtDateTime } from "./helpers";
-import { getReportsFromDb } from "../../../lib/supabaseService";
+import { apiClient } from "../../../lib/apiClient";
 
 export default function AlertsPage({
   qrList, setQrList, templates, setToast, searchQuery, isAdmin,
@@ -16,12 +16,14 @@ export default function AlertsPage({
   const [reports, setReports] = useState<any[]>([]);
   const [expandedAlert, setExpandedAlert] = useState<string | null>(null);
 
-  // Fetch reports from Supabase & LocalStorage (real reports only — no mocks).
+  // Fetch reports from the backend & LocalStorage (real reports only — no mocks).
   // GET /api/alerts is admin-only (reporter phone + GPS location) — client accounts
   // can never pass verifyAdmin, so skip the backend call entirely for them rather
   // than polling it into a permanent 401 loop every 15s.
   const loadReports = useCallback(() => {
-    const reportsPromise = isAdmin ? getReportsFromDb() : Promise.resolve(null);
+    const reportsPromise = isAdmin
+      ? apiClient.alerts.getAlerts().then((res) => res?.data || null).catch(() => null)
+      : Promise.resolve(null);
     reportsPromise.then((dbReports) => {
       let combined: any[] = dbReports || [];
       try {

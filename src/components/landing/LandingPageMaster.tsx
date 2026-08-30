@@ -47,7 +47,7 @@ import {
   getUserDistributorApplication,
   DistributorApplication,
 } from '../../lib/distributorService';
-import { submitProviderApplication } from '../../lib/supabaseService';
+import { apiClient } from '../../lib/apiClient';
 import { SERVICE_TYPES } from '../scan/tileActions';
 import { getServiceMeta } from '../scan/serviceMeta';
 import { STICKER_CATEGORIES } from '../../stickerModules';
@@ -1217,18 +1217,24 @@ export default function LandingPageMaster({
     setJoinSubmitting(true);
     setJoinError(null);
     const type = joinServiceType;
-    const saved = await submitProviderApplication({
+    let saved = null;
+    try {
       // The legacy label is what the bespoke car/bike scan screen looks providers
       // up by, so it stays authoritative alongside the slug.
-      category: type.legacy || type.label,
-      serviceType: type.slug,
-      categories: joinForm.categories,
-      label: joinForm.label.trim(),
-      phone: joinForm.phone.trim(),
-      email: joinForm.email.trim(),
-      city: joinForm.city.trim(),
-      notes: joinForm.notes.trim(),
-    });
+      const res = await apiClient.helplines.apply({
+        category: type.legacy || type.label,
+        serviceType: type.slug,
+        categories: joinForm.categories,
+        label: joinForm.label.trim(),
+        phone: joinForm.phone.trim(),
+        email: joinForm.email.trim(),
+        city: joinForm.city.trim(),
+        notes: joinForm.notes.trim(),
+      });
+      saved = res.data || null;
+    } catch (err) {
+      console.warn('Provider application submit failed:', err);
+    }
     setJoinSubmitting(false);
 
     if (saved) setJoinSubmitted(true);

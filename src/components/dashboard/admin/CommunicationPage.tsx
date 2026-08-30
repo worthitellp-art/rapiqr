@@ -2,7 +2,7 @@ import type React from "react";
 import { useState, useEffect } from "react";
 import { Plus, Trash2, Phone, AlertTriangle, Check, Mail, MapPin } from "lucide-react";
 import { useLocalStorage } from "./useLocalStorage";
-import { getCommunicationProvidersFromDb, saveCommunicationProviderToDb, deleteCommunicationProviderFromDb } from "../../../lib/supabaseService";
+import { apiClient } from "../../../lib/apiClient";
 import PhoneInputWithCountry from "../../common/PhoneInputWithCountry";
 import { SERVICE_TYPES, slugifyService } from "../../scan/tileActions";
 import { getServiceMeta } from "../../scan/serviceMeta";
@@ -23,6 +23,22 @@ import { STICKER_CATEGORIES } from "../../../stickerModules";
 /** The service type a stored row belongs to, tolerating pre-migration rows. */
 function providerSlug(p: any): string {
   return slugifyService(p?.service_type || p?.category);
+}
+
+async function saveProvider(provider: {
+  id?: string; category: string; serviceType?: string; categories?: string[];
+  label: string; phone: string; active?: boolean;
+  email?: string | null; city?: string | null; notes?: string | null;
+}) {
+  try {
+    const res = provider.id
+      ? await apiClient.helplines.update(provider.id, provider)
+      : await apiClient.helplines.create(provider);
+    return res.data ? [res.data] : null;
+  } catch (err) {
+    console.warn('Failed to save communication provider:', err);
+    return null;
+  }
 }
 
 export default function CommunicationPage({ setToast }: { setToast: (msg: string | null) => void }) {
@@ -46,11 +62,11 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
   };
 
   useEffect(() => {
-    getCommunicationProvidersFromDb().then((dbData) => {
-      if (dbData && Array.isArray(dbData) && dbData.length > 0) {
-        setProviders(dbData);
+    apiClient.helplines.getAll().then((res) => {
+      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setProviders(res.data);
       }
-    });
+    }).catch((err) => console.warn('Failed to fetch communication providers:', err));
   }, []);
 
   const toggleCategory = (value: string) => {
@@ -76,7 +92,7 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
         active: true,
       };
 
-      const saved = await saveCommunicationProviderToDb(payload);
+      const saved = await saveProvider(payload);
       // Adopt the row the server actually created — the old code invented a
       // local `prov-<timestamp>` id, so later edits (activate/delete) addressed
       // a row that never existed in the database.
@@ -98,14 +114,14 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
     const next = p.active === false;
     setProviders((prev) => prev.map((x: any) => (x.id === p.id ? { ...x, active: next } : x)));
     announce();
-    await saveCommunicationProviderToDb({ ...p, serviceType: providerSlug(p), active: next });
+    await saveProvider({ ...p, serviceType: providerSlug(p), active: next });
     flash(next ? "Provider activated" : "Provider deactivated", 1500);
   };
 
   const handleRemove = async (id: string) => {
     setProviders((prev) => prev.filter((x: any) => x.id !== id));
     announce();
-    await deleteCommunicationProviderFromDb(id);
+    await apiClient.helplines.remove(id).catch((err) => console.warn('Failed to delete communication provider:', err));
     flash("Provider removed from database", 1500);
   };
 

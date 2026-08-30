@@ -25,7 +25,7 @@ export interface DashboardSticker {
   meta: [string, string][];
   contacts: EmergencyContact[];
   timeline: [string, string, string, string][];
-  isBackendManaged: boolean; // true when backed by a real products row (API or Supabase-direct)
+  isBackendManaged: boolean; // true when backed by a real sticker record via the API
 }
 
 // A sticker only reads as "Active" when both layers agree: the owner's product

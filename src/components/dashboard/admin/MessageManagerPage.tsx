@@ -171,7 +171,7 @@ export default function MessageManagerPage() {
             <MessageSquareText size={28} className="text-[#C9CACC] mb-3" />
             <p className="text-[13px] font-semibold text-[#17181A]">No messages logged yet</p>
             <p className="text-[11px] text-[#777B80] mt-1 max-w-sm">
-              Sends will appear here once an alert, phone verification, or sticker activation OTP goes out. If this stays empty after a real send, the <code className="font-mono bg-[#F3F3F4] px-1 rounded">messages</code> table may not be provisioned in Supabase yet.
+              Sends will appear here once an alert, phone verification, or sticker activation OTP goes out.
             </p>
           </div>
         )}

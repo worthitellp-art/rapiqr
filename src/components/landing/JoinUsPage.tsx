@@ -4,7 +4,7 @@ import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
 import { SERVICE_TYPES } from '../scan/tileActions';
 import { getServiceMeta } from '../scan/serviceMeta';
 import { STICKER_CATEGORIES } from '../../stickerModules';
-import { submitProviderApplication } from '../../lib/supabaseService';
+import { apiClient } from '../../lib/apiClient';
 
 interface JoinUsPageProps {
   onBack: () => void;
@@ -47,16 +47,22 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
     if (!valid) return;
     setSubmitting(true);
     setError('');
-    const saved = await submitProviderApplication({
-      category: service.legacy || service.label,
-      serviceType: service.slug,
-      categories,
-      label: label.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
-      city: city.trim(),
-      notes: notes.trim(),
-    });
+    let saved = null;
+    try {
+      const res = await apiClient.helplines.apply({
+        category: service.legacy || service.label,
+        serviceType: service.slug,
+        categories,
+        label: label.trim(),
+        phone: phone.trim(),
+        email: email.trim(),
+        city: city.trim(),
+        notes: notes.trim(),
+      });
+      saved = res.data || null;
+    } catch (err) {
+      console.warn('Provider application submit failed:', err);
+    }
     setSubmitting(false);
     if (saved) setSubmitted(true);
     else setError("We couldn't submit your application just now. Please try again.");

@@ -50,15 +50,71 @@ import { apiClient, ChatSession } from '../lib/apiClient';
 import { connectAsOwner } from '../lib/socketClient';
 import { recallOwnerThread, rememberOwnerThread } from '../lib/chatStorage';
 import { soundNotification } from '../utils/soundNotification';
-import {
-  getProductsFromDb,
-  updateProductDetailsInDb,
-  updateProductContactsInDb,
-  setProductStatusInDb,
-  transferProductInDb,
-  deleteProductFromDb,
-  getProductHistoryFromDb,
-} from '../lib/supabaseService';
+
+async function getProductsFromDb(): Promise<any[]> {
+  try {
+    const res = await apiClient.products.list();
+    return res.data || [];
+  } catch (err) {
+    console.warn('Failed to fetch products:', err);
+    return [];
+  }
+}
+
+async function updateProductDetailsInDb(productId: string, updates: Record<string, any>): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = await apiClient.products.updateDetails(productId, updates);
+    return { success: true, data: res.data || null };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to update sticker details' };
+  }
+}
+
+async function updateProductContactsInDb(productId: string, contacts: { name: string; phone: string }[]): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = await apiClient.products.updateContacts(productId, contacts);
+    return { success: true, data: res.data || null };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to save contacts' };
+  }
+}
+
+async function setProductStatusInDb(productId: string, active: boolean): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = active ? await apiClient.products.reactivate(productId) : await apiClient.products.deactivate(productId);
+    return { success: true, data: res.data || null };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to update status' };
+  }
+}
+
+async function transferProductInDb(productId: string, targetEmail: string): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = await apiClient.products.transfer(productId, targetEmail);
+    return { success: true, data: res.data };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to transfer sticker' };
+  }
+}
+
+async function deleteProductFromDb(productId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await apiClient.products.remove(productId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to delete sticker' };
+  }
+}
+
+async function getProductHistoryFromDb(productId: string): Promise<any[]> {
+  try {
+    const res = await apiClient.products.getHistory(productId);
+    return res.data || [];
+  } catch (err) {
+    console.warn('Failed to fetch sticker history:', err);
+    return [];
+  }
+}
 
 interface ClientDashboardProps {
   onBack: () => void;
@@ -230,7 +286,7 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
   const loadProducts = useCallback(async () => {
     setProductsLoading(true);
     try {
-      const rows = await getProductsFromDb(profile?.id, profile?.phoneNumber);
+      const rows = await getProductsFromDb();
       const mapped = Array.isArray(rows) ? rows.map(mapProductRow) : [];
 
       if (profile?.id) {
@@ -334,7 +390,7 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
 
   const handleSetStatus = async (sticker: DashboardSticker, active: boolean) => {
     setModalBusy(true);
-    const res = await setProductStatusInDb(sticker.id, active, sticker.qrCodeId);
+    const res = await setProductStatusInDb(sticker.id, active);
     setModalBusy(false);
     if (res.success && res.data) {
       setProducts((prev) => prev.map((p) => (p.id === sticker.id ? mapProductRow(res.data) : p)));
@@ -361,7 +417,7 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
 
   const handleConfirmDelete = async (sticker: DashboardSticker) => {
     setModalBusy(true);
-    const res = await deleteProductFromDb(sticker.id, sticker.qrCodeId);
+    const res = await deleteProductFromDb(sticker.id);
     setModalBusy(false);
     if (res.success) {
       setProducts((prev) => prev.filter((p) => p.id !== sticker.id));

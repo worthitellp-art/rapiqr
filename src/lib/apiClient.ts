@@ -19,8 +19,8 @@ const API_BASE_URL = (() => {
 
 /**
  * True when the frontend is built with a REAL backend URL (not the placeholder).
- * The app prefers the Render/Express API for auth, QR, and alert flows when this
- * is true, and falls back to direct Supabase access otherwise.
+ * A relative default (e.g. `/api`) still works via same-origin fetch even when
+ * this is false — it only gates the cross-origin (e.g. Render) deployment case.
  */
 export const isApiBackendConfigured = (() => {
   const base = RAW_API_BASE_URL || '';
@@ -34,7 +34,7 @@ function getAuthHeader(): Record<string, string> {
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && (key.includes('auth-token') || key.includes('supabase.auth'))) {
+        if (key && key.includes('auth-token')) {
           const val = localStorage.getItem(key);
           if (val) {
             const parsed = JSON.parse(val);
@@ -259,6 +259,20 @@ export const apiClient = {
     async deleteAccount() {
       return request<{ success: boolean; message?: string }>('/auth/me', {
         method: 'DELETE',
+      });
+    },
+
+    async forgotPassword(email: string) {
+      return request<{ success: boolean; message?: string }>('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      });
+    },
+
+    async resetPassword(token: string, newPassword: string) {
+      return request<{ success: boolean; message?: string }>('/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ token, newPassword }),
       });
     },
   },
@@ -566,7 +580,7 @@ export const apiClient = {
     },
   },
 
-  // Checkout order receipts (backed by Supabase via the Express server — see task.md #6)
+  // Checkout order receipts (see task.md #6)
   orders: {
     async create(order: {
       name: string; email: string; phone: string;
@@ -713,7 +727,7 @@ export const apiClient = {
     },
   },
 
-  // Distributor / Partner Applications (backed by Supabase via the Express server — see task.md #3)
+  // Distributor / Partner Applications (see task.md #3)
   distributors: {
     async apply(appData: { userName: string; userEmail: string; phone: string; city: string; business: string; tier: string }) {
       return request<{ success: boolean; data: any }>('/distributors', {

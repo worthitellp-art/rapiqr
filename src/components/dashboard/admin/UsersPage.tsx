@@ -6,7 +6,7 @@ import {
 import StatusPill from "./StatusPill";
 import { fmtDate } from "./helpers";
 import InitialAvatar from "../../common/InitialAvatar";
-import { getUsersFromDb, deleteUserFromDb } from "../../../lib/supabaseService";
+import { apiClient } from "../../../lib/apiClient";
 import ConfirmModal from "./ConfirmModal";
 
 export interface AdminUserRow {
@@ -40,8 +40,8 @@ export default function UsersPage({
   const fetchUserAccounts = useCallback(async (q: string) => {
     setUsersLoading(true);
     try {
-      const data = await getUsersFromDb(q || undefined);
-      setUsers(data || []);
+      const res = await apiClient.admin.listUsers(q || undefined);
+      setUsers(res.data || []);
     } catch (error) {
       console.error("Failed to load user accounts:", error);
       setUsers([]);
@@ -64,8 +64,8 @@ export default function UsersPage({
     setIsDeleting(true);
 
     try {
-      const success = await deleteUserFromDb(target.id);
-      if (success) {
+      const res = await apiClient.admin.deleteUser(target.id).catch(() => ({ success: false }));
+      if (res.success) {
         setUsers((prev) => prev.filter((u) => u.id !== target.id));
         showToast(`User account ${target.email || target.id} deleted successfully`);
         fetchUserAccounts(searchQuery);

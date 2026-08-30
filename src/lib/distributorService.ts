@@ -15,7 +15,7 @@ export interface DistributorApplication {
   notes?: string;
 }
 
-/** Admin: fetch every distributor/partner application (backed by Supabase, not localStorage — task.md #3). */
+/** Admin: fetch every distributor/partner application (backed by the API, not localStorage — task.md #3). */
 export async function getDistributorApplications(): Promise<DistributorApplication[]> {
   try {
     const res = await apiClient.distributors.list();

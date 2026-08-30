@@ -92,7 +92,7 @@ function MainAppContent() {
 
   // After auth loads or on signout: if on dashboard/distributor but not logged in → send to landing & reset dashboardMode
   useEffect(() => {
-    if (loading) return; // wait for Supabase session to resolve
+    if (loading) return; // wait for the session restore to resolve
     if ((page === 'dashboard' || page === 'distributor') && !isLoggedIn) {
       setDashboardMode(null);
       navigateTo('landing');
@@ -123,7 +123,7 @@ function MainAppContent() {
     handleOpenAuth('signup');
   };
 
-  // While Supabase is resolving the session, show loader — prevents flash of landing page
+  // While the session is resolving, show loader — prevents flash of landing page
   if (loading && (page === 'dashboard' || page === 'distributor')) {
     return <PageLoader />;
   }

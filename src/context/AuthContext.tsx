@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase, isSupabaseConfigured, getAuthCallbackUrl } from '../lib/supabase';
-import { getUserProfile, updateProfilePhoneNumber, UserProfileData, ADMIN_EMAIL } from '../lib/authService';
+import { UserProfileData, ADMIN_EMAIL } from '../lib/authService';
 import { apiClient, isApiBackendConfigured } from '../lib/apiClient';
-import type { Session, User } from '@supabase/supabase-js';
 
 /**
  * Map a backend (Express/Render) user profile into the app's UserProfileData shape.
@@ -33,8 +31,6 @@ function backendUserToProfile(u: any): UserProfileData {
 }
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
   profile: UserProfileData | null;
   loading: boolean;
   isLoggedIn: boolean;
@@ -63,8 +59,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfileData | null>(() => {
     const saved = localStorage.getItem('repiqr-auth-user') || localStorage.getItem('namoqr-auth-user');
     if (saved) {
@@ -75,116 +69,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Backend session restore first (when a backend token exists)
-    if (isApiBackendConfigured) {
-      const token = localStorage.getItem('repiqr-token') || localStorage.getItem('namoqr-token');
-
-      // adminSignIn()'s local-only fallback (used when the Render API was NOT yet
-      // configured) stamps this exact id with role:'admin' and never obtains any
-      // token — no Supabase session, no backend JWT. If that cached profile is
-      // still around now that the API IS configured, every apiClient call (Orders,
-      // Alerts, ...) will 401 forever since there was never a real token to restore.
-      // Force a clean re-login instead of leaving a permanently-broken "logged in" state.
-      if (!token && profile?.id === 'admin-101') {
-        setProfile(null);
-        localStorage.removeItem('repiqr-auth-user');
-        localStorage.removeItem('namoqr-auth-user');
-      }
-
-      if (token) {
-        apiClient.auth.getMe()
-          .then((res) => {
-            if (res?.user) {
-              const userProfile = backendUserToProfile(res.user);
-              setProfile(userProfile);
-              localStorage.setItem('repiqr-auth-user', JSON.stringify(userProfile));
-              localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
-            }
-          })
-          .catch((err: any) => {
-            // ONLY a 401 means the token itself is dead. This used to clear the
-            // token on any failure at all — including the 404 that /auth/me
-            // returned for accounts whose profiles row was never written, and
-            // any transient network/5xx blip. Once the token was gone, every
-            // apiClient call went out unauthenticated, 401'd, and tripped the
-            // rapiqr:unauthorized -> signOut() handler below: the client
-            // dashboard would simply never load, seemingly at random.
-            if (err?.status === 401) {
-              localStorage.removeItem('repiqr-token');
-              localStorage.removeItem('namoqr-token');
-            }
-          });
-      }
-    }
-
-    if (!isSupabaseConfigured) {
+    if (!isApiBackendConfigured) {
       setLoading(false);
       return;
     }
 
-    // Single source of truth for session restoration: onAuthStateChange fires an
-    // INITIAL_SESSION event immediately with whatever session it recovers from storage
-    // (or null), then SIGNED_IN / TOKEN_REFRESHED / SIGNED_OUT on later changes.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
+    const token = localStorage.getItem('repiqr-token') || localStorage.getItem('namoqr-token');
 
-      if (currentSession?.user && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')) {
-        const userProfile = await getUserProfile(currentSession.user.id, currentSession.user.email || '');
-        if (userProfile) {
+    // adminSignIn()'s local-only fallback (used when the Render API was NOT yet
+    // configured) stamps this exact id with role:'admin' and never obtains any
+    // token — no backend JWT. If that cached profile is still around now that
+    // the API IS configured, every apiClient call (Orders, Alerts, ...) will
+    // 401 forever since there was never a real token to restore. Force a clean
+    // re-login instead of leaving a permanently-broken "logged in" state.
+    if (!token && profile?.id === 'admin-101') {
+      setProfile(null);
+      localStorage.removeItem('repiqr-auth-user');
+      localStorage.removeItem('namoqr-auth-user');
+    }
+
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    apiClient.auth.getMe()
+      .then((res) => {
+        if (res?.user) {
+          const userProfile = backendUserToProfile(res.user);
           setProfile(userProfile);
           localStorage.setItem('repiqr-auth-user', JSON.stringify(userProfile));
           localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
         }
-        // A session established purely via Supabase (Google OAuth, or a session
-        // restored from before the Render API was configured) never goes through
-        // apiClient.auth.signIn(), so repiqr-token/namoqr-token would stay empty —
-        // every apiClient call (Orders, Alerts, ...) would 401 with "Missing or
-        // invalid token" despite the user genuinely being signed in. The backend's
-        // verifyToken already accepts a raw Supabase access_token as a fallback, so
-        // mirror it into the same keys apiClient reads.
-        if (isApiBackendConfigured && currentSession.access_token) {
-          localStorage.setItem('repiqr-token', currentSession.access_token);
-          localStorage.setItem('namoqr-token', currentSession.access_token);
-
-          // Now that a token exists, pull the profile through the backend. getUserProfile
-          // above writes with the anon key, so RLS can silently drop the insert and leave
-          // an in-memory-only profile — the exact way accounts ended up with no profiles
-          // row. /auth/me runs ensureProfile with the service-role key, which actually
-          // persists it, and derives role/plan from ADMIN_EMAIL so a Google sign-in as the
-          // designated admin comes back as admin rather than a plain user.
-          //
-          // The mount effect's getMe only fires when a token was ALREADY in storage, so
-          // without this a first-time OAuth sign-in wrote nothing until the next reload.
-          try {
-            const res = await apiClient.auth.getMe();
-            if (res?.user) {
-              const backendProfile = backendUserToProfile(res.user);
-              setProfile(backendProfile);
-              localStorage.setItem('repiqr-auth-user', JSON.stringify(backendProfile));
-              localStorage.setItem('namoqr-auth-user', JSON.stringify(backendProfile));
-            }
-          } catch {
-            // Non-fatal — the Supabase-derived profile above is already in state.
-          }
+      })
+      .catch((err: any) => {
+        // ONLY a 401 means the token itself is dead. This used to clear the
+        // token on any failure at all — including the 404 that /auth/me
+        // returned for accounts whose profiles row was never written, and
+        // any transient network/5xx blip. Once the token was gone, every
+        // apiClient call went out unauthenticated, 401'd, and tripped the
+        // rapiqr:unauthorized -> signOut() handler below: the client
+        // dashboard would simply never load, seemingly at random.
+        if (err?.status === 401) {
+          localStorage.removeItem('repiqr-token');
+          localStorage.removeItem('namoqr-token');
         }
-      } else if (event === 'SIGNED_OUT') {
-        setProfile(null);
-        localStorage.removeItem('repiqr-auth-user');
-        localStorage.removeItem('namoqr-auth-user');
-        localStorage.removeItem('repiqr-token');
-        localStorage.removeItem('namoqr-token');
-      }
-      // INITIAL_SESSION with no Supabase session: leave `profile` untouched — it may hold
-      // a valid admin/demo login that never used Supabase auth, and clearing it here would
-      // wrongly force a relogin for those accounts.
-
-      setLoading(false);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   // Standard user signup: ALWAYS assigns role = 'user'
@@ -208,48 +139,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: true };
       }
 
-      if (!isSupabaseConfigured) {
-        const newUser: UserProfileData = {
-          id: 'demo-' + Date.now(),
-          email,
-          fullName,
-          phoneNumber: phoneNumber || undefined,
-          role: 'user',
-          subscriptionPlan: 'free'
-        };
-        setProfile(newUser);
-        localStorage.setItem('repiqr-auth-user', JSON.stringify(newUser));
-        localStorage.setItem('namoqr-auth-user', JSON.stringify(newUser));
-        return { success: true };
-      }
-
-      const { data, error } = await supabase.auth.signUp({
+      // No backend configured (e.g. local Vite-only dev) — local-only demo profile.
+      const newUser: UserProfileData = {
+        id: 'demo-' + Date.now(),
         email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            role: 'user' // Explicitly set default user role
-          },
-        },
-      });
-
-      if (error) return { success: false, error: error.message };
-
-      if (data.user) {
-        const p = await getUserProfile(data.user.id, data.user.email || email);
-        if (p) {
-          p.role = 'user';
-          if (phoneNumber) {
-            p.phoneNumber = phoneNumber;
-            await updateProfilePhoneNumber(data.user.id, phoneNumber);
-          }
-          setProfile(p);
-          localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
-          localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
-        }
-      }
-
+        fullName,
+        phoneNumber: phoneNumber || undefined,
+        role: 'user',
+        subscriptionPlan: 'free'
+      };
+      setProfile(newUser);
+      localStorage.setItem('repiqr-auth-user', JSON.stringify(newUser));
+      localStorage.setItem('namoqr-auth-user', JSON.stringify(newUser));
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || 'An error occurred during registration.' };
@@ -284,52 +185,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: true };
       }
 
-      if (!isSupabaseConfigured) {
-        const demoUser: UserProfileData = { 
-          id: 'user-' + Date.now(), 
-          email: isEmail ? cleanId : `${cleanId.replace(/\s+/g, '')}@repiqr.local`, 
-          fullName: isEmail ? cleanId.split('@')[0] : `User (${cleanId})`,
-          phoneNumber: !isEmail ? cleanId : undefined,
-          role: isAdminEmail ? 'admin' : 'user',
-          subscriptionPlan: 'free'
-        };
-        setProfile(demoUser);
-        localStorage.setItem('repiqr-auth-user', JSON.stringify(demoUser));
-        localStorage.setItem('namoqr-auth-user', JSON.stringify(demoUser));
-        return { success: true };
-      }
-
-      // Supabase email password authentication
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // No backend configured — local-only demo profile.
+      const demoUser: UserProfileData = {
+        id: 'user-' + Date.now(),
         email: isEmail ? cleanId : `${cleanId.replace(/\s+/g, '')}@repiqr.local`,
-        password: effectivePassword,
-      });
-
-      if (error) {
-        // Fallback demo user for non-email / phone / code authentication
-        const fallbackUser: UserProfileData = { 
-          id: 'user-' + Date.now(), 
-          email: isEmail ? cleanId : `${cleanId.replace(/\s+/g, '')}@repiqr.local`, 
-          fullName: isEmail ? cleanId.split('@')[0] : `User (${cleanId})`,
-          phoneNumber: !isEmail ? cleanId : undefined,
-          role: isAdminEmail ? 'admin' : 'user',
-          subscriptionPlan: 'free'
-        };
-        setProfile(fallbackUser);
-        localStorage.setItem('repiqr-auth-user', JSON.stringify(fallbackUser));
-        localStorage.setItem('namoqr-auth-user', JSON.stringify(fallbackUser));
-        return { success: true };
-      }
-
-      if (data.user) {
-        const userProfile = await getUserProfile(data.user.id, data.user.email || cleanId);
-        if (userProfile) {
-          setProfile(userProfile);
-          localStorage.setItem('repiqr-auth-user', JSON.stringify(userProfile));
-          localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
-        }
-      }
-
+        fullName: isEmail ? cleanId.split('@')[0] : `User (${cleanId})`,
+        phoneNumber: !isEmail ? cleanId : undefined,
+        role: isAdminEmail ? 'admin' : 'user',
+        subscriptionPlan: 'free'
+      };
+      setProfile(demoUser);
+      localStorage.setItem('repiqr-auth-user', JSON.stringify(demoUser));
+      localStorage.setItem('namoqr-auth-user', JSON.stringify(demoUser));
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || 'An error occurred during sign in.' };
@@ -400,12 +267,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      if (isSupabaseConfigured) {
-        await supabase.auth.signOut().catch(() => { /* ignore */ });
-      }
-    } catch { /* ignore */ }
-
-    try {
       localStorage.removeItem('repiqr-token');
       localStorage.removeItem('namoqr-token');
       localStorage.removeItem('repiqr-auth-user');
@@ -422,8 +283,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       sessionStorage.clear();
     } catch { /* ignore */ }
 
-    setSession(null);
-    setUser(null);
     setProfile(null);
   };
 
@@ -453,26 +312,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetPassword = async (email: string) => {
+    if (!isApiBackendConfigured) {
+      return { success: true, message: 'Demo mode: Password reset email simulated.' };
+    }
     try {
-      if (!isSupabaseConfigured) {
-        return { success: true, message: 'Demo mode: Password reset email simulated.' };
-      }
-
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: getAuthCallbackUrl('/reset-password'),
-      });
-
-      if (error) return { success: false, error: error.message };
-      return { success: true, message: 'Password reset link sent to your email.' };
+      const res = await apiClient.auth.forgotPassword(email);
+      return { success: true, message: res.message || 'If an account exists for that email, a reset link has been sent.' };
     } catch (err: any) {
       return { success: false, error: err.message || 'Failed to send reset email.' };
     }
   };
 
   /**
-   * Google Sign-In with real OAuth verification:
-   * Uses Google Identity Services (Token Client) or Supabase OAuth.
-   * Only transitions to logged-in state after Google successfully confirms the account.
+   * Google Sign-In with real OAuth verification via Google Identity Services
+   * (Token Client). Only transitions to logged-in state after Google
+   * successfully confirms the account AND the backend independently verifies
+   * the token server-side (see Server/controllers/authController.js
+   * googleAuth — it never trusts the `user` object below on its own).
    */
   const signInWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -480,7 +336,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
         '640446362534-73ub5mvtklhs4e3eldvde892q8jbtlbo.apps.googleusercontent.com';
 
-      // 1. Try Google Identity Services (GIS) Token Client first
       if (typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2 && clientId) {
         const tokenResponse = await new Promise<any>((resolve, reject) => {
           try {
@@ -518,47 +373,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const avatarUrl = googleUser.picture;
             const sub = googleUser.sub;
 
-            // Sync with backend /api/auth/google when backend is available
             if (isApiBackendConfigured) {
-              try {
-                const res = await apiClient.auth.googleAuth({
-                  user: { email, fullName, avatarUrl, id: sub },
-                  token: tokenResponse.access_token,
-                });
+              const res = await apiClient.auth.googleAuth({
+                user: { email, fullName, avatarUrl, id: sub },
+                token: tokenResponse.access_token,
+              });
 
-                if (res?.token) {
-                  localStorage.setItem('repiqr-token', res.token);
-                  localStorage.setItem('namoqr-token', res.token);
-                }
-                if (res?.user) {
-                  const p = backendUserToProfile(res.user);
-                  setProfile(p);
-                  localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
-                  localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
-                  return { success: true };
-                }
-              } catch (apiErr) {
-                console.warn('Backend googleAuth sync warning:', apiErr);
+              if (res?.token) {
+                localStorage.setItem('repiqr-token', res.token);
+                localStorage.setItem('namoqr-token', res.token);
               }
+              if (res?.user) {
+                const p = backendUserToProfile(res.user);
+                setProfile(p);
+                localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
+                localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+                return { success: true };
+              }
+              return { success: false, error: 'Google sign-in did not return an account.' };
             }
 
-            // Sync with Supabase Profile if configured
-            if (isSupabaseConfigured) {
-              try {
-                const p = await getUserProfile(sub, email);
-                if (p) {
-                  p.fullName = fullName;
-                  p.avatarUrl = avatarUrl;
-                  setProfile(p);
-                  localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
-                  localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
-                  return { success: true };
-                }
-              } catch (supabaseErr) {
-                console.warn('Supabase profile sync warning:', supabaseErr);
-              }
-            }
-
+            // No backend configured — local-only demo profile.
             const localProfile: UserProfileData = {
               id: sub || `google-${Date.now()}`,
               email,
@@ -574,20 +409,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return { success: true };
           }
         }
-      }
-
-      // 2. Fallback to Supabase OAuth redirect if GIS is not loaded
-      if (isSupabaseConfigured) {
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: getAuthCallbackUrl('/auth/callback'),
-          },
-        });
-        if (error) {
-          return { success: false, error: error.message };
-        }
-        return { success: true };
       }
 
       return { success: false, error: 'Google sign-in client is initializing. Please try again.' };
@@ -631,14 +452,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return { success: true };
           }
         } catch (apiErr) {
-          console.warn('API updateProfile failed, falling back to direct update:', apiErr);
+          console.warn('API updateProfile failed, falling back to local update:', apiErr);
         }
       }
 
-      if (isSupabaseConfigured && !profile.id.startsWith('demo-') && profile.id !== 'demo-user') {
-        const ok = await updateProfilePhoneNumber(profile.id, phoneNumber);
-        if (!ok) return { success: false, error: 'Failed to save phone number.' };
-      }
       const updated = { ...profile, phoneNumber };
       setProfile(updated);
       localStorage.setItem('repiqr-auth-user', JSON.stringify(updated));
@@ -650,7 +467,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Phone verification step 1 — backend-only (SMS/WhatsApp delivery requires the
-  // Express/Twilio backend; there's no Supabase-direct equivalent).
+  // Express/Twilio backend).
   const sendPhoneOtp = async (phoneNumber: string) => {
     if (!profile) return { success: false, error: 'Not signed in.' };
     localStorage.setItem('repiqr-pending-otp-phone', phoneNumber);
@@ -667,9 +484,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Phone verification step 2 — verifies via backend (the backend itself already
   // accepts 000000 as a master bypass code, and only a real backend call actually
-  // persists profiles.phone_number and runs the phone-based sticker auto-claim;
-  // faking success here locally would mark the phone "verified" in the UI while
-  // never linking any sticker in the database).
+  // persists the phone number and runs the phone-based sticker auto-claim; faking
+  // success here locally would mark the phone "verified" in the UI while never
+  // linking any sticker in the database).
   const verifyPhoneOtp = async (code: string) => {
     if (!profile) return { success: false, error: 'Not signed in.' };
     const cleanCode = code.trim();
@@ -702,18 +519,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // A real backend rejection (wrong/expired code, or the code was lost —
       // e.g. a server restart wiped the in-memory OTP store) must surface as a
       // real error. Silently marking the phone "verified" here only in local
-      // state — without the backend ever writing profiles.phone_number /
-      // metadata.phone_verified — is what caused the dashboard to ask for
-      // phone verification again on every reload/login: the fake local
-      // "verified" flag never survived a refreshProfile() or getMe() refetch.
+      // state — without the backend ever writing the phone number / phone
+      // verification metadata — is what caused the dashboard to ask for phone
+      // verification again on every reload/login: the fake local "verified"
+      // flag never survived a refreshProfile() or getMe() refetch.
       return { success: false, error: err?.message || 'Verification failed. Please try again.' };
     }
   };
 
   // Re-pulls the profile after Account Settings changes (name/phone/email). Only
   // meaningful for backend-authenticated sessions — a no-op otherwise since there's
-  // nothing server-side to re-fetch (demo/Supabase-direct profiles already update
-  // the local `profile` state directly at the call site).
+  // nothing server-side to re-fetch (demo profiles already update the local
+  // `profile` state directly at the call site).
   const refreshProfile = async () => {
     const token = localStorage.getItem('repiqr-token') || localStorage.getItem('namoqr-token');
     if (!isApiBackendConfigured || !token) return;
@@ -732,15 +549,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const isLoggedIn = Boolean(user || profile);
+  const isLoggedIn = Boolean(profile);
   // isAdmin is purely role-based — only adminSignIn() produces role='admin'
   const isAdmin = profile?.role === 'admin';
 
   return (
     <AuthContext.Provider
       value={{
-        user,
-        session,
         profile,
         loading,
         isLoggedIn,

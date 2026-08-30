@@ -3,7 +3,7 @@ import { useState } from "react";
 import { RefreshCw, X } from "lucide-react";
 import { QrRecord } from "./types";
 import { qrFullUrl } from "./helpers";
-import { saveQrCodeToDb } from "../../../lib/supabaseService";
+import { apiClient } from "../../../lib/apiClient";
 
 export default function RestoreStickerModal({
   isOpen, onClose, qrList, setQrList, templates, openQuickLook, setToast,
@@ -47,7 +47,8 @@ export default function RestoreStickerModal({
     };
 
     setQrList((prev) => [rec, ...prev]);
-    saveQrCodeToDb({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, category: rec.category, fgColor: rec.fg, bgColor: rec.bg });
+    apiClient.qr.saveQrCode({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, category: rec.category, fgColor: rec.fg, bgColor: rec.bg })
+      .catch((err) => console.warn(`Failed to save restored sticker ${rec.id} to backend:`, err));
     setToast(`Sticker ${cleanId} restored!`);
     setTimeout(() => setToast(null), 3000);
     onClose(); openQuickLook(rec);

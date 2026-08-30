@@ -5,7 +5,7 @@ import StatusPill from "./StatusPill";
 import StickerThumb from "./StickerThumb";
 import { QrRecord, Template, StickerPos } from "./types";
 import { uid, qrFullUrl, fmtDate, dispatchActivationToUserDashboard, saveGeneratedSticker } from "./helpers";
-import { saveQrCodeToDb, bulkSaveQrCodesToDb, deleteQrCodeFromDb, deleteAllQrCodesFromDb } from "../../../lib/supabaseService";
+import { apiClient } from "../../../lib/apiClient";
 import { STICKER_CATEGORIES, getCategoryIcon, getCategoryLabel } from "../../../stickerModules";
 import ConfirmModal from "./ConfirmModal";
 import QrRowActions from "./QrRowActions";
@@ -73,7 +73,8 @@ export default function QrCodesPage({
     rec.qrUrl = qrFullUrl(rec.id);
 
     setQrList((prev) => [rec, ...prev]);
-    saveQrCodeToDb({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, category: rec.category, fgColor: rec.fg, bgColor: rec.bg });
+    apiClient.qr.saveQrCode({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, category: rec.category, fgColor: rec.fg, bgColor: rec.bg })
+      .catch((err) => console.warn(`Failed to save QR ${rec.id} to backend:`, err));
 
     // Uses the admin's actual saved placement (Customize > Sticker Placement) instead
     // of a hardcoded box — otherwise the image uploaded to the bucket never matched
@@ -99,7 +100,15 @@ export default function QrCodesPage({
 
     const CHUNK = 50;
     for (let i = 0; i < batch.length; i += CHUNK) {
-      await bulkSaveQrCodesToDb(batch.slice(i, i + CHUNK));
+      const slice = batch.slice(i, i + CHUNK);
+      // No bulk endpoint on the backend — save one at a time.
+      for (const qr of slice) {
+        try {
+          await apiClient.qr.saveQrCode(qr);
+        } catch (err) {
+          console.warn(`Failed to save QR ${qr.id} to backend:`, err);
+        }
+      }
       setBulkProgress(Math.min(100, Math.round(((i + CHUNK) / batch.length) * 100)));
     }
 
@@ -417,7 +426,7 @@ export default function QrCodesPage({
           if (deleteTarget) {
             const targetId = deleteTarget.id;
             setDeleteTarget(null);
-            const deleted = await deleteQrCodeFromDb(targetId);
+            const deleted = await apiClient.qr.deleteQrCode(targetId).then((res) => res?.success).catch(() => false);
             if (!deleted) {
               setToast(`Failed to delete ${targetId} — it still exists in the database. Please try again.`);
               setTimeout(() => setToast(null), 3000);
@@ -449,7 +458,7 @@ export default function QrCodesPage({
         confirmLabel="Clear All"
         onConfirm={async () => {
           setClearAllOpen(false);
-          const deleted = await deleteAllQrCodesFromDb();
+          const deleted = await apiClient.qr.deleteAllQrCodes().then((res) => res?.success).catch(() => false);
           if (!deleted) {
             setToast("Failed to clear QR codes from the database. Please try again.");
             setTimeout(() => setToast(null), 3000);
