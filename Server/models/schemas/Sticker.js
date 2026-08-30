@@ -12,7 +12,9 @@ const stickerSchema = new Schema({
   template_name: { type: String, default: 'Standard Badge' },
   fg_color: { type: String, default: 'D9581F' },
   bg_color: { type: String, default: 'FFFFFF' },
-  sticker_image: { type: String, default: null },
+  // No stored sticker image: the composited sticker graphic is a pure function
+  // of (id, fg_color, bg_color, template placement) and is regenerated
+  // on-demand client-side wherever it's needed — nothing to store, nothing to lose.
   category: { type: String, default: 'car' },
   // Legacy secondary ownership pointer, carried over as-is (now redundant
   // with user_id on the same document, but kept for compatibility).

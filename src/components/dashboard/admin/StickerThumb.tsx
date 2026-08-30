@@ -1,5 +1,6 @@
-import { qrImageUrl, qrFullUrl } from "./helpers";
+import { qrFullUrl } from "./helpers";
 import { QrRecord, Template, StickerPos } from "./types";
+import QrCodeImage from "./QrCodeImage";
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
 
 const STICKER_SRC = stickerTemplateImg;
@@ -49,8 +50,11 @@ export default function StickerThumb({
           draggable={false}
           alt=""
         />
-        <img
-          src={qrImageUrl(qrFullUrl(qr.id), qrFg, qrBg, 256)}
+        <QrCodeImage
+          data={qrFullUrl(qr.id)}
+          fg={qrFg}
+          bg={qrBg}
+          size={256}
           style={{
             position: "absolute",
             left: `${qrXPercent}%`,
@@ -90,8 +94,11 @@ export default function StickerThumb({
         draggable={false}
         alt=""
       />
-      <img
-        src={qrImageUrl(qrFullUrl(qr.id), qrFg, qrBg, 128)}
+      <QrCodeImage
+        data={qrFullUrl(qr.id)}
+        fg={qrFg}
+        bg={qrBg}
+        size={128}
         style={{
           position: "absolute",
           left: qrX,

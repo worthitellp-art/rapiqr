@@ -3,20 +3,19 @@ import { useState, useEffect } from "react";
 import { Plus, Sparkles, Download, Trash2, RefreshCw, Tag, Phone, ChevronLeft, ChevronRight } from "lucide-react";
 import StatusPill from "./StatusPill";
 import StickerThumb from "./StickerThumb";
-import { QrRecord, Template, StickerPos } from "./types";
-import { uid, qrFullUrl, fmtDate, dispatchActivationToUserDashboard, saveGeneratedSticker } from "./helpers";
+import { QrRecord, Template } from "./types";
+import { uid, qrFullUrl, fmtDate, dispatchActivationToUserDashboard } from "./helpers";
 import { apiClient } from "../../../lib/apiClient";
 import { STICKER_CATEGORIES, getCategoryIcon, getCategoryLabel } from "../../../stickerModules";
 import ConfirmModal from "./ConfirmModal";
 import QrRowActions from "./QrRowActions";
 
 export default function QrCodesPage({
-  qrList, setQrList, templates, setToast, openQuickLook, openRestore, searchQuery, stickerPos,
+  qrList, setQrList, templates, setToast, openQuickLook, openRestore, searchQuery,
 }: {
   qrList: QrRecord[]; setQrList: React.Dispatch<React.SetStateAction<QrRecord[]>>;
   templates: Template[]; setToast: (msg: string | null) => void;
   openQuickLook: (q: QrRecord) => void; openRestore: () => void; searchQuery: string;
-  stickerPos: StickerPos;
 }) {
   const [selectedCategory, setSelectedCategory] = useState<string>("car");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -75,11 +74,6 @@ export default function QrCodesPage({
     setQrList((prev) => [rec, ...prev]);
     apiClient.qr.saveQrCode({ id: rec.id, clientId: rec.clientId, status: rec.status, templateName: rec.template, category: rec.category, fgColor: rec.fg, bgColor: rec.bg })
       .catch((err) => console.warn(`Failed to save QR ${rec.id} to backend:`, err));
-
-    // Uses the admin's actual saved placement (Customize > Sticker Placement) instead
-    // of a hardcoded box — otherwise the image uploaded to the bucket never matched
-    // whatever position/size the admin had customized and saved there.
-    saveGeneratedSticker(rec, stickerPos);
 
     setToast(`Generated 1 ${rec.category || "Car"} Tag`);
     setTimeout(() => setToast(null), 3000);

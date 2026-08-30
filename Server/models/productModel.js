@@ -40,7 +40,6 @@ function toApi(doc) {
     template_name: doc.template_name,
     fg_color: doc.fg_color,
     bg_color: doc.bg_color,
-    sticker_image: doc.sticker_image,
     category: doc.category,
     user_id: userId ? String(userId) : null,
     name: doc.name,

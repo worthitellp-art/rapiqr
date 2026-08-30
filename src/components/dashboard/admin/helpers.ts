@@ -1,12 +1,29 @@
+import QRCode from "qrcode";
 import { QrRecord, StickerPos } from "./types";
-import { apiClient } from "../../../lib/apiClient";
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
 
 const STICKER_SRC = stickerTemplateImg;
 const EDITOR_DISPLAY = { w: 320, h: 200 };
 
-export function qrImageUrl(data: string, fg: string, bg: string, size = 220) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}&color=${fg}&bgcolor=${bg}&qzone=1`;
+// Generated entirely client-side (no network call, no third-party service) —
+// the exact same (data, fg, bg, size) always produces the exact same PNG data
+// URL, so there is nothing to store: it can be regenerated on demand, forever,
+// from just the sticker's own id and colors. Cached in memory since the admin
+// fleet list can render the same QR many times per session (list + thumbnail).
+const qrDataUrlCache = new Map<string, string>();
+
+export async function generateQrDataUrl(data: string, fg: string, bg: string, size = 220): Promise<string> {
+  const key = `${data}|${fg}|${bg}|${size}`;
+  const cached = qrDataUrlCache.get(key);
+  if (cached) return cached;
+
+  const url = await QRCode.toDataURL(data, {
+    width: size,
+    margin: 1,
+    color: { dark: `#${fg}`, light: `#${bg}` },
+  });
+  qrDataUrlCache.set(key, url);
+  return url;
 }
 
 
@@ -106,41 +123,19 @@ export async function compositeQrOnSticker(qrDataUrl: string, pos: StickerPos): 
   });
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
-}
-
 /**
- * Generate the composed sticker image for a QR record and persist it to the
- * backend (uploads to object storage + stores the public URL on the sticker record).
+ * Generate the composed sticker image for a QR record entirely client-side.
+ * Nothing is uploaded or persisted — every input (id, colors, template
+ * placement) is already in the sticker record, so this can be called again
+ * at any time (list rendering, print export, "restore") and always produces
+ * the identical result.
  */
-export async function saveGeneratedSticker(rec: QrRecord, pos: StickerPos) {
+export async function generateStickerBlob(rec: QrRecord, pos: StickerPos): Promise<Blob | null> {
   try {
-    const qrDataUrl = await new Promise<string | null>((resolve) => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        const c = document.createElement("canvas");
-        c.width = img.naturalWidth; c.height = img.naturalHeight;
-        c.getContext("2d")!.drawImage(img, 0, 0);
-        resolve(c.toDataURL("image/png"));
-      };
-      img.onerror = () => resolve(null);
-      img.src = qrImageUrl(qrFullUrl(rec.id), rec.fg || "EAB308", rec.bg || "FFFFFF", 512);
-    });
-    if (!qrDataUrl) return null;
-    const blob = await compositeQrOnSticker(qrDataUrl, pos);
-    if (!blob) return null;
-    const dataUrl = await blobToDataUrl(blob);
-    const res = await apiClient.qr.saveStickerImage(rec.id, dataUrl);
-    return res?.stickerImage || (res as any)?.data?.sticker_image || res?.data || null;
+    const qrDataUrl = await generateQrDataUrl(qrFullUrl(rec.id), rec.fg || "EAB308", rec.bg || "FFFFFF", 512);
+    return await compositeQrOnSticker(qrDataUrl, pos);
   } catch (err) {
-    console.warn("Failed to save generated sticker image:", err);
+    console.warn("Failed to generate sticker image:", err);
     return null;
   }
 }

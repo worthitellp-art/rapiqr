@@ -3,7 +3,6 @@ const ChatSession = require('./schemas/ChatSession');
 const ChatMessage = require('./schemas/ChatMessage');
 const Alert = require('./schemas/Alert');
 const User = require('./schemas/User');
-const { deleteFiles, listKeys } = require('../services/storageService');
 const { normalizePhone, isSamePhone } = require('../utils/phone');
 
 // Fields safe to return from the PUBLIC scan/activate/record-scan endpoints —
@@ -13,7 +12,7 @@ const { normalizePhone, isSamePhone } = require('../utils/phone');
 // document; without this whitelist, an unauthenticated caller who knows a
 // sticker's ID could pull a stranger's medical/contact details straight off
 // GET /api/qr/:id or the activate/scan response.
-const PUBLIC_QR_FIELDS = '_id client_id status scans_count last_scanned_at template_name fg_color bg_color sticker_image category created_at';
+const PUBLIC_QR_FIELDS = '_id client_id status scans_count last_scanned_at template_name fg_color bg_color category created_at';
 
 function toPublicQr(doc) {
   if (!doc) return null;
@@ -26,7 +25,6 @@ function toPublicQr(doc) {
     template_name: doc.template_name,
     fg_color: doc.fg_color,
     bg_color: doc.bg_color,
-    sticker_image: doc.sticker_image,
     category: doc.category,
     created_at: doc.created_at,
   };
@@ -76,7 +74,6 @@ class QrModel {
         template_name: doc.template_name,
         fg_color: doc.fg_color,
         bg_color: doc.bg_color,
-        sticker_image: doc.sticker_image,
         category: doc.category,
         created_at: doc.created_at,
         owner_phone: doc.details?.ownerPhone || null,
@@ -121,7 +118,6 @@ class QrModel {
         category: qrData.category || 'car',
         fg_color: qrData.fgColor || qrData.fg_color || 'D9581F',
         bg_color: qrData.bgColor || qrData.bg_color || 'FFFFFF',
-        sticker_image: qrData.stickerImage || qrData.sticker_image || null,
       };
 
       const doc = await Sticker.findByIdAndUpdate(
@@ -136,22 +132,6 @@ class QrModel {
       return toPublicQr(doc);
     } catch (err) {
       console.error('QrModel.save Error:', err);
-      return null;
-    }
-  }
-
-  /**
-   * Save the generated sticker image URL for a QR code
-   */
-  static async saveStickerImage(qrId, stickerImage) {
-    try {
-      const doc = await Sticker.findByIdAndUpdate(qrId, { $set: { sticker_image: stickerImage } }, { new: true })
-        .select('_id sticker_image')
-        .lean();
-      if (!doc) return null;
-      return { id: doc._id, sticker_image: doc.sticker_image };
-    } catch (err) {
-      console.error(`QrModel.saveStickerImage (${qrId}) Error:`, err);
       return null;
     }
   }
@@ -241,15 +221,6 @@ class QrModel {
     await Alert.deleteMany({ sticker_id: qrId });
 
     const doc = await Sticker.findByIdAndDelete(qrId).select(PUBLIC_QR_FIELDS).lean();
-
-    // Best-effort: also drop the uploaded sticker image so a deleted QR doesn't
-    // leave an orphaned file behind in storage forever.
-    try {
-      await deleteFiles([`stickers/${qrId}.png`, `stickers/${qrId}.avif`]);
-    } catch (err) {
-      console.warn(`QrModel.delete (${qrId}): sticker image cleanup failed:`, err);
-    }
-
     return toPublicQr(doc);
   }
 
@@ -262,16 +233,6 @@ class QrModel {
     await ChatSession.deleteMany({});
     await Alert.deleteMany({});
     await Sticker.deleteMany({});
-
-    // Best-effort: clear every uploaded sticker image too, so "Clear all"
-    // doesn't leave storage full of orphaned files with no record left to own them.
-    try {
-      const keys = await listKeys('stickers/');
-      if (keys.length > 0) await deleteFiles(keys);
-    } catch (err) {
-      console.warn('QrModel.deleteAll: sticker image cleanup failed:', err);
-    }
-
     return true;
   }
 }

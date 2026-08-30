@@ -19,7 +19,7 @@ import {
   createBackupPackage,
   restoreFromBackupPackage,
 } from "../../../lib/googleDriveService";
-import { qrImageUrl, qrFullUrl, compositeQrOnSticker } from "./helpers";
+import { generateQrDataUrl, qrFullUrl, compositeQrOnSticker } from "./helpers";
 
 export default function BackupPage({
   qrList,
@@ -90,34 +90,16 @@ export default function BackupPage({
           percent: Math.round((progressCount / qrList.length) * 100),
         });
 
-        // 1. Generate QR Code image Data URL
-        const qrUrl = qrImageUrl(qrFullUrl(item.id), item.fg || "EAB308", item.bg || "FFFFFF", 512);
-        
+        // Generated locally (no network call) and composited onto the sticker
+        // template — deterministic from the sticker's own id + colors, so this
+        // always reproduces the same image regardless of when it's exported.
         try {
-          const qrDataUrl = await new Promise<string | null>((resolve) => {
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-            img.onload = () => {
-              const canvas = document.createElement("canvas");
-              canvas.width = img.naturalWidth;
-              canvas.height = img.naturalHeight;
-              const ctx = canvas.getContext("2d");
-              if (!ctx) return resolve(null);
-              ctx.drawImage(img, 0, 0);
-              resolve(canvas.toDataURL("image/png"));
-            };
-            img.onerror = () => resolve(null);
-            img.src = qrUrl;
-          });
-
-          if (qrDataUrl) {
-            // 2. Composite onto Sticker Template
-            const stickerBlob = await compositeQrOnSticker(qrDataUrl, stickerPos);
-            if (stickerBlob) {
-              const safeVehicle = (item.vehicleNumber || item.vehicleName || "sticker").replace(/[^a-zA-Z0-9_-]/g, "_");
-              const fileName = `${item.id}_${safeVehicle}.png`;
-              stickersFolder.file(fileName, stickerBlob);
-            }
+          const qrDataUrl = await generateQrDataUrl(qrFullUrl(item.id), item.fg || "EAB308", item.bg || "FFFFFF", 512);
+          const stickerBlob = await compositeQrOnSticker(qrDataUrl, stickerPos);
+          if (stickerBlob) {
+            const safeVehicle = (item.vehicleNumber || item.vehicleName || "sticker").replace(/[^a-zA-Z0-9_-]/g, "_");
+            const fileName = `${item.id}_${safeVehicle}.png`;
+            stickersFolder.file(fileName, stickerBlob);
           }
         } catch (itemErr) {
           console.warn(`Could not generate sticker for ${item.id}:`, itemErr);

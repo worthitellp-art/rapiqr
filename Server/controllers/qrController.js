@@ -1,5 +1,4 @@
 const QrModel = require('../models/qrModel');
-const { uploadPublicFile } = require('../services/storageService');
 const { logger } = require('../middleware/loggerMiddleware');
 const { sendSms } = require('../services/smsService');
 const { createOtp, verifyOtp } = require('../services/phoneVerificationService');
@@ -57,38 +56,6 @@ class QrController {
       return res.json({ success: true, data: saved });
     } catch (err) {
       logger.error('QR_SAVE', 'Error saving QR Code record', err);
-      return res.status(500).json({ success: false, error: err.message });
-    }
-  }
-
-  /**
-   * Save a generated sticker image to the "Stickers" storage bucket
-   * and persist its public URL on the qr_codes record.
-   * Body: { image: "<base64 data URL>" }
-   */
-  static async saveStickerImage(req, res) {
-    try {
-      const { id } = req.params;
-      const { image } = req.body || {};
-
-      if (!image) {
-        return res.status(400).json({ success: false, error: 'image (base64 data URL) is required' });
-      }
-
-      const mimeMatch = image.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/);
-      const contentType = mimeMatch ? mimeMatch[1] : 'image/png';
-      const ext = contentType.includes('avif') ? 'avif' : 'png';
-      const base64 = mimeMatch ? image.split(',')[1] : image;
-      const buffer = Buffer.from(base64, 'base64');
-
-      const fileName = `stickers/${id}.${ext}`;
-      const publicUrl = await uploadPublicFile(fileName, buffer, contentType);
-
-      const saved = await QrModel.saveStickerImage(id, publicUrl);
-      logger.rowUpdated('qr_codes', id, { action: 'sticker_image_linked', sticker_image: publicUrl });
-      return res.json({ success: true, data: saved, stickerImage: publicUrl });
-    } catch (err) {
-      logger.error('STICKER_SAVE', `Failed to save sticker image for QR: ${req.params.id}`, err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

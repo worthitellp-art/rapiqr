@@ -2,7 +2,7 @@ import type React from "react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Save, Grid3X3, Lock, Unlock, Magnet, Check, ShieldCheck } from "lucide-react";
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
-import { qrImageUrl } from "./helpers";
+import QrCodeImage from "./QrCodeImage";
 import { StickerPos } from "./types";
 
 const STICKER_SRC = stickerTemplateImg;
@@ -234,8 +234,11 @@ export default function StickerEditor({
                 height: Math.round(stickerPos.h * (previewSize * (EDITOR_DISPLAY.h / EDITOR_DISPLAY.w) / EDITOR_DISPLAY.h)),
               }}
             >
-              <img
-                src={qrImageUrl("https://repiqr.com/demo", "000000", "FFFFFF", 128)}
+              <QrCodeImage
+                data="https://repiqr.com/demo"
+                fg="000000"
+                bg="FFFFFF"
+                size={128}
                 className="w-full h-full object-contain pointer-events-none"
                 alt="Black QR Code"
               />
