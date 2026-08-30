@@ -4,6 +4,7 @@ const { JWT_SECRET } = require('../middleware/authMiddleware');
 const ChatModel = require('../models/chatModel');
 const ProductModel = require('../models/productModel');
 const { notifyOwner } = require('../services/notificationService');
+const pushService = require('../services/pushService');
 
 const APP_URL = process.env.APP_URL || 'https://rapiqr.worthitellp.workers.dev';
 
@@ -215,18 +216,26 @@ function initChatSocket(httpServer, allowedOrigins) {
           io.to(`owner:${ownerId}`).emit('inbox_updated', { sessionId, message, session });
         }
 
-        // If the customer sent it, notify the owner on WhatsApp
-        if (socket.identity.type === 'customer' && product?.details?.ownerPhone) {
-          notifyOwner({
-            type: 'CHAT_MESSAGE',
-            ownerPhone: product.details.ownerPhone,
-            data: {
-              label: session.vehicle_label || product?.name || 'your vehicle',
-              message: text,
-              link: `${APP_URL}/#/dashboard?tab=chat`,
-            },
-            eventId: sessionId,
-          }).catch(() => { /* best effort */ });
+        // If the customer sent it, notify the owner on WhatsApp and via Web
+        // Push (the latter reaches them even with the dashboard tab closed).
+        if (socket.identity.type === 'customer') {
+          const label = session.vehicle_label || product?.name || 'your vehicle';
+          if (product?.details?.ownerPhone) {
+            notifyOwner({
+              type: 'CHAT_MESSAGE',
+              ownerPhone: product.details.ownerPhone,
+              data: { label, message: text, link: `${APP_URL}/#/dashboard?tab=chat` },
+              eventId: sessionId,
+            }).catch(() => { /* best effort */ });
+          }
+          if (ownerId) {
+            pushService.sendToUser(ownerId, {
+              title: `New message about ${label}`,
+              body: text,
+              url: '/#/dashboard?tab=chat',
+              tag: `chat-${sessionId}`,
+            }).catch(() => { /* best effort */ });
+          }
         }
       }).catch(() => { /* best effort */ });
     });

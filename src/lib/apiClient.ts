@@ -954,5 +954,24 @@ export const apiClient = {
       return request<{ success: boolean }>(`/helplines/${id}`, { method: 'DELETE' });
     },
   },
+
+  // Web Push (chat/alert notifications reaching a closed tab)
+  push: {
+    async getVapidPublicKey() {
+      return request<{ success: boolean; publicKey?: string }>('/push/vapid-public-key', { method: 'GET' });
+    },
+    async subscribe(subscription: unknown) {
+      return request<{ success: boolean }>('/push/subscribe', {
+        method: 'POST',
+        body: JSON.stringify({ subscription }),
+      });
+    },
+    async unsubscribe(endpoint: string) {
+      return request<{ success: boolean }>('/push/unsubscribe', {
+        method: 'POST',
+        body: JSON.stringify({ endpoint }),
+      });
+    },
+  },
 };
 

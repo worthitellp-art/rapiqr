@@ -5,6 +5,7 @@ const User = require('../models/schemas/User');
 const ProductModel = require('../models/productModel');
 const { uploadPublicFile } = require('../services/storageService');
 const { notifyOwner } = require('../services/notificationService');
+const pushService = require('../services/pushService');
 const { logger } = require('../middleware/loggerMiddleware');
 const { getIo, getOnlineOwners, markDeliveredIfPeerPresent } = require('../sockets/chatSocket');
 
@@ -59,17 +60,27 @@ async function fanOutMessage(session, message, isOwner, previewText) {
 
   markDeliveredIfPeerPresent(session.id, message, isOwner ? 'owner' : 'customer');
 
-  if (!isOwner && product?.details?.ownerPhone) {
-    notifyOwner({
-      type: 'CHAT_MESSAGE',
-      ownerPhone: product.details.ownerPhone,
-      data: {
-        label: session.vehicle_label || product?.name || 'your vehicle',
-        message: previewText,
-        link: `${APP_URL}/#/dashboard?tab=chat`,
-      },
-      eventId: session.id,
-    }).catch((err) => logger.error('CHAT_MESSAGE', 'Failed to notify owner', err));
+  if (!isOwner) {
+    const label = session.vehicle_label || product?.name || 'your vehicle';
+    if (product?.details?.ownerPhone) {
+      notifyOwner({
+        type: 'CHAT_MESSAGE',
+        ownerPhone: product.details.ownerPhone,
+        data: { label, message: previewText, link: `${APP_URL}/#/dashboard?tab=chat` },
+        eventId: session.id,
+      }).catch((err) => logger.error('CHAT_MESSAGE', 'Failed to notify owner', err));
+    }
+    // Web Push reaches the owner even with the dashboard tab closed, unlike
+    // the socket emit above (only delivered to an open connection) — doesn't
+    // need a phone number, just a subscribed device.
+    if (ownerId) {
+      pushService.sendToUser(ownerId, {
+        title: `New message about ${label}`,
+        body: previewText,
+        url: '/#/dashboard?tab=chat',
+        tag: `chat-${session.id}`,
+      }).catch((err) => logger.error('CHAT_MESSAGE', 'Failed to push-notify owner', err));
+    }
   }
 }
 

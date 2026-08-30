@@ -11,4 +11,5 @@ module.exports = {
   ChatMessage: require('./ChatMessage'),
   ShopProduct: require('./ShopProduct'),
   Template: require('./Template'),
+  PushSubscription: require('./PushSubscription'),
 };

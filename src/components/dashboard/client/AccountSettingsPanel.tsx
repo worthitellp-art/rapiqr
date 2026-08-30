@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { ShieldCheck, KeyRound, Mail, Smartphone, Loader2, Check, Copy } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ShieldCheck, KeyRound, Mail, Smartphone, Loader2, Check, Copy, Bell } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { apiClient, isApiBackendConfigured } from '../../../lib/apiClient';
+import { isPushSupported, getExistingSubscription, subscribeToPush, unsubscribeFromPush } from '../../../lib/push';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
 
 const inputCls = 'w-full px-3.5 py-2.5 text-sm bg-[#F5F6FA] border border-[#E8ECF4] rounded-xl outline-none focus:border-[#111111]';
@@ -46,6 +47,7 @@ export default function AccountSettingsPanel({ showToast, onAccountDeleted, onPr
       <EmailForm profile={profile} refreshProfile={refreshProfile} showToast={showToast} />
       <PasswordForm showToast={showToast} />
       <TwoFactorSection profile={profile} refreshProfile={refreshProfile} showToast={showToast} />
+      <PushNotificationsSection showToast={showToast} />
       {/* No Danger Zone for the admin account — the server refuses to delete it
           (deleting it would unlink every sticker it touches and lock the fleet
           console out), so offering the button would only ever produce an error. */}
@@ -555,6 +557,74 @@ function TwoFactorSection({ profile, refreshProfile, showToast }: any) {
             </button>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function PushNotificationsSection({ showToast }: any) {
+  const [supported, setSupported] = useState(true);
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    if (!isPushSupported()) {
+      setSupported(false);
+      return;
+    }
+    getExistingSubscription().then((sub) => setEnabled(Boolean(sub))).catch(() => {});
+  }, []);
+
+  const handleEnable = async () => {
+    setBusy(true);
+    setMsg(null);
+    const res = await subscribeToPush();
+    if (res.success) {
+      setEnabled(true);
+      showToast('Push notifications enabled');
+    } else {
+      setMsg({ tone: 'error', text: res.error || 'Failed to enable notifications' });
+    }
+    setBusy(false);
+  };
+
+  const handleDisable = async () => {
+    setBusy(true);
+    setMsg(null);
+    const res = await unsubscribeFromPush();
+    if (res.success) {
+      setEnabled(false);
+      showToast('Push notifications disabled');
+    } else {
+      setMsg({ tone: 'error', text: res.error || 'Failed to disable notifications' });
+    }
+    setBusy(false);
+  };
+
+  // Nothing useful to show a visitor on a browser that can't do Web Push at all.
+  if (!supported) return null;
+
+  return (
+    <div className={cardCls}>
+      <div className="flex items-center justify-between">
+        <h3 className="font-bold text-sm text-[#1A1D26] flex items-center gap-2"><Bell size={15} /> Push Notifications</h3>
+        <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full ${enabled ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#F1F5F9] text-[#64748B]'}`}>
+          {enabled ? 'Enabled' : 'Disabled'}
+        </span>
+      </div>
+      <p className="text-xs text-[#64748B]">
+        Get notified the moment someone messages you about a scanned sticker — even when RapiQR isn't open in a tab.
+      </p>
+      {msg && <Banner tone={msg.tone} message={msg.text} />}
+      {enabled ? (
+        <button onClick={handleDisable} disabled={busy} className="px-5 py-2.5 rounded-xl bg-[#FEE2E2] hover:bg-[#FECACA] text-[#DC2626] text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5">
+          {busy && <Loader2 size={13} className="animate-spin" />} Turn Off
+        </button>
+      ) : (
+        <button onClick={handleEnable} disabled={busy} className="px-5 py-2.5 rounded-xl bg-[#111111] hover:bg-black text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5">
+          {busy && <Loader2 size={13} className="animate-spin" />} Turn On
+        </button>
       )}
     </div>
   );

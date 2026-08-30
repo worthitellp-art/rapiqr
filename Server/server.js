@@ -29,6 +29,7 @@ const shopProductRoutes = require('./routes/shopProductRoutes');
 const shiprocketRoutes = require('./routes/shiprocketRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
+const pushRoutes = require('./routes/pushRoutes');
 const { initChatSocket } = require('./sockets/chatSocket');
 
 const app = express();
@@ -86,6 +87,7 @@ app.use('/api/shop-products', shopProductRoutes);
 app.use('/api/shiprocket', shiprocketRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/push', pushRoutes);
 
 
 // Global 404 Route Handler
