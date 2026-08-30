@@ -126,8 +126,9 @@ class QrModel {
    */
   static async save(qrData) {
     try {
-      const id = qrData.id || qrData.client_id;
-      if (!id) return null;
+      const rawId = qrData.id || qrData.client_id;
+      if (!rawId || (typeof rawId !== 'string' && typeof rawId !== 'number')) return null;
+      const id = String(rawId);
 
       const payload = {
         client_id: qrData.clientId || qrData.client_id || id || 'UNASSIGNED',

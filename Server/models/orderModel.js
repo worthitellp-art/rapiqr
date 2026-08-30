@@ -53,32 +53,41 @@ class OrderModel {
   }
 
   static async updateStatus(id, status) {
-    const doc = await Order.findByIdAndUpdate(id, { $set: { status } }, { new: true }).lean();
+    if (typeof id !== 'string' && typeof id !== 'number') return null;
+    const doc = await Order.findByIdAndUpdate(String(id), { $set: { status } }, { new: true }).lean();
     return toApi(doc);
   }
 
+  // Reached from PUBLIC payment endpoints with a request-body orderId
+  // (paymentController.createOrder/verify use optionalAuth, not verifyToken)
+  // — without this guard, a body like {"orderId": {"$ne": null}} matches an
+  // arbitrary order and leaks its name/email/phone/total to an unauthenticated caller.
   static async getById(id) {
-    const doc = await Order.findById(id).lean();
+    if (typeof id !== 'string' && typeof id !== 'number') return null;
+    const doc = await Order.findById(String(id)).lean();
     return toApi(doc);
   }
 
   /** Persist the Razorpay order/payment result on an order (see paymentController) */
   static async attachPaymentInfo(id, paymentData) {
+    if (typeof id !== 'string' && typeof id !== 'number') return null;
     const update = { payment: paymentData };
     if (paymentData?.razorpayOrderId) update.razorpayOrderId = paymentData.razorpayOrderId;
-    const doc = await Order.findByIdAndUpdate(id, { $set: update }, { new: true }).lean();
+    const doc = await Order.findByIdAndUpdate(String(id), { $set: update }, { new: true }).lean();
     return toApi(doc);
   }
 
   /** Reverse lookup for the Razorpay webhook, which only knows Razorpay's own ids. */
   static async getByRazorpayOrderId(razorpayOrderId) {
-    const doc = await Order.findOne({ razorpayOrderId }).lean();
+    if (typeof razorpayOrderId !== 'string' && typeof razorpayOrderId !== 'number') return null;
+    const doc = await Order.findOne({ razorpayOrderId: String(razorpayOrderId) }).lean();
     return toApi(doc);
   }
 
   /** Reverse lookup for the Shiprocket webhook, which is keyed by AWB. */
   static async getByAwb(awbCode) {
-    const doc = await Order.findOne({ awbCode }).lean();
+    if (typeof awbCode !== 'string' && typeof awbCode !== 'number') return null;
+    const doc = await Order.findOne({ awbCode: String(awbCode) }).lean();
     return toApi(doc);
   }
 

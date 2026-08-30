@@ -26,15 +26,20 @@ class DistributorModel {
   }
 
   static async getByUserId(userId) {
-    if (!userId) return null;
-    const doc = await DistributorApplication.findOne({ user_id: userId }).sort({ created_at: -1 }).lean();
+    if (!userId || (typeof userId !== 'string' && typeof userId !== 'number')) return null;
+    const doc = await DistributorApplication.findOne({ user_id: String(userId) }).sort({ created_at: -1 }).lean();
     return toApi(doc);
   }
 
+  // emailOrPhone is client-supplied (the public "apply" form and, historically,
+  // a query param) — cast to a plain string before it can reach $or, otherwise
+  // a value like {"$ne": null} matches every application in the collection
+  // and leaks another applicant's business name/city/phone.
   static async getByUser(emailOrPhone) {
-    if (!emailOrPhone) return null;
+    if (!emailOrPhone || (typeof emailOrPhone !== 'string' && typeof emailOrPhone !== 'number')) return null;
+    const value = String(emailOrPhone);
     const doc = await DistributorApplication.findOne({
-      $or: [{ user_email: emailOrPhone }, { phone: emailOrPhone }],
+      $or: [{ user_email: value }, { phone: value }],
     }).sort({ created_at: -1 }).lean();
     return toApi(doc);
   }

@@ -45,6 +45,16 @@ class ChatModel {
    * one exists, otherwise create a fresh one.
    */
   static async findOrCreateOpenSession({ qrCodeId, customerToken, customerName, ownerId, vehicleLabel }) {
+    // Callers reach this from multiple public, unauthenticated routes
+    // (chat start, alert dispatch) with request-body values — cast to plain
+    // strings before they can reach a query filter, otherwise a value like
+    // {"$ne": null} matches an arbitrary existing open session instead of
+    // this specific (sticker, visitor) pair.
+    if (typeof qrCodeId !== 'string' && typeof qrCodeId !== 'number') throw new Error('qrCodeId must be a string');
+    if (typeof customerToken !== 'string' && typeof customerToken !== 'number') throw new Error('customerToken must be a string');
+    qrCodeId = String(qrCodeId);
+    customerToken = String(customerToken);
+
     try {
       const existing = await ChatSession.findOne({ qr_code_id: qrCodeId, customer_token: customerToken, status: 'open' }).lean();
       if (existing) return { session: sessionToApi(existing), isNew: false };
@@ -53,7 +63,7 @@ class ChatModel {
         qr_code_id: qrCodeId,
         owner_id: ownerId || null,
         customer_token: customerToken,
-        customer_name: customerName || 'Visitor',
+        customer_name: customerName ? String(customerName) : 'Visitor',
         vehicle_label: vehicleLabel || null,
       });
       return { session: sessionToApi(created), isNew: true };
@@ -65,6 +75,7 @@ class ChatModel {
 
   static async getSessionById(sessionId) {
     try {
+      if (typeof sessionId !== 'string' && typeof sessionId !== 'number') return null;
       const doc = await ChatSession.findById(sessionId).lean();
       return sessionToApi(doc);
     } catch (err) {

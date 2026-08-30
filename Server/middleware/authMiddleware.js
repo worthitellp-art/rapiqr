@@ -20,7 +20,7 @@ async function verifyToken(req, res, next) {
 
   const token = authHeader.split(' ')[1];
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
+    req.user = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
     return next();
   } catch {
     return res.status(401).json({ success: false, error: 'Unauthorized: Invalid or expired session' });
@@ -39,7 +39,7 @@ async function optionalAuth(req, res, next) {
 
   const token = authHeader.split(' ')[1];
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
+    req.user = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
   } catch { /* invalid/expired token — proceed as guest */ }
   next();
 }

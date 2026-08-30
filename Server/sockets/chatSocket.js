@@ -42,18 +42,21 @@ async function resolveIdentity(auth) {
 
   if (token) {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET);
+      const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
       return { type: 'owner', ownerId: decoded.id };
     } catch { /* invalid/expired token */ }
   }
 
-  if (sessionId && customerToken) {
+  if (typeof sessionId === 'string' && sessionId && typeof customerToken === 'string' && customerToken) {
     const session = await ChatModel.getSessionById(sessionId);
     if (session && session.customer_token === customerToken) {
       return { type: 'customer', sessionId, customerToken };
     }
-    // Fallback: accept session token matching if session was created in memory
-    return { type: 'customer', sessionId, customerToken };
+    // No matching session, or the token doesn't match its real one — reject.
+    // (This used to fall through and return the "customer" identity anyway
+    // regardless of whether the check above passed, which meant anyone who
+    // could guess/see a sessionId could read and send messages in it with
+    // any customerToken at all — the check was effectively a no-op.)
   }
 
   return null;

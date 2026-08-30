@@ -9,13 +9,16 @@ class LogModel {
   static async getLogs({ limit = 100, level = null, tag = null, category = null, event = null, userId = null, requestId = null } = {}) {
     let dbLogs = [];
     try {
+      // These arrive from req.query, which Express parses with bracket-notation
+      // support (?event[$ne]=x becomes {$ne: 'x'}) — cast to plain strings
+      // before they can reach a query filter.
       const query = {};
-      if (level && level !== 'ALL') query.level = level.toUpperCase();
+      if (level && level !== 'ALL') query.level = String(level).toUpperCase();
       if (tag) query.tag = new RegExp(String(tag).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-      if (category && category !== 'ALL') query.category = category.toUpperCase();
-      if (event) query.event = event;
-      if (userId) query.user_id = userId;
-      if (requestId) query.request_id = requestId;
+      if (category && category !== 'ALL') query.category = String(category).toUpperCase();
+      if (event) query.event = String(event);
+      if (userId) query.user_id = String(userId);
+      if (requestId) query.request_id = String(requestId);
 
       const docs = await ServerLog.find(query).sort({ created_at: -1 }).limit(limit).lean();
       dbLogs = docs.map((d) => ({ ...d, id: String(d._id) }));

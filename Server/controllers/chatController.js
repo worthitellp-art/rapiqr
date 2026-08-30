@@ -154,8 +154,15 @@ class ChatController {
    */
   static async startSession(req, res) {
     try {
-      const { qrId, customerToken: incomingToken, customerName } = req.body || {};
-      if (!qrId) return res.status(400).json({ success: false, error: 'qrId is required' });
+      const { qrId: rawQrId, customerToken: rawIncomingToken, customerName: rawCustomerName } = req.body || {};
+      if (!rawQrId) return res.status(400).json({ success: false, error: 'qrId is required' });
+
+      // Cast every client-supplied value to a plain string before it can reach
+      // a Mongo query — otherwise a body like {"qrId": {"$ne": null}} lets an
+      // unauthenticated caller match an arbitrary existing chat session instead
+      // of a specific sticker's.
+      const qrId = String(rawQrId);
+      const customerName = rawCustomerName !== undefined ? String(rawCustomerName) : undefined;
 
       const product = await ProductModel.getByQrCodeId(qrId).catch(() => null);
       const ownerId = product?.user_id || null;
@@ -163,7 +170,7 @@ class ChatController {
         ? `${product.name || 'Vehicle'}${product.vehicle_number ? ` (${product.vehicle_number})` : ''}`
         : null;
 
-      const customerToken = incomingToken || crypto.randomUUID();
+      const customerToken = rawIncomingToken ? String(rawIncomingToken) : crypto.randomUUID();
       const { session, isNew } = await ChatModel.findOrCreateOpenSession({
         qrCodeId: qrId,
         customerToken,

@@ -54,8 +54,11 @@ class HelplineModel {
       typeof filter === 'string' || filter == null ? { category: filter } : filter;
 
     try {
+      // category arrives from req.query on the PUBLIC route, which Express
+      // parses with bracket-notation support (?category[$ne]=x becomes
+      // {$ne: 'x'}) — cast to a plain string before it can reach the filter.
       const query = { active: true };
-      if (category) query.category = category;
+      if (category) query.category = String(category);
       if (serviceType) query.service_type = slugify(serviceType);
 
       const docs = await Communication.find(query).sort({ created_at: -1 }).lean();

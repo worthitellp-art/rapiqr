@@ -9,6 +9,9 @@ class DistributorController {
       if (!userName || !userEmail || !phone || !city || !business || !tier) {
         return res.status(400).json({ success: false, error: 'userName, userEmail, phone, city, business and tier are required' });
       }
+      if ([userName, userEmail, phone, city, business, tier].some((v) => typeof v !== 'string')) {
+        return res.status(400).json({ success: false, error: 'All fields must be text values' });
+      }
 
       const app = await DistributorModel.create({
         userId: req.user?.id,

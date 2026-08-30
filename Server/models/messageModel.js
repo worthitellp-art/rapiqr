@@ -43,10 +43,13 @@ class MessageModel {
 
   static async getMessages({ limit = 100, channel = null, status = null, event = null } = {}) {
     try {
+      // channel/status/event arrive from req.query, which Express parses with
+      // bracket-notation support (?channel[$ne]=x becomes {$ne: 'x'}) — cast
+      // to plain strings before they can reach a query filter.
       const query = {};
-      if (channel && channel !== 'ALL') query.channel = channel;
-      if (status && status !== 'ALL') query.status = status;
-      if (event) query.event = event;
+      if (channel && channel !== 'ALL') query.channel = String(channel);
+      if (status && status !== 'ALL') query.status = String(status);
+      if (event) query.event = String(event);
 
       const docs = await SmsMessage.find(query).sort({ created_at: -1 }).limit(limit).lean();
       return docs.map((d) => ({ ...d, id: String(d._id) }));

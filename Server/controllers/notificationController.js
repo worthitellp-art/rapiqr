@@ -1,3 +1,4 @@
+const ProductModel = require('../models/productModel');
 const { sendEmail } = require('../services/emailService');
 const { logger } = require('../middleware/loggerMiddleware');
 
@@ -8,13 +9,24 @@ class NotificationController {
    * Fired once a sticker activation finishes (after emergency contacts are collected).
    * Sends the owner a confirmation email, plus a sample "test scan" email previewing
    * what a responder sees when they scan the tag — per the Activation Confirmation spec.
+   *
+   * Public and unauthenticated (activation happens before any account exists), so the
+   * recipient is looked up from the sticker's own stored owner email rather than trusted
+   * from the request body — otherwise this endpoint is an open mail relay: anyone could
+   * POST any qrId + an arbitrary ownerEmail and use it to spam that address.
    */
   static async sendActivationConfirmation(req, res) {
     try {
-      const { qrId, ownerName, ownerEmail, category } = req.body;
+      const { qrId, ownerName, category } = req.body;
 
       if (!qrId) {
         return res.status(400).json({ success: false, error: 'qrId is required' });
+      }
+
+      const product = await ProductModel.getByQrCodeId(qrId).catch(() => null);
+      const ownerEmail = product?.details?.ownerEmail;
+      if (!ownerEmail) {
+        return res.json({ success: true, confirmation: { sent: false, reason: 'no_owner_email' }, sample: { sent: false, reason: 'no_owner_email' } });
       }
 
       const name = ownerName || 'there';

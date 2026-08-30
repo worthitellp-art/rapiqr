@@ -185,7 +185,8 @@ class ProductModel {
 
   static async getById(productId) {
     try {
-      const doc = await Sticker.findOne({ _id: productId, deleted_at: null }).lean();
+      if (typeof productId !== 'string' && typeof productId !== 'number') return null;
+      const doc = await Sticker.findOne({ _id: String(productId), deleted_at: null }).lean();
       return toApi(doc);
     } catch (err) {
       console.error(`ProductModel.getById (${productId}) Error:`, err);
