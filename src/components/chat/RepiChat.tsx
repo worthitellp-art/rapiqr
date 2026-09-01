@@ -392,34 +392,38 @@ export default function RepiChat({
   const syncHistory = useCallback(
     async (id: string | undefined = sessionId, token: string | undefined = customerToken) => {
       if (!id) return;
-      const res = await apiClient.chat
-        .getMessages(id, mode === "customer" ? token : undefined)
-        .catch(() => null);
-      if (!res?.success || !Array.isArray(res.data)) return;
+      try {
+        const res = await apiClient.chat.getMessages(id, mode === "customer" ? token : undefined);
+        if (!res?.success || !Array.isArray(res.data)) {
+          if (mode === "customer" && qrId && (res as any)?.error?.includes("Session not found")) {
+            localStorage.removeItem(customerTokenKey(qrId));
+            localStorage.removeItem(`repichat-last-session-${qrId}`);
+          }
+          return;
+        }
 
-      setMessages((prev) => {
-        // apiClient falls back to an empty transcript when the request fails —
-        // never let that wipe a conversation the user can currently see.
-        if (res.data.length === 0 && prev.length > 0) return prev;
+        setMessages((prev) => {
+          if (res.data.length === 0 && prev.length > 0) return prev;
 
-        // Local sends the server hasn't confirmed yet must survive a resync, but
-        // one that DID land (its ack was lost, not the message) must not come
-        // back as a duplicate. An in-flight upload is always kept: the server
-        // transcript cannot contain it yet, and its empty body would otherwise
-        // match any other image message.
-        const unlanded = prev.filter((m) => {
-          if (!m.pending && !m.failed) return false;
-          if (m.uploadProgress !== undefined || m.retryFile) return true;
-          return !res.data.some((d) => d.sender_type === m.sender_type && d.body === m.body);
+          const unlanded = prev.filter((m) => {
+            if (!m.pending && !m.failed) return false;
+            if (m.uploadProgress !== undefined || m.retryFile) return true;
+            return !res.data.some((d) => d.sender_type === m.sender_type && d.body === m.body);
+          });
+          return [...(res.data as UiMessage[]), ...unlanded];
         });
-        return [...(res.data as UiMessage[]), ...unlanded];
-      });
 
-      if (res.session && mode === "owner") {
-        setResolvedTitle((t) => t || title || res.session.customer_name || "Visitor");
+        if (res.session && mode === "owner") {
+          setResolvedTitle((t) => t || title || res.session.customer_name || "Visitor");
+        }
+      } catch (err: any) {
+        if (mode === "customer" && qrId && err?.message?.includes("Session not found")) {
+          localStorage.removeItem(customerTokenKey(qrId));
+          localStorage.removeItem(`repichat-last-session-${qrId}`);
+        }
       }
     },
-    [sessionId, mode, customerToken, title]
+    [sessionId, mode, customerToken, title, qrId]
   );
 
   /* ── Bootstrap ───────────────────────────────────────────────────────── */
@@ -435,8 +439,15 @@ export default function RepiChat({
       let res = await apiClient.chat.startSession(qrId, customerToken, customerName).catch(() => null);
       if (cancelled) return;
 
+      // If existing token caused session not found or invalid session, retry without token to create fresh session
       if (!res || !res.success) {
-        const fallbackTok = customerToken || `cust_${Math.random().toString(36).substring(2, 9)}`;
+        localStorage.removeItem(customerTokenKey(qrId));
+        localStorage.removeItem(`repichat-last-session-${qrId}`);
+        res = await apiClient.chat.startSession(qrId, undefined, customerName).catch(() => null);
+      }
+
+      if (!res || !res.success) {
+        const fallbackTok = `cust_${Math.random().toString(36).substring(2, 9)}`;
         const fallbackSess = `sess_${qrId.replace(/[^a-zA-Z0-9]/g, "")}_${fallbackTok.substring(0, 6)}`;
         res = {
           success: true,
@@ -459,7 +470,7 @@ export default function RepiChat({
         setInput((current) => current || readDraft(res!.sessionId));
       }
 
-      await syncHistory(res.sessionId);
+      await syncHistory(res.sessionId, res.customerToken);
       if (cancelled) return;
 
       connectAsCustomer(res.sessionId, res.customerToken);
@@ -725,12 +736,50 @@ export default function RepiChat({
           mode === "customer" ? customerToken : undefined,
           tempId
         );
+        if (!res.success && (res as any)?.error?.includes('Session not found') && mode === "customer" && qrId) {
+          localStorage.removeItem(customerTokenKey(qrId));
+          localStorage.removeItem(`repichat-last-session-${qrId}`);
+          const fresh = await apiClient.chat.startSession(qrId, undefined, customerName).catch(() => null);
+          if (fresh?.success) {
+            localStorage.setItem(customerTokenKey(qrId), fresh.customerToken);
+            rememberCustomerSession(qrId, fresh.sessionId);
+            setCustomerToken(fresh.customerToken);
+            setSessionId(fresh.sessionId);
+            const retryRes = await apiClient.chat.sendMessage(
+              fresh.sessionId,
+              trimmed,
+              fresh.customerToken,
+              tempId
+            ).catch(() => null);
+            settle(retryRes?.success ? retryRes.data : undefined);
+            return;
+          }
+        }
         settle(res.success ? res.data : undefined);
-      } catch {
+      } catch (err: any) {
+        if (err?.message?.includes('Session not found') && mode === "customer" && qrId) {
+          localStorage.removeItem(customerTokenKey(qrId));
+          localStorage.removeItem(`repichat-last-session-${qrId}`);
+          const fresh = await apiClient.chat.startSession(qrId, undefined, customerName).catch(() => null);
+          if (fresh?.success) {
+            localStorage.setItem(customerTokenKey(qrId), fresh.customerToken);
+            rememberCustomerSession(qrId, fresh.sessionId);
+            setCustomerToken(fresh.customerToken);
+            setSessionId(fresh.sessionId);
+            const retryRes = await apiClient.chat.sendMessage(
+              fresh.sessionId,
+              trimmed,
+              fresh.customerToken,
+              tempId
+            ).catch(() => null);
+            settle(retryRes?.success ? retryRes.data : undefined);
+            return;
+          }
+        }
         settle();
       }
     },
-    [sessionId, mode, customerToken]
+    [sessionId, mode, customerToken, qrId, customerName]
   );
 
   /**

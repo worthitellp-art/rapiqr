@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { getStickerCategoryLabel, getCategoryIcon, getCategoryLabel } from "../../stickerModules";
 import PhoneInputWithCountry from "../common/PhoneInputWithCountry";
+import InstallAppFab from "../common/InstallAppFab";
+import InstallAppBar from "../common/InstallAppBar";
 import CategoryScanView from "./CategoryScanView";
 import AssistantChat from "./AssistantChat";
 import { getCategoryVariant, BESPOKE_CATEGORIES, type VariantAction } from "./categoryVariants";
@@ -60,10 +62,17 @@ import {
   Loader2,
   BellRing,
   MessageCircle,
-  Users
+  Users,
+  Shield,
+  QrCode,
+  Zap,
+  Radio
 } from "lucide-react";
 import RepiChat, { customerTokenKey } from "../chat/RepiChat";
 import { isChatOpen as recallChatOpen, setChatOpen as rememberChatOpen } from "../../lib/chatStorage";
+import activationArt from "../../assets/illustrations/activation-art.jpg";
+import guardianArt from "../../assets/illustrations/guardian-art.jpg";
+import deepinspireScene from "../../assets/illustrations/deepinspire-scene.jpg";
 
 /* ---------------------------------------------------------------------- */
 /*  Types                                                                   */
@@ -1510,348 +1519,475 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   }, [phase, qrData, location]);
 
   return (
-    <div className="min-h-screen bg-[#F8F9FE] text-gray-900 flex flex-col items-center justify-start font-sans relative selection:bg-yellow-500 selection:text-white overflow-x-hidden">
-      {/* Light Theme Background Glow */}
-      <div
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-80 pointer-events-none opacity-30 z-0"
-        style={{ background: 'radial-gradient(ellipse at top, rgba(234,179,8,0.15), transparent 70%)' }}
-      />
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-[#F5F6FC] to-slate-100 text-slate-900 flex flex-col items-center justify-start font-sans relative selection:bg-amber-500 selection:text-slate-950 overflow-x-hidden">
+      {/* ── Multi-Layered Ambient Light & Grid Atmosphere ── */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        {/* Precision Tech Dot Grid */}
+        <div
+          className="absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_60%_60%_at_50%_35%,#000_60%,transparent_100%)]"
+          style={{
+            backgroundImage: "radial-gradient(rgba(100, 116, 139, 0.25) 1.25px, transparent 1.25px)",
+            backgroundSize: "20px 20px",
+          }}
+        />
 
+        {/* Top Radiant Amber / Gold Ambient Aura */}
+        <div
+          className="absolute -top-24 left-1/2 -translate-x-1/2 w-[650px] h-[380px] rounded-full blur-[100px] opacity-45 pointer-events-none"
+          style={{ background: "radial-gradient(circle, rgba(245,158,11,0.35) 0%, rgba(251,191,36,0.15) 50%, transparent 75%)" }}
+        />
 
+        {/* Subtle Bottom Cool Indigo / Cyan Glow */}
+        <div
+          className="absolute -bottom-28 right-1/4 w-[500px] h-[350px] rounded-full blur-[120px] opacity-25 pointer-events-none"
+          style={{ background: "radial-gradient(circle, rgba(99,102,241,0.2) 0%, rgba(6,182,212,0.12) 50%, transparent 80%)" }}
+        />
+      </div>
 
-      {/* Main Light Visitor Container */}
-      <main className="flex-1 w-full max-w-md mx-auto px-4 py-2 pb-5 z-10 flex flex-col justify-center items-center">
-        {/* ============ ACTIVATION — Enter Activation Code ============ */}
+      {/* Main Visitor Container */}
+      <main className="flex-1 w-full max-w-5xl mx-auto px-2 sm:px-4 py-4 pb-12 z-10 flex flex-col justify-center items-center">
+
+        {/* ============ ACTIVATION — Enter Activation Details (EXACT 1:1 DEEPINSPIRE UI) ============ */}
         {phase === "activation" && qrData && (
-          <div className="w-full max-w-sm sm:max-w-md mx-auto animate-fade-in">
-            <div className="overflow-hidden rounded-3xl bg-white shadow-[0_12px_40px_rgba(0,0,0,0.06)] border border-slate-200/80">
+          <div className="w-full animate-fade-in">
+            <div className="relative w-full rounded-[32px] sm:rounded-[40px] bg-white overflow-hidden shadow-2xl p-6 sm:p-10 lg:p-12 min-h-[620px] border border-slate-100 flex flex-col justify-between">
+              
+              {/* Illustrated Backdrop matching exact Deepinspire Vector Scene */}
+              <img
+                src={deepinspireScene}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover object-right pointer-events-none z-0"
+              />
 
-              {/* ——— Clean Header ——— */}
-              <div className="bg-gradient-to-b from-slate-50/90 to-white px-6 pt-6 pb-4 text-center border-b border-slate-100">
-                <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center text-2xl mx-auto shadow-xs mb-3">
-                  {getCategoryIcon((qrData.category || "car") as any)}
+              {/* Gradient mask for smooth text contrast on top left */}
+              <div className="absolute inset-0 bg-gradient-to-r from-white via-white/80 to-transparent pointer-events-none z-0 w-full lg:w-3/5" />
+
+              {/* Content Wrapper */}
+              <div className="relative z-10 space-y-6">
+                
+                {/* 1. Header Section */}
+                <div className="text-left max-w-xl space-y-1">
+                  <div className="text-[#E11D48] font-black uppercase text-xs sm:text-sm tracking-wider">
+                    DEEPINSPIRE · RAPIQR
+                  </div>
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-950 tracking-tight">
+                    Let&apos;s connect
+                  </h1>
+                  <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed max-w-md pt-1">
+                    Have cool idea for new project? Need reliable partner to improve your product?<br className="hidden sm:inline" />
+                    We are here to help you uncomplicate your product development.
+                  </p>
                 </div>
-                <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight">
-                  Activate {getStickerCategoryLabel(qrData.category) || getCategoryLabel((qrData.category || "car") as any) || "Sticker"}
-                </h1>
-                <p className="mt-1 text-xs text-slate-500 font-medium">
-                  Enter your details to activate and link this QR sticker
-                </p>
-              </div>
 
-              {/* ——— Body Content ——— */}
-              <div className="p-6 space-y-4">
-                {!otpStep ? (
-                  <>
-                    {/* ── DETAILS ── */}
-                    <div className="space-y-1.5">
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                        Full Name <span className="text-amber-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={regName}
-                        onChange={(e) => { setRegName(e.target.value); setActivationError(null); }}
-                        placeholder="e.g. John Doe"
-                        className="h-11 w-full rounded-xl border border-slate-200/90 bg-slate-50/50 px-3.5 text-sm text-slate-900 outline-none transition-all focus:bg-white focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 font-medium placeholder:text-slate-400"
-                      />
-                    </div>
+                {/* 2. Floating Form Card */}
+                <div className="w-full max-w-lg bg-white rounded-[28px] shadow-[0_20px_50px_-10px_rgba(0,0,0,0.12)] p-6 sm:p-8 space-y-3.5 border border-slate-100/80 transition-all">
+                  
+                  {!otpStep ? (
+                    <>
+                      {/* Row 1: Your Name */}
+                      <div className="rounded-full bg-[#f4f5f8] px-5 py-3 border border-transparent focus-within:border-[#E11D48] focus-within:bg-white focus-within:ring-2 focus-within:ring-red-500/15 transition-all">
+                        <input
+                          type="text"
+                          value={regName}
+                          onChange={(e) => { setRegName(e.target.value); setActivationError(null); }}
+                          placeholder="Your Name"
+                          className="w-full bg-transparent text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400"
+                        />
+                      </div>
 
-                    <div className="space-y-1.5">
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                        Phone Number <span className="text-amber-500">*</span>
-                      </label>
-                      <div className="flex gap-2">
+                      {/* Row 2: Your email/phone */}
+                      <div className="rounded-full bg-[#f4f5f8] px-4 py-2 flex items-center gap-2 border border-transparent focus-within:border-[#E11D48] focus-within:bg-white focus-within:ring-2 focus-within:ring-red-500/15 transition-all">
                         <select
                           value={regCountry}
                           onChange={(e) => { setRegCountry(e.target.value); setActivationError(null); }}
-                          title="Country dial code"
-                          className="h-11 w-20 flex-shrink-0 rounded-xl border border-slate-200/90 bg-slate-50/50 px-2 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 cursor-pointer"
+                          title="Country code"
+                          className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer pr-1"
                         >
                           {ACTIVATION_COUNTRIES.map((c) => (
                             <option key={`${c.code}-${c.name}`} value={c.code}>{c.code}</option>
                           ))}
                         </select>
+                        <span className="text-slate-300">|</span>
                         <input
                           type="tel"
                           inputMode="numeric"
                           value={regPhone}
                           onChange={(e) => { setRegPhone(e.target.value.replace(/\D/g, "").slice(0, 10)); setActivationError(null); }}
-                          placeholder="98765 43210"
-                          className="h-11 w-full rounded-xl border border-slate-200/90 bg-slate-50/50 px-3.5 text-sm text-slate-900 outline-none focus:bg-white focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 font-mono font-medium placeholder:text-slate-400"
+                          placeholder="Your email/phone"
+                          className="w-full bg-transparent text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400"
                         />
                       </div>
+
+                      {/* Row 3: Company & Position (50% - 50% split) */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-full bg-[#f4f5f8] px-5 py-3 border border-transparent focus-within:border-[#E11D48] focus-within:bg-white focus-within:ring-2 focus-within:ring-red-500/15 transition-all">
+                          <input
+                            type="text"
+                            value={getStickerCategoryLabel(qrData.category) || "Vehicle"}
+                            readOnly
+                            placeholder="Company"
+                            className="w-full bg-transparent text-sm font-medium text-slate-700 outline-none placeholder:text-slate-400 cursor-default"
+                          />
+                        </div>
+                        <div className="rounded-full bg-[#f4f5f8] px-5 py-3 border border-transparent focus-within:border-[#E11D48] focus-within:bg-white focus-within:ring-2 focus-within:ring-red-500/15 transition-all">
+                          <input
+                            type="text"
+                            value={qrData.id ? `#${qrData.id.slice(0, 8).toUpperCase()}` : "Smart Tag"}
+                            readOnly
+                            placeholder="Position"
+                            className="w-full bg-transparent text-sm font-medium text-slate-700 outline-none placeholder:text-slate-400 cursor-default"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Row 4: Message Box */}
+                      <div className="rounded-[20px] bg-[#f4f5f8] px-5 py-3 border border-transparent focus-within:border-[#E11D48] focus-within:bg-white focus-within:ring-2 focus-within:ring-red-500/15 transition-all">
+                        <textarea
+                          rows={2}
+                          placeholder="Message (optional notes or vehicle plate number)"
+                          className="w-full bg-transparent text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400 resize-none"
+                        />
+                      </div>
+
                       {phoneMatchesBuyer && (
-                        <p className="mt-2 flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-[11px] font-bold text-emerald-800">
-                          <CheckCircle2 size={13} className="text-emerald-600 flex-shrink-0" />
-                          Matches purchase phone — instant activation available.
+                        <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 border border-emerald-200/80 p-2.5 text-xs font-bold text-emerald-900 animate-fade-in">
+                          <Check size={14} className="text-emerald-600 flex-shrink-0" />
+                          <span>Purchase match detected — ready to activate.</span>
+                        </div>
+                      )}
+
+                      {activationError && (
+                        <p className="text-xs font-semibold text-red-500 bg-red-50 border border-red-100 rounded-2xl px-3 py-2">
+                          {activationError}
                         </p>
                       )}
-                    </div>
 
-                    {activationError && (
-                      <p className="flex items-center gap-1.5 text-xs font-semibold text-red-500 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
-                        <AlertTriangle size={14} className="flex-shrink-0" />
-                        {activationError}
-                      </p>
-                    )}
-
-                    {/* ── PRIMARY ACTION ── */}
-                    {phoneMatchesBuyer ? (
-                      <button
-                        onClick={() => proceedToEmergencyContacts(true)}
-                        disabled={activatingQr}
-                        className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold shadow-md shadow-emerald-600/20 transition-all active:scale-[0.98] cursor-pointer text-sm disabled:opacity-60 mt-2"
-                      >
-                        {activatingQr ? (
-                          <span className="flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Activating…</span>
+                      {/* Row 5: Center Aligned Red Pill CTA Button */}
+                      <div className="text-center pt-2">
+                        {phoneMatchesBuyer ? (
+                          <button
+                            type="button"
+                            onClick={() => proceedToEmergencyContacts(true)}
+                            disabled={activatingQr}
+                            className="rounded-full bg-[#E11D48] hover:bg-[#BE123C] text-white font-bold text-sm px-10 py-3.5 shadow-md shadow-red-500/25 active:scale-95 transition-all cursor-pointer inline-flex items-center justify-center gap-2 disabled:opacity-60"
+                          >
+                            {activatingQr ? (
+                              <span className="flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> Activating…</span>
+                            ) : (
+                              <span>Send Message</span>
+                            )}
+                          </button>
                         ) : (
-                          <><ShieldCheck size={16} /> Activate Instantly</>
+                          <button
+                            type="button"
+                            onClick={handleSendOtp}
+                            disabled={otpSending}
+                            className="rounded-full bg-[#E11D48] hover:bg-[#BE123C] text-white font-bold text-sm px-10 py-3.5 shadow-md shadow-red-500/25 active:scale-95 transition-all cursor-pointer inline-flex items-center justify-center gap-2 disabled:opacity-60"
+                          >
+                            {otpSending ? (
+                              <span className="flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> Sending OTP…</span>
+                            ) : (
+                              <span>Send Message</span>
+                            )}
+                          </button>
                         )}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleSendOtp}
-                        disabled={otpSending}
-                        className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black shadow-md shadow-amber-500/25 transition-all active:scale-[0.98] cursor-pointer text-sm disabled:opacity-60 mt-2"
-                      >
-                        {otpSending ? (
-                          <span className="flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Sending OTP…</span>
-                        ) : (
-                          <><Send size={15} /> Send OTP &amp; Verify</>
-                        )}
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  /* OTP VERIFICATION STEP */
-                  <div className="space-y-4 text-left">
-                    <div className="text-center space-y-1">
-                      <h2 className="text-base font-extrabold text-slate-900">OTP Verification</h2>
-                      <p className="text-xs text-slate-500 font-medium">
+                      </div>
+                    </>
+                  ) : (
+                    /* OTP Verification Form */
+                    <div className="space-y-4 text-center py-2">
+                      <h2 className="text-base font-black text-slate-900">Enter Verification Code</h2>
+                      <p className="text-xs text-slate-500">
                         {otpSimulated
                           ? "Development mode: enter 000000 to verify."
-                          : `Enter the 6-digit code sent to ${regCountry} ${regPhone}`}
+                          : `Enter code sent to ${regCountry} ${regPhone}`}
                       </p>
+
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        autoFocus
+                        maxLength={6}
+                        value={otpInput}
+                        onChange={(e) => { setOtpInput(e.target.value.replace(/\D/g, "").slice(0, 6)); setActivationError(null); }}
+                        placeholder="000000"
+                        className="h-12 w-full rounded-full border border-slate-200 bg-[#f4f5f8] px-4 text-center font-mono text-xl font-black tracking-[0.4em] outline-none focus:bg-white focus:border-[#E11D48] text-slate-900 placeholder:text-slate-300"
+                      />
+
+                      {activationError && (
+                        <p className="text-xs font-semibold text-red-500 bg-red-50 rounded-full py-1.5">
+                          {activationError}
+                        </p>
+                      )}
+
+                      <div className="pt-2 space-y-2">
+                        <button
+                          type="button"
+                          onClick={handleVerifyOtpAndActivate}
+                          disabled={activatingQr}
+                          className="rounded-full bg-[#E11D48] hover:bg-[#BE123C] text-white font-bold text-sm px-10 py-3.5 shadow-md shadow-red-500/25 active:scale-95 transition-all cursor-pointer inline-flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {activatingQr ? (
+                            <span className="flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> Verifying…</span>
+                          ) : (
+                            <span>Verify &amp; Connect</span>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setOtpStep(false); setOtpInput(""); setActivationError(null); }}
+                          className="block mx-auto text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors py-1"
+                        >
+                          ← Change Phone
+                        </button>
+                      </div>
                     </div>
+                  )}
 
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      autoFocus
-                      maxLength={6}
-                      value={otpInput}
-                      onChange={(e) => { setOtpInput(e.target.value.replace(/\D/g, "").slice(0, 6)); setActivationError(null); }}
-                      placeholder="000000"
-                      className="h-12 w-full rounded-xl border border-slate-200/90 bg-slate-50/50 px-4 text-center font-mono text-lg font-extrabold tracking-[0.4em] outline-none focus:bg-white focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 text-slate-900 placeholder:text-slate-300"
-                    />
-
-                    {activationError && (
-                      <p className="text-center text-xs font-semibold text-red-500 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
-                        {activationError}
-                      </p>
-                    )}
-
-                    <div className="space-y-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={handleVerifyOtpAndActivate}
-                        disabled={activatingQr}
-                        className="h-11 w-full rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm shadow-md shadow-amber-500/25 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-                      >
-                        {activatingQr ? (
-                          <span className="flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Activating…</span>
-                        ) : (
-                          <><CheckCircle2 size={16} /> Verify &amp; Activate</>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setOtpStep(false); setOtpInput(""); setActivationError(null); }}
-                        className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors py-1 cursor-pointer"
-                      >
-                        ← Change Phone Number
-                      </button>
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
+
             </div>
           </div>
         )}
 
         {/* ============ EMERGENCY CONTACTS (after identity verified, before final activation) ============ */}
         {phase === "register" && qrData && (
-          <div className="w-full max-w-sm sm:max-w-md mx-auto animate-fade-in">
-            <div className="overflow-hidden rounded-3xl bg-white shadow-[0_12px_40px_rgba(0,0,0,0.06)] border border-slate-200/80">
-              {/* — Clean Header — */}
-              <div className="bg-gradient-to-b from-slate-50/90 to-white px-6 pt-6 pb-4 text-center border-b border-slate-100">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-200/60 flex items-center justify-center text-2xl mx-auto shadow-xs mb-3">
-                  <Users size={22} className="text-indigo-600" />
+          <div className="w-full animate-fade-in">
+            <div className="relative w-full rounded-[32px] sm:rounded-[40px] bg-white overflow-hidden shadow-2xl p-6 sm:p-10 lg:p-12 min-h-[620px] border border-slate-100 flex flex-col justify-between">
+              
+              {/* Illustrated Backdrop */}
+              <img
+                src={guardianArt}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover object-right pointer-events-none z-0 opacity-40 lg:opacity-90"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-transparent pointer-events-none z-0 w-full lg:w-3/5" />
+
+              <div className="relative z-10 space-y-6">
+                {/* Header */}
+                <div className="text-left max-w-xl space-y-1">
+                  <div className="text-[#E11D48] font-black uppercase text-xs sm:text-sm tracking-wider">
+                    STEP 2 OF 2 · GUARDIAN NETWORK
+                  </div>
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-950 tracking-tight">
+                    Emergency Contacts
+                  </h1>
+                  <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed max-w-md pt-1">
+                    Add trusted family or friends to be alerted with your exact GPS location in any roadside emergency.
+                  </p>
                 </div>
-                <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight">
-                  Emergency Contacts
-                </h1>
-                <p className="mt-1 text-xs text-slate-500 font-medium">
-                  Alerted first with location during an emergency
-                </p>
-              </div>
 
-              <div className="p-6 space-y-4">
-                {isContactPickerSupported && (
-                  <button
-                    type="button"
-                    onClick={handleImportContact}
-                    className="w-full h-10 rounded-xl border border-dashed border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                  >
-                    <Smartphone size={14} /> Import from phone contacts
-                  </button>
-                )}
+                {/* Form Card */}
+                <div className="w-full max-w-lg bg-white rounded-[28px] shadow-[0_20px_50px_-10px_rgba(0,0,0,0.12)] p-6 sm:p-8 space-y-4 border border-slate-100/80">
+                  {isContactPickerSupported && (
+                    <button
+                      type="button"
+                      onClick={handleImportContact}
+                      className="w-full py-2.5 rounded-full border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <Smartphone size={14} /> Import from phone contacts
+                    </button>
+                  )}
 
-                <div className="space-y-3">
-                  {emergencyContacts.map((contact, idx) => (
-                    <div key={contact.id} className="rounded-2xl border border-slate-200/90 p-3.5 space-y-2.5 relative bg-slate-50/40">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                          Contact {idx + 1}
-                        </span>
-                        {emergencyContacts.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeEmergencyContact(contact.id)}
-                            className="text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
-                            aria-label={`Remove contact ${idx + 1}`}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                  <div className="space-y-3">
+                    {emergencyContacts.map((contact, idx) => (
+                      <div key={contact.id} className="rounded-2xl border border-slate-200/80 bg-[#f8f9fc] p-4 space-y-3 relative">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                            Contact {idx + 1} {idx === 0 ? "· Primary SOS" : ""}
+                          </span>
+                          {emergencyContacts.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeEmergencyContact(contact.id)}
+                              className="text-slate-400 hover:text-red-500 transition-colors cursor-pointer p-1"
+                              aria-label={`Remove contact ${idx + 1}`}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="rounded-full bg-white px-4 py-2 border border-slate-200">
+                          <input
+                            type="text"
+                            value={contact.name}
+                            onChange={(e) => updateEmergencyContact(contact.id, "name", e.target.value)}
+                            placeholder="Full name (e.g. Sarah Doe)"
+                            className="w-full bg-transparent text-xs font-semibold text-slate-900 outline-none placeholder:text-slate-400"
+                          />
+                        </div>
+
+                        <div>
+                          <div className="rounded-full bg-white px-4 py-2 border border-slate-200">
+                            <input
+                              type="text"
+                              value={contact.relationship}
+                              onChange={(e) => updateEmergencyContact(contact.id, "relationship", e.target.value)}
+                              placeholder="Relationship (e.g. Spouse / Parent)"
+                              className="w-full bg-transparent text-xs font-semibold text-slate-900 outline-none placeholder:text-slate-400"
+                            />
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {RELATIONSHIP_PRESETS.map((label) => (
+                              <button
+                                key={label}
+                                type="button"
+                                onClick={() => updateEmergencyContact(contact.id, "relationship", label)}
+                                className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer ${contact.relationship === label
+                                    ? "border-red-500 bg-[#E11D48] text-white font-extrabold"
+                                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                                  }`}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <PhoneInputWithCountry
+                          value={contact.phone}
+                          onChange={(full) => updateEmergencyContact(contact.id, "phone", full)}
+                          placeholder="10-digit mobile"
+                        />
+                        {contact.phone.trim() && !isValidContactPhone(contact.phone) && (
+                          <p className="text-[11px] font-semibold text-red-500">Enter a valid phone number.</p>
                         )}
                       </div>
+                    ))}
+                  </div>
 
-                      <input
-                        type="text"
-                        value={contact.name}
-                        onChange={(e) => updateEmergencyContact(contact.id, "name", e.target.value)}
-                        placeholder="Full name"
-                        className="h-10 w-full rounded-xl border border-slate-200/90 bg-white px-3.5 text-xs text-slate-900 outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 font-medium"
-                      />
+                  <button
+                    type="button"
+                    onClick={addEmergencyContactRow}
+                    className="w-full py-2.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    + Add another contact
+                  </button>
 
-                      <div>
-                        <input
-                          type="text"
-                          value={contact.relationship}
-                          onChange={(e) => updateEmergencyContact(contact.id, "relationship", e.target.value)}
-                          placeholder="Relationship (e.g. Spouse / Parent)"
-                          className="h-10 w-full rounded-xl border border-slate-200/90 bg-white px-3.5 text-xs text-slate-900 outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 font-medium"
-                        />
-                        <div className="mt-1.5 flex flex-wrap gap-1">
-                          {RELATIONSHIP_PRESETS.map((label) => (
-                            <button
-                              key={label}
-                              type="button"
-                              onClick={() => updateEmergencyContact(contact.id, "relationship", label)}
-                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${contact.relationship === label
-                                  ? "border-indigo-400 bg-indigo-50 text-indigo-700 font-extrabold"
-                                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                                }`}
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                  {(contactsError || activationError) && (
+                    <p className="text-xs font-semibold text-red-500 bg-red-50 rounded-2xl p-2.5">
+                      {contactsError || activationError}
+                    </p>
+                  )}
 
-                      <PhoneInputWithCountry
-                        value={contact.phone}
-                        onChange={(full) => updateEmergencyContact(contact.id, "phone", full)}
-                        placeholder="10-digit mobile"
-                      />
-                      {contact.phone.trim() && !isValidContactPhone(contact.phone) && (
-                        <p className="text-[11px] font-semibold text-red-500">Enter a valid phone number.</p>
+                  <div className="text-center pt-2 space-y-2">
+                    <button
+                      type="button"
+                      onClick={handleFinishEmergencyContacts}
+                      disabled={activatingQr}
+                      className="rounded-full bg-[#E11D48] hover:bg-[#BE123C] text-white font-bold text-sm px-10 py-3.5 shadow-md shadow-red-500/25 active:scale-95 transition-all cursor-pointer inline-flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {activatingQr ? (
+                        <span className="flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> Saving…</span>
+                      ) : (
+                        <span>Save &amp; Activate</span>
                       )}
-                    </div>
-                  ))}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSkipEmergencyContacts}
+                      disabled={activatingQr}
+                      className="block mx-auto text-slate-500 hover:text-slate-900 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 py-1"
+                    >
+                      Skip for now →
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* ============ LOCATION REQUEST ============ */}
+        {phase === "location-request" && (
+          <div className="w-full animate-fade-in">
+            <div className="relative w-full rounded-[32px] sm:rounded-[40px] bg-white overflow-hidden shadow-2xl p-6 sm:p-10 lg:p-12 min-h-[500px] border border-slate-100 flex flex-col justify-between">
+              
+              <img
+                src={deepinspireScene}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover object-right pointer-events-none z-0"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-white via-white/80 to-transparent pointer-events-none z-0 w-full lg:w-3/5" />
+
+              <div className="relative z-10 space-y-6">
+                <div className="text-left max-w-xl space-y-1">
+                  <div className="text-[#E11D48] font-black uppercase text-xs sm:text-sm tracking-wider">
+                    PRECISION DISPATCH
+                  </div>
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-950 tracking-tight">
+                    Location Access
+                  </h1>
+                  <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed max-w-md pt-1">
+                    To connect you with the vehicle owner or dispatch emergency help to your exact spot, please allow location access.
+                  </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={addEmergencyContactRow}
-                  className="w-full h-9 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center justify-center gap-1 cursor-pointer transition-colors"
-                >
-                  + Add another contact
-                </button>
-
-                {(contactsError || activationError) && (
-                  <p className="flex items-center gap-1.5 text-xs font-semibold text-red-500 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
-                    <AlertTriangle size={14} className="flex-shrink-0" />
-                    {contactsError || activationError}
+                <div className="w-full max-w-md bg-white rounded-[28px] shadow-[0_20px_50px_-10px_rgba(0,0,0,0.12)] p-6 sm:p-8 space-y-4 border border-slate-100/80 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-200/80 flex items-center justify-center text-blue-600 mx-auto">
+                    <MapPin size={28} />
+                  </div>
+                  <h3 className="text-base font-black text-slate-900">Allow GPS in Browser</h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Coordinates are encrypted and only transmitted during active emergency dispatch.
                   </p>
-                )}
+                  <button
+                    onClick={requestLocation}
+                    className="rounded-full bg-[#E11D48] hover:bg-[#BE123C] text-white font-bold text-sm px-10 py-3.5 shadow-md shadow-red-500/25 active:scale-95 transition-all cursor-pointer inline-flex items-center justify-center gap-2"
+                  >
+                    <span>Allow GPS Location</span>
+                  </button>
+                </div>
+              </div>
 
-                <button
-                  type="button"
-                  onClick={handleFinishEmergencyContacts}
-                  disabled={activatingQr}
-                  className="w-full h-11 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black shadow-md shadow-amber-500/25 transition-all active:scale-[0.98] cursor-pointer text-sm disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {activatingQr ? (
-                    <span className="flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Activating…</span>
-                  ) : (
-                    <><ShieldCheck size={16} /> Save Contacts &amp; Activate Sticker</>
-                  )}
-                </button>
+            </div>
+          </div>
+        )}
 
-                <button
-                  type="button"
-                  onClick={handleSkipEmergencyContacts}
-                  disabled={activatingQr}
-                  className="w-full py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 font-extrabold text-xs transition-all cursor-pointer disabled:opacity-50 text-center"
-                >
-                  Skip for now
-                </button>
+        {/* ============ LOCATION DENIED ============ */}
+        {phase === "location-denied" && (
+          <div className="w-full animate-fade-in space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+              <div className="md:col-span-7">
+                <div className="bg-white/95 backdrop-blur-2xl rounded-[28px] border border-white shadow-[0_25px_65px_-12px_rgba(220,38,38,0.15)] p-6 sm:p-8 text-center relative overflow-hidden">
+                  <div className="h-1.5 w-full bg-gradient-to-r from-red-500 via-rose-500 to-red-500 absolute top-0 left-0 right-0" />
+                  
+                  <div className="w-16 h-16 rounded-2xl bg-red-50 border border-red-200 flex items-center justify-center mx-auto mb-4 text-red-600 shadow-md shadow-red-500/10">
+                    <AlertTriangle size={28} />
+                  </div>
+                  
+                  <h2 className="text-xl font-black text-slate-900 mb-2">Location Access Blocked</h2>
+                  <p className="text-slate-500 text-xs leading-relaxed max-w-sm mx-auto mb-6">
+                    Please enable location permission in your browser settings so responders know where your vehicle notification originated.
+                  </p>
+                  
+                  <button
+                    onClick={requestLocation}
+                    className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-orange-500 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-sm shadow-md transition-all cursor-pointer"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              </div>
+
+              <div className="md:col-span-5">
+                <div className="rounded-[24px] bg-white/90 backdrop-blur-xl border border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.04)] p-4 text-left space-y-2">
+                  <div className="text-xs font-black text-slate-900 border-b border-slate-100 pb-2">
+                    How to enable GPS in browser:
+                  </div>
+                  <div className="text-[11px] text-slate-600 space-y-1.5">
+                    <p>1. Tap the <strong>Lock / Settings icon</strong> in your browser address bar.</p>
+                    <p>2. Select <strong>Permissions</strong> → <strong>Location</strong>.</p>
+                    <p>3. Toggle to <strong>Allow</strong> and refresh.</p>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-
-
-
-        {/* ============ LOCATION REQUEST (Light Mode) ============ */}
-        {phase === "location-request" && (
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/60 p-8 text-center animate-fade-in w-full">
-            <div className="w-20 h-20 rounded-3xl bg-blue-50 border border-blue-100 flex items-center justify-center mx-auto mb-6 text-blue-600 shadow-md shadow-blue-500/10">
-              <MapPin size={36} />
-            </div>
-            <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Location Permission Required</h2>
-            <p className="text-gray-500 text-xs leading-relaxed max-w-[260px] mx-auto mb-6">
-              To notify the vehicle owner with your exact spot, please allow location access when prompted by your phone browser.
-            </p>
-            <button
-              onClick={requestLocation}
-              className="w-full py-3.5 rounded-2xl text-gray-900 font-bold text-sm shadow-md shadow-yellow-500/20 active:scale-95 transition-all"
-              style={{ background: "linear-gradient(135deg, #FBBF24, #F59E0B)" }}
-            >
-              Allow GPS Location
-            </button>
-          </div>
-        )}
-
-        {/* ============ LOCATION DENIED (Light Mode) ============ */}
-        {phase === "location-denied" && (
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/60 p-8 text-center animate-fade-in w-full">
-            <div className="w-20 h-20 rounded-3xl bg-red-50 border border-red-100 flex items-center justify-center mx-auto mb-6 text-red-600">
-              <AlertTriangle size={36} />
-            </div>
-            <h2 className="text-xl font-extrabold text-gray-900 mb-2">Location Access Blocked</h2>
-            <p className="text-gray-500 text-xs leading-relaxed max-w-[260px] mx-auto mb-6">
-              Please enable location permission in your browser settings so the owner knows where your alert originated.
-            </p>
-            <button
-              onClick={requestLocation}
-              className="w-full py-3.5 rounded-2xl bg-yellow-400 text-gray-900 font-bold text-sm shadow-md hover:bg-yellow-500 transition-all"
-            >
-              Try Again
-            </button>
           </div>
         )}
 
@@ -2069,24 +2205,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                     </button>
                   </div>
 
-                  {/* 6. AI SAFETY ASSISTANT & SUPPORT BAR */}
-                  <button
-                    onClick={() => setAiChatOpen(true)}
-                    className="w-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-500 hover:to-yellow-500 text-gray-950 rounded-2xl p-4 flex items-center justify-between shadow-md shadow-yellow-500/20 active:scale-[0.98] transition-all cursor-pointer"
-                  >
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-11 h-11 rounded-xl bg-gray-950/15 text-gray-950 flex items-center justify-center font-bold text-xl flex-shrink-0">
-                        <Bot size={22} />
-                      </div>
-                      <div className="text-left min-w-0">
-                        <p className="text-sm font-black text-gray-950 tracking-tight">RapiQR AI Assistant</p>
-                        <p className="text-[11px] font-medium text-gray-900">Ask AI for emergency advice &amp; owner assistance</p>
-                      </div>
-                    </div>
-                    <div className="bg-gray-950 text-yellow-400 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
-                      CHAT
-                    </div>
-                  </button>
+                  {/* 6. INSTALL APP BAR — replaces the old AI Assistant entry point here */}
+                  <InstallAppBar />
                 </div>
 
                 {/* 5. MESSAGE VEHICLE OWNER CARD — Big button opens popup & auto-sends SMS alert to owner */}
@@ -2831,44 +2951,56 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
         {/* ============ ACTIVATION SUCCESS (owner just activated their sticker) ============ */}
         {phase === "success" && qrData && (
-          <div className="w-full max-w-sm sm:max-w-md mx-auto animate-fade-in">
-            <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-xl p-5 sm:p-6 text-center space-y-4">
-              <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto text-emerald-600 shadow-sm">
-                <CheckCircle2 size={32} />
+          <div className="w-full animate-fade-in">
+            <div className="relative w-full rounded-[32px] sm:rounded-[40px] bg-white overflow-hidden shadow-2xl p-6 sm:p-10 lg:p-12 min-h-[560px] border border-slate-100 flex flex-col justify-between">
+              
+              <img
+                src={deepinspireScene}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover object-right pointer-events-none z-0"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-white via-white/80 to-transparent pointer-events-none z-0 w-full lg:w-3/5" />
+
+              <div className="relative z-10 space-y-6">
+                <div className="text-left max-w-xl space-y-1">
+                  <div className="text-[#E11D48] font-black uppercase text-xs sm:text-sm tracking-wider">
+                    24/7 PROTECTION ACTIVE
+                  </div>
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-950 tracking-tight">
+                    All set! Tag is Live.
+                  </h1>
+                  <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed max-w-md pt-1">
+                    Your {getStickerCategoryLabel(qrData.category) || "smart sticker"} is now active and protected with 24/7 SafeSync™ call proxy and emergency SOS.
+                  </p>
+                </div>
+
+                <div className="w-full max-w-md bg-white rounded-[28px] shadow-[0_20px_50px_-10px_rgba(0,0,0,0.12)] p-6 sm:p-8 space-y-4 border border-slate-100/80 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-600 mx-auto">
+                    <CheckCircle2 size={28} />
+                  </div>
+                  <h3 className="text-base font-black text-slate-900">Protected &amp; Ready</h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Preview how bystanders will see and interact with your smart QR code.
+                  </p>
+                  <button
+                    onClick={() => setPhase("emergency")}
+                    className="rounded-full bg-[#E11D48] hover:bg-[#BE123C] text-white font-bold text-sm px-10 py-3.5 shadow-md shadow-red-500/25 active:scale-95 transition-all cursor-pointer inline-flex items-center justify-center gap-2"
+                  >
+                    <span>Preview Public Scan View</span>
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
               </div>
 
-              <div>
-                <h2 className="text-lg sm:text-xl font-bold text-slate-900">All set! Your sticker is active.</h2>
-                <p className="text-xs text-slate-500 mt-1">
-                  You can manage it anytime from your dashboard.
-                </p>
-              </div>
-
-
-              <div className="pt-1">
-                <button
-                  onClick={() => setPhase("emergency")}
-                  className="w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold text-xs sm:text-sm shadow-sm transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <span>Continue</span>
-                  <ArrowRight size={14} />
-                </button>
-              </div>
             </div>
           </div>
         )}
 
-        {/* Floating AI Assistant FAB Button */}
-        {phase === "emergency" && (
-          <button
-            onClick={() => setAiChatOpen(true)}
-            className="fixed bottom-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))] right-5 z-40 bg-gradient-to-br from-violet-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs px-4 py-3 rounded-full shadow-2xl flex items-center gap-2 border-2 border-white/30 active:scale-95 transition-all cursor-pointer"
-            aria-label="Open the RepiQR assistant"
-          >
-            <Sparkles size={17} />
-            <span>Ask Assistant</span>
-          </button>
-        )}
+        {/* Floating Install App Button — replaces the old floating AI-assistant
+            trigger in this spot (and the full-width "RapiQR AI Assistant" bar
+            was replaced by InstallAppBar above). The assistant itself is still
+            reachable via the category tiles' "Ask" action (see handleCategoryButtonAction). */}
+        <InstallAppFab />
 
         {/* ============ ASSISTANT CHAT ============ */}
         <AssistantChat

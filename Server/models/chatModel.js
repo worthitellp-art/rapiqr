@@ -76,7 +76,17 @@ class ChatModel {
   static async getSessionById(sessionId) {
     try {
       if (typeof sessionId !== 'string' && typeof sessionId !== 'number') return null;
-      const doc = await ChatSession.findById(sessionId).lean();
+      const cleanId = String(sessionId).trim();
+      if (!cleanId) return null;
+
+      const isObjectId = /^[0-9a-fA-F]{24}$/.test(cleanId);
+      let doc = null;
+      if (isObjectId) {
+        doc = await ChatSession.findById(cleanId).lean().catch(() => null);
+      }
+      if (!doc) {
+        doc = await ChatSession.findOne({ _id: cleanId }).lean().catch(() => null);
+      }
       return sessionToApi(doc);
     } catch (err) {
       console.error(`ChatModel.getSessionById (${sessionId}) Error:`, err);

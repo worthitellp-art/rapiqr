@@ -1,8 +1,11 @@
+import { useEffect, useState } from 'react';
+
 // Captured at module load (not inside a component) — Chromium fires
 // beforeinstallprompt as soon as it decides the page is installable, which
 // can happen before any component that wants to react to it has mounted.
 // Missing that first firing means losing the only chance to call .prompt()
-// later, since the event is not re-dispatched.
+// later, since the event is not re-dispatched. This module is imported for
+// its side effect as early as possible in src/main.tsx for exactly that reason.
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
@@ -62,4 +65,48 @@ export async function promptInstall(): Promise<'accepted' | 'dismissed' | 'unava
   deferredPrompt = null;
   promptAvailable = false;
   return outcome;
+}
+
+/**
+ * Shared state/behavior for every "Install App" control in the app (the
+ * floating button and the full-width bar). Always reports a usable action —
+ * a real prompt when one was captured, otherwise a platform-appropriate
+ * manual-install hint — rather than making a caller decide whether to
+ * render anything, which is what let the button silently show nowhere.
+ */
+export function useInstallPrompt() {
+  const [installed, setInstalled] = useState(isRunningInstalled());
+  const [canPrompt, setCanPrompt] = useState(isInstallPromptAvailable());
+  const [installing, setInstalling] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
+  const ios = isIOS();
+
+  useEffect(() => onInstallPromptChange(() => setCanPrompt(true)), []);
+
+  const showHint = () => {
+    const text = ios
+      ? 'Tap Share, then "Add to Home Screen" to install.'
+      : 'Open your browser menu and choose "Install app" or "Add to Home screen".';
+    setHint(text);
+    setTimeout(() => setHint(null), 4500);
+  };
+
+  const install = async () => {
+    if (!canPrompt) {
+      showHint();
+      return;
+    }
+    setInstalling(true);
+    const outcome = await promptInstall();
+    setInstalling(false);
+    if (outcome === 'accepted') {
+      setInstalled(true);
+    } else if (outcome === 'unavailable') {
+      // The captured event turned out to be stale/already consumed.
+      setCanPrompt(false);
+      showHint();
+    }
+  };
+
+  return { installed, installing, hint, install };
 }

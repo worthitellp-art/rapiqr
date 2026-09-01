@@ -18,9 +18,29 @@ let connectionPromise = null;
 
 async function connectDB() {
   if (connectionPromise) return connectionPromise;
-  connectionPromise = mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 10000 });
-  await connectionPromise;
-  return mongoose.connection;
+
+  const primaryUri = MONGODB_URI;
+  const localUri = process.env.MONGODB_LOCAL_URI || 'mongodb://127.0.0.1:27017/repiqr';
+
+  try {
+    connectionPromise = mongoose.connect(primaryUri, { serverSelectionTimeoutMS: 5000 });
+    await connectionPromise;
+    console.log('[DATABASE] Connected to primary MongoDB cluster successfully.');
+    return mongoose.connection;
+  } catch (err) {
+    console.warn('[DATABASE] Primary MongoDB connection failed (likely IP whitelist or network issue):', err.message);
+    console.log('[DATABASE] Attempting connection to local MongoDB fallback at:', localUri);
+    try {
+      connectionPromise = mongoose.connect(localUri, { serverSelectionTimeoutMS: 3000 });
+      await connectionPromise;
+      console.log('[DATABASE] Connected to local MongoDB fallback.');
+      return mongoose.connection;
+    } catch (localErr) {
+      console.error('[DATABASE] Local MongoDB fallback failed:', localErr.message);
+      console.error('[DATABASE] To fix: Whitelist IP 0.0.0.0/0 on MongoDB Atlas (https://cloud.mongodb.com/ -> Network Access) or start local mongod.');
+      throw err;
+    }
+  }
 }
 
 module.exports = {
