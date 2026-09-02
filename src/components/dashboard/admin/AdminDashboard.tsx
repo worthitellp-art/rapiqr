@@ -199,6 +199,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
               qrList={qrList} setQrList={setQrList} templates={templates}
               setToast={setToast} openQuickLook={setQuickLookQr}
               openRestore={() => setRestoreModalOpen(true)} searchQuery={searchQuery}
+              stickerPos={stickerPos}
             />
           )}
           {page === "communication" && <CommunicationPage setToast={setToast} />}

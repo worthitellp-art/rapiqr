@@ -7,8 +7,9 @@ const { requestLogger, logger } = require('./middleware/loggerMiddleware');
 const { connectDB } = require('./config/db');
 
 // Single project-wide env file lives at the repo root (shared with Vite) —
-// see .env.example for the documented template.
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
+// also check Server/.env for standalone backend setups.
+dotenv.config({ path: path.join(__dirname, '.env'), override: true });
+dotenv.config({ path: path.join(__dirname, '..', '.env'), override: true });
 
 const authRoutes = require('./routes/authRoutes');
 const qrRoutes = require('./routes/qrRoutes');
@@ -129,3 +130,4 @@ connectDB()
     logger.error('SERVER', 'Failed to connect to MongoDB — refusing to start', err);
     process.exit(1);
   });
+// Nodemon reload trigger

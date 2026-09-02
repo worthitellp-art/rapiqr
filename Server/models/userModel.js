@@ -210,6 +210,46 @@ class UserModel {
   }
 
   /**
+   * Login/logout audit fields (last_login_ip etc.) are select:false — this is
+   * the one place they're read, for new-device detection and admin review.
+   */
+  static async getSecurityMeta(userId) {
+    try {
+      if (!userId) return null;
+      return await User.findById(userId)
+        .select('last_login_at last_login_ip last_login_user_agent login_count last_logout_at')
+        .lean();
+    } catch (err) {
+      console.error('UserModel.getSecurityMeta Error:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Stamp a successful sign-in. Called after authentication succeeds (password,
+   * admin, or Google) so last_login_ip always reflects the most recent proven
+   * login, which is what new-device detection compares the next attempt against.
+   */
+  static async recordLogin(userId, { ip, userAgent } = {}) {
+    try {
+      await User.findByIdAndUpdate(userId, {
+        $set: { last_login_at: new Date(), last_login_ip: ip || null, last_login_user_agent: userAgent || null },
+        $inc: { login_count: 1 },
+      });
+    } catch (err) {
+      console.error('UserModel.recordLogin Error:', err);
+    }
+  }
+
+  static async recordLogout(userId) {
+    try {
+      await User.findByIdAndUpdate(userId, { $set: { last_logout_at: new Date() } });
+    } catch (err) {
+      console.error('UserModel.recordLogout Error:', err);
+    }
+  }
+
+  /**
    * Admin-only: list/search all users.
    */
   static async searchAll(query, limit = 1000) {

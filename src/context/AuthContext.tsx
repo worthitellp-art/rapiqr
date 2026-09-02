@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { UserProfileData, ADMIN_EMAIL } from '../lib/authService';
 import { apiClient, isApiBackendConfigured } from '../lib/apiClient';
 
@@ -57,6 +57,32 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Loaded on demand (first Google sign-in attempt) rather than eagerly in
+// index.html — most visitors never use Google sign-in, and the script was
+// ~84% unused bytes on every page load when it loaded unconditionally.
+let googleIdentityScriptPromise: Promise<void> | null = null;
+function loadGoogleIdentityScript(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+  if ((window as any).google?.accounts?.oauth2) return Promise.resolve();
+  if (googleIdentityScriptPromise) return googleIdentityScriptPromise;
+
+  googleIdentityScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error('Failed to load Google Sign-In')));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Google Sign-In'));
+    document.head.appendChild(script);
+  });
+  return googleIdentityScriptPromise;
+}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [profile, setProfile] = useState<UserProfileData | null>(() => {
@@ -208,15 +234,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // here — not through the normal signup/signin flow.
   const adminSignIn = async (email: string, password: string) => {
     try {
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanPassword = password.trim();
+
       // Validate email format
-      if (!email.includes('@')) {
+      if (!cleanEmail.includes('@')) {
         return { success: false, error: 'Invalid admin email address.' };
       }
 
       // Backend-first: validated server-side against Server/.env ADMIN_EMAIL/ADMIN_PASSWORD.
       if (isApiBackendConfigured) {
         try {
-          const res = await apiClient.auth.adminSignIn(email, password);
+          const res = await apiClient.auth.adminSignIn(cleanEmail, cleanPassword);
           if (!res?.user || !res?.token) {
             return { success: false, error: 'Admin authentication failed.' };
           }
@@ -236,21 +265,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // No Express backend configured (e.g. local Vite-only dev): validate against
       // VITE_ADMIN_EMAIL / VITE_ADMIN_PASSWORD instead. Note these are bundled into the
       // client JS and are not secret in that build — the backend path above is authoritative.
-      const envAdminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
-      const envAdminPassword = import.meta.env.VITE_ADMIN_PASSWORD as string | undefined;
+      const envAdminEmail = (import.meta.env.VITE_ADMIN_EMAIL as string | undefined)?.trim() || 'worthitellp@gmail.com';
+      const envAdminPassword = (import.meta.env.VITE_ADMIN_PASSWORD as string | undefined)?.trim();
 
       if (envAdminEmail && envAdminPassword) {
-        if (email.toLowerCase() !== envAdminEmail.toLowerCase() || password !== envAdminPassword) {
+        if (cleanEmail !== envAdminEmail.toLowerCase() || cleanPassword !== envAdminPassword) {
           return { success: false, error: 'Invalid admin credentials.' };
         }
-      } else if (password.length < 4) {
+      } else if (cleanPassword.length < 4) {
         // No admin credentials configured anywhere — lenient local-only fallback.
         return { success: false, error: 'Invalid admin password.' };
       }
 
       const adminUser: UserProfileData = {
         id: 'admin-101',
-        email,
+        email: cleanEmail,
         fullName: 'System Fleet Admin',
         role: 'admin',
         subscriptionPlan: 'enterprise',
@@ -265,7 +294,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signOut = async () => {
+  const isSigningOutRef = useRef(false);
+
+  const signOut = useCallback(async () => {
+    if (isSigningOutRef.current) return;
+    isSigningOutRef.current = true;
+
+    // Clear local session first so subsequent requests cannot send a dead token
     try {
       localStorage.removeItem('repiqr-token');
       localStorage.removeItem('namoqr-token');
@@ -284,16 +319,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch { /* ignore */ }
 
     setProfile(null);
-  };
+
+    // Best-effort audit record — must never block the local sign-out
+    if (isApiBackendConfigured) {
+      try {
+        await apiClient.auth.logout();
+      } catch { /* ignore */ }
+    }
+
+    isSigningOutRef.current = false;
+  }, []);
 
   // apiClient broadcasts this when the backend rejects our token as expired/invalid.
-  // Previously that failed silently per-call, leaving pages (e.g. Message Center)
-  // stuck showing nothing with no way back short of a manual localStorage wipe —
-  // force the same clean logout signOut() already does for other invalid-session cases.
+  // Force a clean logout signOut() to prevent UI getting stuck in an invalid session.
   useEffect(() => {
-    const onUnauthorized = () => { signOut(); };
-    window.addEventListener('rapiqr:unauthorized', onUnauthorized);
-    return () => window.removeEventListener('rapiqr:unauthorized', onUnauthorized);
+    const handleUnauthorized = () => {
+      signOut();
+    };
+    window.addEventListener('rapiqr:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('rapiqr:unauthorized', handleUnauthorized);
   }, [signOut]);
 
   // Permanently deletes the account server-side (task.md #3 — DPDP/GDPR "right to
@@ -332,6 +376,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const signInWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
     try {
+      await loadGoogleIdentityScript().catch(() => { /* handled by the oauth2 check below */ });
+
       const clientId =
         (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
         '640446362534-73ub5mvtklhs4e3eldvde892q8jbtlbo.apps.googleusercontent.com';

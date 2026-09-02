@@ -1,11 +1,12 @@
 const jwt = require('jsonwebtoken');
+const { setUserId } = require('./loggerMiddleware');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   throw new Error('JWT_SECRET is not set in Server/.env — refusing to start with an insecure default secret.');
 }
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'worthitellp@gmail.com';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null;
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'worthitellp@gmail.com').trim().replace(/^["']|["']$/g, '');
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ? String(process.env.ADMIN_PASSWORD).trim().replace(/^["']|["']$/g, '') : null;
 
 /**
  * Verify our own JWT. There is no external auth provider anymore — the
@@ -21,6 +22,11 @@ async function verifyToken(req, res, next) {
   const token = authHeader.split(' ')[1];
   try {
     req.user = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+    // Correlates every log emitted for the rest of this request (including the
+    // HTTP REQUEST_START/END entries already logged for every route) with the
+    // acting user, so the "what did this user do" audit trail is automatic
+    // rather than requiring every controller to pass userId explicitly.
+    setUserId(req.user.id);
     return next();
   } catch {
     return res.status(401).json({ success: false, error: 'Unauthorized: Invalid or expired session' });
@@ -40,6 +46,7 @@ async function optionalAuth(req, res, next) {
   const token = authHeader.split(' ')[1];
   try {
     req.user = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+    setUserId(req.user.id);
   } catch { /* invalid/expired token — proceed as guest */ }
   next();
 }

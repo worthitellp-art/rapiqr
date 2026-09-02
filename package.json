@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "lighthouse": "lighthouse http://localhost:4173/ --output=html --output=json --output-path=./lighthouse-report --chrome-flags=\"--headless=new\" --view"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
@@ -19,6 +20,7 @@
     "express": "^4.21.2",
     "framer-motion": "^12.42.2",
     "jszip": "^3.10.1",
+    "lighthouse": "^13.4.1",
     "lucide-react": "^0.546.0",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",

@@ -1,10 +1,10 @@
 import type React from "react";
 import { useState, useEffect } from "react";
-import { Plus, Sparkles, Download, Trash2, RefreshCw, Tag, Phone, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Sparkles, Download, Trash2, RefreshCw, Tag, Phone, ChevronLeft, ChevronRight, Printer } from "lucide-react";
 import StatusPill from "./StatusPill";
 import StickerThumb from "./StickerThumb";
-import { QrRecord, Template } from "./types";
-import { uid, generateStickerId, qrFullUrl, fmtDate, dispatchActivationToUserDashboard } from "./helpers";
+import { QrRecord, Template, StickerPos } from "./types";
+import { uid, generateStickerId, qrFullUrl, fmtDate, dispatchActivationToUserDashboard, generateSheetBlobs } from "./helpers";
 import { apiClient } from "../../../lib/apiClient";
 import { STICKER_CATEGORIES, getCategoryIcon, getCategoryLabel } from "../../../stickerModules";
 import ConfirmModal from "./ConfirmModal";
@@ -12,11 +12,12 @@ import RecoveryCodeModal from "./RecoveryCodeModal";
 import QrRowActions from "./QrRowActions";
 
 export default function QrCodesPage({
-  qrList, setQrList, templates, setToast, openQuickLook, openRestore, searchQuery,
+  qrList, setQrList, templates, setToast, openQuickLook, openRestore, searchQuery, stickerPos,
 }: {
   qrList: QrRecord[]; setQrList: React.Dispatch<React.SetStateAction<QrRecord[]>>;
   templates: Template[]; setToast: (msg: string | null) => void;
   openQuickLook: (q: QrRecord) => void; openRestore: () => void; searchQuery: string;
+  stickerPos: StickerPos;
 }) {
   const [selectedCategory, setSelectedCategory] = useState<string>("car");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -28,6 +29,8 @@ export default function QrCodesPage({
   const [recoveryModal, setRecoveryModal] = useState<{ stickerId: string; recoveryCode: string } | null>(null);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sheetGenerating, setSheetGenerating] = useState(false);
 
   const filtered = qrList.filter((q) => {
     const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
@@ -52,6 +55,68 @@ export default function QrCodesPage({
   }, [searchQuery, categoryFilter]);
 
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Drop any selected id that no longer exists (deleted / cleared) so the
+  // Print Sheet count and the header checkbox's "all selected" state stay accurate.
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const validIds = new Set(qrList.map((q) => q.id));
+      const next = new Set([...prev].filter((id) => validIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [qrList]);
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every((q) => selectedIds.has(q.id));
+  function toggleSelectAllFiltered() {
+    setSelectedIds((prev) => {
+      if (allFilteredSelected) {
+        const next = new Set(prev);
+        filtered.forEach((q) => next.delete(q.id));
+        return next;
+      }
+      const next = new Set(prev);
+      filtered.forEach((q) => next.add(q.id));
+      return next;
+    });
+  }
+
+  // Print Sheet: composite the selected stickers (own QR + colors baked in)
+  // onto 18x12in, 300 DPI sheets in a 3x3 grid with cut lines — same
+  // reference layout requested for the one-off NamoQR sheet export, now
+  // driven by whichever stickers the admin selects here.
+  async function handlePrintSheet() {
+    const selected = filtered.filter((q) => selectedIds.has(q.id));
+    if (selected.length === 0 || sheetGenerating) return;
+
+    setSheetGenerating(true);
+    try {
+      const blobs = await generateSheetBlobs(selected, stickerPos);
+      const dateStr = new Date().toISOString().slice(0, 10);
+      blobs.forEach((blob, i) => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `rapiqr-print-sheet-${dateStr}-${i + 1}-of-${blobs.length}.png`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+      setToast(`Generated ${blobs.length} print sheet${blobs.length > 1 ? "s" : ""} for ${selected.length} sticker${selected.length > 1 ? "s" : ""}`);
+    } catch (err) {
+      console.error("Failed to generate print sheet:", err);
+      setToast("Failed to generate print sheet — please try again");
+    } finally {
+      setSheetGenerating(false);
+      setTimeout(() => setToast(null), 4000);
+    }
+  }
 
   function buildQrRecord(targetCategory: string): QrRecord {
     const codeId = generateStickerId();
@@ -315,6 +380,15 @@ export default function QrCodesPage({
           </button>
 
           <button
+            onClick={handlePrintSheet}
+            disabled={selectedIds.size === 0 || sheetGenerating}
+            title={selectedIds.size === 0 ? "Select tags below to build a print sheet" : `Build an 18×12in print sheet from ${selectedIds.size} selected tag${selectedIds.size > 1 ? "s" : ""}`}
+            className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-2 rounded-[4px] border border-[#5C78DF]/30 bg-[#E8EDFF] text-[#3E52B8] hover:bg-[#DCE3FF] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          >
+            <Printer size={12} /> {sheetGenerating ? "Building sheet…" : `Print Sheet${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
+          </button>
+
+          <button
             onClick={downloadCsv}
             disabled={qrList.length === 0}
             className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-2 rounded-[4px] border border-[#E5E5E7] bg-white text-[#17181A] hover:bg-[#F7F7F8] transition-all disabled:opacity-40 cursor-pointer"
@@ -349,6 +423,15 @@ export default function QrCodesPage({
           <table className="w-full min-w-[760px] text-sm text-[#17181A]">
             <thead>
               <tr className="text-left font-display text-[12px] font-semibold text-[#777B80] tracking-normal bg-[#F7F7F8] border-b border-[#E5E5E7]">
+                <th className="px-4 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={allFilteredSelected}
+                    onChange={toggleSelectAllFiltered}
+                    title="Select all tags matching the current filter"
+                    className="w-4 h-4 rounded-[3px] border-[#C7C9CC] text-[#5C78DF] cursor-pointer"
+                  />
+                </th>
                 <th className="px-6 py-3">QR Plate</th>
                 <th className="px-2 py-3">Phone number</th>
                 <th className="px-2 py-3">Category</th>
@@ -367,7 +450,15 @@ export default function QrCodesPage({
                 const computedStatus = isActivated ? "active" : q.status;
 
                 return (
-                  <tr key={q.id} className="hover:bg-[#F3F3F4] transition-colors">
+                  <tr key={q.id} className={`hover:bg-[#F3F3F4] transition-colors ${selectedIds.has(q.id) ? "bg-[#F0F3FF]" : ""}`}>
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(q.id)}
+                        onChange={() => toggleSelected(q.id)}
+                        className="w-4 h-4 rounded-[3px] border-[#C7C9CC] text-[#5C78DF] cursor-pointer"
+                      />
+                    </td>
                     <td className="px-6 py-3">
                       <div className="flex items-center gap-3">
                         <button onClick={() => openQuickLook(q)} className="hover:opacity-80 transition-opacity cursor-pointer">

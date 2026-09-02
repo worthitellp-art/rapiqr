@@ -100,12 +100,28 @@ function MainAppContent() {
   }, [loading, isLoggedIn, page]);
 
   useEffect(() => {
-    const handler = () => {
-      if (isScanUrl() && page !== 'scan') navigateTo('scan');
+    const handleUrlChange = () => {
+      if (isScanUrl() && page !== 'scan') {
+        navigateTo('scan');
+      }
+      if (isAdminUrl()) {
+        if (isAdmin) {
+          setDashboardMode('admin');
+          setAdminModalOpen(false);
+          window.history.replaceState({}, '', '/');
+          navigateTo('dashboard');
+        } else {
+          setAdminModalOpen(true);
+        }
+      }
     };
-    window.addEventListener('popstate', handler);
-    return () => window.removeEventListener('popstate', handler);
-  }, [page]);
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
+  }, [page, isAdmin]);
 
   const handleOpenAuth = (mode: 'login' | 'signup') => {
     if (isLoggedIn) {

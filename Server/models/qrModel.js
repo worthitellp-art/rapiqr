@@ -52,29 +52,70 @@ function hashRecoveryCode(rawCode) {
  * An account whose verified number contradicts the number being registered is
  * acting for a third party, so the row is left unclaimed for auto-claim to
  * hand to the person who actually owns that number. Admins manage the fleet
- * and should never claim personal ownership of customer stickers.
+ * and should never claim personal ownership of customer stickers
  */
 async function resolveOwnerId(userId, ownerPhone) {
-  if (!userId) return null;
-  if (!normalizePhone(ownerPhone)) return null;
-
-  try {
-    const account = await User.findById(userId).select('phone_number role').lean();
-    if (account?.role === 'admin') return null;
-
-    const accountPhone = account?.phone_number;
-    if (!normalizePhone(accountPhone)) return null;
-    return isSamePhone(accountPhone, ownerPhone) ? userId : null;
-  } catch (err) {
-    console.error('QrModel.resolveOwnerId Error:', err);
-    return null;
+  if (userId) {
+    try {
+      const account = await User.findById(userId).select('phone_number role').lean();
+      if (account && account.role !== 'admin') return userId;
+    } catch (err) {
+      console.error('QrModel.resolveOwnerId Error:', err);
+    }
   }
+
+  if (ownerPhone) {
+    try {
+      const digits = String(ownerPhone).replace(/\D/g, '');
+      const last10 = digits.length >= 10 ? digits.slice(-10) : digits;
+      if (last10.length >= 7) {
+        const user = await User.findOne({
+          role: { $ne: 'admin' },
+          $or: [
+            { phone_number: ownerPhone },
+            { phone_number: digits },
+            { phone_number: new RegExp(`${last10}$`) },
+          ],
+        }).select('_id').lean();
+        if (user) return user._id;
+      }
+    } catch (err) {
+      console.error('QrModel.resolveOwnerId phone match Error:', err);
+    }
+  }
+
+  return null;
+}
+
+function buildStickerIdFilter(qrId) {
+  if (!qrId) return { _id: null };
+  const raw = String(qrId).trim().replace(/^[#]/, '');
+  const lower = raw.toLowerCase();
+  const upper = raw.toUpperCase();
+
+  const conditions = [
+    { _id: raw },
+    { _id: lower },
+    { _id: upper },
+    { client_id: raw },
+    { client_id: upper },
+    { client_id: lower },
+  ];
+
+  // If 8-hex prefix or UUID short-code is passed (e.g. 1FBD68FC from 1fbd68fc-...)
+  if (/^[0-9a-f]{6,12}$/i.test(raw)) {
+    conditions.push({ _id: new RegExp(`^${raw}`, 'i') });
+  }
+
+  return {
+    deleted_at: null,
+    $or: conditions,
+  };
 }
 
 class QrModel {
   /**
-   * Admin fleet view — owner info is on the same document now (previously a
-   * join against a separate `products` table). Excludes soft-deleted stickers.
+   * Admin fleet view — owner info is on the same document now. Excludes soft-deleted stickers.
    */
   static async getAll(limit = 100) {
     try {
@@ -90,9 +131,10 @@ class QrModel {
         bg_color: doc.bg_color,
         category: doc.category,
         created_at: doc.created_at,
-        owner_phone: doc.details?.ownerPhone || null,
+        owner_phone: doc.details?.ownerPhone || doc.phone_number || null,
         owner_email: doc.details?.ownerEmail || null,
-        owner_name: doc.name || doc.assigned_to || null,
+        owner_name: doc.name || doc.assigned_to || doc.details?.ownerName || null,
+        notes: doc.details?.notes || null,
         product_status: doc.status,
       }));
     } catch (err) {
@@ -107,53 +149,50 @@ class QrModel {
    */
   static async getById(qrId) {
     try {
-      const doc = await Sticker.findOne({ _id: qrId, deleted_at: null }).select(PUBLIC_QR_FIELDS).lean();
+      const filter = buildStickerIdFilter(qrId);
+      const doc = await Sticker.findOne(filter).select(PUBLIC_QR_FIELDS).lean();
       return toPublicQr(doc);
     } catch (err) {
-      console.error(`QrModel.getById (${qrId}) Error:`, err);
+      console.error('QrModel.getById Error:', err);
       return null;
     }
   }
 
   /**
-   * Save or update a QR code fleet record (colors/template/status). Only
-   * touches qr-side fields via $set, so an admin editing a batch's template
-   * can never clobber an owner's details/user_id sitting on the same document.
-   *
-   * On first creation, mints a recovery code and returns the raw value
-   * exactly once (only the SHA-256 hash is persisted) — see
-   * restoreByRecoveryCode. Editing an existing record never touches it.
+   * Find by recovery code (recovery page).
+   */
+  static async getByRecoveryCode(plainCode) {
+    try {
+      const codeHash = hashRecoveryCode(plainCode);
+      const doc = await Sticker.findOne({ recovery_code_hash: codeHash, deleted_at: null })
+        .select(PUBLIC_QR_FIELDS)
+        .lean();
+      return toPublicQr(doc);
+    } catch (err) {
+      console.error('QrModel.getByRecoveryCode Error:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Create/Mint QR code (admin batch generator).
    */
   static async save(qrData) {
     try {
-      const rawId = qrData.id || qrData.client_id;
-      if (!rawId || (typeof rawId !== 'string' && typeof rawId !== 'number')) return null;
-      const id = String(rawId);
-
-      const payload = {
-        client_id: qrData.clientId || qrData.client_id || id || 'UNASSIGNED',
-        status: qrData.status || 'inactive',
-        scans_count: qrData.scansCount ?? qrData.scans_count ?? 0,
-        template_name: qrData.templateName || qrData.template_name || 'Standard Badge',
-        category: qrData.category || 'car',
-        fg_color: qrData.fgColor || qrData.fg_color || 'D9581F',
-        bg_color: qrData.bgColor || qrData.bg_color || 'FFFFFF',
-      };
-
-      const existing = await Sticker.findById(id).select('_id').lean();
-
-      if (existing) {
-        const doc = await Sticker.findByIdAndUpdate(id, { $set: payload }, { new: true })
-          .select(PUBLIC_QR_FIELDS).lean();
-        return toPublicQr(doc);
-      }
-
+      const id = qrData.id || require('crypto').randomBytes(8).toString('hex');
       const rawRecoveryCode = generateRecoveryCode();
+      const codeHash = hashRecoveryCode(rawRecoveryCode);
+
       const doc = await Sticker.create({
         _id: id,
-        ...payload,
-        recovery_code_hash: hashRecoveryCode(rawRecoveryCode),
-        created_at: qrData.createdAt || qrData.created_at || new Date(),
+        client_id: qrData.clientId || `CL${require('crypto').randomBytes(3).toString('hex').toUpperCase()}`,
+        status: qrData.status || 'inactive',
+        template_name: qrData.template || 'Standard Tag',
+        fg_color: qrData.fg || '000000',
+        bg_color: qrData.bg || 'FFFFFF',
+        category: qrData.category || 'car',
+        recovery_code_hash: codeHash,
+        created_at: qrData.createdAt || new Date(),
       });
 
       return { ...toPublicQr(doc), recoveryCode: rawRecoveryCode };
@@ -164,30 +203,29 @@ class QrModel {
   }
 
   /**
-   * Activate QR Code — writes the qr-side status and the product-side
-   * ownership/details in one atomic update (previously two writes against
-   * two tables), then returns only the public-safe fleet fields. Does not
-   * swallow errors: a missing sticker or a write failure must propagate so
-   * the controller never reports success:true on a failed activation.
+   * Activate QR Code — writes the qr-side status and ownership/details in one atomic update.
    */
   static async activate(qrId, activationData) {
-    const current = await Sticker.findOne({ _id: qrId, deleted_at: null }).select('details user_id category').lean();
+    const filter = buildStickerIdFilter(qrId);
+    const current = await Sticker.findOne(filter).select('_id details user_id category').lean();
     if (!current) {
       throw new Error(`QR code ${qrId} not found`);
     }
 
     const update = { status: 'active' };
 
-    if (activationData.ownerName || activationData.ownerPhone) {
-      // Read-modify-write on `details`: the owner who claimed this sticker and
-      // the emergency contacts they curated must survive a second activation,
-      // not get reset to null and replaced wholesale.
+    if (activationData.ownerName || activationData.ownerPhone || activationData.notes || activationData.message) {
       const requestedUserId = activationData.userId || activationData.user_id || null;
       const ownerId = await resolveOwnerId(requestedUserId, activationData.ownerPhone);
 
       const details = { ...(current.details || {}) };
-      if (activationData.ownerPhone) details.ownerPhone = activationData.ownerPhone;
+      if (activationData.ownerPhone) {
+        details.ownerPhone = activationData.ownerPhone;
+        update.phone_number = activationData.ownerPhone;
+      }
       if (activationData.ownerEmail) details.ownerEmail = activationData.ownerEmail;
+      if (activationData.notes) details.notes = activationData.notes;
+      if (activationData.message) details.notes = activationData.message;
       if (Array.isArray(activationData.emergencyContacts) && activationData.emergencyContacts.length) {
         details.emergencyContacts = activationData.emergencyContacts;
       } else if (!Array.isArray(details.emergencyContacts)) {
@@ -202,12 +240,11 @@ class QrModel {
       update.category = activationData.category || current.category || 'car';
       update.name = activationData.ownerName || 'Vehicle Owner';
       update.assigned_to = activationData.ownerName || 'Vehicle Owner';
-      // A confirmed owner wins; otherwise keep whoever already holds it rather
-      // than dropping the claim back to null on every re-activation.
+      if (activationData.vehicleNumber) update.vehicle_number = activationData.vehicleNumber;
       update.user_id = ownerId || current.user_id || null;
     }
 
-    const doc = await Sticker.findByIdAndUpdate(qrId, { $set: update }, { new: true })
+    const doc = await Sticker.findByIdAndUpdate(current._id, { $set: update }, { new: true })
       .select(PUBLIC_QR_FIELDS)
       .lean();
 
@@ -220,8 +257,9 @@ class QrModel {
    */
   static async recordScan(qrId) {
     try {
+      if (!qrId) return null;
       const doc = await Sticker.findOneAndUpdate(
-        { _id: qrId, deleted_at: null },
+        buildStickerIdFilter(qrId),
         { $inc: { scans_count: 1 }, $set: { last_scanned_at: new Date() } },
         { new: true }
       ).select(PUBLIC_QR_FIELDS).lean();
@@ -241,17 +279,23 @@ class QrModel {
    * failure instead of a false success.
    */
   static async delete(qrId) {
-    const sessions = await ChatSession.find({ qr_code_id: qrId }).select('_id').lean();
+    const target = await Sticker.findOne(buildStickerIdFilter(qrId)).select('_id').lean();
+    if (!target) {
+      throw new Error(`QR code ${qrId} not found`);
+    }
+    const realId = target._id;
+
+    const sessions = await ChatSession.find({ qr_code_id: realId }).select('_id').lean();
     const sessionIds = sessions.map((s) => s._id);
     if (sessionIds.length > 0) {
       await ChatMessage.deleteMany({ session_id: { $in: sessionIds } });
-      await ChatSession.deleteMany({ qr_code_id: qrId });
+      await ChatSession.deleteMany({ qr_code_id: realId });
     }
 
-    await Alert.deleteMany({ sticker_id: qrId });
+    await Alert.deleteMany({ sticker_id: realId });
 
     const doc = await Sticker.findByIdAndUpdate(
-      qrId,
+      realId,
       { $set: { deleted_at: new Date(), status: 'inactive' } },
       { new: true }
     ).select(PUBLIC_QR_FIELDS).lean();

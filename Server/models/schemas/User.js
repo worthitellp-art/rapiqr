@@ -28,6 +28,15 @@ const userSchema = new Schema({
   password_reset_token: { type: String, default: null, select: false },
   password_reset_expires: { type: Date, default: null, select: false },
   created_at: { type: Date, default: Date.now },
+
+  // Login/logout audit trail — never exposed via PUBLIC_FIELDS (IP/UA are not
+  // for client consumption), read only through UserModel.getSecurityMeta for
+  // suspicious-activity checks and admin review.
+  last_login_at: { type: Date, default: null, select: false },
+  last_login_ip: { type: String, default: null, select: false },
+  last_login_user_agent: { type: String, default: null, select: false },
+  login_count: { type: Number, default: 0, select: false },
+  last_logout_at: { type: Date, default: null, select: false },
 }, { versionKey: false });
 
 module.exports = model('User', userSchema);

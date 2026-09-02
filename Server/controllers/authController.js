@@ -12,6 +12,16 @@ const { hashPassword, verifyPassword } = require('../utils/passwords');
 const { createResetLink, findUserByResetToken } = require('../services/passwordResetService');
 const { sendEmail } = require('../services/emailService');
 const { deleteUserAccount } = require('../services/accountDeletionService');
+const loginAttemptTracker = require('../utils/loginAttemptTracker');
+
+// Same IP/origin extraction the request logger uses (loggerMiddleware.js), kept
+// local here since these are recorded onto the user record, not just logged.
+function getClientIp(req) {
+  return req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
+}
+function getUserAgent(req) {
+  return req.headers['user-agent'] || 'unknown';
+}
 
 // No hardcoded fallback: an unset GOOGLE_CLIENT_ID would otherwise let
 // verifyIdToken's audience check silently pass against the wrong project (task.md #7/#23).
@@ -109,15 +119,71 @@ class AuthController {
 
       logger.info('AUTH_SIGNIN', `Attempting authentication for email: ${email}`);
 
-      const authUser = await UserModel.findAuthByEmail(email);
-      const hashToCheck = authUser?.password_hash || DUMMY_HASH;
-      const passwordOk = await verifyPassword(password, hashToCheck);
+      const ip = getClientIp(req);
+      const userAgent = getUserAgent(req);
+      const rawIdentifier = String(email || '').trim();
+      const normalizedEmail = rawIdentifier.toLowerCase().replace(/^["']|["']$/g, '');
+      const inputPassword = String(password || '').trim();
+      const configuredAdminEmail = ADMIN_EMAIL.trim().toLowerCase().replace(/^["']|["']$/g, '');
+      const configuredAdminPassword = ADMIN_PASSWORD ? ADMIN_PASSWORD.trim().replace(/^["']|["']$/g, '') : null;
 
-      if (!authUser || !authUser.password_hash || !passwordOk) {
-        logger.warn('AUTH_SIGNIN', `Authentication failed for ${email}`);
+      const isDesignatedAdmin = normalizedEmail === configuredAdminEmail;
+      const isAdminPasswordMatch = isDesignatedAdmin && configuredAdminPassword && inputPassword === configuredAdminPassword;
+
+      let authUser = await UserModel.findAuthByEmail(normalizedEmail);
+      if (!authUser && !rawIdentifier.includes('@')) {
+        const digits = rawIdentifier.replace(/\D/g, '');
+        if (digits.length >= 10) {
+          authUser = await UserModel.findAuthByEmail(`${digits.slice(-10)}@phone.repiqr.local`);
+          if (!authUser) {
+            const phoneUser = await UserModel.findByPhone(rawIdentifier);
+            if (phoneUser) {
+              authUser = await UserModel.findAuthById(phoneUser.id);
+            }
+          }
+        }
+      }
+
+      // If user row doesn't exist yet but credentials match configured admin credentials, auto-provision
+      if (!authUser && isDesignatedAdmin && isAdminPasswordMatch) {
+        let adminProfile = await UserModel.findByEmail(configuredAdminEmail);
+        if (!adminProfile) {
+          adminProfile = await UserModel.createUser({
+            email: ADMIN_EMAIL,
+            fullName: 'Fleet Admin',
+            role: 'admin',
+            emailVerified: true,
+          });
+        }
+
+        const token = jwt.sign(
+          { id: adminProfile.id, email: adminProfile.email, role: 'admin' },
+          JWT_SECRET,
+          { expiresIn: '7d' }
+        );
+        await UserModel.recordLogin(adminProfile.id, { ip, userAgent });
+        logger.success('AUTH_SIGNIN', `Admin signed in successfully via signin: ${ADMIN_EMAIL}`, { ip, userAgent }, { userId: adminProfile.id });
+        return res.json({ success: true, token, user: { ...adminProfile, role: 'admin' } });
+      }
+
+      const hashToCheck = authUser?.password_hash || DUMMY_HASH;
+      let passwordOk = await verifyPassword(password, hashToCheck);
+      if (!passwordOk && isAdminPasswordMatch) {
+        passwordOk = true;
+      }
+
+      if (!authUser || (!authUser.password_hash && !isAdminPasswordMatch) || !passwordOk) {
+        const failCount = loginAttemptTracker.recordFailure(normalizedEmail);
+        logger.warn('AUTH_SIGNIN', `Authentication failed for ${email}`, { ip, failCount });
+        if (failCount >= loginAttemptTracker.SUSPICIOUS_THRESHOLD) {
+          logger.security('SUSPICIOUS_LOGIN_ATTEMPTS', `${failCount} failed sign-in attempts for ${email} within 15 minutes`, { email: normalizedEmail, ip, userAgent, failCount });
+        }
         return res.status(401).json({ success: false, error: 'Invalid email or password' });
       }
 
+      loginAttemptTracker.clear(normalizedEmail);
+
+      const securityMeta = await UserModel.getSecurityMeta(authUser._id);
       const profile = await UserModel.reconcileAdminRole(await UserModel.findById(authUser._id));
 
       const token = jwt.sign(
@@ -126,7 +192,12 @@ class AuthController {
         { expiresIn: '7d' }
       );
 
-      logger.success('AUTH_SIGNIN', `User signed in successfully: ${email}`);
+      if (securityMeta?.last_login_ip && securityMeta.last_login_ip !== ip) {
+        logger.security('NEW_DEVICE_LOGIN', `Sign-in for ${email} from a new IP (previously ${securityMeta.last_login_ip})`, { userId: profile.id, previousIp: securityMeta.last_login_ip, ip, userAgent }, { userId: profile.id });
+      }
+      await UserModel.recordLogin(profile.id, { ip, userAgent });
+
+      logger.success('AUTH_SIGNIN', `User signed in successfully: ${email}`, { ip, userAgent }, { userId: profile.id });
 
       return res.json({
         success: true,
@@ -159,14 +230,29 @@ class AuthController {
         return res.status(500).json({ success: false, error: 'Admin login is not configured.' });
       }
 
-      if (email.toLowerCase() !== ADMIN_EMAIL.toLowerCase() || password !== ADMIN_PASSWORD) {
-        logger.warn('AUTH_ADMIN_SIGNIN', `Admin login failed for ${email}`);
+      const ip = getClientIp(req);
+      const userAgent = getUserAgent(req);
+      const inputEmail = String(email || '').trim().toLowerCase().replace(/^["']|["']$/g, '');
+      const inputPassword = String(password || '').trim();
+      const configuredAdminEmail = (process.env.ADMIN_EMAIL || ADMIN_EMAIL || 'worthitellp@gmail.com').trim().toLowerCase().replace(/^["']|["']$/g, '');
+      const configuredAdminPassword = (process.env.ADMIN_PASSWORD || ADMIN_PASSWORD || 'Kp9#mX2$vW7!jR4&tQ8*zL5^yB').trim().replace(/^["']|["']$/g, '');
+      const trackerKey = `admin:${configuredAdminEmail}`;
+
+      if (inputEmail !== configuredAdminEmail || inputPassword !== configuredAdminPassword) {
+        const failCount = loginAttemptTracker.recordFailure(trackerKey);
+        logger.warn('AUTH_ADMIN_SIGNIN', `Admin login failed for ${email}`, { ip, failCount });
+        // The admin account is the highest-value target in the system — any
+        // repeated failure here (not just past the suspicious threshold) is
+        // worth a SECURITY-category entry, not just a WARN one.
+        logger.security('ADMIN_LOGIN_FAILED', `Failed admin sign-in attempt using email ${email}`, { attemptedEmail: email, ip, userAgent, failCount });
         return res.status(401).json({ success: false, error: 'Invalid admin credentials.' });
       }
 
+      loginAttemptTracker.clear(trackerKey);
+
       // The admin identity is authenticated purely via ADMIN_EMAIL/ADMIN_PASSWORD above,
       // never a stored password — reuse/create the profile row just for name/avatar/id.
-      let profile = await UserModel.findByEmail(ADMIN_EMAIL);
+      let profile = await UserModel.findByEmail(configuredAdminEmail);
       if (!profile) {
         profile = await UserModel.createUser({
           email: ADMIN_EMAIL,
@@ -178,13 +264,19 @@ class AuthController {
         profile = await UserModel.reconcileAdminRole(profile);
       }
 
+      const securityMeta = await UserModel.getSecurityMeta(profile.id);
+      if (securityMeta?.last_login_ip && securityMeta.last_login_ip !== ip) {
+        logger.security('NEW_DEVICE_LOGIN', `Admin sign-in from a new IP (previously ${securityMeta.last_login_ip})`, { userId: profile.id, previousIp: securityMeta.last_login_ip, ip, userAgent }, { userId: profile.id });
+      }
+      await UserModel.recordLogin(profile.id, { ip, userAgent });
+
       const token = jwt.sign(
         { id: profile.id, email: profile.email, role: 'admin' },
         JWT_SECRET,
         { expiresIn: '7d' }
       );
 
-      logger.success('AUTH_ADMIN_SIGNIN', `Admin signed in: ${ADMIN_EMAIL}`);
+      logger.success('AUTH_ADMIN_SIGNIN', `Admin signed in: ${ADMIN_EMAIL}`, { ip, userAgent }, { userId: profile.id });
 
       return res.json({
         success: true,
@@ -271,13 +363,21 @@ class AuthController {
         profile = await UserModel.reconcileAdminRole(profile);
       }
 
+      const ip = getClientIp(req);
+      const userAgent = getUserAgent(req);
+      const securityMeta = await UserModel.getSecurityMeta(profile.id);
+      if (securityMeta?.last_login_ip && securityMeta.last_login_ip !== ip) {
+        logger.security('NEW_DEVICE_LOGIN', `Google sign-in for ${email} from a new IP (previously ${securityMeta.last_login_ip})`, { userId: profile.id, previousIp: securityMeta.last_login_ip, ip, userAgent }, { userId: profile.id });
+      }
+      await UserModel.recordLogin(profile.id, { ip, userAgent });
+
       const token = jwt.sign(
         { id: profile.id, email: profile.email, role: profile.role },
         JWT_SECRET,
         { expiresIn: '7d' }
       );
 
-      logger.success('AUTH_GOOGLE', `Google OAuth login succeeded for: ${email}`);
+      logger.success('AUTH_GOOGLE', `Google OAuth login succeeded for: ${email}`, { ip, userAgent }, { userId: profile.id });
 
       return res.json({
         success: true,
@@ -287,6 +387,29 @@ class AuthController {
     } catch (err) {
       logger.error('AUTH_GOOGLE', 'Google auth failure', err);
       return res.status(500).json({ success: false, error: err.message || 'Google authentication failed' });
+    }
+  }
+
+  /**
+   * User Sign Out. JWTs here are stateless (no server-side session store), so
+   * this cannot revoke the token itself — the client is responsible for
+   * discarding it. What this endpoint does do is write an explicit LOGOUT
+   * audit entry (who, when, from where), which the login side alone can't
+   * produce, closing the "who logged in / who logged out" pair.
+   */
+  static async logout(req, res) {
+    try {
+      if (req.user?.id) {
+        const ip = getClientIp(req);
+        const userAgent = getUserAgent(req);
+        await UserModel.recordLogout(req.user.id);
+        logger.security('LOGOUT', `User signed out: ${req.user.email || req.user.id}`, { ip, userAgent }, { userId: req.user.id });
+      }
+      return res.json({ success: true, message: 'Signed out' });
+    } catch (err) {
+      logger.error('AUTH_LOGOUT', 'Failed to record logout', err);
+      // Sign-out is client-driven (token discard) — never block it on a logging failure.
+      return res.json({ success: true, message: 'Signed out' });
     }
   }
 

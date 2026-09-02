@@ -57,6 +57,32 @@ function toApi(doc) {
   };
 }
 
+function buildStickerIdFilter(productId) {
+  if (!productId) return { _id: null };
+  const raw = String(productId).trim().replace(/^[#]/, '');
+  const lower = raw.toLowerCase();
+  const upper = raw.toUpperCase();
+
+  const conditions = [
+    { _id: raw },
+    { _id: lower },
+    { _id: upper },
+    { client_id: raw },
+    { client_id: upper },
+    { client_id: lower },
+  ];
+
+  // If 8-hex prefix or UUID short-code is passed (e.g. 1FBD68FC from 1fbd68fc-...)
+  if (/^[0-9a-f]{6,12}$/i.test(raw)) {
+    conditions.push({ _id: new RegExp(`^${raw}`, 'i') });
+  }
+
+  return {
+    deleted_at: null,
+    $or: conditions,
+  };
+}
+
 class ProductModel {
   /**
    * Admin-only: search stickers across ALL users by QR code id, name,
@@ -186,7 +212,7 @@ class ProductModel {
   static async getById(productId) {
     try {
       if (typeof productId !== 'string' && typeof productId !== 'number') return null;
-      const doc = await Sticker.findOne({ _id: String(productId), deleted_at: null }).lean();
+      const doc = await Sticker.findOne(buildStickerIdFilter(productId)).lean();
       return toApi(doc);
     } catch (err) {
       console.error(`ProductModel.getById (${productId}) Error:`, err);
@@ -201,7 +227,7 @@ class ProductModel {
    */
   static async updateDetails(productId, updates) {
     try {
-      const current = await Sticker.findById(productId).lean();
+      const current = await Sticker.findOne(buildStickerIdFilter(productId)).lean();
       if (!current) return null;
 
       const payload = {};

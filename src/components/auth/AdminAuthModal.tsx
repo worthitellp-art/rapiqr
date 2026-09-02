@@ -12,7 +12,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
   const { adminSignIn } = useAuth();
 
   const [adminEmail, setAdminEmail] = useState<string>(
-    () => (import.meta.env.VITE_ADMIN_EMAIL as string | undefined) || 'worthitellp@gmail.com'
+    () => ((import.meta.env.VITE_ADMIN_EMAIL as string | undefined)?.replace(/^["']|["']$/g, '').trim()) || 'worthitellp@gmail.com'
   );
   const [adminPassword, setAdminPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,7 +36,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
     setIsSubmitting(true);
 
     try {
-      const signInResult = await adminSignIn(adminEmail, adminPassword);
+      const signInResult = await adminSignIn(adminEmail.trim(), adminPassword.trim());
       if (!signInResult.success) {
         setErrorMessage(signInResult.error || 'Invalid Admin Credentials.');
       } else {

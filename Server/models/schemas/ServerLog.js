@@ -23,4 +23,7 @@ const serverLogSchema = new Schema({
   metadata: { type: Schema.Types.Mixed, default: null },
 }, { versionKey: false });
 
+// Auto-expire logs after 48 hours to prevent database bloat
+serverLogSchema.index({ created_at: 1 }, { expireAfterSeconds: 86400 * 2 });
+
 module.exports = model('ServerLog', serverLogSchema);

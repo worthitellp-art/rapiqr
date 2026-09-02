@@ -9,6 +9,7 @@ router.use(verifyToken, verifyAdmin);
 
 router.get('/users', AdminController.listUsers);
 router.get('/users/:id', AdminController.getUserDetail);
+router.get('/users/:id/activity', AdminController.getUserActivity);
 router.delete('/users/:id', AdminController.deleteUser);
 router.post('/users/:id/reset-password', AdminController.triggerPasswordReset);
 router.post('/users/:id/disable-2fa', AdminController.disableUserTwoFactor);

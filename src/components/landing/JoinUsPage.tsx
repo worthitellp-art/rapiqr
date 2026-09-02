@@ -76,13 +76,13 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
             <ArrowLeft size={16} /> Back to home
           </button>
           <span className="text-sm font-semibold tracking-[0.16em]">RAPI<span className="text-[#C79E00]">QR</span></span>
-          <span className="hidden text-[11px] font-medium uppercase tracking-[0.16em] text-black/35 sm:block">Partner network</span>
+          <span className="hidden text-[11px] font-medium uppercase tracking-[0.16em] text-black/60 sm:block">Partner network</span>
         </div>
       </header>
 
       <div className="mx-auto grid max-w-[1200px] gap-12 px-6 py-14 sm:px-10 sm:py-20 lg:grid-cols-[0.8fr_1.2fr] lg:items-start lg:gap-20">
         <section className="lg:sticky lg:top-10">
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-black/40">Join us</p>
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-black/60">Join us</p>
           <h1 className="mt-5 max-w-lg text-[clamp(2.8rem,6vw,5.4rem)] font-medium leading-[0.92] tracking-[-0.055em]">
             Be the help someone finds.
           </h1>
@@ -116,36 +116,36 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="border-b border-black/10 pb-6">
-                <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-black/35">Partner application</p>
+                <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-black/60">Partner application</p>
                 <h2 className="mt-2 text-2xl font-medium tracking-[-0.03em]">Tell us about your service</h2>
-                <p className="mt-2 text-[13px] text-black/45">Only three fields are required to get started.</p>
+                <p className="mt-2 text-[13px] text-black/60">Only three fields are required to get started.</p>
               </div>
 
               <div>
-                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/45">Service type</label>
+                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">Service type</label>
                 <select value={serviceType} onChange={(event) => setServiceType(event.target.value)} className="w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3.5 text-[14px] outline-hidden focus:border-black">
                   {SERVICE_TYPES.map((type) => <option key={type.slug} value={type.slug}>{type.label}</option>)}
                 </select>
               </div>
 
               <div>
-                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/45">Provider / business name *</label>
+                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">Provider / business name *</label>
                 <input value={label} onChange={(event) => setLabel(event.target.value)} placeholder={serviceMeta.placeholder} className="w-full rounded-xl border border-black/12 px-4 py-3.5 text-[14px] outline-hidden focus:border-black" />
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/45">Phone *</label>
+                  <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">Phone *</label>
                   <PhoneInputWithCountry value={phone} onChange={setPhone} />
                 </div>
                 <div>
-                  <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/45">City / service area *</label>
+                  <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">City / service area *</label>
                   <input value={city} onChange={(event) => setCity(event.target.value)} placeholder="e.g. Pune" className="w-full rounded-xl border border-black/12 px-4 py-3.5 text-[14px] outline-hidden focus:border-black" />
                 </div>
               </div>
 
               <div>
-                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/45">Email</label>
+                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">Email</label>
                 <div className="relative">
                   <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-black/30" />
                   <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" className="w-full rounded-xl border border-black/12 py-3.5 pl-11 pr-4 text-[14px] outline-hidden focus:border-black" />
@@ -153,7 +153,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
               </div>
 
               <div>
-                <label className="mb-2.5 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/45">Categories you cover <span className="ml-1 normal-case tracking-normal text-black/30">(optional)</span></label>
+                <label className="mb-2.5 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">Categories you cover <span className="ml-1 normal-case tracking-normal text-black/60">(optional)</span></label>
                 <div className="flex flex-wrap gap-2">
                   {STICKER_CATEGORIES.map((category) => {
                     const selected = categories.includes(category.value);
@@ -163,7 +163,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
               </div>
 
               <div>
-                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/45">Anything else we should know</label>
+                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">Anything else we should know</label>
                 <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={4} placeholder="Hours, coverage radius, fleet size, licence number..." className="w-full resize-none rounded-xl border border-black/12 px-4 py-3.5 text-[14px] outline-hidden focus:border-black" />
               </div>
 
@@ -171,7 +171,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
               <button type="submit" disabled={!valid || submitting} className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-[#0B0B0C] py-4 text-[14px] font-semibold text-white transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-35">
                 {submitting ? <><Loader2 size={16} className="animate-spin" /> Sending application</> : <>Submit application <ArrowRight size={16} className="text-[#F6C000]" /></>}
               </button>
-              <p className="text-center text-[11px] text-black/35">We verify every provider before listing. There is no fee to apply.</p>
+              <p className="text-center text-[11px] text-black/60">We verify every provider before listing. There is no fee to apply.</p>
             </form>
           )}
         </section>

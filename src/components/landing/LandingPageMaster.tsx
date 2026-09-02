@@ -1329,7 +1329,7 @@ export default function LandingPageMaster({
                     className="absolute left-1/2 top-full z-50 w-56 -translate-x-1/2 pt-4"
                   >
                     <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#171719] p-2 shadow-[0_20px_45px_-18px_rgba(0,0,0,0.8)]">
-                      <p className="px-3 pb-2 pt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-white/35">
+                      <p className="px-3 pb-2 pt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-white/50">
                         Choose your service
                       </p>
                       <div className="grid max-h-72 overflow-y-auto">
@@ -1572,7 +1572,7 @@ export default function LandingPageMaster({
                 <div className="text-[clamp(2.2rem,5vw,3.6rem)] font-light leading-none tracking-[-0.04em] text-white">
                   <Counter to={stat.value} suffix={stat.suffix} kilo={stat.kilo} />
                 </div>
-                <div className="mt-3 text-[11px] font-light uppercase tracking-[0.16em] text-white/40">
+                <div className="mt-3 text-[11px] font-light uppercase tracking-[0.16em] text-white/50">
                   {stat.label}
                 </div>
               </Reveal>
@@ -1601,18 +1601,18 @@ export default function LandingPageMaster({
         <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
           <Reveal className="flex flex-col gap-8 border-b border-black/10 pb-10 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-xl">
-              <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.18em] text-black/40">
+              <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.18em] text-black/60">
                 The RepiQR collection
               </p>
               <h2 className="text-[clamp(2rem,4.2vw,3.4rem)] font-medium leading-[1.02] tracking-[-0.04em]">
                 <SplitWords text="Protection, made personal" />
               </h2>
-              <p className="mt-4 max-w-lg text-[15px] font-light leading-relaxed text-black/50">
+              <p className="mt-4 max-w-lg text-[15px] font-light leading-relaxed text-black/60">
                 Choose a purpose-built tag for the things that move through your day.
                 Every one includes lifetime validity and private contact routing.
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-5 text-[11px] uppercase tracking-[0.14em] text-black/40">
+            <div className="flex shrink-0 items-center gap-5 text-[11px] uppercase tracking-[0.14em] text-black/60">
               <span><strong className="text-black">{PRODUCTS.length}</strong> tag styles</span>
               <span className="h-5 w-px bg-black/15" />
               <span><strong className="text-black">∞</strong> validity</span>
@@ -1679,7 +1679,7 @@ export default function LandingPageMaster({
                       <h3 className="text-xl font-medium tracking-[-0.02em]">{product.name}</h3>
                       <div className="shrink-0 text-right">
                         <div className="text-lg font-medium">₹{product.price}</div>
-                        <div className="text-[11px] font-light text-white/35 line-through">
+                        <div className="text-[11px] font-light text-white/50 line-through">
                           ₹{product.mrp}
                         </div>
                       </div>
@@ -1718,7 +1718,7 @@ export default function LandingPageMaster({
                     </div>
 
                     {product.rating && (
-                      <div className="mt-4 flex items-center gap-1.5 text-[11px] font-light text-white/35">
+                      <div className="mt-4 flex items-center gap-1.5 text-[11px] font-light text-white/50">
                         <Star size={12} style={{ color: '#F6C000' }} fill="#F6C000" />
                         {product.rating} · {product.reviewsCount?.toLocaleString('en-IN')} owners
                       </div>
@@ -1740,7 +1740,7 @@ export default function LandingPageMaster({
             <div className="mx-auto grid w-full max-w-[1400px] grid-cols-2 items-center gap-16 px-10">
               {/* Left: the list */}
               <div>
-                <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-black/40">
+                <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-black/60">
                   How it works
                 </p>
                 <h2 className="max-w-md text-[clamp(2rem,3.4vw,3rem)] font-medium leading-[1.06] tracking-[-0.035em]">
@@ -1773,7 +1773,7 @@ export default function LandingPageMaster({
                             transition={{ duration: 0.45, ease: EASE }}
                           >
                             <h3 className="text-xl font-medium tracking-[-0.02em]">
-                              <span className="mr-3 text-[13px] font-light text-black/35">
+                              <span className="mr-3 text-[13px] font-light text-black/60">
                                 0{step.step}
                               </span>
                               {step.title}
@@ -1826,7 +1826,7 @@ export default function LandingPageMaster({
         {/* Mobile: the same story, stacked. Pinning on a phone fights the
             browser's own scroll chrome, so it is not worth the jank. */}
         <div className="px-6 py-24 lg:hidden">
-          <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-black/40">
+          <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-black/60">
             How it works
           </p>
           <h2 className="text-[clamp(1.9rem,7vw,2.4rem)] font-medium leading-[1.08] tracking-[-0.035em]">
@@ -1839,7 +1839,7 @@ export default function LandingPageMaster({
                 <div className="overflow-hidden rounded-3xl bg-[#0B0B0C]">
                   <img src={step.img} alt={step.title} className="aspect-4/3 w-full object-cover" />
                   <div className="p-6 text-white">
-                    <span className="text-[12px] font-light text-white/35">0{step.step}</span>
+                    <span className="text-[12px] font-light text-white/50">0{step.step}</span>
                     <h3 className="mt-1 text-lg font-medium">{step.title}</h3>
                     <p className="mt-2 text-[13px] font-light leading-relaxed text-white/50">
                       {step.body}
@@ -1893,7 +1893,7 @@ export default function LandingPageMaster({
             <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em]">
               Pricing plans for every need
             </h2>
-            <p className="mx-auto mt-4 max-w-lg text-[15px] font-light text-black/50">
+            <p className="mx-auto mt-4 max-w-lg text-[15px] font-light text-black/60">
               Lifetime validity, no recurring subscription. Talk to us for volume pricing.
             </p>
           </Reveal>
@@ -1914,7 +1914,7 @@ export default function LandingPageMaster({
                     <div className="flex items-center justify-between">
                       <span
                         className={`text-[11px] font-light uppercase tracking-[0.16em] ${
-                          plan.featured ? 'text-white/40' : 'text-black/40'
+                          plan.featured ? 'text-white/50' : 'text-black/60'
                         }`}
                       >
                         {plan.name}
@@ -1932,7 +1932,7 @@ export default function LandingPageMaster({
                     <div className="mt-5 text-[2rem] font-light tracking-[-0.04em]">Contact us</div>
                     <p
                       className={`mt-2 text-[13px] font-light ${
-                        plan.featured ? 'text-white/45' : 'text-black/45'
+                        plan.featured ? 'text-white/50' : 'text-black/60'
                       }`}
                     >
                       {plan.desc}
@@ -1978,13 +1978,13 @@ export default function LandingPageMaster({
       {false && <section id="join-section" className="bg-[#F4F1EC] py-16 sm:py-24 lg:py-32">
         <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
           <Reveal className="mx-auto max-w-2xl text-center">
-            <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-black/40">
+            <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-black/60">
               Join us
             </p>
             <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em]">
               <SplitWords text="Become a service partner" />
             </h2>
-            <p className="mt-4 text-[15px] font-light leading-relaxed text-black/50">
+            <p className="mt-4 text-[15px] font-light leading-relaxed text-black/60">
               Ambulance, towing, mechanic, plumber, vet, security — whatever you do, get
               listed once and take masked calls the moment a nearby tag is scanned.
             </p>
@@ -2065,7 +2065,7 @@ export default function LandingPageMaster({
                 ) : (
                   <form onSubmit={handleJoinSubmit} className="space-y-5">
                     <div>
-                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
                         Service type
                       </label>
                       <select
@@ -2082,7 +2082,7 @@ export default function LandingPageMaster({
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
                         Provider / business name *
                       </label>
                       <input
@@ -2097,7 +2097,7 @@ export default function LandingPageMaster({
 
                     <div className="grid gap-5 sm:grid-cols-2">
                       <div>
-                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
                           Phone *
                         </label>
                         <PhoneInputWithCountry
@@ -2106,7 +2106,7 @@ export default function LandingPageMaster({
                         />
                       </div>
                       <div>
-                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
                           City / service area *
                         </label>
                         <input
@@ -2121,7 +2121,7 @@ export default function LandingPageMaster({
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
                         Email
                       </label>
                       <div className="relative">
@@ -2137,9 +2137,9 @@ export default function LandingPageMaster({
                     </div>
 
                     <div>
-                      <label className="mb-2.5 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                      <label className="mb-2.5 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
                         Categories you cover
-                        <span className="ml-2 normal-case tracking-normal text-black/30">
+                        <span className="ml-2 normal-case tracking-normal text-black/60">
                           — leave empty to cover all
                         </span>
                       </label>
@@ -2165,7 +2165,7 @@ export default function LandingPageMaster({
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
                         Anything else we should know
                       </label>
                       <textarea
@@ -2200,7 +2200,7 @@ export default function LandingPageMaster({
                       )}
                     </button>
 
-                    <p className="text-center text-[11px] font-light text-black/35">
+                    <p className="text-center text-[11px] font-light text-black/60">
                       We verify every provider before listing. No fee to apply.
                     </p>
                   </form>
@@ -2215,7 +2215,7 @@ export default function LandingPageMaster({
       <section id="distributor-section" className="bg-[#0B0B0C] py-16 text-white sm:py-24 lg:py-32">
         <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
           <Reveal className="max-w-2xl">
-            <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-white/40">
+            <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-white/50">
               Franchise
             </p>
             <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em]">
@@ -2240,7 +2240,7 @@ export default function LandingPageMaster({
                   <div>
                     <span
                       className={`text-[11px] font-light uppercase tracking-[0.16em] ${
-                        tier.isPopular ? 'text-black/40' : 'text-white/40'
+                        tier.isPopular ? 'text-black/60' : 'text-white/50'
                       }`}
                     >
                       {tier.badge}
@@ -2248,7 +2248,7 @@ export default function LandingPageMaster({
                     <h3 className="mt-4 text-xl font-medium tracking-[-0.02em]">{tier.name}</h3>
                     <p
                       className={`mt-2.5 text-[13px] font-light leading-relaxed ${
-                        tier.isPopular ? 'text-black/50' : 'text-white/45'
+                        tier.isPopular ? 'text-black/60' : 'text-white/50'
                       }`}
                     >
                       {tier.desc}
@@ -2260,7 +2260,7 @@ export default function LandingPageMaster({
                       }`}
                     >
                       <span>{tier.minUnits}</span>
-                      <span className={tier.isPopular ? 'text-black/20' : 'text-white/20'}>·</span>
+                      <span className={tier.isPopular ? 'text-black/60' : 'text-white/50'}>·</span>
                       <span className="font-medium">{tier.margin}</span>
                     </div>
 
@@ -2425,11 +2425,11 @@ export default function LandingPageMaster({
           <div className="grid gap-12 pb-16 md:grid-cols-12">
             <div className="space-y-5 md:col-span-4">
               <img src={darkBgLogo} alt="RepiQR" className="h-8 w-auto object-contain" />
-              <p className="max-w-xs text-[13px] font-light leading-relaxed text-white/45">
+              <p className="max-w-xs text-[13px] font-light leading-relaxed text-white/50">
                 A universal smart QR safety layer for vehicles, valuables, pets and families —
                 with masked telephony and instant scan alerts.
               </p>
-              <div className="flex items-center gap-2 pt-1 text-[12px] font-light text-white/40">
+              <div className="flex items-center gap-2 pt-1 text-[12px] font-light text-white/50">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
                 All proxy gateway nodes operational
               </div>
@@ -2437,7 +2437,7 @@ export default function LandingPageMaster({
 
             <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 md:col-span-8">
               <div className="space-y-3.5">
-                <div className="text-[11px] font-light uppercase tracking-[0.16em] text-white/35">
+                <div className="text-[11px] font-light uppercase tracking-[0.16em] text-white/50">
                   Products
                 </div>
                 <ul className="space-y-2.5 text-[13px] font-light text-white/55">
@@ -2455,7 +2455,7 @@ export default function LandingPageMaster({
               </div>
 
               <div className="space-y-3.5">
-                <div className="text-[11px] font-light uppercase tracking-[0.16em] text-white/35">
+                <div className="text-[11px] font-light uppercase tracking-[0.16em] text-white/50">
                   Platform
                 </div>
                 <ul className="space-y-2.5 text-[13px] font-light text-white/55">
@@ -2492,7 +2492,7 @@ export default function LandingPageMaster({
               </div>
 
               <div className="space-y-3.5">
-                <div className="text-[11px] font-light uppercase tracking-[0.16em] text-white/35">
+                <div className="text-[11px] font-light uppercase tracking-[0.16em] text-white/50">
                   Company
                 </div>
                 <ul className="space-y-2.5 text-[13px] font-light text-white/55">
@@ -2532,7 +2532,7 @@ export default function LandingPageMaster({
               </div>
 
               <div className="space-y-3.5">
-                <div className="text-[11px] font-light uppercase tracking-[0.16em] text-white/35">
+                <div className="text-[11px] font-light uppercase tracking-[0.16em] text-white/50">
                   Legal
                 </div>
                 <ul className="space-y-2.5 text-[13px] font-light text-white/55">
@@ -2545,7 +2545,7 @@ export default function LandingPageMaster({
             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-[12px] font-light text-white/35 sm:flex-row">
+          <div className="flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-[12px] font-light text-white/50 sm:flex-row">
             <span>© {new Date().getFullYear()} RepiQR. All rights reserved.</span>
             <span className="flex items-center gap-2">
               <Shield size={12} />
@@ -2582,7 +2582,7 @@ export default function LandingPageMaster({
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-[13px] font-semibold text-[#0B0B0C]">Added to your cart</p>
-              <p className="mt-0.5 truncate text-[12px] font-light text-black/50">
+              <p className="mt-0.5 truncate text-[12px] font-light text-black/60">
                 {cartNotice.qty > 1 ? `${cartNotice.qty} × ` : ''}{cartNotice.name}
               </p>
             </div>
@@ -2636,7 +2636,7 @@ export default function LandingPageMaster({
                   <div className="py-20 text-center">
                     <ShoppingBag size={36} className="mx-auto mb-4 text-black/15" />
                     <p className="text-[14px] font-medium">Your cart is empty</p>
-                    <p className="mt-1 text-[12px] font-light text-black/40">
+                    <p className="mt-1 text-[12px] font-light text-black/60">
                       Add a tag to start protecting something.
                     </p>
                   </div>
@@ -2651,7 +2651,7 @@ export default function LandingPageMaster({
                         />
                         <div className="min-w-0 flex-1">
                           <h4 className="truncate text-[13px] font-medium">{item.product.name}</h4>
-                          <div className="mt-1 text-[13px] font-light text-black/50">
+                          <div className="mt-1 text-[13px] font-light text-black/60">
                             ₹{item.product.price}
                           </div>
                         </div>
@@ -2821,7 +2821,7 @@ export default function LandingPageMaster({
                     </span>
                     <div>
                       <h3 className="text-xl font-medium tracking-[-0.02em]">Become a partner</h3>
-                      <p className="text-[12px] font-light text-black/45">
+                      <p className="text-[12px] font-light text-black/60">
                         Apply for a RepiQR distributorship or franchise
                       </p>
                     </div>
@@ -2829,7 +2829,7 @@ export default function LandingPageMaster({
 
                   <form onSubmit={handlePartnerSubmit} className="space-y-4">
                     <div>
-                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
                         Full name / company
                       </label>
                       <input
@@ -2846,7 +2846,7 @@ export default function LandingPageMaster({
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
-                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
                           Phone / WhatsApp
                         </label>
                         <PhoneInputWithCountry
@@ -2856,7 +2856,7 @@ export default function LandingPageMaster({
                         />
                       </div>
                       <div>
-                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
                           City &amp; state
                         </label>
                         <input
@@ -2873,7 +2873,7 @@ export default function LandingPageMaster({
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
                         Business type
                       </label>
                       <select
@@ -2894,7 +2894,7 @@ export default function LandingPageMaster({
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/40">
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
                         Interested package
                       </label>
                       <select

@@ -8,6 +8,7 @@
          drawer, cart, toasts) silently computed to its fallback. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>RapiQR - Smart Safety QR Tags</title>
+    <meta name="description" content="RapiQR smart QR tags for vehicles, luggage, and pets — scan to instantly contact the owner in an emergency, report a parking issue, or reunite lost items with their families." />
     <meta name="theme-color" content="#D9581F" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -17,7 +18,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Google Identity Services is loaded lazily, only when Google sign-in is
+         actually attempted (see loadGoogleIdentityScript in AuthContext.tsx) —
+         it was previously loaded eagerly here and shipped ~84% unused bytes to
+         every visitor who never uses Google sign-in. -->
   </head>
   <body>
     <div id="root"></div>

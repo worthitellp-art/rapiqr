@@ -33,6 +33,7 @@ const stickerSchema = new Schema({
   client_id: { type: String, default: 'UNASSIGNED' },
 
   user_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+  phone_number: { type: String, default: null, index: true },
   name: { type: String, default: null },
   assigned_to: { type: String, default: null },
   vehicle_number: { type: String, default: null },

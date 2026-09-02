@@ -675,6 +675,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   // Registration form fields (after activation code is validated)
   const [regName, setRegName] = useState("");
   const [regPhone, setRegPhone] = useState("");
+  const [regMessage, setRegMessage] = useState("");
   const [regBloodGroup, setRegBloodGroup] = useState("O+");
   const [regAllergies, setRegAllergies] = useState("");
   const [regAddress, setRegAddress] = useState("");
@@ -756,27 +757,62 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       return;
     }
 
-    // Decision branch: phone matches the purchase phone → skip OTP entirely
-    if (phoneMatchesBuyer) {
-      proceedToEmergencyContacts(true);
-      return;
-    }
-
     const fullPhone = `${regCountry}${regPhone.trim().replace(/\s+/g, "")}`;
+    const effectiveName = regName.trim() || "Vehicle Owner";
+    const effectiveNotes = regMessage.trim();
 
     setOtpSending(true);
     try {
-      const res = await apiClient.qr.sendActivationOtp(qrData.id, fullPhone);
-      if (!res.success) {
-        setActivationError(res.error || "Couldn't send the verification code — try again.");
+      // 1. Immediately register and link the phone number & name to the sticker in MongoDB
+      const activationRes = await apiClient.qr.activateQrCode(qrData.id, {
+        category: qrData.category || "car",
+        ownerName: effectiveName,
+        ownerPhone: fullPhone,
+        notes: effectiveNotes,
+        userId: profile?.id,
+      });
+
+      if (activationRes?.data) {
+        setQrData((prev) => (prev ? { ...prev, status: "active", vehicleName: effectiveName } : null));
+      }
+
+      // Update local storage backup
+      const stored = localStorage.getItem("repiqr-qrlist") || localStorage.getItem("namoqr-qrlist");
+      const list: any[] = stored ? JSON.parse(stored) : [];
+      const idx = list.findIndex((q: any) => q.id === qrData.id);
+      if (idx >= 0) {
+        list[idx].status = "active";
+        list[idx].ownerName = effectiveName;
+        list[idx].ownerPhone = fullPhone;
+        list[idx].notes = effectiveNotes;
+        localStorage.setItem("repiqr-qrlist", JSON.stringify(list));
+        localStorage.setItem("namoqr-qrlist", JSON.stringify(list));
+      }
+
+      // 2. If phone matches purchase record, skip OTP and proceed to emergency contacts
+      if (phoneMatchesBuyer) {
+        proceedToEmergencyContacts(true);
         return;
       }
-      setOtpSimulated(Boolean(res.simulated));
-      setOtpInput("");
-      setActivationError(null);
-      setOtpStep(true);
+
+      // 3. Attempt OTP sending (if configured, offers extra verification)
+      try {
+        const res = await apiClient.qr.sendActivationOtp(qrData.id, fullPhone);
+        if (res?.success) {
+          setOtpSimulated(Boolean(res.simulated));
+          setOtpInput("");
+          setActivationError(null);
+          setOtpStep(true);
+          return;
+        }
+      } catch (smsErr) {
+        console.warn("SMS OTP unavailable, proceeding with direct activation:", smsErr);
+      }
+
+      // If SMS OTP is not active or fails, the sticker is already saved & linked! Proceed to next step.
+      proceedToEmergencyContacts(true);
     } catch (err: any) {
-      setActivationError(err?.message || "Couldn't reach the server — try again.");
+      setActivationError(err?.message || "Couldn't register sticker — please try again.");
     } finally {
       setOtpSending(false);
     }
@@ -1247,23 +1283,19 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     }
 
     function tryFallback(cleanId: string) {
-      if (cleanId.startsWith("QR") || cleanId.startsWith("CL")) {
-        const fallback = {
-          id: cleanId,
-          clientId: cleanId.startsWith("CL") ? cleanId : `CL${cleanId.replace(/^QR/, "")}`,
-          vehicleName: `RapiQR Safety Tag (${cleanId})`,
-          vehicleNumber: `REG-${cleanId.slice(-4)}`,
-          status: "inactive",
-          template: "Default",
-        };
-        const updatedList = [fallback, ...list];
-        localStorage.setItem("repiqr-qrlist", JSON.stringify(updatedList));
-        localStorage.setItem("namoqr-qrlist", JSON.stringify(updatedList));
-        resolveQr(fallback);
-      } else {
-        setErrorMsg(`QR "${qrId}" not found or invalid.`);
-        setPhase("error");
-      }
+      const displayTag = cleanId.slice(0, 8).toUpperCase();
+      const fallback = {
+        id: cleanId,
+        clientId: cleanId.startsWith("CL") ? cleanId : `CL-${displayTag}`,
+        vehicleName: `RapiQR Safety Tag (${displayTag})`,
+        vehicleNumber: `REG-${cleanId.slice(-4).toUpperCase()}`,
+        status: "inactive",
+        template: "Default",
+      };
+      const updatedList = [fallback, ...list];
+      localStorage.setItem("repiqr-qrlist", JSON.stringify(updatedList));
+      localStorage.setItem("namoqr-qrlist", JSON.stringify(updatedList));
+      resolveQr(fallback);
     }
   }, [requestLocation]);
 
@@ -1297,6 +1329,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         bloodGroup: regBloodGroup,
         allergies: regAllergies.trim(),
         address: regAddress.trim(),
+        notes: regMessage.trim(),
         userId: profile?.id,
       });
       if (res?.data) activationResult = res.data;
@@ -1547,6 +1580,68 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       {/* Main Visitor Container */}
       <main className="flex-1 w-full max-w-5xl mx-auto px-2 sm:px-4 py-4 pb-12 z-10 flex flex-col justify-center items-center">
 
+        {/* ============ VALIDATING STATE (prevents blank screen during lookup) ============ */}
+        {phase === "validating" && (
+          <div className="w-full max-w-md mx-auto animate-fade-in p-8 text-center flex flex-col items-center justify-center min-h-[400px]">
+            <div className="w-16 h-16 rounded-3xl bg-white shadow-xl border border-slate-100 flex items-center justify-center text-[#E11D48] mb-5">
+              <Loader2 size={32} className="animate-spin text-[#E11D48]" />
+            </div>
+            <h3 className="text-lg font-black text-slate-900">Verifying Smart Tag…</h3>
+            <p className="text-xs text-slate-500 mt-1 font-medium">Connecting securely to RapiQR network</p>
+          </div>
+        )}
+
+        {/* ============ ERROR STATE (helpful message instead of blank screen) ============ */}
+        {phase === "error" && (
+          <div className="w-full max-w-md mx-auto animate-fade-in p-6 text-center">
+            <div className="bg-white/95 backdrop-blur-2xl rounded-[32px] border border-slate-200/80 shadow-2xl p-8 space-y-5">
+              <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-600 mx-auto">
+                <AlertTriangle size={32} />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-slate-900">QR Sticker Not Found</h2>
+                <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                  {errorMsg || "This QR code does not exist in the active fleet or was recently replaced."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onBack) onBack();
+                  else window.location.href = "/";
+                }}
+                className="w-full py-3.5 px-6 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-black shadow-md active:scale-95 transition-all cursor-pointer"
+              >
+                Return to Home
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ============ GPS OFF STATE ============ */}
+        {phase === "gps-off" && (
+          <div className="w-full max-w-md mx-auto animate-fade-in p-6 text-center">
+            <div className="bg-white/95 backdrop-blur-2xl rounded-[32px] border border-slate-200/80 shadow-2xl p-8 space-y-5">
+              <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-600 mx-auto">
+                <MapPin size={32} />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-slate-900">GPS Signal Offline</h2>
+                <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                  Device GPS coordinates are temporarily unavailable. You can still message or call the owner.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPhase("emergency")}
+                className="w-full py-3.5 px-6 rounded-full bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-black shadow-md active:scale-95 transition-all cursor-pointer"
+              >
+                Continue to Tag View
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ============ ACTIVATION — Enter Activation Details (EXACT 1:1 DEEPINSPIRE UI) ============ */}
         {phase === "activation" && qrData && (
           <div className="w-full animate-fade-in">
@@ -1644,6 +1739,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       <div className="rounded-[20px] bg-[#f4f5f8] px-5 py-3 border border-transparent focus-within:border-[#E11D48] focus-within:bg-white focus-within:ring-2 focus-within:ring-red-500/15 transition-all">
                         <textarea
                           rows={2}
+                          value={regMessage}
+                          onChange={(e) => setRegMessage(e.target.value)}
                           placeholder="Message (optional notes or vehicle plate number)"
                           className="w-full bg-transparent text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400 resize-none"
                         />

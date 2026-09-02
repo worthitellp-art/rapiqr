@@ -24,6 +24,8 @@ const API_BASE_URL = (() => {
  */
 export const isApiBackendConfigured = (() => {
   const base = RAW_API_BASE_URL || '';
+  if (!base) return true;
+  if (base.startsWith('/')) return true;
   return base.startsWith('http') && !base.includes('YOUR-RENDER-SERVICE');
 })();
 
@@ -87,7 +89,21 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
       // short of a manual localStorage wipe. Broadcast it so AuthContext can force
       // a clean re-login instead of leaving the UI stuck half-authenticated.
       if (response.status === 401) {
-        window.dispatchEvent(new CustomEvent('rapiqr:unauthorized', { detail: { endpoint } }));
+        // Exclude authentication lifecycle endpoints (e.g. invalid credentials on signin, or logout)
+        // from broadcasting unauthorized to prevent infinite recursion and cascading loops.
+        const isAuthLifecycleEndpoint = [
+          '/auth/logout',
+          '/auth/signin',
+          '/auth/admin-signin',
+          '/auth/signup',
+          '/auth/forgot-password',
+          '/auth/reset-password',
+          '/auth/google',
+        ].some(path => endpoint.includes(path));
+
+        if (!isAuthLifecycleEndpoint) {
+          window.dispatchEvent(new CustomEvent('rapiqr:unauthorized', { detail: { endpoint } }));
+        }
       }
       // Carry the HTTP status on the error so callers can tell "your token is
       // dead" (401) apart from "the server had a problem answering" (404/5xx).
@@ -213,6 +229,15 @@ export const apiClient = {
     async getMe() {
       return request<{ success: boolean; user?: any }>('/auth/me', {
         method: 'GET',
+      });
+    },
+
+    // Records a LOGOUT audit entry server-side. JWTs are stateless here, so
+    // this doesn't revoke the token — signOut() still clears it locally
+    // regardless of whether this call succeeds.
+    async logout() {
+      return request<{ success: boolean; message?: string }>('/auth/logout', {
+        method: 'POST',
       });
     },
 

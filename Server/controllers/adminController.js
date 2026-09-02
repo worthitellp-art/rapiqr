@@ -1,6 +1,7 @@
 const UserModel = require('../models/userModel');
 const ProductModel = require('../models/productModel');
 const MessageModel = require('../models/messageModel');
+const LogModel = require('../models/logModel');
 const Sticker = require('../models/schemas/Sticker');
 const { logger } = require('../middleware/loggerMiddleware');
 const { sendEmail } = require('../services/emailService');
@@ -46,6 +47,25 @@ class AdminController {
       return res.json({ success: true, data: { profile, products } });
     } catch (err) {
       logger.error('ADMIN_USER_DETAIL', `Failed to fetch user ${req.params.id}`, err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Support console: this user's login/logout/action audit trail — the same
+   * ServerLog records the Live Logs feed reads, scoped to one user_id, so
+   * sign-ins, sign-outs, and every request they made while authenticated
+   * (correlated via authMiddleware's setUserId call) show up newest-first.
+   * GET /api/admin/users/:id/activity
+   */
+  static async getUserActivity(req, res) {
+    try {
+      const { id } = req.params;
+      const limit = Math.min(parseInt(req.query.limit) || 200, 1000);
+      const data = await LogModel.getLogs({ userId: id, limit });
+      return res.json({ success: true, data });
+    } catch (err) {
+      logger.error('ADMIN_USER_ACTIVITY', `Failed to fetch activity for user ${req.params.id}`, err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

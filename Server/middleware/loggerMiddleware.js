@@ -199,6 +199,48 @@ function clearMemoryLogs() {
  *   requestId, userId, resourceId, method, url, statusCode, durationMs, origin, ip
  * }
  */
+function shouldPersistToDatabase(logItem) {
+  const level = String(logItem.level || '').toUpperCase();
+  const category = String(logItem.category || '').toUpperCase();
+  const event = String(logItem.event || '').toUpperCase();
+  const tag = String(logItem.tag || '').toUpperCase();
+  const statusCode = Number(logItem.status_code || 0);
+
+  // Always persist server errors, unhandled rejections, warnings, and security violations
+  if (level === 'ERROR' || level === 'FATAL' || level === 'WARN' || category === 'SECURITY' || statusCode >= 400) {
+    return true;
+  }
+
+  // Never persist routine HTTP pings, 200/304 requests, assets, or debug logs
+  if (level === 'HTTP' || level === 'DEBUG') {
+    return false;
+  }
+
+  // Never persist bootstrap server logs (MongoDB connection established, RepiChat ENABLED, etc.)
+  if (category === 'SYSTEM' || tag === 'SERVER' || event === 'SERVER') {
+    return false;
+  }
+
+  // Only persist meaningful real-world business & user activities
+  const SIGNIFICANT_EVENTS = [
+    'AUTH_SIGNIN',
+    'AUTH_SIGNUP',
+    'AUTH_ADMIN_SIGNIN',
+    'QR_ACTIVATED',
+    'QR_CREATE',
+    'ALERT_TRIGGERED',
+    'ORDER_CREATED',
+    'PAYMENT',
+    'ACCOUNT_DELETED',
+  ];
+
+  if (SIGNIFICANT_EVENTS.some((sig) => event.includes(sig) || tag.includes(sig))) {
+    return true;
+  }
+
+  return category === 'BUSINESS' || category === 'USER';
+}
+
 async function writeLogToDatabase(payload) {
   const uuid = generateUUID();
   const ctx = currentContext();
@@ -228,7 +270,13 @@ async function writeLogToDatabase(payload) {
     metadata: sanitize(payload.metadata || {})
   };
 
+  // Live buffer keeps recent logs in memory for the admin live logs console without touching disk/DB
   pushToMemoryBuffer(logItem);
+
+  // Only persist important user activity, security events, and errors to MongoDB
+  if (!shouldPersistToDatabase(logItem)) {
+    return;
+  }
 
   try {
     await ServerLog.create({

@@ -3,6 +3,7 @@ build/
 dist/
 dev-dist/
 coverage/
+lighthouse-report.*
 .DS_Store
 *.log
 .env*
