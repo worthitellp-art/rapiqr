@@ -1,6 +1,6 @@
 import type React from "react";
 import { useState } from "react";
-import { Copy, Check, ExternalLink, Eye, Trash2 } from "lucide-react";
+import { Copy, Check, ExternalLink, Eye, Trash2, Printer } from "lucide-react";
 import { QrRecord } from "./types";
 import { qrFullUrl } from "./helpers";
 
@@ -8,9 +8,10 @@ interface QrRowActionsProps {
   qr: QrRecord;
   openQuickLook: (qr: QrRecord) => void;
   setDeleteTarget: (qr: QrRecord) => void;
+  openPrintSheet?: (qr: QrRecord) => void;
 }
 
-export default function QrRowActions({ qr, openQuickLook, setDeleteTarget }: QrRowActionsProps) {
+export default function QrRowActions({ qr, openQuickLook, setDeleteTarget, openPrintSheet }: QrRowActionsProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopyLink = (e: React.MouseEvent) => {
@@ -77,6 +78,21 @@ export default function QrRowActions({ qr, openQuickLook, setDeleteTarget }: QrR
         <Eye size={13} className="text-slate-600 flex-shrink-0" />
         <span>View</span>
       </button>
+
+      {/* Print 18x12 Sheet button */}
+      {openPrintSheet && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            openPrintSheet(qr);
+          }}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#E8EDFF] text-[#3E52B8] border border-[#5C78DF]/30 hover:bg-[#DCE3FF] transition-all cursor-pointer shadow-2xs"
+          title="Generate 18×12″ print sheet (3×3 grid, 9 stickers)"
+        >
+          <Printer size={13} className="text-[#3E52B8] flex-shrink-0" />
+          <span>Print Sheet</span>
+        </button>
+      )}
 
       {/* Delete button */}
       <button

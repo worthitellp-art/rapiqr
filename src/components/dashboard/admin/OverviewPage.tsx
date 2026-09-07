@@ -20,6 +20,7 @@ interface OverviewPageProps {
   openQuickLook: (qr: QrRecord) => void;
   openRestore: () => void;
   setToast: (msg: string | null) => void;
+  openPrintSheet?: (qr: QrRecord) => void;
 }
 
 export default function OverviewPage({
@@ -30,6 +31,7 @@ export default function OverviewPage({
   openQuickLook,
   openRestore,
   setToast,
+  openPrintSheet,
 }: OverviewPageProps) {
   const [deleteTarget, setDeleteTarget] = useState<QrRecord | null>(null);
 
@@ -414,7 +416,12 @@ export default function OverviewPage({
                     <td className="px-3 py-3 text-[11px] text-[#777B80]">{fmtDate(q.createdAt)}</td>
                     <td className="px-3 py-3"><StatusPill status={computedStatus} /></td>
                     <td className="px-4 py-3 text-right">
-                      <QrRowActions qr={q} openQuickLook={openQuickLook} setDeleteTarget={setDeleteTarget} />
+                      <QrRowActions
+                        qr={q}
+                        openQuickLook={openQuickLook}
+                        setDeleteTarget={setDeleteTarget}
+                        openPrintSheet={openPrintSheet}
+                      />
                     </td>
                   </tr>
                 );

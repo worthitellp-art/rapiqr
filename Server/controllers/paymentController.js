@@ -83,11 +83,17 @@ class PaymentController {
       }
 
       const expectedSignature = crypto
-        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
         .update(`${razorpay_order_id}|${razorpay_payment_id}`)
         .digest('hex');
 
-      if (expectedSignature !== razorpay_signature) {
+      const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+      const receivedBuffer = Buffer.from(String(razorpay_signature || ''), 'utf8');
+      const isSignatureValid =
+        expectedBuffer.length === receivedBuffer.length &&
+        crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+
+      if (!isSignatureValid) {
         await OrderModel.attachPaymentInfo(orderId, { ...order.payment, status: 'failed', razorpayPaymentId: razorpay_payment_id });
         logger.warn('PAYMENT_VERIFY', `Signature mismatch for order ${orderId}`);
         return res.status(400).json({ success: false, error: 'Payment verification failed' });

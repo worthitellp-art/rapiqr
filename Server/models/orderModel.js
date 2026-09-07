@@ -139,6 +139,37 @@ class OrderModel {
     await Order.deleteMany({});
     return true;
   }
+
+  /**
+   * Links unassigned guest orders to a newly registered or authenticated user.
+   * Matches against exact email or 10-digit phone suffix.
+   */
+  static async linkGuestOrdersToUser(userId, email, phone) {
+    if (!userId || (!email && !phone)) return 0;
+
+    const conditions = [];
+    if (email && typeof email === 'string') {
+      conditions.push({ email: email.trim().toLowerCase() });
+    }
+    if (phone && typeof phone === 'string') {
+      const cleanDigits = phone.replace(/\D/g, '');
+      if (cleanDigits.length >= 10) {
+        conditions.push({ phone: { $regex: cleanDigits.slice(-10) + '$' } });
+      }
+    }
+
+    if (conditions.length === 0) return 0;
+
+    const query = {
+      $and: [
+        { $or: [{ user_id: null }, { user_id: { $exists: false } }] },
+        { $or: conditions }
+      ]
+    };
+
+    const updateResult = await Order.updateMany(query, { $set: { user_id: String(userId) } });
+    return updateResult.modifiedCount || 0;
+  }
 }
 
 module.exports = OrderModel;

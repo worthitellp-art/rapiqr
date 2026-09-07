@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X, Printer } from "lucide-react";
 import CopyLinkButton from "./CopyLinkButton";
 import StickerThumb from "./StickerThumb";
 import { QrRecord, Template, StickerPos } from "./types";
@@ -8,11 +8,13 @@ interface QuickLookModalProps {
   onClose: () => void;
   stickerPos?: StickerPos;
   templates?: Template[];
+  onOpenPrintSheet?: (qr: QrRecord) => void;
 }
 
 export default function QuickLookModal({
   qr,
   onClose,
+  onOpenPrintSheet,
 }: QuickLookModalProps) {
   if (!qr) return null;
 
@@ -54,8 +56,22 @@ export default function QuickLookModal({
             {displayLabel}
           </p>
 
-          <div className="w-full mt-5">
+          <div className="w-full mt-5 space-y-2">
             <CopyLinkButton qrId={qr.id} />
+
+            {onOpenPrintSheet && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenPrintSheet(qr);
+                }}
+                className="w-full py-2.5 px-3 rounded-[4px] bg-[#E8EDFF] hover:bg-[#DCE3FF] text-[#3E52B8] border border-[#5C78DF]/30 text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
+              >
+                <Printer size={14} />
+                <span>Print 18×12″ Sheet (3×3 Grid)</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

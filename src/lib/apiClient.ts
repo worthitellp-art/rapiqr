@@ -627,22 +627,65 @@ export const apiClient = {
     },
 
     /**
-     * The buyer's own delivery status. Refreshes from the courier server-side
-     * and returns the folded-in result, so calling this also persists the
-     * tracking onto the order for the admin console to see.
+     * The buyer's own delivery status. Supports optional guest verification contact.
      */
-    async track(id: string) {
+    async track(id: string, verificationContact?: string) {
+      const queryString = verificationContact ? `?contact=${encodeURIComponent(verificationContact)}` : '';
       return request<{
         success: boolean;
-        data: {
+        error?: string;
+        data?: {
           id: string;
           status: 'placed' | 'shipped' | 'delivered' | 'cancelled';
           payment?: any;
+          paymentStatus?: string;
           deliveryMethod?: string;
+          total?: number;
           createdAt?: string;
+          items?: Array<{ name: string; qty: number; price: number }>;
+          maskedBuyer?: {
+            firstName: string;
+            email: string;
+            phone: string;
+            city: string;
+            state: string;
+            pincode: string;
+          };
           shiprocket?: OrderTracking | null;
         };
-      }>(`/orders/${encodeURIComponent(id)}/track`, { method: 'GET' });
+      }>(`/orders/${encodeURIComponent(id)}/track${queryString}`, { method: 'GET' });
+    },
+
+    /**
+     * Secure tracking lookup by Order ID and Phone Number / Email.
+     */
+    async trackByLookup(orderId: string, contact: string) {
+      return request<{
+        success: boolean;
+        error?: string;
+        data?: {
+          id: string;
+          status: 'placed' | 'shipped' | 'delivered' | 'cancelled';
+          payment?: any;
+          paymentStatus?: string;
+          deliveryMethod?: string;
+          total?: number;
+          createdAt?: string;
+          items?: Array<{ name: string; qty: number; price: number }>;
+          maskedBuyer?: {
+            firstName: string;
+            email: string;
+            phone: string;
+            city: string;
+            state: string;
+            pincode: string;
+          };
+          shiprocket?: OrderTracking | null;
+        };
+      }>('/orders/track', {
+        method: 'POST',
+        body: JSON.stringify({ orderId, contact }),
+      });
     },
 
     // Admin: every order placed via checkout

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { X, AlertTriangle, Plus, Trash2, ArrowRightLeft, History, Loader2, ExternalLink, Download, Copy, Check, QrCode } from 'lucide-react';
+import { X, AlertTriangle, Plus, Trash2, ArrowRightLeft, History, Loader2, ExternalLink, Download, Copy, Check, QrCode, Printer } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { DashboardSticker, EmergencyContact } from './types';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
 import { getCategoryIcon } from '../../../stickerModules';
+import { generateRepeatedStickerSheetBlob, downloadSheetBlob } from '../../../services/stickerPrintSheetService';
+import type { QrRecord } from '../admin/types';
 
 function ModalShell({
   onClose,
@@ -467,6 +469,37 @@ export function QrCodeModal({
               <Download size={14} /> Download PNG
             </button>
           </div>
+
+          <button
+            onClick={async () => {
+              try {
+                const rec: QrRecord = {
+                  id: sticker.code || sticker.qrCodeId || 'STICKER',
+                  qrUrl: scanUrl,
+                  createdAt: new Date().toISOString(),
+                  scans: sticker.scans || 0,
+                  status: 'active',
+                  template: 'Standard Tag',
+                  category: sticker.category || 'car',
+                  fg: '000000',
+                  bg: 'FFFFFF',
+                };
+                const pos = { x: 110, y: 40, w: 100, h: 100 };
+                const blob = await generateRepeatedStickerSheetBlob(rec, pos);
+                if (blob) {
+                  downloadSheetBlob(blob, `repiqr-print-sheet-18x12-${rec.id}.png`);
+                  onShowToast('18×12″ print sheet (9 stickers) downloaded');
+                }
+              } catch (err) {
+                console.error('Failed to generate sticker sheet:', err);
+                onShowToast('Failed to generate print sheet');
+              }
+            }}
+            className="w-full py-2.5 px-3 rounded-xl border border-[#5C78DF]/30 bg-[#E8EDFF] hover:bg-[#DCE3FF] text-xs font-bold text-[#3E52B8] flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-2xs"
+          >
+            <Printer size={14} />
+            <span>Print 18×12″ Sheet (9 Stickers)</span>
+          </button>
         </div>
       </div>
     </ModalShell>

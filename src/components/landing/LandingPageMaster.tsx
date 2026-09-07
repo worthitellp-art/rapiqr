@@ -39,6 +39,7 @@ import {
   ShoppingBag,
   Star,
   Shield,
+  Truck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
@@ -108,6 +109,7 @@ export interface LandingPageMasterProps {
   onOpenDistributorDashboard?: () => void;
   onOpenCheckout?: () => void;
   onOpenJoinUs?: (serviceType?: string) => void;
+  onOpenTrackOrder?: () => void;
   isEmbeddedInDashboard?: boolean;
 }
 
@@ -920,6 +922,7 @@ export default function LandingPageMaster({
   onOpenDistributorDashboard,
   onOpenCheckout,
   onOpenJoinUs,
+  onOpenTrackOrder,
   isEmbeddedInDashboard = false,
 }: LandingPageMasterProps) {
   const { isLoggedIn, profile } = useAuth();
@@ -1351,6 +1354,17 @@ export default function LandingPageMaster({
           </nav>
 
           <div className="hidden items-center gap-5 lg:flex">
+            {onOpenTrackOrder && (
+              <button
+                onClick={onOpenTrackOrder}
+                className="cursor-pointer text-[13px] font-medium text-white/70 transition-colors hover:text-white flex items-center gap-1.5"
+                title="Track order delivery"
+              >
+                <Truck size={14} className="text-[#F6C000]" />
+                <span>Track Order</span>
+              </button>
+            )}
+
             <button
               onClick={() => setIsCartOpen(true)}
               className="relative cursor-pointer p-2 text-white/70 transition-colors hover:text-white"
@@ -1446,6 +1460,22 @@ export default function LandingPageMaster({
                   {link.label}
                 </motion.button>
               ))}
+
+              {onOpenTrackOrder && (
+                <motion.button
+                  initial={{ opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.35, duration: 0.5, ease: EASE }}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onOpenTrackOrder();
+                  }}
+                  className="flex w-full items-center gap-3 border-b border-white/10 py-5 text-left text-2xl font-light tracking-tight text-[#F6C000]"
+                >
+                  <Truck size={24} />
+                  <span>Track Order</span>
+                </motion.button>
+              )}
             </div>
 
             <div className="mt-8 flex flex-col gap-3">
@@ -2528,6 +2558,17 @@ export default function LandingPageMaster({
                       Help &amp; FAQ
                     </button>
                   </li>
+                  {onOpenTrackOrder && (
+                    <li>
+                      <button
+                        onClick={onOpenTrackOrder}
+                        className="cursor-pointer text-left text-[#F6C000] hover:underline flex items-center gap-1.5 font-medium"
+                      >
+                        <Truck size={13} />
+                        <span>Track order status</span>
+                      </button>
+                    </li>
+                  )}
                 </ul>
               </div>
 

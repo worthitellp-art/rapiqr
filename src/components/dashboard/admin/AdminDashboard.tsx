@@ -20,6 +20,7 @@ import DistributorsPage from "./DistributorsPage";
 import OrdersPage from "./OrdersPage";
 import RepiChatPage from "./RepiChatPage";
 import BackupPage from "./BackupPage";
+import PrintSheetModal from "./PrintSheetModal";
 import { apiClient } from "../../../lib/apiClient";
 
 export default function AdminDashboard({ onBack }: { onBack: () => void }) {
@@ -43,6 +44,15 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const [unreadChats, setUnreadChats] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [printSheetTargetSticker, setPrintSheetTargetSticker] = useState<QrRecord | null>(null);
+  const [printSheetInitialBatch, setPrintSheetInitialBatch] = useState<QrRecord[] | undefined>(undefined);
+  const [isPrintSheetModalOpen, setIsPrintSheetModalOpen] = useState(false);
+
+  function handleOpenPrintSheet(targetSticker?: QrRecord, selectedBatchStickers?: QrRecord[]) {
+    setPrintSheetTargetSticker(targetSticker || null);
+    setPrintSheetInitialBatch(selectedBatchStickers);
+    setIsPrintSheetModalOpen(true);
+  }
 
   // RepiChat unread count — client accounts only; admin gets the "Online Now"
   // presence widget on the Overview page instead of a chat inbox.
@@ -190,6 +200,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
               qrList={qrList} setQrList={setQrList} templates={templates}
               setPage={setPage} openQuickLook={setQuickLookQr}
               openRestore={() => setRestoreModalOpen(true)} setToast={setToast}
+              openPrintSheet={handleOpenPrintSheet}
             />
           )}
           {page === "orders" && <OrdersPage setToast={setToast} />}
@@ -199,7 +210,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
               qrList={qrList} setQrList={setQrList} templates={templates}
               setToast={setToast} openQuickLook={setQuickLookQr}
               openRestore={() => setRestoreModalOpen(true)} searchQuery={searchQuery}
-              stickerPos={stickerPos}
+              stickerPos={stickerPos} openPrintSheet={handleOpenPrintSheet}
             />
           )}
           {page === "communication" && <CommunicationPage setToast={setToast} />}
@@ -218,6 +229,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
               templates={templates} setTemplates={setTemplates}
               stickerPos={stickerPos} setStickerPos={setStickerPos}
               setToast={setToast}
+              openPrintSheet={() => handleOpenPrintSheet()}
             />
           )}
 
@@ -231,10 +243,32 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
         </div>
       </div>
 
-      <QuickLookModal qr={quickLookQr} onClose={() => setQuickLookQr(null)} stickerPos={stickerPos} templates={templates} />
+      <QuickLookModal
+        qr={quickLookQr}
+        onClose={() => setQuickLookQr(null)}
+        stickerPos={stickerPos}
+        templates={templates}
+        onOpenPrintSheet={handleOpenPrintSheet}
+      />
       <RestoreStickerModal
         isOpen={restoreModalOpen} onClose={() => setRestoreModalOpen(false)}
         setQrList={setQrList} openQuickLook={setQuickLookQr} setToast={setToast}
+      />
+      <PrintSheetModal
+        isOpen={isPrintSheetModalOpen}
+        onClose={() => {
+          setIsPrintSheetModalOpen(false);
+          setPrintSheetTargetSticker(null);
+          setPrintSheetInitialBatch(undefined);
+        }}
+        availableStickers={qrList}
+        initialSelectedSticker={printSheetTargetSticker}
+        initialBatchStickers={printSheetInitialBatch}
+        stickerPos={stickerPos}
+        onShowToast={(msg) => {
+          setToast(msg);
+          setTimeout(() => setToast(null), 3500);
+        }}
       />
       <Toast msg={toast} />
     </div>

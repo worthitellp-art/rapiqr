@@ -63,6 +63,7 @@ interface CheckoutPageProps {
   onOpenLogin: () => void;
   onViewDashboard: () => void;
   onOrderComplete?: () => void;
+  onTrackOrder?: (orderId: string, contact?: string) => void;
 }
 
 const PAYMENT_LOGOS = ['UPI', 'GPay', 'PhonePe', 'Paytm', 'Visa', 'Mastercard', 'RuPay'];
@@ -90,6 +91,7 @@ export default function CheckoutPage({
   onOpenLogin,
   onViewDashboard,
   onOrderComplete,
+  onTrackOrder,
 }: CheckoutPageProps) {
   const { isLoggedIn, profile } = useAuth();
 
@@ -984,13 +986,24 @@ export default function CheckoutPage({
                 <p className="text-xs text-emerald-800 leading-relaxed">
                   Your safety tags are provisioned in your Client Dashboard. You can assign contacts and configure alert routing now.
                 </p>
-                <button
-                  onClick={onViewDashboard}
-                  className="w-full py-3 rounded-xl bg-slate-950 hover:bg-slate-900 text-white font-extrabold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md"
-                >
-                  <span>Open Client Dashboard</span>
-                  <ArrowRight size={14} className="text-amber-400" />
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <button
+                    onClick={onViewDashboard}
+                    className="flex-1 py-3 rounded-xl bg-slate-950 hover:bg-slate-900 text-white font-extrabold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                  >
+                    <span>Open Client Dashboard</span>
+                    <ArrowRight size={14} className="text-amber-400" />
+                  </button>
+                  {onTrackOrder && (
+                    <button
+                      onClick={() => onTrackOrder(orderId, email.trim() || phone.trim())}
+                      className="py-3 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-800 font-bold text-xs border border-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Truck size={14} className="text-amber-500" />
+                      <span>Track Order</span>
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 text-left space-y-4">
@@ -1012,11 +1025,20 @@ export default function CheckoutPage({
                     <span>Create Free Account</span>
                     <ArrowRight size={14} />
                   </button>
+                  {onTrackOrder && (
+                    <button
+                      onClick={() => onTrackOrder(orderId, email.trim() || phone.trim())}
+                      className="py-3 px-4 rounded-xl bg-slate-950 hover:bg-slate-900 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                    >
+                      <Truck size={14} className="text-amber-400" />
+                      <span>Track Order</span>
+                    </button>
+                  )}
                   <button
                     onClick={onBack}
-                    className="py-3 px-5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 transition-colors cursor-pointer"
+                    className="py-3 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 transition-colors cursor-pointer"
                   >
-                    Continue as Guest
+                    Home
                   </button>
                 </div>
               </div>

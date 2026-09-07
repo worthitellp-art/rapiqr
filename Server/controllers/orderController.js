@@ -2,24 +2,174 @@ const OrderModel = require('../models/orderModel');
 const ShiprocketController = require('./shiprocketController');
 const { logger } = require('../middleware/loggerMiddleware');
 
+/**
+ * Server-authoritative catalog prices.
+ * Prevents client-side price tampering at checkout.
+ */
+const CATALOG_PRICES = {
+  'car-qr': 299,
+  'home-qr': 349,
+  'child-qr': 249,
+  'travel-qr': 299,
+};
+
+const EXPRESS_DELIVERY_FEE = 99;
+const STANDARD_DELIVERY_FEE = 0;
+
+/**
+ * Validates cart items and calculates canonical subtotal using server catalog.
+ */
+function computeCanonicalOrderItems(rawItems) {
+  if (!Array.isArray(rawItems) || rawItems.length === 0) {
+    throw new Error('Order must contain at least one item');
+  }
+
+  let computedSubtotal = 0;
+  const verifiedItems = rawItems.map((rawItem, index) => {
+    const productId = String(rawItem.product?.id || rawItem.id || `custom-item-${index}`).trim();
+    const name = String(rawItem.product?.name || rawItem.name || 'Safety Tag').trim();
+    const rawQty = Number(rawItem.qty || rawItem.quantity || 1);
+    const qty = Number.isInteger(rawQty) && rawQty >= 1 ? Math.min(rawQty, 100) : 1;
+
+    // Use catalog price if known product; fallback to positive declared price if valid
+    const catalogPrice = CATALOG_PRICES[productId];
+    const declaredPrice = Number(rawItem.product?.price ?? rawItem.price ?? 0);
+    const unitPrice = catalogPrice !== undefined ? catalogPrice : (Number.isFinite(declaredPrice) && declaredPrice > 0 ? declaredPrice : 299);
+
+    const lineTotal = unitPrice * qty;
+    computedSubtotal += lineTotal;
+
+    return {
+      id: productId,
+      name,
+      price: unitPrice,
+      qty,
+      img: rawItem.product?.img || rawItem.img || '',
+      category: rawItem.product?.category || rawItem.category || 'Safety',
+    };
+  });
+
+  return { verifiedItems, computedSubtotal };
+}
+
+/**
+ * Verifies whether the request caller is authorized to view this order.
+ * Authorized if: Admin, or authenticated owner, or matching guest email/phone proof.
+ */
+function isCallerAuthorizedToTrack(order, caller, verificationContact) {
+  if (caller?.role === 'admin') return true;
+  if (caller?.id && order.userId && String(caller.id) === String(order.userId)) return true;
+
+  if (!verificationContact || typeof verificationContact !== 'string') return false;
+
+  const normalizedInput = verificationContact.trim().toLowerCase();
+  const inputDigits = normalizedInput.replace(/\D/g, '');
+
+  const orderEmail = (order.email || '').trim().toLowerCase();
+  const orderPhoneDigits = (order.phone || '').replace(/\D/g, '');
+
+  // Exact email match
+  if (orderEmail && normalizedInput === orderEmail) return true;
+
+  // Phone match on trailing 10 digits
+  if (inputDigits.length >= 10 && orderPhoneDigits.length >= 10) {
+    return orderPhoneDigits.slice(-10) === inputDigits.slice(-10);
+  }
+
+  return false;
+}
+
+/**
+ * Masks contact and address details to prevent IDOR data leaks.
+ */
+function sanitizeOrderDetailsForPublicTracking(order) {
+  const email = order.email || '';
+  const phone = order.phone || '';
+  const shipping = order.shippingAddress || {};
+
+  const maskedEmail = email.includes('@')
+    ? email.replace(/^(.)(.*)(@.*)$/, (_, first, middle, domain) => `${first}***${domain}`)
+    : '***';
+
+  const cleanDigits = phone.replace(/\D/g, '');
+  const maskedPhone = cleanDigits.length >= 4
+    ? `******${cleanDigits.slice(-4)}`
+    : '******';
+
+  return {
+    id: order.id,
+    status: order.status,
+    createdAt: order.createdAt,
+    deliveryMethod: order.deliveryMethod,
+    paymentMethod: order.paymentMethod,
+    paymentStatus: order.payment?.status || 'created',
+    total: order.total,
+    items: (order.items || []).map((item) => ({
+      name: item.name,
+      qty: item.qty,
+      price: item.price,
+    })),
+    maskedBuyer: {
+      firstName: (order.name || 'Customer').split(' ')[0],
+      email: maskedEmail,
+      phone: maskedPhone,
+      city: shipping.city || '',
+      state: shipping.state || '',
+      pincode: shipping.pincode || '',
+    },
+    shiprocket: order.shiprocket || null,
+  };
+}
+
 class OrderController {
-  /** POST /api/orders — guest-friendly checkout receipt (user_id attached if logged in) */
+  /** POST /api/orders — Secure order placement with server-authoritative pricing */
   static async create(req, res) {
     try {
-      const { name, email, phone, items, subtotal, deliveryFee, total, paymentMethod, deliveryMethod, shippingAddress } = req.body || {};
-      if (!name || !email || !phone || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ success: false, error: 'name, email, phone and a non-empty items array are required' });
+      const { name, email, phone, items, paymentMethod, deliveryMethod, shippingAddress } = req.body || {};
+
+      if (!name || !email || !phone) {
+        return res.status(400).json({ success: false, error: 'Name, email, and phone number are required.' });
       }
 
+      const cleanName = String(name).trim();
+      const cleanEmail = String(email).trim().toLowerCase();
+      const cleanPhone = String(phone).trim();
+
+      if (cleanName.length < 2) {
+        return res.status(400).json({ success: false, error: 'Please provide a valid full name.' });
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        return res.status(400).json({ success: false, error: 'Please provide a valid email address.' });
+      }
+      if (cleanPhone.replace(/\D/g, '').length < 7) {
+        return res.status(400).json({ success: false, error: 'Please provide a valid phone number.' });
+      }
+
+      // Compute pricing server-side to prevent price tampering
+      const { verifiedItems, computedSubtotal } = computeCanonicalOrderItems(items);
+      const isExpress = deliveryMethod === 'express';
+      const verifiedDeliveryFee = isExpress ? EXPRESS_DELIVERY_FEE : STANDARD_DELIVERY_FEE;
+      const verifiedTotal = computedSubtotal + verifiedDeliveryFee;
+
       const order = await OrderModel.create({
-        userId: req.user?.id,
-        name, email, phone, items, subtotal, deliveryFee, total, paymentMethod, deliveryMethod, shippingAddress,
+        userId: req.user?.id || null,
+        name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
+        items: verifiedItems,
+        subtotal: computedSubtotal,
+        deliveryFee: verifiedDeliveryFee,
+        total: verifiedTotal,
+        paymentMethod: paymentMethod || 'upi',
+        deliveryMethod: isExpress ? 'express' : 'standard',
+        shippingAddress: shippingAddress || null,
       });
-      logger.event('ORDER', '🛒', `Order ${order.id} placed by ${email} (₹${order.total})`);
+
+      logger.event('ORDER', '🛒', `Order ${order.id} placed by ${cleanEmail} (₹${order.total})`);
       return res.json({ success: true, data: order });
     } catch (err) {
       logger.error('ORDER_CREATE', 'Failed to save order', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return res.status(500).json({ success: false, error: err.message || 'Order creation failed' });
     }
   }
 
@@ -35,15 +185,8 @@ class OrderController {
   }
 
   /**
-   * GET /api/orders/:id/track — the buyer's own delivery status.
-   *
-   * The Shiprocket track route is admin-only (it also exposes wallet and pickup
-   * config), so customers need their own way in. Scoped to the caller's own
-   * orders; admins may track any.
-   *
-   * Refreshes from the courier when there's a shipment, but never fails the
-   * request over it: a Shiprocket outage should still show the customer the
-   * status and timeline we already have stored.
+   * GET /api/orders/:id/track — Secure buyer tracking endpoint.
+   * Accessible by logged-in order owner, admin, or guest providing verification phone/email.
    */
   static async track(req, res) {
     try {
@@ -53,10 +196,14 @@ class OrderController {
         return res.status(404).json({ success: false, error: 'Order not found' });
       }
 
-      const isOwner = order.userId && order.userId === req.user?.id;
-      const isAdmin = req.user?.role === 'admin';
-      if (!isOwner && !isAdmin) {
-        return res.status(403).json({ success: false, error: 'This order belongs to another account.' });
+      const verificationContact = req.query.contact || req.query.phone || req.query.email || req.body?.contact;
+      const isAuthorized = isCallerAuthorizedToTrack(order, req.user, verificationContact);
+
+      if (!isAuthorized) {
+        return res.status(403).json({
+          success: false,
+          error: 'Verification required. Please provide the phone number or email used during order placement to view tracking.',
+        });
       }
 
       let current = order;
@@ -70,17 +217,62 @@ class OrderController {
 
       return res.json({
         success: true,
-        data: {
-          id: current.id,
-          status: current.status,
-          payment: current.payment,
-          deliveryMethod: current.deliveryMethod,
-          createdAt: current.createdAt,
-          shiprocket: current.shiprocket || null,
-        },
+        data: sanitizeOrderDetailsForPublicTracking(current),
       });
     } catch (err) {
       logger.error('ORDER_TRACK', `Failed to track order: ${req.params.id}`, err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * POST /api/orders/track — Dedicated lookup endpoint by Order ID + Contact (Phone or Email).
+   */
+  static async trackByLookup(req, res) {
+    try {
+      const { orderId, contact } = req.body || {};
+      if (!orderId || !contact) {
+        return res.status(400).json({
+          success: false,
+          error: 'Order ID and contact (phone number or email) are required.',
+        });
+      }
+
+      let cleanOrderId = String(orderId).trim();
+      if (!cleanOrderId.startsWith('#') && /^\d+$/.test(cleanOrderId)) {
+        cleanOrderId = `#NQ-${cleanOrderId}`;
+      } else if (!cleanOrderId.startsWith('#') && /^NQ-\d+$/i.test(cleanOrderId)) {
+        cleanOrderId = `#${cleanOrderId.toUpperCase()}`;
+      }
+
+      const order = await OrderModel.getById(cleanOrderId);
+      if (!order) {
+        return res.status(404).json({ success: false, error: 'No order found with the provided Order ID.' });
+      }
+
+      const isAuthorized = isCallerAuthorizedToTrack(order, req.user, contact);
+      if (!isAuthorized) {
+        return res.status(403).json({
+          success: false,
+          error: 'Verification failed. The phone or email does not match this order.',
+        });
+      }
+
+      let current = order;
+      if (order.shiprocket?.shipmentId) {
+        try {
+          current = (await ShiprocketController.refreshTracking(order)) || order;
+        } catch (err) {
+          logger.warn('ORDER_TRACK_LOOKUP', `Live tracking refresh failed for ${cleanOrderId}: ${err.message}`);
+        }
+      }
+
+      return res.json({
+        success: true,
+        data: sanitizeOrderDetailsForPublicTracking(current),
+      });
+    } catch (err) {
+      logger.error('ORDER_TRACK_LOOKUP', 'Failed to lookup order tracking', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

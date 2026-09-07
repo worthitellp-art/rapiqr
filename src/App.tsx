@@ -11,6 +11,7 @@ const QRFleetDashboard = lazy(() => import('./components/dashboard/admin'));
 const ClientDashboard = lazy(() => import('./components/ClientDashboard'));
 const ScanPage = lazy(() => import('./components/scan/ScanPage'));
 const DistributorDashboard = lazy(() => import('./components/dashboard/DistributorDashboard'));
+const TrackOrderModal = lazy(() => import('./components/landing/TrackOrderModal'));
 
 function PageLoader() {
   return (
@@ -63,6 +64,25 @@ function MainAppContent() {
   const [adminModalOpen, setAdminModalOpen] = useState(() => isAdminUrl());
   const [joinServiceType, setJoinServiceType] = useState<string | undefined>();
 
+  // Track order modal state
+  const [trackModalOpen, setTrackModalOpen] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const search = new URLSearchParams(window.location.search);
+    return search.has('track') || window.location.hash.includes('track');
+  });
+  const [trackInitialOrderId, setTrackInitialOrderId] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    const search = new URLSearchParams(window.location.search);
+    return search.get('track') || '';
+  });
+  const [trackInitialContact, setTrackInitialContact] = useState('');
+
+  const handleOpenTrackOrder = (orderId?: string, contact?: string) => {
+    setTrackInitialOrderId(orderId || '');
+    setTrackInitialContact(contact || '');
+    setTrackModalOpen(true);
+  };
+
   // Restore page from localStorage, but only non-scan pages
   const [page, setPage] = useState<'landing' | 'dashboard' | 'scan' | 'distributor' | 'checkout' | 'join'>(() => {
     if (isScanUrl()) return 'scan';
@@ -113,6 +133,11 @@ function MainAppContent() {
         } else {
           setAdminModalOpen(true);
         }
+      }
+      const search = new URLSearchParams(window.location.search);
+      if (search.has('track')) {
+        setTrackInitialOrderId(search.get('track') || '');
+        setTrackModalOpen(true);
       }
     };
     window.addEventListener('popstate', handleUrlChange);
@@ -223,6 +248,7 @@ function MainAppContent() {
           onOpenSignup={handleOpenSignupWithEmail}
           onOpenLogin={() => handleOpenAuth('login')}
           onViewDashboard={() => navigateTo('dashboard')}
+          onTrackOrder={(orderId, contact) => handleOpenTrackOrder(orderId, contact)}
           onOrderComplete={() => {
             try { localStorage.removeItem('namoqr-cart'); } catch { /* ignore */ }
           }}
@@ -233,6 +259,16 @@ function MainAppContent() {
           onSuccess={() => navigateTo('dashboard')}
           initialMode={authModalMode}
           prefillEmail={authPrefillEmail}
+        />
+        <TrackOrderModal
+          isOpen={trackModalOpen}
+          onClose={() => setTrackModalOpen(false)}
+          initialOrderId={trackInitialOrderId}
+          initialContact={trackInitialContact}
+          onOpenDashboard={() => {
+            setTrackModalOpen(false);
+            navigateTo('dashboard');
+          }}
         />
       </Suspense>
     );
@@ -254,6 +290,7 @@ function MainAppContent() {
           onLogin={() => handleOpenAuth('login')}
           onOpenDistributorDashboard={() => navigateTo('distributor')}
           onOpenCheckout={() => navigateTo('checkout')}
+          onOpenTrackOrder={() => handleOpenTrackOrder()}
           onOpenJoinUs={(serviceType) => {
             setJoinServiceType(serviceType);
             navigateTo('join');
@@ -274,6 +311,16 @@ function MainAppContent() {
           }}
           initialMode={authModalMode}
           prefillEmail={authPrefillEmail}
+        />
+        <TrackOrderModal
+          isOpen={trackModalOpen}
+          onClose={() => setTrackModalOpen(false)}
+          initialOrderId={trackInitialOrderId}
+          initialContact={trackInitialContact}
+          onOpenDashboard={() => {
+            setTrackModalOpen(false);
+            navigateTo('dashboard');
+          }}
         />
       </div>
     </Suspense>

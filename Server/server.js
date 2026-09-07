@@ -37,11 +37,13 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const FRONTEND_ORIGIN = process.env.FRONTEND_URL || 'https://rapiqr.worthitellp.workers.dev';
 
-// Enable CORS & Request Parsing — only the configured frontend (plus local dev) may send credentials
-const ALLOWED_ORIGINS = [FRONTEND_ORIGIN, 'http://localhost:3000', 'http://localhost:5173'];
+// Enable CORS & Request Parsing — configured frontend plus local dev origins
+const ALLOWED_ORIGINS = [FRONTEND_ORIGIN, 'http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173'];
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    if (!origin || ALLOWED_ORIGINS.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true

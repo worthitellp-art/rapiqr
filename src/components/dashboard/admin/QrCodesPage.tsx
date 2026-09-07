@@ -10,14 +10,16 @@ import { STICKER_CATEGORIES, getCategoryIcon, getCategoryLabel } from "../../../
 import ConfirmModal from "./ConfirmModal";
 import RecoveryCodeModal from "./RecoveryCodeModal";
 import QrRowActions from "./QrRowActions";
+import PrintSheetModal from "./PrintSheetModal";
 
 export default function QrCodesPage({
-  qrList, setQrList, templates, setToast, openQuickLook, openRestore, searchQuery, stickerPos,
+  qrList, setQrList, templates, setToast, openQuickLook, openRestore, searchQuery, stickerPos, openPrintSheet,
 }: {
   qrList: QrRecord[]; setQrList: React.Dispatch<React.SetStateAction<QrRecord[]>>;
   templates: Template[]; setToast: (msg: string | null) => void;
   openQuickLook: (q: QrRecord) => void; openRestore: () => void; searchQuery: string;
   stickerPos: StickerPos;
+  openPrintSheet?: (targetSticker?: QrRecord, selectedBatchStickers?: QrRecord[]) => void;
 }) {
   const [selectedCategory, setSelectedCategory] = useState<string>("car");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -89,13 +91,26 @@ export default function QrCodesPage({
     });
   }
 
-  // Print Sheet: composite the selected stickers (own QR + colors baked in)
-  // onto 18x12in, 300 DPI sheets in a 3x3 grid with cut lines — same
-  // reference layout requested for the one-off NamoQR sheet export, now
-  // driven by whichever stickers the admin selects here.
+  const [isLocalPrintModalOpen, setIsLocalPrintModalOpen] = useState(false);
+  const [localPrintTargetSticker, setLocalPrintTargetSticker] = useState<QrRecord | null>(null);
+
+  function handleTriggerPrintSheet(targetSticker?: QrRecord, selectedBatchStickers?: QrRecord[]) {
+    if (openPrintSheet) {
+      openPrintSheet(targetSticker, selectedBatchStickers);
+      return;
+    }
+    setLocalPrintTargetSticker(targetSticker || null);
+    setIsLocalPrintModalOpen(true);
+  }
+
+  // Legacy direct sheet export fallback for backwards-compatibility.
   async function handlePrintSheet() {
     const selected = filtered.filter((q) => selectedIds.has(q.id));
-    if (selected.length === 0 || sheetGenerating) return;
+    if (selected.length === 0) {
+      handleTriggerPrintSheet(filtered[0]);
+      return;
+    }
+    if (sheetGenerating) return;
 
     setSheetGenerating(true);
     try {
@@ -380,12 +395,20 @@ export default function QrCodesPage({
           </button>
 
           <button
-            onClick={handlePrintSheet}
-            disabled={selectedIds.size === 0 || sheetGenerating}
-            title={selectedIds.size === 0 ? "Select tags below to build a print sheet" : `Build an 18×12in print sheet from ${selectedIds.size} selected tag${selectedIds.size > 1 ? "s" : ""}`}
-            className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-2 rounded-[4px] border border-[#5C78DF]/30 bg-[#E8EDFF] text-[#3E52B8] hover:bg-[#DCE3FF] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            type="button"
+            onClick={() => {
+              const selectedStickers = filtered.filter((q) => selectedIds.has(q.id));
+              if (selectedStickers.length > 0) {
+                handleTriggerPrintSheet(undefined, selectedStickers);
+              } else {
+                handleTriggerPrintSheet(undefined, filtered);
+              }
+            }}
+            className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-2 rounded-[4px] border border-[#5C78DF]/30 bg-[#E8EDFF] text-[#3E52B8] hover:bg-[#DCE3FF] transition-all cursor-pointer shadow-2xs"
+            title="Generate 18×12″ print sheet (3×3 grid, 9 stickers)"
           >
-            <Printer size={12} /> {sheetGenerating ? "Building sheet…" : `Print Sheet${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
+            <Printer size={13} />
+            <span>Print Sheet{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</span>
           </button>
 
           <button
@@ -488,7 +511,12 @@ export default function QrCodesPage({
                     <td className="px-2 py-3 text-[11px] text-[#777B80]">{fmtDate(q.createdAt)}</td>
                     <td className="px-2 py-3"><StatusPill status={computedStatus} /></td>
                     <td className="px-6 py-3 text-right">
-                      <QrRowActions qr={q} openQuickLook={openQuickLook} setDeleteTarget={setDeleteTarget} />
+                      <QrRowActions
+                        qr={q}
+                        openQuickLook={openQuickLook}
+                        setDeleteTarget={setDeleteTarget}
+                        openPrintSheet={(targetQr) => handleTriggerPrintSheet(targetQr, [targetQr])}
+                      />
                     </td>
                   </tr>
                 );
@@ -595,6 +623,23 @@ export default function QrCodesPage({
         stickerId={recoveryModal?.stickerId || ""}
         recoveryCode={recoveryModal?.recoveryCode || ""}
         onClose={() => setRecoveryModal(null)}
+      />
+
+      {/* 18x12 Print Sheet Modal */}
+      <PrintSheetModal
+        isOpen={isLocalPrintModalOpen}
+        onClose={() => {
+          setIsLocalPrintModalOpen(false);
+          setLocalPrintTargetSticker(null);
+        }}
+        availableStickers={filtered}
+        initialSelectedSticker={localPrintTargetSticker}
+        initialBatchStickers={selectedIds.size > 0 ? filtered.filter((q) => selectedIds.has(q.id)) : undefined}
+        stickerPos={stickerPos}
+        onShowToast={(msg) => {
+          setToast(msg);
+          setTimeout(() => setToast(null), 4000);
+        }}
       />
     </div>
   );

@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const UserModel = require('../models/userModel');
 const ProductModel = require('../models/productModel');
+const OrderModel = require('../models/orderModel');
 const { JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD } = require('../middleware/authMiddleware');
 const { logger } = require('../middleware/loggerMiddleware');
 const { generateSecret, verifyTOTP, buildOtpauthUrl } = require('../utils/totp');
@@ -91,6 +92,11 @@ class AuthController {
         JWT_SECRET,
         { expiresIn: '7d' }
       );
+
+      // Link any prior guest checkout orders placed with this email or phone number
+      await OrderModel.linkGuestOrdersToUser(profile.id, profile.email, profile.phoneNumber).catch((linkErr) => {
+        logger.warn('AUTH_SIGNUP', `Non-blocking error linking guest orders: ${linkErr.message}`);
+      });
 
       logger.success('AUTH_SIGNUP', `User registered successfully: ${profile.email} (${profile.role})`);
 
@@ -196,6 +202,11 @@ class AuthController {
         logger.security('NEW_DEVICE_LOGIN', `Sign-in for ${email} from a new IP (previously ${securityMeta.last_login_ip})`, { userId: profile.id, previousIp: securityMeta.last_login_ip, ip, userAgent }, { userId: profile.id });
       }
       await UserModel.recordLogin(profile.id, { ip, userAgent });
+
+      // Automatically link previous guest checkout orders matching email or phone
+      await OrderModel.linkGuestOrdersToUser(profile.id, profile.email, profile.phoneNumber).catch((linkErr) => {
+        logger.warn('AUTH_SIGNIN', `Non-blocking error linking guest orders: ${linkErr.message}`);
+      });
 
       logger.success('AUTH_SIGNIN', `User signed in successfully: ${email}`, { ip, userAgent }, { userId: profile.id });
 
@@ -370,6 +381,11 @@ class AuthController {
         logger.security('NEW_DEVICE_LOGIN', `Google sign-in for ${email} from a new IP (previously ${securityMeta.last_login_ip})`, { userId: profile.id, previousIp: securityMeta.last_login_ip, ip, userAgent }, { userId: profile.id });
       }
       await UserModel.recordLogin(profile.id, { ip, userAgent });
+
+      // Automatically link previous guest checkout orders matching email or phone
+      await OrderModel.linkGuestOrdersToUser(profile.id, profile.email, profile.phoneNumber).catch((linkErr) => {
+        logger.warn('AUTH_GOOGLE', `Non-blocking error linking guest orders: ${linkErr.message}`);
+      });
 
       const token = jwt.sign(
         { id: profile.id, email: profile.email, role: profile.role },
@@ -569,6 +585,11 @@ class AuthController {
       } catch (err) {
         logger.error('PRODUCT_AUTO_CLAIM', 'Failed to auto-claim products after verified phone update', err);
       }
+
+      // Link any prior guest orders placed with this verified phone or email
+      await OrderModel.linkGuestOrdersToUser(req.user.id, finalProfile.email, result.phone).catch((linkErr) => {
+        logger.warn('PHONE_OTP_VERIFY', `Non-blocking error linking guest orders: ${linkErr.message}`);
+      });
 
       logger.user('PHONE_VERIFIED', `Phone number verified & linked for ${req.user.email}`, { claimedCount });
       return res.json({ success: true, user: finalProfile, claimedCount });

@@ -1,9 +1,10 @@
 import type React from "react";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Save, Grid3X3, Lock, Unlock, Magnet, Check, ShieldCheck } from "lucide-react";
+import { Save, Grid3X3, Lock, Unlock, Magnet, Check, ShieldCheck, Printer } from "lucide-react";
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
 import QrCodeImage from "./QrCodeImage";
 import { StickerPos } from "./types";
+import PrintSheetModal from "./PrintSheetModal";
 
 const STICKER_SRC = stickerTemplateImg;
 const EDITOR_DISPLAY = { w: 320, h: 200 };
@@ -15,10 +16,12 @@ export default function StickerEditor({
   stickerPos,
   setStickerPos,
   setToast,
+  openPrintSheet,
 }: {
   stickerPos: StickerPos;
   setStickerPos: (p: StickerPos) => void;
   setToast: (msg: string | null) => void;
+  openPrintSheet?: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -30,6 +33,7 @@ export default function StickerEditor({
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [lockAspect, setLockAspect] = useState(true);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const [isLocalPrintOpen, setIsLocalPrintOpen] = useState(false);
 
   function clamp(val: number, min: number, max: number) {
     return Math.max(min, Math.min(max, val));
@@ -315,26 +319,54 @@ export default function StickerEditor({
             </div>
           </div>
 
-          {/* Single Save Action Button */}
-          <button
-            onClick={handleSaveDefaultPosition}
-            disabled={saveState !== "idle"}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-[4px] bg-[#17181A] text-white font-semibold text-[14.5px] hover:bg-[#2A2B2E] active:scale-95 disabled:opacity-60 transition-all cursor-pointer"
-          >
-            {saveState === "saving" ? (
-              "Saving Position..."
-            ) : saveState === "saved" ? (
-              <>
-                <Check size={16} strokeWidth={2.5} /> Position Saved!
-              </>
-            ) : (
-              <>
-                <Save size={16} strokeWidth={2.4} /> Save Default Position
-              </>
-            )}
-          </button>
+          <div className="space-y-2.5">
+            {/* Single Save Action Button */}
+            <button
+              onClick={handleSaveDefaultPosition}
+              disabled={saveState !== "idle"}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-[4px] bg-[#17181A] text-white font-semibold text-[14.5px] hover:bg-[#2A2B2E] active:scale-95 disabled:opacity-60 transition-all cursor-pointer"
+            >
+              {saveState === "saving" ? (
+                "Saving Position..."
+              ) : saveState === "saved" ? (
+                <>
+                  <Check size={16} strokeWidth={2.5} /> Position Saved!
+                </>
+              ) : (
+                <>
+                  <Save size={16} strokeWidth={2.4} /> Save Default Position
+                </>
+              )}
+            </button>
+
+            {/* Print 18x12 Sheet Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (openPrintSheet) {
+                  openPrintSheet();
+                } else {
+                  setIsLocalPrintOpen(true);
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-[4px] bg-[#E8EDFF] hover:bg-[#DCE3FF] text-[#3E52B8] border border-[#5C78DF]/30 font-semibold text-[13.5px] active:scale-95 transition-all cursor-pointer shadow-2xs"
+            >
+              <Printer size={16} strokeWidth={2.2} /> Print Test Sheet (18×12″)
+            </button>
+          </div>
         </div>
       </div>
+
+      <PrintSheetModal
+        isOpen={isLocalPrintOpen}
+        onClose={() => setIsLocalPrintOpen(false)}
+        availableStickers={[]}
+        stickerPos={stickerPos}
+        onShowToast={(msg) => {
+          setToast(msg);
+          setTimeout(() => setToast(null), 3500);
+        }}
+      />
     </div>
   );
 }
