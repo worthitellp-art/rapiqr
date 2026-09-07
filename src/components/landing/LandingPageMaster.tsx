@@ -1360,8 +1360,7 @@ export default function LandingPageMaster({
                 className="cursor-pointer text-[13px] font-medium text-white/70 transition-colors hover:text-white flex items-center gap-1.5"
                 title="Track order delivery"
               >
-                <Truck size={14} className="text-[#F6C000]" />
-                <span>Track Order</span>
+              
               </button>
             )}
 

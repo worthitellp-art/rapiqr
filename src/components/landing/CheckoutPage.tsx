@@ -18,6 +18,10 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { apiClient } from '../../lib/apiClient';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
+import { OrderInvoice } from '../../types/invoice';
+import { buildOrderInvoice, printOrderInvoice } from '../../services/invoiceService';
+import OrderInvoiceModal from './OrderInvoiceModal';
+import OrderInvoiceCard from './OrderInvoiceCard';
 
 /**
  * Last-resort local receipt when the backend order API is unreachable —
@@ -100,6 +104,8 @@ export default function CheckoutPage({
   const [orderId, setOrderId] = useState('');
   const [confirmedTotal, setConfirmedTotal] = useState(0);
   const [recognized, setRecognized] = useState(false);
+  const [invoice, setInvoice] = useState<OrderInvoice | null>(null);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
 
   // Cart is persisted in localStorage
   const [cart, setCart] = useState<CheckoutCartItem[]>(() => {
@@ -199,7 +205,57 @@ export default function CheckoutPage({
     return false;
   };
 
-  const finalizeLocalRecords = (id: string, isRecognized: boolean) => {
+  // Reconstruct invoice record if navigating to success screen without cached state
+  useEffect(() => {
+    if (step === 'success' && !invoice && orderId) {
+      const fallbackInvoice = buildOrderInvoice({
+        orderId,
+        customerName: name.trim() || 'Valued Customer',
+        customerEmail: email.trim(),
+        customerPhone: phone.trim(),
+        shippingAddress: {
+          address: address.trim(),
+          city: city.trim(),
+          state: state.trim(),
+          pincode: pincode.trim(),
+        },
+        items: cart.map((cartItem) => ({
+          id: cartItem.product.id,
+          name: cartItem.product.name,
+          category: cartItem.product.category,
+          qty: cartItem.qty,
+          price: cartItem.product.price,
+        })),
+        subtotal,
+        deliveryFee,
+        paymentMethod: payment,
+        deliveryType: delivery,
+      });
+      setInvoice(fallbackInvoice);
+    }
+  }, [
+    step,
+    invoice,
+    orderId,
+    name,
+    email,
+    phone,
+    address,
+    city,
+    state,
+    pincode,
+    cart,
+    subtotal,
+    deliveryFee,
+    payment,
+    delivery,
+  ]);
+
+  const finalizeLocalRecords = (
+    id: string,
+    isRecognized: boolean,
+    orderInvoice?: OrderInvoice
+  ) => {
     const items = cart.map((i) => ({
       name: i.product.name,
       qty: i.qty,
@@ -214,6 +270,8 @@ export default function CheckoutPage({
       );
       orders.unshift({
         orderId: id,
+        invoiceNumber: orderInvoice?.invoiceNumber,
+        invoice: orderInvoice,
         email: email.trim(),
         phone: phone.trim(),
         name: name.trim(),
@@ -451,9 +509,35 @@ export default function CheckoutPage({
           return;
         }
 
+        const completedInvoice = buildOrderInvoice({
+          orderId: newOrderId,
+          customerName: name.trim(),
+          customerEmail: email.trim(),
+          customerPhone: phone.trim(),
+          shippingAddress: {
+            address: address.trim(),
+            city: city.trim(),
+            state: state.trim(),
+            pincode: pincode.trim(),
+          },
+          items: cart.map((cartItem) => ({
+            id: cartItem.product.id,
+            name: cartItem.product.name,
+            category: cartItem.product.category,
+            qty: cartItem.qty,
+            price: cartItem.product.price,
+          })),
+          subtotal,
+          deliveryFee,
+          paymentMethod: payment,
+          paymentTransactionId: response.razorpay_payment_id,
+          deliveryType: delivery,
+        });
+
+        setInvoice(completedInvoice);
         setOrderId(newOrderId);
         setConfirmedTotal(total);
-        finalizeLocalRecords(newOrderId, isRecognized);
+        finalizeLocalRecords(newOrderId, isRecognized, completedInvoice);
         setStep('success');
         if (onOrderComplete) onOrderComplete();
       },
@@ -977,6 +1061,15 @@ export default function CheckoutPage({
               </p>
             </div>
 
+            {/* ── Tax Invoice Details & Action Card ── */}
+            {invoice && (
+              <OrderInvoiceCard
+                invoice={invoice}
+                onViewInvoice={() => setIsInvoiceModalOpen(true)}
+                onPrintInvoice={() => printOrderInvoice(invoice)}
+              />
+            )}
+
             {recognized ? (
               <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-left space-y-3">
                 <div className="flex items-center gap-2 font-bold text-emerald-900 text-sm">
@@ -1048,6 +1141,18 @@ export default function CheckoutPage({
         )}
 
       </main>
+
+      {/* ── Official Tax Invoice Preview & Print Modal ── */}
+      <OrderInvoiceModal
+        isOpen={isInvoiceModalOpen}
+        onClose={() => setIsInvoiceModalOpen(false)}
+        invoice={invoice}
+        onPrintInvoice={() => {
+          if (invoice) {
+            printOrderInvoice(invoice);
+          }
+        }}
+      />
 
     </div>
   );
