@@ -38,7 +38,6 @@ import {
   Loader2,
   ShoppingBag,
   Star,
-  Shield,
   Truck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -2452,76 +2451,34 @@ export default function LandingPageMaster({
       >
         <div className="relative z-10 mx-auto max-w-[1400px] px-6 sm:px-10">
           <div className="grid gap-12 pb-16 md:grid-cols-12">
-            <div className="space-y-5 md:col-span-4">
+            <div className="space-y-4 md:col-span-4">
               <img src={darkBgLogo} alt="RepiQR" className="h-8 w-auto object-contain" />
-              <p className="max-w-xs text-[13px] font-light leading-relaxed text-white/50">
-                A universal smart QR safety layer for vehicles, valuables, pets and families —
-                with masked telephony and instant scan alerts.
-              </p>
-              <div className="flex items-center gap-2 pt-1 text-[12px] font-light text-white/50">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                All proxy gateway nodes operational
-              </div>
+              <p className="text-[13px] font-light text-white/50">Scan. Connect. Stay Safe.</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 md:col-span-8">
+            <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 md:col-span-8">
               <div className="space-y-3.5">
-                <div className="text-[11px] font-light uppercase tracking-[0.16em] text-white/50">
-                  Products
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/60">
+                  Product
                 </div>
                 <ul className="space-y-2.5 text-[13px] font-light text-white/55">
-                  {PRODUCTS.map((p) => (
-                    <li key={p.id}>
-                      <button
-                        onClick={onOpenCheckout}
-                        className="cursor-pointer text-left transition-colors hover:text-white"
-                      >
-                        {p.name}
-                      </button>
-                    </li>
-                  ))}
+                  {['Vehicle Safety QR', 'Bike Safety QR', 'Child Safety QR', 'Home Safety QR'].map(
+                    (label) => (
+                      <li key={label}>
+                        <button
+                          onClick={onOpenCheckout}
+                          className="cursor-pointer text-left transition-colors hover:text-white"
+                        >
+                          {label}
+                        </button>
+                      </li>
+                    ),
+                  )}
                 </ul>
               </div>
 
               <div className="space-y-3.5">
-                <div className="text-[11px] font-light uppercase tracking-[0.16em] text-white/50">
-                  Platform
-                </div>
-                <ul className="space-y-2.5 text-[13px] font-light text-white/55">
-                  <li>
-                    <button onClick={onLogin} className="cursor-pointer transition-colors hover:text-white">
-                      Client dashboard
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => setIsPartnerModalOpen(true)}
-                      className="cursor-pointer text-left transition-colors hover:text-white"
-                    >
-                      Distributor portal
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => handleSmoothScroll('join-section')}
-                      className="cursor-pointer text-left transition-colors hover:text-white"
-                    >
-                      Service partners
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => handleSmoothScroll('demo-section')}
-                      className="cursor-pointer text-left transition-colors hover:text-white"
-                    >
-                      Live scan demo
-                    </button>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="space-y-3.5">
-                <div className="text-[11px] font-light uppercase tracking-[0.16em] text-white/50">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/60">
                   Company
                 </div>
                 <ul className="space-y-2.5 text-[13px] font-light text-white/55">
@@ -2530,67 +2487,58 @@ export default function LandingPageMaster({
                       onClick={() => handleSmoothScroll('hiw-section')}
                       className="cursor-pointer text-left transition-colors hover:text-white"
                     >
-                      How it works
+                      About Us
                     </button>
                   </li>
                   <li>
-                    <button
-                      onClick={() => handleSmoothScroll('pricing-section')}
+                    <a
+                      href="mailto:admin@repiqr.com"
                       className="cursor-pointer text-left transition-colors hover:text-white"
                     >
-                      Pricing
-                    </button>
+                      Contact
+                    </a>
                   </li>
-                  <li>
-                    <button
-                      onClick={() => handleSmoothScroll('distributor-section')}
-                      className="cursor-pointer text-left transition-colors hover:text-white"
-                    >
-                      Franchise
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => handleSmoothScroll('faq-section')}
-                      className="cursor-pointer text-left transition-colors hover:text-white"
-                    >
-                      Help &amp; FAQ
-                    </button>
-                  </li>
-                  {onOpenTrackOrder && (
-                    <li>
-                      <button
-                        onClick={onOpenTrackOrder}
-                        className="cursor-pointer text-left text-[#F6C000] hover:underline flex items-center gap-1.5 font-medium"
-                      >
-                        <Truck size={13} />
-                        <span>Track order status</span>
-                      </button>
-                    </li>
-                  )}
+                  <li>Privacy Policy</li>
+                  <li>Terms &amp; Conditions</li>
                 </ul>
               </div>
 
               <div className="space-y-3.5">
-                <div className="text-[11px] font-light uppercase tracking-[0.16em] text-white/50">
-                  Legal
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/60">
+                  Contact
                 </div>
-                <ul className="space-y-2.5 text-[13px] font-light text-white/55">
-                  <li>Privacy policy</li>
-                  <li>Terms of service</li>
-                  <li>Security whitepaper</li>
-                  <li>3-year warranty</li>
+                <ul className="space-y-2.5 text-[13px] font-light leading-relaxed text-white/55">
+                  <li>
+                    38 Kadambari Complex,
+                    <br />
+                    Opp. Asthalni Jagya, Thangadh,
+                    <br />
+                    Surendranagar, Gujarat 363530
+                  </li>
+                  <li>
+                    <a href="mailto:admin@repiqr.com" className="transition-colors hover:text-white">
+                      admin@repiqr.com
+                    </a>
+                  </li>
+                  <li>
+                    <a href="tel:+919313719720" className="transition-colors hover:text-white">
+                      +91 93137 19720
+                    </a>
+                  </li>
                 </ul>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-[12px] font-light text-white/50 sm:flex-row">
-            <span>© {new Date().getFullYear()} RepiQR. All rights reserved.</span>
-            <span className="flex items-center gap-2">
-              <Shield size={12} />
-              Your number is never rendered on a scan page
-            </span>
+          <div className="space-y-1.5 border-t border-white/10 pt-8 text-[12px] font-light text-white/50">
+            <p>
+              <span className="font-semibold text-white/70">RepiQR</span> is a product of{' '}
+              <span className="font-semibold text-white/70">Worthite LLP</span> | LLPIN: ADA-2053 |
+              GSTIN: 24AAFFW7093N1ZH
+            </p>
+            <p className="text-white/35">
+              © {new Date().getFullYear()} Worthite LLP. All rights reserved.
+            </p>
           </div>
         </div>
 
