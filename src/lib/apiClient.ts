@@ -446,6 +446,15 @@ export const apiClient = {
       });
     },
 
+    // Owner self-service recover — ID only, no recovery code. Only works for
+    // a sticker whose user_id still matches the signed-in account (survives
+    // a soft-delete either the owner or an admin performed).
+    async recover(productId: string) {
+      return request<{ success: boolean; data?: any; error?: string }>(`/products/${productId}/recover`, {
+        method: 'POST',
+      });
+    },
+
     async getHistory(productId: string) {
       return request<{ success: boolean; data: any[] }>(`/products/${productId}/history`, {
         method: 'GET',
@@ -970,9 +979,10 @@ export const apiClient = {
      * Active providers. With no filters this is the full list, which the scan
      * page fetches once and then resolves against locally (see tileActions.ts).
      * `serviceType` matches the slug; `stickerCategory` keeps providers scoped
-     * to that category plus every provider scoped to none.
+     * to that category plus every provider scoped to none. `city` prefers
+     * providers scoped to that city plus every provider scoped to none.
      */
-    async getPublic(filter?: string | { category?: string; serviceType?: string; stickerCategory?: string }) {
+    async getPublic(filter?: string | { category?: string; serviceType?: string; stickerCategory?: string; city?: string }) {
       try {
         const params = typeof filter === 'string' ? { category: filter } : (filter || {});
         const qs = new URLSearchParams(

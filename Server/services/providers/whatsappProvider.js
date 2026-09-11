@@ -16,13 +16,15 @@
  */
 const { sendWhatsApp } = require('../smsService');
 
-async function send({ to, body, type, templateName, variables = [] }) {
+async function send({ to, body, type, templateName, variables = [], languageCode, templateNamespace }) {
   const result = await sendWhatsApp({
     to,
     body,
     event: `NOTIFY_${type}`,
     templateName,
     variables,
+    languageCode,
+    templateNamespace,
     // Templates are required to open a conversation. Until ours are approved the
     // underlying client falls back to the plain body, which is also what a
     // session message (inside the 24h window) needs.

@@ -8,12 +8,14 @@ function hashToken(rawToken) {
 }
 
 /**
- * Generates a password-reset link for a user, storing only the SHA-256 hash
- * of the token (never the raw token) so a database read alone can't be used
- * to reset the account. Used by both the self-service forgot-password flow
- * and the admin-triggered reset.
+ * Mints a password-reset token for a user, storing only the SHA-256 hash of it
+ * (never the raw token) so a database read alone can't be used to reset the
+ * account. Shared by the email-link flow (createResetLink) and the WhatsApp-OTP
+ * flow, which hands the raw token straight back to the client instead of
+ * emailing a link — the OTP step already proved phone ownership, so a second
+ * hop through email isn't needed.
  */
-async function createResetLink(user) {
+async function createResetToken(user) {
   const rawToken = crypto.randomBytes(32).toString('hex');
   await User.findByIdAndUpdate(user.id || user._id, {
     $set: {
@@ -21,7 +23,15 @@ async function createResetLink(user) {
       password_reset_expires: new Date(Date.now() + RESET_TOKEN_TTL_MS),
     },
   });
+  return rawToken;
+}
 
+/**
+ * Generates a password-reset link for a user. Used by both the self-service
+ * forgot-password flow and the admin-triggered reset.
+ */
+async function createResetLink(user) {
+  const rawToken = await createResetToken(user);
   const frontendUrl = (process.env.FRONTEND_URL || '').replace(/\/+$/, '');
   return `${frontendUrl}/reset-password?token=${rawToken}`;
 }
@@ -39,4 +49,4 @@ async function findUserByResetToken(rawToken) {
   }).select('+password_hash +password_reset_token +password_reset_expires');
 }
 
-module.exports = { createResetLink, findUserByResetToken };
+module.exports = { createResetToken, createResetLink, findUserByResetToken };

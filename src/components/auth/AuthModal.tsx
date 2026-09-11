@@ -71,9 +71,9 @@ export default function AuthModal({
       style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
       onClick={onClose}
     >
-      {/* ── Ultra-Clean Minimal Card Container ── */}
+      {/* ── Modal Card — 32px radius, matching the app's other large surfaces ── */}
       <div
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden relative p-7 sm:p-8 space-y-6 animate-modal-pop"
+        className="bg-white rounded-[32px] shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden relative p-7 sm:p-8 space-y-6 animate-modal-pop"
         onClick={(event) => event.stopPropagation()}
       >
         {/* Close Button */}
@@ -89,18 +89,18 @@ export default function AuthModal({
         <div className="text-center pt-2 relative">
           {/* Soft brand glow behind the logo — pure CSS, no extra asset */}
           <div
-            className="pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full bg-amber-400/20 blur-3xl"
+            className="pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full bg-[#F6C000]/20 blur-3xl"
             aria-hidden="true"
           />
           <AppLogo variant="light" className="relative h-9 w-auto mx-auto object-contain mb-3" />
           <h2 className="relative text-2xl font-extrabold text-slate-900 tracking-tight">
             {authMode === 'login' ? 'Welcome back' : 'Get started with RapiQR'}
           </h2>
-          <p className="relative text-xs text-slate-500 font-medium mt-1 leading-relaxed">
-            {authStep === 'list' && 'Select your preferred sign-in option below'}
-            {authStep === 'email' && 'Enter your email details to proceed'}
-            {authStep === 'forgot' && 'Enter your email address to reset your password'}
-          </p>
+          {authStep === 'forgot' && (
+            <p className="relative text-xs text-slate-500 font-medium mt-1 leading-relaxed">
+              Enter your email to reset your password
+            </p>
+          )}
         </div>
 
         {/* Feedback Alert Banners */}

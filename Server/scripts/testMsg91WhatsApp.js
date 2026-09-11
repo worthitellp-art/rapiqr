@@ -54,6 +54,8 @@ const scanPageMessage = process.argv.includes('--message')
   console.log('  MSG91_AUTH_KEY set:', Boolean(cfg.authKey));
   console.log('  Integrated number:', cfg.whatsappIntegratedNumber || '(missing)');
   console.log('  Default template:', cfg.whatsappTemplateName || '(missing)');
+  console.log('  Template language code:', cfg.whatsappLanguageCode || 'en');
+  console.log('  Template namespace:', cfg.whatsappTemplateNamespace || '(missing)');
 
   const data = {
     label: 'Car GJ 01 XX 0000',
@@ -68,6 +70,7 @@ const scanPageMessage = process.argv.includes('--message')
   if (DRY_RUN) {
     console.log('\n── DRY RUN ─────────────────────────────────────────────');
     console.log('Would send template:', getTemplate(TYPE).templateName);
+    console.log('  language:', getTemplate(TYPE).languageCode, '| namespace:', cfg.whatsappTemplateNamespace || '(missing)');
     console.log('Named variables ({{label}}, {{message}}, {{link}}):', variables);
     console.log('Components sent to MSG91:');
     console.log(JSON.stringify(buildMsg91WhatsAppComponents({ variables, body }), null, 2));
@@ -82,6 +85,8 @@ const scanPageMessage = process.argv.includes('--message')
       event: `NOTIFY_${TYPE}`, // must be present in WHATSAPP_LIVE_EVENTS
       templateName: getTemplate(TYPE).templateName,
       variables,
+      languageCode: getTemplate(TYPE).languageCode,
+      templateNamespace: cfg.whatsappTemplateNamespace,
     });
 
     if (result.sent) {

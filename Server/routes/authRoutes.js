@@ -20,6 +20,8 @@ router.post('/admin-signin', adminSignInLimiter, AuthController.adminSignIn);
 router.post('/google', AuthController.googleAuth);
 router.post('/forgot-password', passwordResetLimiter, AuthController.forgotPassword);
 router.post('/reset-password', passwordResetLimiter, AuthController.resetPassword);
+router.post('/forgot-password/whatsapp/send', passwordResetLimiter, AuthController.forgotPasswordWhatsApp);
+router.post('/forgot-password/whatsapp/verify', passwordResetLimiter, AuthController.verifyForgotPasswordWhatsApp);
 router.get('/me', verifyToken, AuthController.getMe);
 router.patch('/me', verifyToken, AuthController.updateProfile);
 router.post('/logout', optionalAuth, AuthController.logout);

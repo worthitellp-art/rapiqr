@@ -30,6 +30,10 @@ function clip(value, max = 120) {
  *   audience:   'owner' | 'emergency_contact' | 'otp' — who receives it,
  *   variables:  ordered variable names used as placeholders, for example
  *              `['label', 'message', 'link']`,
+ *   languageCode: optional WhatsApp template language locale (e.g. 'en_US') —
+ *              MSG91 matches templates by name + locale, so a bare 'en' won't
+ *              resolve a template registered under a full locale code. Falls
+ *              back to MSG91_WHATSAPP_LANGUAGE_CODE, then 'en'.
  *   defaults:   fallback text used ONLY by the runtime session/mock render
  *               when a variable value is empty,
  *   body:       the EXACT message you paste into MSG91, with named placeholders.

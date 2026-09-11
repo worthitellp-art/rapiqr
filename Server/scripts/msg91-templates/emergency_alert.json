@@ -1,0 +1,18 @@
+{
+  "name": "emergency_alert",
+  "category": "UTILITY",
+  "language": "en",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "RepiQR EMERGENCY: an urgent alert has been raised for \"{{label}}\". The person who scanned your tag reports: \"{{message}}\". Open your dashboard here: {{link}} to view visitor details and take action.",
+      "example": {
+        "body_text_named_params": [
+          { "param_name": "label", "example": "Car GJ 01 XX 0000" },
+          { "param_name": "message", "example": "Found your car unlocked with lights on" },
+          { "param_name": "link", "example": "https://repiqr.com/dashboard?tab=chat" }
+        ]
+      }
+    }
+  ]
+}

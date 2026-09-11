@@ -58,17 +58,12 @@ export default function EmailAuthStep({
       </button>
 
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
+        <div className="w-10 h-10 rounded-xl bg-[#F6C000] text-[#4A3900] flex items-center justify-center shrink-0">
           <Mail size={20} />
         </div>
-        <div>
-          <h3 className="text-lg font-bold text-slate-900">
-            {currentMode === 'login' ? 'Email Sign In' : 'Create Email Account'}
-          </h3>
-          <p className="text-xs text-slate-500 font-medium">
-            {currentMode === 'login' ? 'Enter your email and password' : 'Enter your name, email, and password'}
-          </p>
-        </div>
+        <h3 className="text-lg font-bold text-slate-900">
+          {currentMode === 'login' ? 'Email Sign In' : 'Create Account'}
+        </h3>
       </div>
 
       <form onSubmit={onSubmit} className="space-y-4 pt-2">
@@ -85,7 +80,7 @@ export default function EmailAuthStep({
                 placeholder="Mihir Rathod"
                 value={fullName}
                 onChange={handleFullNameInputChange}
-                className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-xl outline-none focus:bg-white focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all text-slate-900 font-medium placeholder:text-slate-400"
+                className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#F6C000] focus:ring-2 focus:ring-[#F6C000]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
               />
             </div>
           </div>
@@ -103,7 +98,7 @@ export default function EmailAuthStep({
               placeholder="name@example.com"
               value={email}
               onChange={handleEmailInputChange}
-              className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-xl outline-none focus:bg-white focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all text-slate-900 font-medium placeholder:text-slate-400"
+              className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#F6C000] focus:ring-2 focus:ring-[#F6C000]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
             />
           </div>
         </div>
@@ -117,7 +112,7 @@ export default function EmailAuthStep({
               <button
                 type="button"
                 onClick={onForgotPasswordClick}
-                className="text-xs text-amber-600 hover:underline font-bold cursor-pointer"
+                className="text-xs text-[#A16207] hover:underline font-bold cursor-pointer"
               >
                 Forgot?
               </button>
@@ -132,7 +127,7 @@ export default function EmailAuthStep({
               minLength={6}
               value={password}
               onChange={handlePasswordInputChange}
-              className="w-full pl-10 pr-12 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-xl outline-none focus:bg-white focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all text-slate-900 font-medium placeholder:text-slate-400"
+              className="w-full pl-10 pr-12 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#F6C000] focus:ring-2 focus:ring-[#F6C000]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
             />
             <button
               type="button"
@@ -148,15 +143,12 @@ export default function EmailAuthStep({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full py-4 rounded-xl font-bold text-white text-sm bg-slate-900 hover:bg-slate-800 active:scale-[0.99] transition-all duration-200 shadow-md cursor-pointer disabled:opacity-60 mt-2 flex items-center justify-center gap-2"
+          className="w-full py-4 rounded-2xl font-bold text-[#4A3900] text-sm bg-[#F6C000] hover:bg-[#E0AE00] active:scale-[0.99] transition-all duration-200 cursor-pointer disabled:opacity-60 mt-2 flex items-center justify-center gap-2"
         >
           {isSubmitting ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin text-white" />
-              <span className="text-xs font-bold tracking-wider uppercase">Processing...</span>
-            </>
+            <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
-            <span>{currentMode === 'login' ? 'Sign In with Email' : 'Create Email Account'}</span>
+            <span>{currentMode === 'login' ? 'Sign In' : 'Create Account'}</span>
           )}
         </button>
       </form>

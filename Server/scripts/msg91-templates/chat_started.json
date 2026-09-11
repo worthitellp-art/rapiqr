@@ -1,0 +1,17 @@
+{
+  "name": "chat_started",
+  "category": "UTILITY",
+  "language": "en",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "RepiQR chat alert: a visitor has started a conversation about your tag \"{{label}}\". They are waiting for your response. Open your dashboard here: {{link}} to view the message and reply securely.",
+      "example": {
+        "body_text_named_params": [
+          { "param_name": "label", "example": "Car GJ 01 XX 0000" },
+          { "param_name": "link", "example": "https://repiqr.com/dashboard?tab=chat" }
+        ]
+      }
+    }
+  ]
+}

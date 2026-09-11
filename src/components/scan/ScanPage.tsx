@@ -3,13 +3,13 @@ import { useAuth } from "../../context/AuthContext";
 import { getStickerCategoryLabel, getCategoryIcon, getCategoryLabel } from "../../stickerModules";
 import PhoneInputWithCountry from "../common/PhoneInputWithCountry";
 import InstallAppFab from "../common/InstallAppFab";
-import InstallAppBar from "../common/InstallAppBar";
 import CategoryScanView from "./CategoryScanView";
 import AssistantChat from "./AssistantChat";
 import { getCategoryVariant, BESPOKE_CATEGORIES, type VariantAction } from "./categoryVariants";
 import type { CategoryButtonAction, ServiceProvider } from "./tileActions";
 import { handleCategoryButtonAction } from "./categoryButtonActions";
 import { apiClient } from "../../lib/apiClient";
+import { isRunningInstalled } from "../../lib/pwaInstall";
 import AppLogo from "../common/AppLogo";
 import groupLogo from "../../../assets/Group 1000005716.png";
 import groupLogo1 from "../../../assets/darkbglogo.png";
@@ -31,7 +31,6 @@ import {
   X,
   Share2,
   Lock,
-  ExternalLink,
   Navigation,
   Stethoscope,
   Wrench,
@@ -900,12 +899,26 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   };
 
   // Share Location — dispatches a real backend alert (so it lands in the owner's
-  // Client Dashboard Alert History, not just a localStorage stub + blocking alert()
-  // popup) and notifies the owner AND their registered emergency/family contacts.
+  // Client Dashboard Alert History, not just a localStorage stub) and notifies
+  // the owner AND their registered emergency/family contacts. Runs entirely in
+  // the background on the visitor's device: it never opens Google Maps here —
+  // that used to hijack the visitor's own browser into a maps tab for a
+  // location that was being sent to the OWNER, not looked up by the visitor.
+  // Toggling this on starts the continuous every-5-seconds location trail (see
+  // the "Live Location Trail" effect below, which activates on `liveSharing`);
+  // toggling it off again stops that trail.
   const [locationSharing, setLocationSharing] = useState(false);
+  const [liveSharing, setLiveSharing] = useState(false);
   const [locationShareBanner, setLocationShareBanner] = useState<string | null>(null);
 
   const handleShareLocation = async () => {
+    if (liveSharing) {
+      setLiveSharing(false);
+      setLocationShareBanner("Live location sharing stopped.");
+      setTimeout(() => setLocationShareBanner(null), 4000);
+      return;
+    }
+
     if (!location) {
       requestLocation();
       return;
@@ -913,7 +926,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     if (!qrData || locationSharing) return;
 
     const mapsUrl = `https://www.google.com/maps?q=${location.lat},${location.lng}`;
-    window.open(mapsUrl);
 
     setLocationSharing(true);
     setLocationShareBanner(null);
@@ -936,13 +948,14 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       });
       const notifiedOwner = Boolean(res.smsResult?.sent);
       const contactsNotified = res.contactsNotified || 0;
+      setLiveSharing(true);
       if (notifiedOwner || contactsNotified > 0) {
-        setLocationShareBanner(`Location sent — owner${contactsNotified > 0 ? ` & ${contactsNotified} emergency contact${contactsNotified === 1 ? "" : "s"}` : ""} notified.`);
+        setLocationShareBanner(`Sharing live location — owner${contactsNotified > 0 ? ` & ${contactsNotified} emergency contact${contactsNotified === 1 ? "" : "s"}` : ""} notified.`);
       } else {
-        setLocationShareBanner("Location saved to the owner's alert history.");
+        setLocationShareBanner("Sharing live location — saved to the owner's alert history.");
       }
     } catch {
-      setLocationShareBanner("Couldn't reach the server — location opened in Maps only.");
+      setLocationShareBanner("Couldn't reach the server — please try again.");
     } finally {
       setLocationSharing(false);
       setTimeout(() => setLocationShareBanner(null), 6000);
@@ -1175,9 +1188,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       setVariantBusy(false);
     }
   };
-  const [pingsSent, setPingsSent] = useState(0);
-  const maxPings = 7;
-  const pingsSentRef = useRef(0);
   const gpsWatchRef = useRef<number | null>(null);
 
   /* ---- Cleanup GPS watcher on unmount ---- */
@@ -1187,23 +1197,55 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     };
   }, []);
 
-  /* ---- Geolocation Request & Auto-Fetch ---- */
+  /* ---- Geolocation Request & Auto-Fetch ----
+   * A single getCurrentPosition() fix is often a fast, low-accuracy one
+   * (network/cell-tower based, sometimes 500m+ off) since the GPS radio
+   * hasn't locked yet — for an emergency ping that inaccuracy matters. So
+   * this unblocks the UI on the first fix (same as before), then keeps a
+   * watchPosition running in the background to replace `location` with
+   * better fixes as the GPS lock improves, stopping once accuracy is good
+   * (<=30m) or after a bounded window so it can't run forever.
+   */
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setPhase("gps-off");
       return;
     }
 
+    const toGeo = (pos: GeolocationPosition): GeoLocation => ({
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      accuracy: Math.round(pos.coords.accuracy),
+      timestamp: new Date().toISOString(),
+    });
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const geo: GeoLocation = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: Math.round(pos.coords.accuracy),
-          timestamp: new Date().toISOString(),
-        };
-        setLocation(geo);
+        setLocation(toGeo(pos));
         setPhase("emergency");
+
+        if (gpsWatchRef.current !== null) navigator.geolocation.clearWatch(gpsWatchRef.current);
+        const refineDeadline = Date.now() + 12000;
+        gpsWatchRef.current = navigator.geolocation.watchPosition(
+          (refined) => {
+            const geo = toGeo(refined);
+            setLocation(geo);
+            if (geo.accuracy <= 30 || Date.now() >= refineDeadline) {
+              if (gpsWatchRef.current !== null) {
+                navigator.geolocation.clearWatch(gpsWatchRef.current);
+                gpsWatchRef.current = null;
+              }
+            }
+          },
+          () => {
+            // Refinement failing doesn't matter — the first fix already landed.
+            if (gpsWatchRef.current !== null) {
+              navigator.geolocation.clearWatch(gpsWatchRef.current);
+              gpsWatchRef.current = null;
+            }
+          },
+          { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+        );
       },
       (err) => {
         if (err.code === err.PERMISSION_DENIED) {
@@ -1216,7 +1258,20 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     );
   }, []);
 
-  /* ---- QR Direct Lookup (no loading screen) ---- */
+  /* ---- QR Direct Lookup (no loading screen) ----
+   * The database is the only source of truth for a generated QR's category,
+   * name, and status — the admin dashboard writes there, so the scan page
+   * must read from there too, every time. A local cache entry left over from
+   * a previous visit is used ONLY as an instant offline fallback (when the
+   * DB call itself fails to reach the server), never as a substitute for a
+   * live check — otherwise this device would keep showing whatever the
+   * category/name were on first scan even after the admin edits or
+   * reassigns the tag, which is exactly the "doesn't sync" bug this fixes.
+   *
+   * Likewise, a confirmed 404 (tag genuinely doesn't exist) now shows a real
+   * error instead of silently fabricating a fake "inactive" tag and letting
+   * a visitor "activate" a QR code that was never generated by admin.
+   */
   useEffect(() => {
     const qrId = getQrIdFromUrl();
     if (!qrId) {
@@ -1229,38 +1284,52 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     const stored = localStorage.getItem("repiqr-qrlist") || localStorage.getItem("namoqr-qrlist");
     const list: any[] = stored ? JSON.parse(stored) : [];
 
-    let found = list.find(
+    const cached = list.find(
       (q: any) =>
         q.id?.toUpperCase() === cleanQrId ||
         (q.clientId && q.clientId.toUpperCase() === cleanQrId) ||
         q.qrUrl?.toUpperCase().includes(cleanQrId)
     );
 
-    if (!found) {
-      // Try DB lookup (async, but we'll run it and handle result)
-      apiClient.qr.getQrCodeById(cleanQrId).then((res) => {
-        const dbRecord = res?.data || null;
-        if (dbRecord) {
-          const dbFound = {
-            id: dbRecord.id,
-            clientId: dbRecord.client_id,
-            status: dbRecord.status,
-            vehicleName: `Vehicle (${dbRecord.id})`,
-            vehicleNumber: `REG-${dbRecord.id.slice(-4)}`,
-            template: dbRecord.template_name || "Default",
-            category: dbRecord.category,
-          };
-          resolveQr(dbFound);
+    apiClient.qr.getQrCodeById(cleanQrId).then((res) => {
+      const dbRecord = res?.data || null;
+      if (dbRecord) {
+        resolveQr({
+          id: dbRecord.id,
+          clientId: dbRecord.client_id,
+          status: dbRecord.status,
+          vehicleName: `Vehicle (${dbRecord.id})`,
+          vehicleNumber: `REG-${dbRecord.id.slice(-4)}`,
+          template: dbRecord.template_name || "Default",
+          category: dbRecord.category,
+        });
+      } else if (cached) {
+        // Legacy/local-only record with no matching DB row (e.g. offline demo data).
+        resolveQr(cached);
+      } else {
+        setErrorMsg("This QR code isn't recognized. It may be damaged, unregistered, or the link is incorrect.");
+        setPhase("error");
+      }
+    }).catch((err: any) => {
+      if (err?.status === 404) {
+        if (cached) {
+          resolveQr(cached);
         } else {
-          // Universal fallback
-          tryFallback(cleanQrId);
+          setErrorMsg("This QR code isn't recognized. It may be damaged, unregistered, or the link is incorrect.");
+          setPhase("error");
         }
-      }).catch(() => {
-        tryFallback(cleanQrId);
-      });
-    } else {
-      resolveQr(found);
-    }
+        return;
+      }
+      // Network/server error, not a "not found" — fall back to the cached
+      // copy if we have one rather than fabricating data, otherwise let the
+      // visitor retry instead of silently proceeding on a made-up record.
+      if (cached) {
+        resolveQr(cached);
+      } else {
+        setErrorMsg("Couldn't reach the server to verify this QR code. Check your connection and try again.");
+        setPhase("error");
+      }
+    });
 
     function resolveQr(record: any) {
       const data = {
@@ -1283,21 +1352,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       }
     }
 
-    function tryFallback(cleanId: string) {
-      const displayTag = cleanId.slice(0, 8).toUpperCase();
-      const fallback = {
-        id: cleanId,
-        clientId: cleanId.startsWith("CL") ? cleanId : `CL-${displayTag}`,
-        vehicleName: `RapiQR Safety Tag (${displayTag})`,
-        vehicleNumber: `REG-${cleanId.slice(-4).toUpperCase()}`,
-        status: "inactive",
-        template: "Default",
-      };
-      const updatedList = [fallback, ...list];
-      localStorage.setItem("repiqr-qrlist", JSON.stringify(updatedList));
-      localStorage.setItem("namoqr-qrlist", JSON.stringify(updatedList));
-      resolveQr(fallback);
-    }
   }, [requestLocation]);
 
   /* ---- Registration Form Submit (after activation code validated) ---- */
@@ -1473,84 +1527,48 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     handleRegisterSubmit(pendingVerified);
   };
 
-  /* ---- Automatic Location Ping Dispatch (Every 5s, 7 times) ---- */
+  // Latest location, read by the interval below without making it restart
+  // (and re-send immediately) on every watchPosition refinement tick.
+  const latestLocationRef = useRef<GeoLocation | null>(null);
   useEffect(() => {
-    if (phase !== "emergency" || !qrData || !location) return;
+    latestLocationRef.current = location;
+  }, [location]);
 
-    const dispatchPing = (index: number, currentLoc: GeoLocation) => {
-      const payload = {
+  /* ---- Live Location Trail (every 5s) ----
+   * Runs whenever the app is opened as the installed PWA (matches "send
+   * accurate location every 5 seconds when the PWA is open"), OR the visitor
+   * has tapped "Share Location" — either one sets `liveSharing`. Uses type
+   * "location_ping" so the backend records the real GPS fix (owner's Alert
+   * History) without firing a WhatsApp message on every tick — see
+   * AlertController.createAlert. Reads latestLocationRef rather than
+   * depending on `location` directly so a mid-refinement update doesn't
+   * reset the 5s cadence into a burst of immediate sends.
+   */
+  useEffect(() => {
+    if (phase !== "emergency" || !qrData || !(isRunningInstalled() || liveSharing)) return;
+
+    const sendPing = () => {
+      const loc = latestLocationRef.current;
+      if (!loc) return;
+      apiClient.alerts.createAlert({
         qrId: qrData.id,
         qrUrl: qrData.qrUrl,
-        latitude: currentLoc.lat,
-        longitude: currentLoc.lng,
-        accuracy: currentLoc.accuracy,
-        deviceId: navigator.userAgent.slice(0, 40),
-        timestamp: new Date().toISOString(),
-        message: `Auto Emergency Ping #${index}`,
+        latitude: loc.lat,
+        longitude: loc.lng,
+        accuracy: loc.accuracy,
+        timestamp: loc.timestamp,
         vehicleName: qrData.vehicleName,
         vehicleNumber: qrData.vehicleNumber,
-        pingIndex: index,
-        totalPings: maxPings,
-      };
-
-      const alerts = JSON.parse(localStorage.getItem("repiqr-alerts") || localStorage.getItem("namoqr-alerts") || "[]");
-      alerts.unshift({ ...payload, id: Date.now() + index, status: "sent" });
-      localStorage.setItem("repiqr-alerts", JSON.stringify(alerts));
-      localStorage.setItem("namoqr-alerts", JSON.stringify(alerts));
-
-      const stored = localStorage.getItem("repiqr-qrlist") || localStorage.getItem("namoqr-qrlist");
-      const list: any[] = stored ? JSON.parse(stored) : [];
-      const idx = list.findIndex((q: any) => q.id === qrData.id);
-      if (idx >= 0) {
-        list[idx].scans = (list[idx].scans || 0) + 1;
-        list[idx].lastScannedAt = new Date().toISOString();
-        list[idx].lastLocation = { lat: currentLoc.lat, lng: currentLoc.lng };
-        localStorage.setItem("repiqr-qrlist", JSON.stringify(list));
-        localStorage.setItem("namoqr-qrlist", JSON.stringify(list));
-      }
+        customerToken: getChatCustomerToken(),
+        type: "location_ping",
+        notifyContacts: false,
+      }).catch(() => { /* a dropped ping isn't worth surfacing — the next one in 5s will land */ });
     };
 
-    // 1st Ping sent immediately on entering emergency phase
-    if (pingsSentRef.current === 0) {
-      pingsSentRef.current = 1;
-      setPingsSent(1);
-      dispatchPing(1, location);
-    }
-
-    // Auto-ping every 5 seconds until maxPings (7) reached
-    const timer = setInterval(() => {
-      if (pingsSentRef.current < maxPings) {
-        pingsSentRef.current += 1;
-        const count = pingsSentRef.current;
-        setPingsSent(count);
-
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              const freshGeo: GeoLocation = {
-                lat: pos.coords.latitude,
-                lng: pos.coords.longitude,
-                accuracy: Math.round(pos.coords.accuracy),
-                timestamp: new Date().toISOString(),
-              };
-              setLocation(freshGeo);
-              dispatchPing(count, freshGeo);
-            },
-            () => {
-              dispatchPing(count, location);
-            },
-            { enableHighAccuracy: true, timeout: 4000 }
-          );
-        } else {
-          dispatchPing(count, location);
-        }
-      } else {
-        clearInterval(timer);
-      }
-    }, 5000);
-
+    sendPing();
+    const timer = setInterval(sendPing, 5000);
     return () => clearInterval(timer);
-  }, [phase, qrData, location]);
+  }, [phase, qrData, getChatCustomerToken, liveSharing]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-[#F5F6FC] to-slate-100 text-slate-900 flex flex-col items-center justify-start font-sans relative selection:bg-amber-500 selection:text-slate-950 overflow-x-hidden">
@@ -2303,8 +2321,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                     </button>
                   </div>
 
-                  {/* 6. INSTALL APP BAR — replaces the old AI Assistant entry point here */}
-                  <InstallAppBar />
                 </div>
 
                 {/* 5. MESSAGE VEHICLE OWNER CARD — Big button opens popup & auto-sends SMS alert to owner */}
@@ -2451,47 +2467,58 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                         );
                       })()}
 
-                      {/* Button 3: Share Location */}
-                      <button
-                        onClick={handleShareLocation}
-                        disabled={locationSharing}
-                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-blue-600/20 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-70"
-                      >
-                        <div className="flex items-center gap-3.5 min-w-0">
-                          <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold text-2xl flex-shrink-0">
-                            📍
-                          </div>
-                          <div className="text-left min-w-0">
-                            <p className="text-sm font-black text-white tracking-tight">Share Location</p>
-                          </div>
-                        </div>
-                        <div className="bg-white text-blue-700 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
-                          {locationSharing ? <Loader2 size={14} className="animate-spin" /> : <Navigation size={14} />} SEND
-                        </div>
-                      </button>
-                      {/* Button 4: Alert Owner on WhatsApp */}
-                      <button
-                        onClick={() => {
-                          sendQuickIssueAlert("Emergency Alert", qrData?.category === "car"
-                            ? "I scanned the RepiQR tag on your car — there is an emergency at the vehicle."
-                            : "I scanned the RepiQR tag on your bike — there is an emergency at the vehicle.");
-                          flashVariantBanner("WhatsApp alert sent — the owner has been notified.");
-                        }}
-                        className="w-full bg-gradient-to-r from-[#22C55E] to-[#15A34A] hover:from-[#16A34A] hover:to-[#15803D] text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-green-600/20 active:scale-[0.98] transition-all cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3.5 min-w-0">
-                          <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center flex-shrink-0">
+                      {/* WhatsApp / Chat / Assistant / Share — 4 quick actions in a 2x2 grid */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          onClick={() => {
+                            sendQuickIssueAlert("Emergency Alert", qrData?.category === "car"
+                              ? "I scanned the RepiQR tag on your car — there is an emergency at the vehicle."
+                              : "I scanned the RepiQR tag on your bike — there is an emergency at the vehicle.");
+                            flashVariantBanner("WhatsApp alert sent — the owner has been notified.");
+                          }}
+                          className="bg-gradient-to-br from-[#22C55E] to-[#15A34A] hover:brightness-105 text-white rounded-2xl p-4 flex flex-col items-center justify-center gap-2 shadow-md shadow-green-600/20 active:scale-[0.97] transition-all cursor-pointer aspect-square"
+                        >
+                          <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center">
                             <WhatsAppSvg size={22} />
                           </div>
-                          <div className="text-left min-w-0">
-                            <p className="text-sm font-black text-white tracking-tight">Alert Owner on WhatsApp</p>
-                            <p className="text-[11px] font-medium text-white/80">Sends alert + location to owner</p>
+                          <p className="text-xs font-black tracking-tight">WhatsApp</p>
+                        </button>
+
+                        <button
+                          onClick={() => openChatWithMessage("Hi, I scanned your vehicle's RapiQR code and need to contact you.")}
+                          className="bg-gradient-to-br from-indigo-600 to-indigo-800 hover:brightness-105 text-white rounded-2xl p-4 flex flex-col items-center justify-center gap-2 shadow-md shadow-indigo-600/20 active:scale-[0.97] transition-all cursor-pointer aspect-square"
+                        >
+                          <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center">
+                            <MessageCircle size={22} />
                           </div>
-                        </div>
-                        <div className="bg-white text-green-700 font-black text-xs px-3 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
-                          <WhatsAppSvg size={12} /> SEND
-                        </div>
-                      </button>
+                          <p className="text-xs font-black tracking-tight">Chat</p>
+                        </button>
+
+                        <button
+                          onClick={() => setAiChatOpen(true)}
+                          className="bg-gradient-to-br from-purple-600 to-fuchsia-700 hover:brightness-105 text-white rounded-2xl p-4 flex flex-col items-center justify-center gap-2 shadow-md shadow-purple-600/20 active:scale-[0.97] transition-all cursor-pointer aspect-square"
+                        >
+                          <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center">
+                            <Bot size={22} />
+                          </div>
+                          <p className="text-xs font-black tracking-tight">Ask Repi</p>
+                        </button>
+
+                        <button
+                          onClick={handleShareLocation}
+                          disabled={locationSharing}
+                          className={`rounded-2xl p-4 flex flex-col items-center justify-center gap-2 active:scale-[0.97] transition-all cursor-pointer disabled:opacity-70 aspect-square text-white shadow-md ${
+                            liveSharing
+                              ? "bg-gradient-to-br from-blue-700 to-blue-900 shadow-blue-700/30"
+                              : "bg-gradient-to-br from-blue-600 to-indigo-700 hover:brightness-105 shadow-blue-600/20"
+                          }`}
+                        >
+                          <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center">
+                            {locationSharing ? <Loader2 size={22} className="animate-spin" /> : <Navigation size={22} />}
+                          </div>
+                          <p className="text-xs font-black tracking-tight">{liveSharing ? "Live — Stop" : "Share"}</p>
+                        </button>
+                      </div>
 
                       {locationShareBanner && (
                         <p className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-1.5">
@@ -2664,14 +2691,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       disabled={locationSharing}
                       className="w-full bg-white border border-gray-200 rounded-xl p-2.5 flex items-center gap-2.5 hover:bg-gray-50 transition-all active:scale-[0.98] shadow-2xs cursor-pointer disabled:opacity-70"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center font-bold flex-shrink-0">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold flex-shrink-0 ${liveSharing ? "bg-blue-500 text-white" : "bg-blue-50 text-blue-500"}`}>
                         {locationSharing ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
                       </div>
                       <div className="text-left min-w-0">
-                        <p className="text-xs font-bold text-gray-900">Share My Live Location</p>
-                        <p className="text-[10px] font-semibold text-gray-400">Notifies owner &amp; emergency contacts</p>
+                        <p className="text-xs font-bold text-gray-900">{liveSharing ? "Stop Sharing Live Location" : "Share My Live Location"}</p>
+                        <p className="text-[10px] font-semibold text-gray-400">{liveSharing ? "Updating every 5 seconds" : "Notifies owner & emergency contacts"}</p>
                       </div>
-                      <ExternalLink size={14} className="text-gray-300 flex-shrink-0 ml-auto" />
                     </button>
                     {locationShareBanner && (
                       <p className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-1.5">
@@ -3118,10 +3144,11 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           </div>
         )}
 
-        {/* Floating Install App Button — replaces the old floating AI-assistant
-            trigger in this spot (and the full-width "RapiQR AI Assistant" bar
-            was replaced by InstallAppBar above). The assistant itself is still
-            reachable via the category tiles' "Ask" action (see handleCategoryButtonAction). */}
+        {/* Floating Install App Button — the only install entry point on this
+            page now; the old full-width promotional banner was removed so
+            nothing about installing appears unless the visitor taps this.
+            The assistant itself is still reachable via the category tiles'
+            "Ask" action (see handleCategoryButtonAction). */}
         <InstallAppFab />
 
         {/* ============ ASSISTANT CHAT ============ */}
@@ -3223,7 +3250,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           {/* Full-bleed sheet on a phone (dvh, so the mobile browser bars don't
               clip the composer); a floating card from the sm breakpoint up. */}
           <div
-            className="w-full h-dvh sm:h-[min(38rem,88vh)] sm:w-auto sm:max-w-md sm:min-w-[24rem] sm:rounded-3xl sm:shadow-2xl sm:border sm:border-gray-200 overflow-hidden"
+            className="w-full h-dvh sm:h-[min(38rem,88vh)] sm:w-auto sm:max-w-md sm:min-w-[24rem] sm:rounded-xl sm:shadow-2xl sm:border sm:border-gray-200 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <RepiChat

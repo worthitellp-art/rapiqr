@@ -58,18 +58,28 @@ const stickerSchema = new Schema({
 
 const { normalizePhone } = require('../../utils/phone');
 
-stickerSchema.pre('save', function(next) {
+// Mongoose 9 dropped the callback-style `next` argument for hooks — a
+// function declaring it no longer receives one, so calling it throws
+// "next is not a function" and the save rejects. This hook is synchronous
+// (no I/O), so the fix is just not taking/calling `next`: Mongoose treats a
+// hook that returns undefined as done as soon as it returns.
+stickerSchema.pre('save', function() {
   if (this.phone_number) {
     this.normalized_phone_number = normalizePhone(this.phone_number);
   } else {
     this.normalized_phone_number = null;
   }
-  next();
 });
 
 stickerSchema.index({ created_at: -1 });
 stickerSchema.index({ user_id: 1 });
 stickerSchema.index({ 'details.ownerPhone': 1 });
-stickerSchema.index({ category: 1, normalized_phone_number: 1 }, { unique: true, sparse: true });
+// Unique phone per category among LIVE (non-deleted) stickers only. Soft-delete
+// frees the (category, phone) slot, so a deleted tag's phone can be reused and a
+// restored tag re-checks for conflicts (see restoreByRecoveryCode).
+stickerSchema.index(
+  { category: 1, normalized_phone_number: 1 },
+  { unique: true, partialFilterExpression: { deleted_at: null, normalized_phone_number: { $type: 'string' } } }
+);
 
 module.exports = model('Sticker', stickerSchema);

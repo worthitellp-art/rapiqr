@@ -37,7 +37,7 @@ import {
 import type { DashboardSticker } from './dashboard/client/types';
 import PhoneVerificationCard from './auth/PhoneVerificationCard';
 import { mapProductRow } from './dashboard/client/types';
-import { QrCodeModal, EditDetailsModal, EditContactsModal, TransferModal, ScanHistoryModal, ConfirmActionModal } from './dashboard/client/StickerModals';
+import { QrCodeModal, EditDetailsModal, EditContactsModal, TransferModal, ScanHistoryModal, ConfirmActionModal, RecoverStickerModal } from './dashboard/client/StickerModals';
 import PhoneInputWithCountry from './common/PhoneInputWithCountry';
 import EmergencyContactsPanel from './dashboard/client/EmergencyContactsPanel';
 import AccountSettingsPanel from './dashboard/client/AccountSettingsPanel';
@@ -106,6 +106,18 @@ async function deleteProductFromDb(productId: string): Promise<{ success: boolea
   }
 }
 
+async function recoverStickerInDb(stickerId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await apiClient.products.recover(stickerId);
+    if (!res?.success) {
+      return { success: false, error: res?.error || "No sticker found with that ID, or it isn't linked to your account." };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Recovery failed. Please try again.' };
+  }
+}
+
 async function getProductHistoryFromDb(productId: string): Promise<any[]> {
   try {
     const res = await apiClient.products.getHistory(productId);
@@ -149,6 +161,7 @@ type ModalState =
   | { type: 'reactivate'; sticker: DashboardSticker }
   | { type: 'delete'; sticker: DashboardSticker }
   | { type: 'qrCode'; sticker: DashboardSticker }
+  | { type: 'recover'; prefillId?: string }
   | null;
 
 export default function ClientDashboard({ onBack }: ClientDashboardProps) {
@@ -276,12 +289,15 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
   const [products, setProducts] = useState<DashboardSticker[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
 
-  // Stickers that used to be in the list and silently disappeared — deletion
-  // is a hard DELETE server-side (no soft-delete/tombstone), so the only
-  // signal a client has that "this was removed by the owner" (vs. never
-  // existing) is noticing it vanished between loads. Tracked per-account in
-  // localStorage so a refresh doesn't lose the "previously seen" baseline.
+  // Stickers that used to be in the list and silently disappeared (admin
+  // deleted it, or this account deleted it from another device/session).
+  // Deletion is a soft-delete server-side (see QrModel.delete /
+  // ProductController.remove), and since it's still linked to this account
+  // (user_id survives a soft-delete), the "Recover" button next to each of
+  // these brings it back with just its ID — no code needed, see
+  // QrModel.restoreOwnedByUser.
   const [removedStickers, setRemovedStickers] = useState<{ id: string; qrCodeId: string; nickname: string }[]>([]);
+  const [recoveringId, setRecoveringId] = useState<string | null>(null);
 
   const loadProducts = useCallback(async () => {
     setProductsLoading(true);
@@ -348,9 +364,9 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
     showToast(`Safety link copied: ${url}`);
   };
 
-  // A 404 from any per-sticker action means the admin deleted it out from under
-  // the client (products are hard-deleted, see QrModel.delete) — surface that
-  // distinctly instead of a generic failure toast.
+  // A 404 from any per-sticker action means it was soft-deleted out from under
+  // the client — by an admin, or by this account elsewhere — see QrModel.delete.
+  // Surface that distinctly (with a Recover path) instead of a generic failure toast.
   const describeError = (sticker: DashboardSticker, error?: string) => {
     if (error && /not found/i.test(error)) {
       flagRemoved(sticker);
@@ -412,6 +428,28 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
       showToast(`Sticker transferred to ${newPhone}`);
     } else {
       showToast(`Transfer failed: ${res.error || 'Unknown error'}`);
+    }
+  };
+
+  const handleRecoverSticker = async (stickerId: string) => {
+    const res = await recoverStickerInDb(stickerId);
+    if (res.success) {
+      setRemovedStickers((prev) => prev.filter((s) => s.qrCodeId.toLowerCase() !== stickerId.trim().toLowerCase() && s.id.toLowerCase() !== stickerId.trim().toLowerCase()));
+      setModal(null);
+      showToast('Sticker recovered — reloading your stickers…');
+      await loadProducts();
+    }
+    return res;
+  };
+
+  // One-click recover for a sticker already listed in removedStickers — its
+  // ID is already known, so there's nothing for a modal to collect.
+  const handleQuickRecover = async (qrCodeId: string) => {
+    setRecoveringId(qrCodeId);
+    const res = await handleRecoverSticker(qrCodeId);
+    setRecoveringId(null);
+    if (!res.success) {
+      showToast(res.error || 'Recovery failed. Please try again.');
     }
   };
 
@@ -1016,7 +1054,10 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                     <div>
                       <div className="flex justify-between items-center mb-3">
                         <h3 className="text-xs font-semibold text-[#17181A]">My Safety Stickers ({products.length})</h3>
-                        <button onClick={() => loadProducts()} className="text-xs text-[#5275D9] hover:underline cursor-pointer">Refresh</button>
+                        <div className="flex items-center gap-2.5">
+                          <button onClick={() => setModal({ type: 'recover' })} className="text-xs text-[#5275D9] hover:underline cursor-pointer">Recover a sticker</button>
+                          <button onClick={() => loadProducts()} className="text-xs text-[#5275D9] hover:underline cursor-pointer">Refresh</button>
+                        </div>
                       </div>
 
                       {productsLoading ? (
@@ -1046,6 +1087,35 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                                   className="px-2 py-1 bg-white border border-[#E5E5E7] text-[#17181A] text-[11px] font-semibold rounded cursor-pointer"
                                 >
                                   Edit
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {removedStickers.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-[#F0F0F2] space-y-2">
+                          {removedStickers.map((s) => (
+                            <div key={s.id} className="p-2.5 border border-[#FBE3B8] bg-[#FFFBF2] rounded-md flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-[11px] font-bold text-[#8A5A00] truncate">{s.nickname || s.qrCodeId} no longer shows here</p>
+                                <p className="text-[10px] text-[#A67C1F] font-mono truncate">{s.qrCodeId}</p>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  onClick={() => handleQuickRecover(s.qrCodeId)}
+                                  disabled={recoveringId === s.qrCodeId}
+                                  className="px-2 py-1 bg-white border border-[#E0AE00] text-[#4A3900] text-[10px] font-bold rounded cursor-pointer disabled:opacity-60"
+                                >
+                                  {recoveringId === s.qrCodeId ? 'Recovering…' : 'Recover'}
+                                </button>
+                                <button
+                                  onClick={() => dismissRemovedSticker(s.id)}
+                                  className="px-1.5 py-1 text-[#A67C1F] hover:text-[#4A3900] cursor-pointer"
+                                  title="Dismiss"
+                                >
+                                  <X size={12} />
                                 </button>
                               </div>
                             </div>
@@ -1502,6 +1572,13 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
           sticker={modal.sticker}
           onClose={() => setModal(null)}
           onSave={(contacts) => handleSaveContacts(modal.sticker.id, contacts)}
+        />
+      )}
+      {modal?.type === 'recover' && (
+        <RecoverStickerModal
+          prefillId={modal.prefillId}
+          onClose={() => setModal(null)}
+          onRecover={handleRecoverSticker}
         />
       )}
 

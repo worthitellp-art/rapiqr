@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, AlertTriangle, Plus, Trash2, ArrowRightLeft, History, Loader2, ExternalLink, Download, Copy, Check, QrCode, Printer } from 'lucide-react';
+import { X, AlertTriangle, Plus, Trash2, ArrowRightLeft, History, Loader2, ExternalLink, Download, Copy, Check, QrCode, Printer, RefreshCw } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { DashboardSticker, EmergencyContact } from './types';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
@@ -359,6 +359,86 @@ export function ConfirmActionModal({
           {busy && <Loader2 size={13} className="animate-spin" />} {confirmLabel}
         </button>
       </div>
+    </ModalShell>
+  );
+}
+
+/* ─── RECOVER A DELETED/BROKEN STICKER ───
+ * ID-only self-service restore — no recovery code needed. The access control
+ * is ownership: the backend only allows this when the sticker's user_id
+ * still matches the signed-in account (see QrModel.restoreOwnedByUser),
+ * which survives a soft-delete whether it was this account or an admin that
+ * deleted it. Hits /products/:id/recover, not the code-based /qr/:id/recover.
+ */
+export function RecoverStickerModal({
+  prefillId = '',
+  onClose,
+  onRecover,
+}: {
+  prefillId?: string;
+  onClose: () => void;
+  onRecover: (stickerId: string) => Promise<{ success: boolean; error?: string }>;
+}) {
+  const [stickerId, setStickerId] = useState(prefillId);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanId = stickerId.trim();
+    if (!cleanId) return;
+
+    setSubmitting(true);
+    setError(null);
+    const res = await onRecover(cleanId);
+    setSubmitting(false);
+    if (!res.success) {
+      setError(res.error || "No sticker found with that ID, or it isn't linked to your account.");
+    }
+  };
+
+  return (
+    <ModalShell onClose={onClose}>
+      <div className="flex items-center gap-3 mb-5">
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(82,117,217,0.12)', color: '#5275D9' }}>
+          <RefreshCw size={18} />
+        </div>
+        <div>
+          <h3 className="font-bold text-gray-900 text-base leading-snug">Recover a Sticker</h3>
+          <p className="text-xs text-gray-500 font-medium">Deleted it by mistake, or it's missing? Enter its ID to bring it back — no code needed if it's linked to your account.</p>
+        </div>
+        <button onClick={onClose} className="ml-auto w-8 h-8 rounded-full bg-[#F5F6FA] flex items-center justify-center text-gray-500 hover:text-gray-900 cursor-pointer shrink-0">
+          <X size={16} />
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div>
+          <label className={labelCls}>Sticker ID *</label>
+          <input
+            type="text"
+            required
+            placeholder="the sticker's ID"
+            value={stickerId}
+            onChange={(e) => setStickerId(e.target.value)}
+            className={`${inputCls} font-mono`}
+          />
+        </div>
+        {error && <p className="text-xs font-semibold text-[#EF4444]">{error}</p>}
+        <div className="flex gap-3 pt-2">
+          <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90 cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60"
+            style={{ background: '#5275D9' }}
+          >
+            {submitting ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} {submitting ? 'Recovering…' : 'Recover Sticker'}
+          </button>
+        </div>
+      </form>
     </ModalShell>
   );
 }

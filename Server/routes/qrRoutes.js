@@ -21,6 +21,11 @@ router.delete('/:id', verifyToken, verifyAdmin, QrController.deleteQrCode);
 router.post('/:id/restore', verifyToken, verifyAdmin, restoreLimiter, QrController.restoreQrCode);
 // Public: anonymous visitors scan/activate a single sticker by ID
 router.get('/:id', QrController.getQrCodeById);
+// Public self-service recovery: a client (or anyone holding the sticker's
+// printed recovery code) can bring back their own deleted/broken sticker
+// without going through admin. Same handler as the admin route above — the
+// recovery code itself is the access control, not the caller's session.
+router.post('/:id/recover', restoreLimiter, QrController.restoreQrCode);
 router.post('/:id/activate', QrController.activateQrCode);
 router.post('/:id/send-activation-otp', activationOtpLimiter, QrController.sendActivationOtp);
 router.post('/:id/verify-activation-otp', QrController.verifyActivationOtp);

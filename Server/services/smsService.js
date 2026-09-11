@@ -170,7 +170,7 @@ async function sendSms({ to, body, event = 'SMS_SEND', flowId, variables }) {
  * Dispatches a WhatsApp notification using MSG91 WhatsApp Outbound API or Twilio WhatsApp.
  * Supports template outbound messages with components, session messages, test redirects, and database logging.
  *
- * @param {{ to: string|string[], body?: string, event?: string, templateName?: string, variables?: Record<string, any>, components?: Record<string, any>, headerMediaUrl?: string, isSessionMessage?: boolean }} opts
+ * @param {{ to: string|string[], body?: string, event?: string, templateName?: string, variables?: Record<string, any>, components?: Record<string, any>, headerMediaUrl?: string, isSessionMessage?: boolean, languageCode?: string, templateNamespace?: string }} opts
  * @returns {Promise<{ sent: boolean, simulated: boolean, sid?: string, error?: string, reason?: string }>}
  */
 async function sendWhatsApp({
@@ -182,6 +182,8 @@ async function sendWhatsApp({
   components,
   headerMediaUrl,
   isSessionMessage = false,
+  languageCode,
+  templateNamespace,
 }) {
   if (!to) return { sent: false, simulated: false, reason: 'no_recipient' };
 
@@ -218,6 +220,8 @@ async function sendWhatsApp({
             components,
             body: outboundBody,
             headerMediaUrl,
+            languageCode,
+            templateNamespace,
           });
 
       if (msg91Res.success) {
@@ -268,9 +272,32 @@ async function sendWhatsApp({
   return { sent: false, simulated: true };
 }
 
+// Authentication-category templates (unlike the rest of the WhatsApp catalogue in
+// msg91Templates.js) don't support named variables or custom body text — Meta
+// auto-generates "{{1}} is your verification code." and expects a single
+// positional component, hence the fixed `body_1` key here rather than a named one.
+const OTP_WHATSAPP_TEMPLATE = 'otp_verification';
+
+/**
+ * Sends a WhatsApp OTP via the `otp_verification` Authentication template.
+ *
+ * @param {{ to: string, code: string|number, event: string }} opts
+ * @returns {Promise<{ sent: boolean, simulated: boolean, sid?: string, error?: string, reason?: string }>}
+ */
+async function sendWhatsAppOtp({ to, code, event }) {
+  return sendWhatsApp({
+    to,
+    body: `Your RapiQR verification code is ${code}.`,
+    event,
+    templateName: OTP_WHATSAPP_TEMPLATE,
+    components: { body_1: { type: 'text', value: String(code) } },
+  });
+}
+
 module.exports = {
   sendSms,
   sendWhatsApp,
+  sendWhatsAppOtp,
   sendMsg91Otp,
   verifyMsg91Otp,
   sendMsg91WhatsApp,

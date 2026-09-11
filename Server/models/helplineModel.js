@@ -46,11 +46,13 @@ class HelplineModel {
    * Public scan-page view — active providers only.
    *
    * @param {string|object} filter Legacy category string, or
-   *   `{ category, serviceType, stickerCategory }`. `stickerCategory` keeps only
+   *   `{ category, serviceType, stickerCategory, city }`. `stickerCategory` keeps only
    *   providers scoped to that sticker category (or scoped to none at all).
+   *   `city` keeps only providers scoped to that city (case-insensitive),
+   *   plus every provider with no city set (available everywhere).
    */
   static async getActive(filter) {
-    const { category, serviceType, stickerCategory } =
+    const { category, serviceType, stickerCategory, city } =
       typeof filter === 'string' || filter == null ? { category: filter } : filter;
 
     try {
@@ -61,10 +63,15 @@ class HelplineModel {
       if (category) query.category = String(category);
       if (serviceType) query.service_type = slugify(serviceType);
 
+      const cityNeedle = city ? String(city).trim().toLowerCase() : null;
+
       const docs = await Communication.find(query).sort({ created_at: -1 }).lean();
       return docs.map(toApi).filter((row) => {
         // No categories set = available to every sticker category.
         if (stickerCategory && row.categories.length > 0 && !row.categories.includes(stickerCategory)) return false;
+        // No city set = available in every city. A city-scoped provider only
+        // shows to visitors whose (reverse-geocoded) city matches it.
+        if (cityNeedle && row.city && row.city.trim().toLowerCase() !== cityNeedle) return false;
         return true;
       });
     } catch (err) {

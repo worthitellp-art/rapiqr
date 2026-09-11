@@ -11,6 +11,23 @@ class AlertModel {
       const stickerId = alertPayload.productId || alertPayload.product_id
         || alertPayload.qrId || alertPayload.qr_code_id || alertPayload.vehicleId || null;
 
+      // Every scan-page call site sends flat latitude/longitude/accuracy
+      // fields (never a pre-built `location` object) — this was previously
+      // read as `alertPayload.location` only, so real GPS coordinates the
+      // visitor's browser had already captured were silently discarded and
+      // every alert was saved with location: null. Build it from whichever
+      // shape the caller sent.
+      const location = alertPayload.location || (
+        alertPayload.latitude != null && alertPayload.longitude != null
+          ? {
+              lat: alertPayload.latitude,
+              lng: alertPayload.longitude,
+              accuracy: alertPayload.accuracy ?? null,
+              timestamp: alertPayload.timestamp || new Date().toISOString(),
+            }
+          : null
+      );
+
       const doc = await Alert.create({
         sticker_id: stickerId,
         product_label: alertPayload.productLabel || alertPayload.product_label || alertPayload.vehicleLabel || 'RapiQR Item',
@@ -18,7 +35,7 @@ class AlertModel {
         type: alertPayload.type || 'contact_owner',
         message: alertPayload.message || '',
         reporter_phone: alertPayload.reporterPhone || alertPayload.reporter_phone || null,
-        location: alertPayload.location || null,
+        location,
         status: alertPayload.status || 'unread',
       });
 

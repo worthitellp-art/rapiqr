@@ -86,11 +86,16 @@ const auditLogSchema = new Schema(
 // Rolling 180-day retention to comply with CERT-In directives
 auditLogSchema.index({ created_at: 1 }, { expireAfterSeconds: 86400 * 180 });
 
-// Immutability safeguards: Prevent modification or deletion of audit records
-function rejectMutation(next) {
+// Immutability safeguards: Prevent modification or deletion of audit records.
+// Mongoose 9 dropped the callback-style `next` argument for hooks — a
+// function declaring it no longer receives one (see the same fix on
+// Sticker.js's pre('save')), so `next(error)` here threw "next is not a
+// function" instead of the intended compliance error. Throwing directly is
+// the modern equivalent: a hook that throws blocks the operation the same way.
+function rejectMutation() {
   const error = new Error('Compliance Violation: AuditLog records are append-only and cannot be modified or deleted.');
   error.status = 403;
-  return next(error);
+  throw error;
 }
 
 auditLogSchema.pre('updateOne', rejectMutation);

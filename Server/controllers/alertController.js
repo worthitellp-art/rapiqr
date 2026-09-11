@@ -9,6 +9,33 @@ const { logger } = require('../middleware/loggerMiddleware');
 // that already holds this visitor's thread.
 const APP_URL = process.env.APP_URL || 'https://rapiqr.worthitellp.workers.dev';
 
+const URL_RE = /(https?:\/\/\S+)/;
+
+/**
+ * Builds the chat-thread copy of an alert. A plain `.slice(0, 100)` here used
+ * to truncate the whole message — for the common case of a quick-issue alert
+ * whose text is "<alert type>\n<vehicle line>\n\n<description>\n📍 Location:
+ * <maps url>", the Google Maps link routinely fell past character 100 and
+ * got cut mid-URL (or dropped entirely), so the "open location" link the
+ * owner saw in their chat inbox was broken. This truncates only the
+ * free-text part and always appends the map URL (if any) in full.
+ */
+function buildAlertChatText(label, rawMessage) {
+  if (!rawMessage) {
+    return `RapiQR Alert: someone scanned and reported an issue with ${label}. Open the app for details.`;
+  }
+  const msg = String(rawMessage);
+  const urlMatch = msg.match(URL_RE);
+  if (!urlMatch) {
+    const truncated = msg.length > 100 ? `${msg.slice(0, 97)}...` : msg;
+    return `RapiQR Alert on ${label}: "${truncated}"`;
+  }
+  const url = urlMatch[0];
+  const withoutUrl = (msg.slice(0, urlMatch.index) + msg.slice(urlMatch.index + url.length)).trim();
+  const truncated = withoutUrl.length > 100 ? `${withoutUrl.slice(0, 97)}...` : withoutUrl;
+  return truncated ? `RapiQR Alert on ${label}: "${truncated}"\n${url}` : `RapiQR Alert on ${label}\n${url}`;
+}
+
 class AlertController {
   /**
    * Dispatch & Save Emergency Alert
@@ -44,12 +71,17 @@ class AlertController {
       // already relied on the fan-out (SOS, live-location share) are unchanged.
       const notifyContacts = alertPayload.notifyContacts !== false;
 
-      if (product) {
+      // A `location_ping` is the every-5-seconds live-location trail sent
+      // while the installed PWA has the emergency screen open (see
+      // ScanPage.tsx) — it must still land in Alert History with real GPS
+      // coordinates (handled above via AlertModel.createAlert), but firing a
+      // WhatsApp message to the owner on every one of those would spam them
+      // once every 5 seconds. The one-time "Share My Location" action still
+      // uses type "emergency" and notifies as normal.
+      if (product && alertPayload.type !== 'location_ping') {
         const ownerPhone = product.details?.ownerPhone;
         const label = alertPayload.vehicleName || alertPayload.vehicleNumber || product.name || 'your RapiQR item';
-        const text = alertPayload.message
-          ? `RapiQR Alert on ${label}: "${String(alertPayload.message).slice(0, 100)}"`
-          : `RapiQR Alert: someone scanned and reported an issue with ${label}. Open the app for details.`;
+        const text = buildAlertChatText(label, alertPayload.message);
 
         // The owner's copy carries a deep link into the dashboard inbox, so the
         // notification is the entry point into the chat with whoever scanned the

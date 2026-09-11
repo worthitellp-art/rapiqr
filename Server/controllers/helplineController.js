@@ -10,14 +10,17 @@ class HelplineController {
    *   serviceType     slug filter ("towing", "veterinarian") — used by SERVICE_PROVIDER buttons
    *   stickerCategory keeps only providers scoped to that sticker category ("pet"),
    *                   plus every provider scoped to no category at all
+   *   city            keeps only providers scoped to that city, plus every
+   *                   provider with no city set — pass the visitor's
+   *                   (reverse-geocoded) city to prefer local numbers
    *
    * With no params this returns the full active list, which is what the scan page
    * preloads once on mount and then resolves against client-side.
    */
   static async getPublic(req, res) {
     try {
-      const { category, serviceType, stickerCategory } = req.query;
-      const data = await HelplineModel.getActive({ category, serviceType, stickerCategory });
+      const { category, serviceType, stickerCategory, city } = req.query;
+      const data = await HelplineModel.getActive({ category, serviceType, stickerCategory, city });
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('HELPLINE_LIST', 'Failed to fetch public helplines', err);

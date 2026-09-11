@@ -6,11 +6,11 @@ const OrderModel = require('../models/orderModel');
 const { JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD } = require('../middleware/authMiddleware');
 const { logger } = require('../middleware/loggerMiddleware');
 const { generateSecret, verifyTOTP, buildOtpauthUrl } = require('../utils/totp');
-const { sendSms, sendWhatsApp } = require('../services/smsService');
+const { sendSms, sendWhatsAppOtp } = require('../services/smsService');
 const { createOtp, verifyOtp } = require('../services/phoneVerificationService');
 const { normalizePhone } = require('../utils/phone');
 const { hashPassword, verifyPassword } = require('../utils/passwords');
-const { createResetLink, findUserByResetToken } = require('../services/passwordResetService');
+const { createResetToken, createResetLink, findUserByResetToken } = require('../services/passwordResetService');
 const { sendEmail } = require('../services/emailService');
 const { deleteUserAccount } = require('../services/accountDeletionService');
 const loginAttemptTracker = require('../utils/loginAttemptTracker');
@@ -587,7 +587,7 @@ class AuthController {
       const body = `Your RapiQR phone verification code is ${code}. It expires in 5 minutes.`;
       const [smsResult, whatsappResult] = await Promise.all([
         sendSms({ to: phoneNumber, body, event: 'PHONE_VERIFY_SMS' }),
-        sendWhatsApp({ to: phoneNumber, body, event: 'PHONE_VERIFY_WHATSAPP' }),
+        sendWhatsAppOtp({ to: phoneNumber, code, event: 'PHONE_VERIFY_WHATSAPP' }),
       ]);
 
       const simulated = Boolean(smsResult.simulated && whatsappResult.simulated);
@@ -753,6 +753,72 @@ class AuthController {
       return res.json({ success: true, message: 'Password updated. You can now sign in with your new password.' });
     } catch (err) {
       logger.error('PASSWORD_RESET', 'Failed to reset password', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Forgot-password via WhatsApp OTP — step 1. Alternative to the email-link
+   * flow above for accounts with a verified phone number. Always answers the
+   * same way whether or not the phone has an account, same enumeration
+   * reasoning as forgotPassword.
+   */
+  static async forgotPasswordWhatsApp(req, res) {
+    try {
+      const { phoneNumber } = req.body || {};
+      if (!normalizePhone(phoneNumber)) {
+        return res.status(400).json({ success: false, error: 'Enter a valid 10-digit mobile number.' });
+      }
+
+      const profile = await UserModel.findByPhone(phoneNumber);
+      if (profile) {
+        const code = createOtp(`reset:${normalizePhone(phoneNumber)}`, phoneNumber);
+        await sendWhatsAppOtp({ to: phoneNumber, code, event: 'PASSWORD_RESET_WHATSAPP' });
+        logger.security('PASSWORD_RESET_REQUESTED', `WhatsApp password reset OTP requested for ${profile.email}`);
+      } else {
+        logger.warn('PASSWORD_RESET_REQUESTED', `WhatsApp password reset requested for a phone with no account`);
+      }
+
+      return res.json({ success: true, message: 'If an account exists for that number, a WhatsApp code has been sent.' });
+    } catch (err) {
+      logger.error('PASSWORD_RESET_REQUEST', 'Failed to process WhatsApp forgot-password request', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Forgot-password via WhatsApp OTP — step 2. Verifies the code, then mints
+   * the same kind of reset token the email flow uses so the client finishes
+   * through the existing POST /reset-password endpoint.
+   */
+  static async verifyForgotPasswordWhatsApp(req, res) {
+    try {
+      const { phoneNumber, code } = req.body || {};
+      if (!normalizePhone(phoneNumber) || !code) {
+        return res.status(400).json({ success: false, error: 'Phone number and code are required.' });
+      }
+
+      const result = verifyOtp(`reset:${normalizePhone(phoneNumber)}`, code);
+      if (!result.ok) {
+        const messages = {
+          no_pending_otp: 'No reset code in progress — request a new one.',
+          expired: 'This code has expired — request a new one.',
+          too_many_attempts: 'Too many incorrect attempts — request a new code.',
+          invalid_code: `Incorrect code.${result.attemptsLeft ? ` ${result.attemptsLeft} attempt(s) left.` : ''}`,
+        };
+        return res.status(400).json({ success: false, error: messages[result.reason] || 'Verification failed.' });
+      }
+
+      const profile = await UserModel.findByPhone(phoneNumber);
+      if (!profile) {
+        return res.status(400).json({ success: false, error: 'No account found for that number.' });
+      }
+
+      const resetToken = await createResetToken(profile);
+      logger.security('PASSWORD_RESET_REQUESTED', `WhatsApp OTP verified, reset token issued for ${profile.email}`);
+      return res.json({ success: true, resetToken });
+    } catch (err) {
+      logger.error('PASSWORD_RESET_REQUEST', 'Failed to verify WhatsApp forgot-password code', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

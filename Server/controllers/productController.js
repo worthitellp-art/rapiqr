@@ -1,4 +1,5 @@
 const ProductModel = require('../models/productModel');
+const QrModel = require('../models/qrModel');
 const UserModel = require('../models/userModel');
 const { logger } = require('../middleware/loggerMiddleware');
 
@@ -83,7 +84,8 @@ class ProductController {
       return res.json({ success: true, data: updated });
     } catch (err) {
       logger.error('PRODUCT_UPDATE', `Failed to update product: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      const status = err?.code === 'DUPLICATE_PHONE' ? 409 : 500;
+      return res.status(status).json({ success: false, error: err.message });
     }
   }
 
@@ -165,16 +167,60 @@ class ProductController {
     }
   }
 
+  /**
+   * Owner self-service delete. Routed through QrModel.delete (the same
+   * soft-delete used by the admin fleet view) rather than a separate
+   * wipe-in-place — that used to leave `deleted_at` unset, which silently
+   * broke recovery-code restore for anything a client deleted themselves
+   * (restoreByRecoveryCode requires deleted_at to be set). Soft-deleting here
+   * means a client's own printed recovery code works the same way admin's does.
+   */
   static async remove(req, res) {
     try {
       const product = await loadOwnedProduct(req, res);
       if (!product) return;
-      const ok = await ProductModel.remove(product.id);
-      if (!ok) return res.status(500).json({ success: false, error: 'Failed to delete sticker' });
+      const deleted = await QrModel.delete(product.id);
+      if (!deleted) return res.status(500).json({ success: false, error: 'Failed to delete sticker' });
       logger.rowDeleted('products', product.id);
       return res.json({ success: true });
     } catch (err) {
       logger.error('PRODUCT_DELETE', `Failed to delete product: ${req.params.id}`, err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Owner self-service recover — ID only, no recovery code. Deliberately does
+   * NOT go through loadOwnedProduct: that helper's lookup filters out
+   * soft-deleted rows entirely (there'd be nothing to recover), and it only
+   * knows how to say "not found" or "not yours" — not "not yours vs. not
+   * currently deleted vs. phone slot taken", which the caller needs to show
+   * a useful message. QrModel.restoreOwnedByUser does its own ownership
+   * check directly against the (still-deleted) document.
+   */
+  static async recover(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await QrModel.restoreOwnedByUser(id, req.user.id);
+      if (!result.ok) {
+        const messages = {
+          missing_fields: 'A sticker ID is required.',
+          not_found: 'No sticker found with that ID.',
+          not_owner: "This sticker isn't linked to your account.",
+          not_deleted: 'This sticker is not currently deleted — nothing to recover.',
+          duplicate_phone: 'Another live tag already uses this phone number in the same category. Change or remove that tag first, then recover.',
+        };
+        const status = result.reason === 'duplicate_phone' ? 409
+          : result.reason === 'not_owner' ? 403
+          : result.reason === 'not_deleted' ? 400
+          : 404;
+        logger.security('PRODUCT_RECOVER_DENIED', `Recover attempt failed for ${id} (${result.reason}) by ${req.user.email}`);
+        return res.status(status).json({ success: false, error: messages[result.reason] || 'Recovery failed.' });
+      }
+      logger.security('PRODUCT_RECOVERED', `Sticker ${id} recovered by owner ${req.user.email}`);
+      return res.json({ success: true, data: result.data });
+    } catch (err) {
+      logger.error('PRODUCT_RECOVER', `Failed to recover product: ${req.params.id}`, err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

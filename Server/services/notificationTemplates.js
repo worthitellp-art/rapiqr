@@ -31,6 +31,7 @@ const TEMPLATES = Object.fromEntries(
     {
       templateName: tpl.name,
       audience: tpl.audience,
+      languageCode: tpl.languageCode,
       variables: tpl.variables,
       build: (data) => renderBody(type, data),
     },

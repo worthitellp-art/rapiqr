@@ -48,6 +48,7 @@ async function notify({ type, to, data = {}, eventId = null }) {
       type,
       templateName: template.templateName,
       variables: buildVariables(type, data),
+      languageCode: template.languageCode,
     });
 
     MessageModel.record({

@@ -106,6 +106,8 @@ function buildStickerIdFilter(qrId) {
   const raw = String(qrId).trim().replace(/^[#]/, '');
   const lower = raw.toLowerCase();
   const upper = raw.toUpperCase();
+  // Strip hyphens so UUID-format IDs (56FC77C2-312C-...) match hex-only stored _ids
+  const hex = raw.replace(/-/g, '').toLowerCase();
 
   const conditions = [
     { _id: raw },
@@ -116,9 +118,9 @@ function buildStickerIdFilter(qrId) {
     { client_id: lower },
   ];
 
-  // If 8-hex prefix or UUID short-code is passed (e.g. 1FBD68FC from 1fbd68fc-...)
-  if (/^[0-9a-f]{6,12}$/i.test(raw)) {
-    conditions.push({ _id: new RegExp(`^${raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i') });
+  // Match UUID or hex-prefix: 56FC77C2-312C-... or 56fc77c2312c... or short 8-hex prefix
+  if (/^[0-9a-f]{6,}$/i.test(hex)) {
+    conditions.push({ _id: new RegExp(`^${hex.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i') });
   }
 
   return {
@@ -246,9 +248,31 @@ class QrModel {
    */
   static async activate(qrId, activationData) {
     const filter = buildStickerIdFilter(qrId);
-    const current = await Sticker.findOne(filter).select('_id details user_id category').lean();
+    let current = await Sticker.findOne(filter).select('_id details user_id category').lean();
     if (!current) {
-      throw new Error(`QR code ${qrId} not found`);
+      // Scanned tag that was never persisted (e.g. printed before the backend
+      // write completed, or restored from a partially-synced client). Register
+      // it on the fly so the activation succeeds instead of 404/500ing.
+      const rawId = String(qrId).trim().replace(/^[#]/, '');
+      const rawRecoveryCode = generateRecoveryCode();
+      try {
+        const created = await Sticker.create({
+          _id: rawId,
+          client_id: `CL${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
+          status: 'inactive',
+          category: activationData.category || 'car',
+          recovery_code: rawRecoveryCode,
+          recovery_code_hash: hashRecoveryCode(rawRecoveryCode),
+        });
+        current = { _id: created._id, details: created.details || {}, user_id: null, category: created.category };
+      } catch (err) {
+        // The id already exists but failed the live filter above — that's a
+        // soft-deleted sticker, which is only restorable via recovery code.
+        if (isDuplicateError(err)) {
+          throw new Error(`QR code ${qrId} not found`);
+        }
+        throw err;
+      }
     }
 
     const update = { status: 'active' };
@@ -371,22 +395,70 @@ class QrModel {
    * its printed recovery code. `not_found` and `invalid_code` deliberately
    * share one outcome/message upstream — telling them apart would let a
    * caller use the response to enumerate valid sticker IDs.
+   *
+   * Restore re-introduces the sticker's (category, phone) into the live set,
+   * so it must reject if another non-deleted sticker already holds that slot
+   * (soft-delete freed it; another tag may have taken it since).
    */
   static async restoreByRecoveryCode(id, rawRecoveryCode) {
     if (!id || !rawRecoveryCode) return { ok: false, reason: 'missing_fields' };
 
-    const doc = await Sticker.findById(id).select('+recovery_code_hash deleted_at').lean();
+    const doc = await Sticker.findById(id).select('+recovery_code_hash deleted_at category normalized_phone_number').lean();
     if (!doc || !doc.recovery_code_hash) return { ok: false, reason: 'not_found' };
     if (hashRecoveryCode(rawRecoveryCode) !== doc.recovery_code_hash) return { ok: false, reason: 'not_found' };
+
+    return QrModel._restoreDeletedSticker(id, doc);
+  }
+
+  /**
+   * Owner self-service restore with NO recovery code — the caller only needs
+   * to be signed in as the account this sticker is (still) linked to.
+   * `user_id` survives a soft-delete untouched (see QrModel.delete), so
+   * "was this yours" is exactly `sticker.user_id === the logged-in user`.
+   * Works whether the sticker was deleted by the owner themselves or by an
+   * admin — either way the rightful owner can bring it back with just the ID.
+   */
+  static async restoreOwnedByUser(id, userId) {
+    if (!id || !userId) return { ok: false, reason: 'missing_fields' };
+
+    const doc = await Sticker.findById(id).select('deleted_at category normalized_phone_number user_id').lean();
+    if (!doc) return { ok: false, reason: 'not_found' };
+    if (!doc.user_id || String(doc.user_id) !== String(userId)) return { ok: false, reason: 'not_owner' };
+
+    return QrModel._restoreDeletedSticker(id, doc);
+  }
+
+  /**
+   * Shared restore mechanics once the caller has already proven the right to
+   * restore `id` (by recovery code or by ownership) — re-checks it's actually
+   * deleted, re-checks the (category, phone) slot is still free (soft-delete
+   * freed it; another tag may have taken it since), then clears deleted_at.
+   */
+  static async _restoreDeletedSticker(id, doc) {
     if (!doc.deleted_at) return { ok: false, reason: 'not_deleted' };
 
-    const restored = await Sticker.findByIdAndUpdate(
-      id,
-      { $set: { deleted_at: null, recovered_at: new Date() } },
-      { new: true }
-    ).select(PUBLIC_QR_FIELDS).lean();
+    if (doc.normalized_phone_number) {
+      const conflict = await Sticker.findOne({
+        _id: { $ne: id },
+        deleted_at: null,
+        category: doc.category || 'car',
+        normalized_phone_number: doc.normalized_phone_number,
+      }).select('_id').lean();
+      if (conflict) return { ok: false, reason: 'duplicate_phone' };
+    }
 
-    return { ok: true, data: toPublicQr(restored) };
+    try {
+      const restored = await Sticker.findByIdAndUpdate(
+        id,
+        { $set: { deleted_at: null, recovered_at: new Date() } },
+        { new: true }
+      ).select(PUBLIC_QR_FIELDS).lean();
+
+      return { ok: true, data: toPublicQr(restored) };
+    } catch (err) {
+      if (isDuplicateError(err)) return { ok: false, reason: 'duplicate_phone' };
+      throw err;
+    }
   }
 }
 

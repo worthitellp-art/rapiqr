@@ -158,12 +158,13 @@ const TINTS: Record<string, { bg: string; ring: string; icon: string; text: stri
   peach:  { bg: "bg-pink-50",    ring: "border-pink-100",    icon: "text-pink-600",    text: "group-hover:text-pink-700" },
 };
 
-/* Sheet button styles, mirroring the prototype's primary / wa / blue / ghost. */
+/* Sheet button styles — flat, single-tone boxes (no gradients) per the
+   Pinterest-minimal system: a tinted surface + icon, not a glossy pill. */
 const BUTTON_STYLES: Record<string, string> = {
-  primary: "bg-gradient-to-br from-[#D91C1C] to-[#8E0F0F] text-white shadow-md hover:brightness-110",
-  wa: "bg-gradient-to-br from-[#22C55E] to-[#15A34A] text-white shadow-md hover:brightness-110",
-  blue: "bg-gradient-to-br from-[#4C82F7] to-[#2B5FD9] text-white shadow-md hover:brightness-110",
-  ghost: "bg-white text-gray-700 border border-gray-200 hover:border-gray-300",
+  primary: "bg-[#FDEAEA] text-[#9E0A0A] hover:bg-[#FBDCDC]",
+  wa: "bg-[#E4F7EA] text-[#15803D] hover:bg-[#D5F2DF]",
+  blue: "bg-[#EAF0FE] text-[#2B5FD9] hover:bg-[#DCE7FD]",
+  ghost: "bg-[#F6F6F3] text-[#33332E] hover:bg-[#EFEFEA]",
 };
 
 function actionIcon(action: VariantAction) {
@@ -276,89 +277,75 @@ export default function CategoryScanView({
       ? resolveServiceProviders(providers, serviceType, category).length > 0
       : false;
 
+    const actionButtons = buttons.filter((b) => b.action.actionType !== "SERVICE_PROVIDER" || hasProvider);
+    const showEmptyProviderNote = Boolean(serviceButton) && !hasProvider;
+
     return (
       <div className="space-y-3 animate-fade-in">
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-100">
+        <div className="bg-white rounded-[32px] border border-[#EAEAE5] overflow-hidden">
+          <div className="flex items-center gap-2.5 px-4 py-3.5">
             <button
               onClick={() => changeTile(null)}
-              className="flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-gray-900 transition-colors cursor-pointer"
+              className="flex items-center gap-1 text-xs font-bold text-[#62625B] hover:text-[#211922] transition-colors cursor-pointer"
             >
               <ArrowLeft size={14} /> Back
             </button>
-            <div className="ml-auto flex items-center gap-2">
-              <span className={`w-8 h-8 rounded-xl ${tint.bg} border ${tint.ring} flex items-center justify-center`}>
-                <Icon name={openTile.icon} size={16} className={tint.icon} />
-              </span>
-              <div className="text-right">
-                <p className="text-sm font-black text-gray-900 leading-tight">{openTile.title}</p>
-                <p className="text-[10px] text-gray-400 font-semibold">{openTile.sub}</p>
-              </div>
-            </div>
+            <span className={`ml-auto w-8 h-8 rounded-xl ${tint.bg} flex items-center justify-center`}>
+              <Icon name={openTile.icon} size={16} className={tint.icon} />
+            </span>
+            <p className="text-sm font-bold text-[#211922]">{openTile.title}</p>
           </div>
 
-          <div className="p-4 space-y-3">
-            <div className="space-y-2">
-              {buttons.map((b, i) => {
-                const isService = b.action.actionType === "SERVICE_PROVIDER";
-
-                /* Service tile with nothing configured — say so instead of
-                   offering a button that cannot work. */
-                if (isService && !hasProvider) {
-                  return (
-                    <div key={i} className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-center">
-                      <p className="text-[12px] font-bold text-gray-500">No service provider is currently available.</p>
-                      <p className="text-[10.5px] text-gray-400 font-semibold mt-0.5">
-                        You can still notify the owner or start a chat below.
-                      </p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div key={i} className="space-y-2">
-                    <button
-                      disabled={busy}
-                      onClick={() => onButton(b.action, openTile.title)}
-                      className={`w-full ${BUTTON_STYLES[b.style] || BUTTON_STYLES.ghost} font-black text-[12.5px] py-3 px-4 rounded-2xl flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed`}
-                    >
-                      {buttonIcon(b.action)}
-                      <span>{b.label}</span>
-                    </button>
-
-                    {/* Resolved providers render directly under the button that
-                        asked for them — name, number and a real dial link. */}
-                    {isService && providerPanel && providerPanel.serviceType === serviceType && (
-                      <div className="space-y-1.5 pl-1">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                          {getServiceType(providerPanel.serviceType)?.label || "Service"} providers
-                        </p>
-                        {providerPanel.providers.map((p, n) => (
-                          <div
-                            key={p.id || n}
-                            className="p-3 rounded-2xl border border-gray-200 bg-white flex items-center justify-between gap-2"
-                          >
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold text-gray-900 leading-tight truncate">{p.label}</p>
-                              <p className="text-sm font-mono font-bold text-gray-700 mt-0.5">{p.phone}</p>
-                            </div>
-                            <a
-                              href={`tel:${String(p.phone).replace(/\s/g, "")}`}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 flex-shrink-0 transition-colors"
-                            >
-                              <Phone size={13} /> Call
-                            </a>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+          <div className="px-4 pb-4 space-y-3">
+            {/* Action buttons as a grid of flat boxes, not a stacked list */}
+            <div className="grid grid-cols-2 gap-2.5">
+              {actionButtons.map((b, i) => (
+                <button
+                  key={i}
+                  disabled={busy}
+                  onClick={() => onButton(b.action, openTile.title)}
+                  className={`${BUTTON_STYLES[b.style] || BUTTON_STYLES.ghost} font-bold text-[12.5px] rounded-2xl flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed`}
+                >
+                  {buttonIcon(b.action)}
+                  <span className="text-center leading-tight">{b.label}</span>
+                </button>
+              ))}
             </div>
 
+            {showEmptyProviderNote && (
+              <p className="text-[11.5px] font-semibold text-[#62625B] bg-[#F6F6F3] rounded-2xl px-4 py-3 text-center">
+                No service provider available — notify the owner or chat instead.
+              </p>
+            )}
+
+            {/* Resolved providers — name, number, a real dial link */}
+            {providerPanel && providerPanel.serviceType === serviceType && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#91918C]">
+                  {getServiceType(providerPanel.serviceType)?.label || "Service"} providers
+                </p>
+                {providerPanel.providers.map((p, n) => (
+                  <div
+                    key={p.id || n}
+                    className="p-3 rounded-2xl border border-[#EAEAE5] bg-white flex items-center justify-between gap-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-[#211922] leading-tight truncate">{p.label}</p>
+                      <p className="text-sm font-mono font-bold text-[#33332E] mt-0.5">{p.phone}</p>
+                    </div>
+                    <a
+                      href={`tel:${String(p.phone).replace(/\s/g, "")}`}
+                      className="bg-[#F6C000] hover:bg-[#E0AE00] text-[#4A3900] font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 flex-shrink-0 transition-colors"
+                    >
+                      <Phone size={13} /> Call
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {banner && (
-              <p className="text-[11px] font-bold text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+              <p className="text-[11px] font-semibold text-[#62625B] bg-[#F6F6F3] rounded-2xl px-3 py-2">
                 {banner}
               </p>
             )}

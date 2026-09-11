@@ -10,6 +10,8 @@ function getMsg91Config() {
   const otpTemplateId = (process.env.MSG91_OTP_TEMPLATE_ID || '').trim();
   const whatsappIntegratedNumber = (process.env.MSG91_WHATSAPP_INTEGRATED_NUMBER || '').trim();
   const whatsappTemplateName = (process.env.MSG91_WHATSAPP_TEMPLATE_NAME || '').trim();
+  const whatsappTemplateNamespace = (process.env.MSG91_WHATSAPP_TEMPLATE_NAMESPACE || '').trim();
+  const whatsappLanguageCode = (process.env.MSG91_WHATSAPP_LANGUAGE_CODE || '').trim() || 'en';
 
   return {
     authKey,
@@ -18,6 +20,8 @@ function getMsg91Config() {
     otpTemplateId,
     whatsappIntegratedNumber,
     whatsappTemplateName,
+    whatsappTemplateNamespace,
+    whatsappLanguageCode,
     isConfigured: Boolean(authKey),
   };
 }
@@ -296,7 +300,12 @@ function buildMsg91WhatsAppComponents({ variables = {}, components = {}, body = 
 /**
  * Dispatches WhatsApp Message via MSG91 Outbound WhatsApp Template API (V5 bulk endpoint).
  *
- * @param {{ to: string|string[], templateName?: string, integratedNumber?: string, variables?: Record<string, any>, components?: Record<string, any>, body?: string, languageCode?: string, headerMediaUrl?: string }} params
+ * @param {{ to: string|string[], templateName?: string, integratedNumber?: string, variables?: Record<string, any>, components?: Record<string, any>, body?: string, languageCode?: string, templateNamespace?: string, headerMediaUrl?: string }} params
+ * @param {string} [params.languageCode] WhatsApp template language locale (e.g. 'en_US'). Falls back to
+ *   MSG91_WHATSAPP_LANGUAGE_CODE, then 'en'. MSG91 matches templates by name + locale, so a bare 'en'
+ *   fails to resolve templates registered under a full locale code.
+ * @param {string} [params.templateNamespace] Meta WABA template namespace. Falls back to
+ *   MSG91_WHATSAPP_TEMPLATE_NAMESPACE. Required for MSG91 to resolve the template.
  * @returns {Promise<{ success: boolean, simulated: boolean, statusCode?: number, response?: any, messageId?: string|null, error?: string|null, reason?: string }>}
  */
 async function sendMsg91WhatsApp({
@@ -306,12 +315,15 @@ async function sendMsg91WhatsApp({
   variables = [],
   components = {},
   body = '',
-  languageCode = 'en',
+  languageCode,
+  templateNamespace,
   headerMediaUrl = '',
 }) {
   const config = getMsg91Config();
   const senderNumber = (integratedNumber || config.whatsappIntegratedNumber || '').trim();
   const targetTemplate = (templateName || config.whatsappTemplateName || '').trim();
+  const resolvedLanguage = (languageCode || config.whatsappLanguageCode || 'en').trim();
+  const resolvedNamespace = (templateNamespace || config.whatsappTemplateNamespace || '').trim();
 
   // Normalize recipient numbers into international format array
   const rawList = Array.isArray(to) ? to : [to];
@@ -340,9 +352,10 @@ async function sendMsg91WhatsApp({
       template: {
         name: targetTemplate,
         language: {
-          code: languageCode,
+          code: resolvedLanguage,
           policy: 'deterministic',
         },
+        ...(resolvedNamespace ? { namespace: resolvedNamespace } : {}),
         to_and_components: [
           {
             to: recipientList,

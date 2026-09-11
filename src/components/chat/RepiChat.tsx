@@ -278,7 +278,7 @@ function renderBody(text: string, isOwn: boolean) {
         target="_blank"
         rel="noopener noreferrer"
         className={`underline underline-offset-2 break-all font-semibold ${
-          isOwn ? "text-white/95 decoration-white/50" : "text-indigo-600 decoration-indigo-300"
+          isOwn ? "text-[#3D2E00] decoration-[#3D2E00]/40" : "text-[#2B5FD9] decoration-[#2B5FD9]/40"
         }`}
       >
         {isMap ? "📍 Open location" : part.length > 42 ? `${part.slice(0, 39)}…` : part}
@@ -1005,12 +1005,12 @@ export default function RepiChat({
       onDrop={handleDrop}
     >
       {/* ── Header ───────────────────────────────────────────────────── */}
-      <header className="flex items-center gap-2 sm:gap-3 shrink-0 px-2.5 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white pt-[max(0.625rem,env(safe-area-inset-top))] sm:pt-3">
+      <header className="flex items-center gap-2 sm:gap-3 shrink-0 px-2.5 sm:px-4 py-2.5 sm:py-3 bg-white border-b border-[#EAEAE5] text-[#211922] pt-[max(0.625rem,env(safe-area-inset-top))] sm:pt-3">
         {/* A full-screen sheet on a phone wants a back arrow; a desktop panel wants a close X. */}
         {onClose && (
           <button
             onClick={onClose}
-            className="sm:hidden w-9 h-9 -ml-1 rounded-full hover:bg-white/15 active:bg-white/25 flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+            className="sm:hidden w-9 h-9 -ml-1 rounded-full hover:bg-[#F6F6F3] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
             aria-label="Back"
           >
             <ChevronLeft size={22} />
@@ -1018,12 +1018,12 @@ export default function RepiChat({
         )}
 
         <div className="relative shrink-0">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/15 flex items-center justify-center font-bold text-sm">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#F6C000] text-[#4A3900] flex items-center justify-center font-bold text-sm">
             {peerInitial === "?" ? <MessageCircle size={18} /> : peerInitial}
           </div>
           <span
-            className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-indigo-600 transition-colors ${
-              connected ? "bg-emerald-400" : "bg-amber-400"
+            className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white transition-colors ${
+              connected ? "bg-emerald-500" : "bg-[#E0AE00]"
             }`}
             aria-hidden
           />
@@ -1031,22 +1031,13 @@ export default function RepiChat({
 
         <div className="min-w-0 flex-1">
           <p className="text-[13.5px] sm:text-[15px] font-bold truncate leading-tight">{headerTitle}</p>
-          <p className="text-[11px] sm:text-xs text-indigo-100 font-medium truncate flex items-center gap-1.5 mt-0.5">
-            {peerTyping && (
-              <span className="flex items-center gap-0.5" aria-hidden>
-                <span className="w-1 h-1 rounded-full bg-indigo-100 animate-bounce [animation-delay:0ms]" />
-                <span className="w-1 h-1 rounded-full bg-indigo-100 animate-bounce [animation-delay:150ms]" />
-                <span className="w-1 h-1 rounded-full bg-indigo-100 animate-bounce [animation-delay:300ms]" />
-              </span>
-            )}
-            {statusLine}
-          </p>
+          <p className="text-[11px] sm:text-xs text-[#62625B] font-medium truncate mt-0.5">{statusLine}</p>
         </div>
 
         {onClose && (
           <button
             onClick={onClose}
-            className="hidden sm:flex w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 items-center justify-center shrink-0 transition-colors cursor-pointer"
+            className="hidden sm:flex w-9 h-9 rounded-full hover:bg-[#F6F6F3] items-center justify-center shrink-0 transition-colors cursor-pointer"
             aria-label="Close chat"
           >
             <X size={17} />
@@ -1054,26 +1045,12 @@ export default function RepiChat({
         )}
       </header>
 
-      {/* A dropped socket used to be visible only as a small amber dot. Messages
-          still send over REST, but replies stop arriving live — worth saying so. */}
-      {ready && !connected && (
-        <div className="shrink-0 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-amber-50 border-b border-amber-200/70 text-[11px] font-semibold text-amber-800">
-          <Loader2 size={12} className="animate-spin" />
-          Reconnecting — new messages may be delayed
-        </div>
-      )}
-
       {/* ── Transcript ───────────────────────────────────────────────── */}
-      <div className="relative flex-1 min-h-0 flex flex-col bg-[#F3F4F8]">
+      <div className="relative flex-1 min-h-0 flex flex-col bg-[#FBFBF9]">
         <div
           ref={scrollerRef}
           onScroll={handleScroll}
           className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2.5 sm:px-4 py-3 sm:py-4"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 1px 1px, rgba(79,70,229,0.055) 1px, transparent 0)",
-            backgroundSize: "22px 22px",
-          }}
         >
           {!ready && messages.length === 0 ? (
             <div className="space-y-3 pt-2" aria-hidden>
@@ -1091,14 +1068,12 @@ export default function RepiChat({
             </div>
           ) : messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center px-8 gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center">
+              <div className="w-14 h-14 rounded-2xl bg-[#FFF7DC] text-[#A16207] flex items-center justify-center">
                 <MessageCircle size={26} />
               </div>
               <div>
-                <p className="text-sm font-bold text-gray-700">No messages yet</p>
-                <p className="text-xs text-gray-400 font-medium mt-1 max-w-[16rem]">
-                  Say hello — replies land here in real time, and this chat stays put if you reload.
-                </p>
+                <p className="text-sm font-bold text-[#211922]">No messages yet</p>
+                <p className="text-xs text-[#91918C] font-medium mt-1 max-w-[16rem]">Say hello</p>
               </div>
             </div>
           ) : (
@@ -1106,7 +1081,7 @@ export default function RepiChat({
               {rows.map((row) =>
                 row.kind === "day" ? (
                   <div key={row.key} className="flex justify-center my-3">
-                    <span className="px-3 py-1 rounded-full bg-white/90 border border-gray-200/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wide shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+                    <span className="px-3 py-1 rounded-full bg-[#EFEFEA] text-[10.5px] font-bold text-[#62625B] uppercase tracking-wide">
                       {row.label}
                     </span>
                   </div>
@@ -1123,13 +1098,13 @@ export default function RepiChat({
 
               {peerTyping && (
                 <div className="flex items-end gap-2 mt-1.5">
-                  <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[11px] font-bold shrink-0">
+                  <div className="w-7 h-7 rounded-full bg-[#F6C000] text-[#4A3900] flex items-center justify-center text-[11px] font-bold shrink-0">
                     {peerInitial}
                   </div>
-                  <div className="bg-white border border-gray-200/80 rounded-2xl rounded-bl-md px-3.5 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)] flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:0ms]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:150ms]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:300ms]" />
+                  <div className="bg-white border border-[#EAEAE5] rounded-lg rounded-bl-sm px-3.5 py-3 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#91918C] animate-bounce [animation-delay:0ms]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#91918C] animate-bounce [animation-delay:150ms]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#91918C] animate-bounce [animation-delay:300ms]" />
                   </div>
                 </div>
               )}
@@ -1141,7 +1116,7 @@ export default function RepiChat({
         {!atBottom && messages.length > 0 && (
           <button
             onClick={() => scrollToBottom("smooth")}
-            className="absolute bottom-3 right-3 sm:right-4 z-10 flex items-center gap-1.5 pl-2.5 pr-3 py-2 rounded-full bg-white shadow-lg border border-gray-200 text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+            className="absolute bottom-3 right-3 sm:right-4 z-10 flex items-center gap-1.5 pl-2.5 pr-3 py-2 rounded-full bg-white shadow-md border border-[#EAEAE5] text-[#211922] hover:bg-[#F6F6F3] transition-colors cursor-pointer"
             aria-label="Scroll to latest messages"
           >
             <ArrowDown size={15} />
@@ -1155,14 +1130,14 @@ export default function RepiChat({
       </div>
 
       {/* ── Composer ─────────────────────────────────────────────────── */}
-      <div className="shrink-0 border-t border-gray-200 bg-white">
+      <div className="shrink-0 border-t border-[#EAEAE5] bg-white">
         {attachError && (
-          <div className="flex items-start gap-2 px-3 pt-2.5 text-[11.5px] font-semibold text-red-600">
+          <div className="flex items-start gap-2 px-3 pt-2.5 text-[11.5px] font-semibold text-[#9E0A0A]">
             <AlertCircle size={14} className="shrink-0 mt-px" />
             <span className="flex-1 leading-snug">{attachError}</span>
             <button
               onClick={() => setAttachError(null)}
-              className="shrink-0 text-red-400 hover:text-red-600 cursor-pointer"
+              className="shrink-0 text-[#9E0A0A]/60 hover:text-[#9E0A0A] cursor-pointer"
               aria-label="Dismiss"
             >
               <X size={13} />
@@ -1190,7 +1165,7 @@ export default function RepiChat({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={!sessionId}
-            className="w-10 h-10 sm:w-9 sm:h-9 shrink-0 rounded-full text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+            className="w-10 h-10 sm:w-9 sm:h-9 shrink-0 rounded-full text-[#62625B] hover:text-[#211922] hover:bg-[#F6F6F3] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors cursor-pointer active:scale-95"
             aria-label="Attach an image"
             title="Attach an image"
           >
@@ -1204,16 +1179,16 @@ export default function RepiChat({
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder={ready ? "Type a message…" : "Connecting…"}
+            placeholder={ready ? "Message" : "Connecting…"}
             disabled={!ready && !sessionId}
             enterKeyHint="send"
             aria-label="Message"
-            className="flex-1 min-w-0 resize-none max-h-[132px] bg-gray-100 border border-transparent focus:border-indigo-400 focus:bg-white rounded-2xl px-3.5 py-2.5 text-[15px] sm:text-sm leading-snug text-gray-900 placeholder-gray-400 outline-none disabled:opacity-50 transition-colors"
+            className="flex-1 min-w-0 resize-none max-h-[132px] bg-[#F6F6F3] border border-transparent focus:border-[#F6C000] focus:bg-white rounded-2xl px-3.5 py-2.5 text-[15px] sm:text-sm leading-snug text-[#211922] placeholder-[#91918C] outline-none disabled:opacity-50 transition-colors"
           />
           <button
             type="submit"
             disabled={!input.trim() || (!ready && !sessionId)}
-            className="w-11 h-11 sm:w-10 sm:h-10 shrink-0 rounded-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+            className="w-11 h-11 sm:w-10 sm:h-10 shrink-0 rounded-full bg-[#F6C000] hover:bg-[#E0AE00] disabled:bg-[#EFEFEA] disabled:text-[#91918C] disabled:cursor-not-allowed text-[#4A3900] flex items-center justify-center transition-colors cursor-pointer active:scale-95"
             aria-label="Send message"
           >
             <Send size={17} />
@@ -1223,9 +1198,9 @@ export default function RepiChat({
 
       {/* ── Drop target ──────────────────────────────────────────────── */}
       {dragActive && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-indigo-600/10 backdrop-blur-[2px] pointer-events-none">
-          <div className="flex flex-col items-center gap-2 px-6 py-5 rounded-2xl bg-white border-2 border-dashed border-indigo-400 shadow-xl">
-            <ImagePlus size={26} className="text-indigo-500" />
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#F6C000]/10 backdrop-blur-[2px] pointer-events-none">
+          <div className="flex flex-col items-center gap-2 px-6 py-5 rounded-2xl bg-white border-2 border-dashed border-[#F6C000] shadow-xl">
+            <ImagePlus size={26} className="text-[#A16207]" />
             <p className="text-sm font-bold text-gray-700">Drop to send</p>
           </div>
         </div>
@@ -1319,7 +1294,7 @@ function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubble
       {/* The peer's avatar anchors the last bubble of their block; earlier ones are indented to match. */}
       {!isOwn &&
         (lastOfGroup ? (
-          <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[11px] font-bold shrink-0">
+          <div className="w-7 h-7 rounded-full bg-[#F6C000] text-[#4A3900] flex items-center justify-center text-[11px] font-bold shrink-0">
             {peerInitial}
           </div>
         ) : (
@@ -1328,14 +1303,14 @@ function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubble
 
       <div className={`max-w-[82%] sm:max-w-[70%] min-w-0 ${isOwn ? "items-end" : "items-start"} flex flex-col`}>
         <div
-          className={`overflow-hidden rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-opacity ${
+          className={`overflow-hidden rounded-lg transition-opacity ${
             attachment ? "p-1" : "px-3.5 py-2"
           } ${
             isOwn
-              ? `bg-indigo-600 text-white ${lastOfGroup ? "rounded-br-md" : ""} ${msg.pending && !attachment ? "opacity-70" : ""} ${
-                  msg.failed ? "bg-red-500" : ""
+              ? `bg-[#FFF3C4] text-[#3D2E00] ${lastOfGroup ? "rounded-br-sm" : ""} ${msg.pending && !attachment ? "opacity-70" : ""} ${
+                  msg.failed ? "bg-[#FDEAEA]" : ""
                 }`
-              : `bg-white text-gray-800 border border-gray-200/80 ${lastOfGroup ? "rounded-bl-md" : ""}`
+              : `bg-white text-[#211922] border border-[#EAEAE5] ${lastOfGroup ? "rounded-bl-sm" : ""}`
           }`}
         >
           {attachment && (
@@ -1382,7 +1357,7 @@ function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubble
 
           <div
             className={`flex items-center gap-1 justify-end ${attachment ? "px-2.5 pb-1 pt-1" : "mt-0.5"} ${
-              isOwn ? "text-indigo-200" : "text-gray-400"
+              isOwn ? "text-[#8A6D00]" : "text-[#91918C]"
             }`}
           >
             <span className="text-[10px] font-medium tabular-nums">{clockTime(msg.created_at)}</span>
@@ -1393,7 +1368,7 @@ function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubble
         {msg.failed && (
           <button
             onClick={() => onRetry(msg)}
-            className="flex items-center gap-1 mt-1 px-1 text-[10.5px] font-bold text-red-600 hover:text-red-700 cursor-pointer"
+            className="flex items-center gap-1 mt-1 px-1 text-[10.5px] font-bold text-[#9E0A0A] hover:text-[#7A0808] cursor-pointer"
           >
             <RotateCw size={11} />
             {msg.retryFile ? "Image not sent · tap to retry" : "Not sent · tap to retry"}
@@ -1405,9 +1380,9 @@ function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubble
 }
 
 function DeliveryTick({ msg }: { msg: UiMessage }) {
-  if (msg.failed) return <AlertCircle size={13} className="text-white" aria-label="Not sent" />;
-  if (msg.pending) return <Clock size={12} className="text-indigo-200" aria-label="Sending" />;
-  if (msg.read_at) return <CheckCheck size={14} className="text-sky-300" aria-label="Read" />;
-  if (msg.delivered_at) return <CheckCheck size={14} className="text-indigo-200" aria-label="Delivered" />;
-  return <Check size={13} className="text-indigo-200" aria-label="Sent" />;
+  if (msg.failed) return <AlertCircle size={13} className="text-[#9E0A0A]" aria-label="Not sent" />;
+  if (msg.pending) return <Clock size={12} className="text-[#8A6D00]" aria-label="Sending" />;
+  if (msg.read_at) return <CheckCheck size={14} className="text-[#2B5FD9]" aria-label="Read" />;
+  if (msg.delivered_at) return <CheckCheck size={14} className="text-[#8A6D00]" aria-label="Delivered" />;
+  return <Check size={13} className="text-[#8A6D00]" aria-label="Sent" />;
 }

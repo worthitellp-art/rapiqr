@@ -2,6 +2,16 @@ const Sticker = require('./schemas/Sticker');
 const Alert = require('./schemas/Alert');
 const { normalizePhone, isSamePhone } = require('../utils/phone');
 
+function isDuplicateError(err) {
+  return err && (String(err.code) === '11000' || String(err.code) === 'E11000' || String(err.errmsg || '').includes('duplicate key'));
+}
+
+function duplicatePhoneError(phone, category) {
+  const err = new Error(`A tag with phone number ${phone || 'unknown'} already exists in category ${category || 'car'}`);
+  err.code = 'DUPLICATE_PHONE';
+  return err;
+}
+
 /**
  * The ONLY fields that hold the registering owner's own phone number, and so the
  * only fields a dashboard may claim a sticker by.
@@ -14,10 +24,19 @@ const { normalizePhone, isSamePhone } = require('../utils/phone');
  */
 const OWNER_PHONE_FIELDS = ['ownerPhone', 'phone', 'phoneNumber', 'owner_phone'];
 
+/**
+ * A sticker's owner phone lives in one of two places depending on how it got
+ * there: `details.*` when set by the scan-page activation flow, or the
+ * top-level `phone_number` when an admin pre-fills it at generation time
+ * (see QrModel.save/GenerateTagModal — that path writes `phone_number`
+ * directly, never `details.ownerPhone`). Missing the top-level field here
+ * meant an admin-linked sticker could never be auto-claimed by a client
+ * verifying that same number — this checks both.
+ */
 function ownerPhonesOf(sticker) {
   const details = sticker?.details || {};
   const fromDetails = OWNER_PHONE_FIELDS.map((field) => details?.[field]);
-  return fromDetails.filter(Boolean);
+  return [...fromDetails, sticker?.phone_number].filter(Boolean);
 }
 
 /**
@@ -200,9 +219,9 @@ class ProductModel {
         .populate('user_id', 'email full_name phone_number role')
         .sort({ created_at: -1 })
         .lean();
-      return docs.map(toApi).filter((p) =>
-        ownerPhonesOf({ details: p.details }).some((candidate) => isSamePhone(candidate, phone))
-      );
+      return docs
+        .filter((doc) => ownerPhonesOf(doc).some((candidate) => isSamePhone(candidate, phone)))
+        .map(toApi);
     } catch (err) {
       console.error('ProductModel.findByOwnerPhone Error:', err);
       return [];
@@ -250,13 +269,41 @@ class ProductModel {
       }
       if (detailsChanged) payload.details = mergedDetails;
 
+      // Keep the indexable top-level phone fields in sync with the editable
+      // details.ownerPhone, so the (category, normalized_phone_number) unique
+      // index actually guards the edit path (findByIdAndUpdate skips pre('save')).
+      if (updates.ownerPhone !== undefined) {
+        payload.phone_number = updates.ownerPhone || null;
+        payload.normalized_phone_number = normalizePhone(updates.ownerPhone);
+      }
+
       if (Object.keys(payload).length === 0) return toApi(current);
+
+      // Reject a (category, phone) that another live sticker already holds,
+      // excluding this sticker itself (updating your own row must not self-conflict).
+      const effectiveCategory = payload.category !== undefined ? payload.category : current.category || 'car';
+      const effectivePhone = payload.phone_number !== undefined ? payload.phone_number : (current.details?.ownerPhone || current.phone_number || null);
+      const normalized = normalizePhone(effectivePhone);
+      if (normalized) {
+        const conflict = await Sticker.findOne({
+          _id: { $ne: current._id },
+          deleted_at: null,
+          category: effectiveCategory,
+          normalized_phone_number: normalized,
+        }).select('_id').lean();
+        if (conflict) {
+          throw duplicatePhoneError(effectivePhone, effectiveCategory);
+        }
+      }
 
       const doc = await Sticker.findByIdAndUpdate(productId, { $set: payload }, { new: true }).lean();
       return toApi(doc);
     } catch (err) {
-      console.error(`ProductModel.updateDetails (${productId}) Error:`, err);
-      return null;
+      if (isDuplicateError(err)) {
+        // Race lost to the DB unique index after the pre-check above.
+        throw duplicatePhoneError(updates.ownerPhone ?? current?.details?.ownerPhone ?? current?.phone_number, updates.category ?? current?.category ?? 'car');
+      }
+      throw err;
     }
   }
 
@@ -302,36 +349,6 @@ class ProductModel {
     } catch (err) {
       console.error(`ProductModel.transfer (${productId}) Error:`, err);
       return null;
-    }
-  }
-
-  /**
-   * Owner self-service "delete my sticker": resets ownership/details back to
-   * unclaimed rather than deleting the underlying document — the sticker ID
-   * is a physical fleet asset (qr_codes previously, now the same document)
-   * that must stay activatable again later, the same way deleting only the
-   * `products` row (and not `qr_codes`) used to work.
-   */
-  static async remove(productId) {
-    try {
-      const doc = await Sticker.findByIdAndUpdate(
-        productId,
-        {
-          $set: {
-            status: 'inactive',
-            user_id: null,
-            name: null,
-            assigned_to: null,
-            vehicle_number: null,
-            details: {},
-          },
-        },
-        { new: true }
-      ).lean();
-      return Boolean(doc);
-    } catch (err) {
-      console.error(`ProductModel.remove (${productId}) Error:`, err);
-      return false;
     }
   }
 

@@ -548,3 +548,324 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
   display: none;
 }
 
+/* ── ac-* fallback tokens ────────────────────────────────────────────────────
+   The ac-* token block lives under `.ac-console`, which isn't mounted anywhere
+   in the current tree — so ac-btn/ac-modal/ac-input classes render with
+   undefined CSS variables and look broken. Mirror the block at `:root` so the
+   legacy classes get their intended values everywhere, not just under a
+   wrapper that was never applied. */
+:root {
+  --ac-bg: #F8F8F7;
+  --ac-surface: #FFFFFF;
+  --ac-border: #E5E7EB;
+  --ac-border-strong: #D4D4D8;
+  --ac-ink: #18181B;
+  --ac-ink-2: #3F3F46;
+  --ac-muted: #71717A;
+  --ac-faint: #A1A1AA;
+  --ac-accent: #F5C518;
+  --ac-accent-strong: #EAB308;
+  --ac-accent-soft: #FDF4DB;
+  --ac-accent-soft-strong: #F8E9B0;
+  --ac-accent-ink: #A16207;
+  --ac-on-accent: #18181B;
+  --ac-green: #22C55E;
+  --ac-green-ink: #16A34A;
+  --ac-green-soft: #F0FDF4;
+  --ac-red: #EF4444;
+  --ac-red-ink: #DC2626;
+  --ac-red-soft: #FEF2F2;
+  --ac-amber: #B54708;
+  --ac-amber-soft: #FEF6E7;
+  --ac-radius-card: 14px;
+  --ac-radius-control: 10px;
+  --ac-radius-pill: 8px;
+  --ac-shadow-card: 0 1px 2px rgba(24, 24, 27, 0.05), 0 1px 3px rgba(24, 24, 27, 0.04);
+  --ac-shadow-pop: 0 8px 24px rgba(24, 24, 27, 0.10), 0 2px 8px rgba(24, 24, 27, 0.06);
+}
+
+/* ── RapiQR Tag Generator 2.0 — design tokens & primitives ──────────────────
+   Premium minimal SaaS language (Linear / Stripe / Vercel). Scoped under
+   `.rq-2` so the redesign only touches the newly built surfaces and never
+   leaks into the rest of the admin console or the public site.
+
+   Tokens (single source of truth for every color/radius/shadow below):
+     bg        #F7F7F5         surface   #FFFFFF
+     text      #171717         text-2    #6B7280
+     muted     #9CA3AF         border    #E5E7EB
+     border-s  #D1D5DB         brand     #FACC15
+     brand-hv  #EAB308         success   #16A34A
+     danger    #DC2626         info      #2563EB
+   Typography: Inter, 14px base, 28px display, 13px body, 11px table heads. */
+.rq-2 {
+  --rq-bg: #F7F7F5;
+  --rq-surface: #FFFFFF;
+  --rq-text: #171717;
+  --rq-text-2: #6B7280;
+  --rq-muted: #9CA3AF;
+  --rq-border: #E5E7EB;
+  --rq-border-strong: #D1D5DB;
+  --rq-brand: #FACC15;
+  --rq-brand-hover: #EAB308;
+  --rq-success: #16A34A;
+  --rq-success-soft: #F0FDF4;
+  --rq-danger: #DC2626;
+  --rq-danger-soft: #FEF2F2;
+  --rq-info: #2563EB;
+  --rq-info-soft: #EFF6FF;
+  --rq-hover: #F9FAFB;
+  --rq-focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.12);
+
+  color: var(--rq-text);
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.rq-2 *,
+.rq-2 *::before,
+.rq-2 *::after { box-sizing: border-box; }
+.rq-2 button { font-family: inherit; }
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.rq-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, opacity .15s ease;
+}
+.rq-btn:disabled { opacity: .48; cursor: not-allowed; }
+.rq-btn-primary { background: var(--rq-brand); color: var(--rq-text); }
+.rq-btn-primary:hover:not(:disabled) { background: var(--rq-brand-hover); }
+.rq-btn-primary:active:not(:disabled) { transform: translateY(1px); }
+.rq-btn-secondary { background: var(--rq-surface); border-color: var(--rq-border); color: var(--rq-text-2); }
+.rq-btn-secondary:hover:not(:disabled) { background: var(--rq-hover); border-color: var(--rq-border-strong); color: var(--rq-text); }
+.rq-btn-ghost { background: transparent; color: var(--rq-text-2); }
+.rq-btn-ghost:hover:not(:disabled) { background: var(--rq-hover); color: var(--rq-text); }
+.rq-btn-danger { background: var(--rq-surface); border-color: var(--rq-border); color: var(--rq-danger); }
+.rq-btn-danger:hover:not(:disabled) { background: var(--rq-danger-soft); border-color: rgba(220, 38, 38, 0.35); }
+.rq-btn-lg { height: 38px; padding: 0 18px; font-size: 13.5px; }
+.rq-btn-sm { height: 30px; padding: 0 11px; font-size: 12.5px; border-radius: 6px; }
+
+.rq-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--rq-muted);
+  cursor: pointer;
+  transition: background-color .12s ease, color .12s ease, opacity .12s ease;
+}
+.rq-icon-btn:hover:not(:disabled) { background: var(--rq-hover); color: var(--rq-text); }
+.rq-icon-btn:disabled { opacity: .4; cursor: not-allowed; }
+.rq-icon-btn-danger:hover:not(:disabled) { background: var(--rq-danger-soft); color: var(--rq-danger); }
+
+/* ── Inputs / selects ─────────────────────────────────────────────────────── */
+.rq-input,
+.rq-select {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--rq-border);
+  background: var(--rq-surface);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--rq-text);
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.rq-input::placeholder { color: var(--rq-muted); }
+.rq-input:focus,
+.rq-select:focus { border-color: var(--rq-border-strong); box-shadow: var(--rq-focus-ring); }
+.rq-select { padding-right: 28px; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; cursor: pointer; }
+.rq-input-sm { height: 30px; font-size: 12.5px; }
+
+/* ── Badge ────────────────────────────────────────────────────────────────── */
+.rq-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  background: var(--rq-hover);
+  color: #4B5563;
+}
+.rq-badge-info { background: var(--rq-info-soft); color: var(--rq-info); }
+
+/* ── Status ───────────────────────────────────────────────────────────────── */
+.rq-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--rq-text-2); }
+.rq-dot { width: 7px; height: 7px; border-radius: 999px; background: #D1D5DB; flex-shrink: 0; }
+.rq-dot-green { background: var(--rq-success); }
+.rq-dot-amber { background: #D97706; }
+
+/* ── Monospace ────────────────────────────────────────────────────────────── */
+.rq-mono { font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 12.5px; letter-spacing: .01em; }
+
+/* ── Segmented control ────────────────────────────────────────────────────── */
+.rq-seg { display: inline-flex; align-items: center; gap: 2px; background: var(--rq-bg); border: 1px solid var(--rq-border); border-radius: 8px; padding: 2px; }
+.rq-seg button {
+  height: 28px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--rq-text-2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color .12s ease, color .12s ease, box-shadow .12s ease;
+}
+.rq-seg button:hover { color: var(--rq-text); }
+.rq-seg button.rq-seg-active { background: var(--rq-surface); color: var(--rq-text); box-shadow: 0 1px 2px rgba(23, 23, 23, 0.06); }
+
+/* ── Generator toolbar ────────────────────────────────────────────────────── */
+.rq-toolbar { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; background: var(--rq-surface); border: 1px solid var(--rq-border); border-radius: 10px; padding: 12px; }
+.rq-toolbar-field { display: flex; flex-direction: column; gap: 5px; }
+.rq-toolbar-label { font-size: 11px; font-weight: 600; color: var(--rq-muted); text-transform: uppercase; letter-spacing: .04em; }
+
+/* ── Table ────────────────────────────────────────────────────────────────── */
+.rq-table-wrap { background: var(--rq-surface); border: 1px solid var(--rq-border); border-radius: 10px; overflow: hidden; }
+.rq-table { width: 100%; border-collapse: collapse; }
+.rq-th {
+  padding: 0 14px;
+  height: 40px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--rq-muted);
+  background: var(--rq-surface);
+  border-bottom: 1px solid var(--rq-border);
+  white-space: nowrap;
+}
+.rq-th-right { text-align: right; }
+.rq-td { padding: 13px 14px; font-size: 13px; color: var(--rq-text); border-bottom: 1px solid var(--rq-border); vertical-align: middle; }
+.rq-tr { transition: background-color .12s ease; }
+.rq-tr:hover .rq-td { background: var(--rq-hover); }
+.rq-tr.rq-selected .rq-td { background: rgba(250, 204, 21, 0.08); }
+.rq-tr.rq-selected:hover .rq-td { background: rgba(250, 204, 21, 0.12); }
+.rq-tr:last-child .rq-td { border-bottom: none; }
+
+.rq-check { width: 15px; height: 15px; margin: 0; accent-color: var(--rq-brand); cursor: pointer; }
+
+/* ── Popover menu ─────────────────────────────────────────────────────────── */
+.rq-menu-wrap { position: relative; }
+.rq-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 60;
+  min-width: 176px;
+  background: var(--rq-surface);
+  border: 1px solid var(--rq-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(23, 23, 23, 0.10), 0 1px 3px rgba(23, 23, 23, 0.06);
+  padding: 4px;
+  animation: rq-fade-in .12s ease;
+}
+.rq-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rq-text-2);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color .12s ease, color .12s ease;
+}
+.rq-menu-item:hover { background: var(--rq-hover); color: var(--rq-text); }
+.rq-menu-item-danger { color: var(--rq-danger); }
+.rq-menu-item-danger:hover { background: var(--rq-danger-soft); color: var(--rq-danger); }
+.rq-menu-sep { height: 1px; margin: 4px 6px; background: var(--rq-border); }
+
+/* ── Modal ────────────────────────────────────────────────────────────────── */
+.rq-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 115;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(23, 23, 23, 0.42);
+  backdrop-filter: blur(4px);
+}
+.rq-modal {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background: var(--rq-surface);
+  border: 1px solid var(--rq-border);
+  border-radius: 12px;
+  box-shadow: 0 20px 48px rgba(23, 23, 23, 0.16), 0 2px 8px rgba(23, 23, 23, 0.08);
+  padding: 24px;
+  animation: rq-modal-in .18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.rq-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rq-muted);
+  cursor: pointer;
+  transition: background-color .12s ease, color .12s ease;
+}
+.rq-modal-close:hover { background: var(--rq-hover); color: var(--rq-text); }
+
+/* ── Field group ──────────────────────────────────────────────────────────── */
+.rq-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.rq-field-label { font-size: 13px; font-weight: 600; color: var(--rq-text); }
+.rq-field-hint { font-size: 12px; color: var(--rq-muted); }
+.rq-error { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--rq-danger); }
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+.rq-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 64px 24px;
+  background: var(--rq-surface);
+  border: 1px dashed var(--rq-border);
+  border-radius: 12px;
+}
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+@keyframes rq-modal-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes rq-fade-in { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
+
