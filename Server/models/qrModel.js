@@ -74,7 +74,7 @@ async function resolveOwnerId(userId, ownerPhone) {
           $or: [
             { phone_number: ownerPhone },
             { phone_number: digits },
-            { phone_number: new RegExp(`${last10}$`) },
+            { phone_number: new RegExp(`${last10.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) },
           ],
         }).select('_id').lean();
         if (user) return user._id;
@@ -104,7 +104,7 @@ function buildStickerIdFilter(qrId) {
 
   // If 8-hex prefix or UUID short-code is passed (e.g. 1FBD68FC from 1fbd68fc-...)
   if (/^[0-9a-f]{6,12}$/i.test(raw)) {
-    conditions.push({ _id: new RegExp(`^${raw}`, 'i') });
+    conditions.push({ _id: new RegExp(`^${raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i') });
   }
 
   return {
@@ -120,23 +120,36 @@ class QrModel {
   static async getAll(limit = 100) {
     try {
       const docs = await Sticker.find({ deleted_at: null }).sort({ created_at: -1 }).limit(limit).lean();
-      return docs.map((doc) => ({
-        id: doc._id,
-        client_id: doc.client_id,
-        status: doc.status,
-        scans_count: doc.scans_count,
-        last_scanned_at: doc.last_scanned_at,
-        template_name: doc.template_name,
-        fg_color: doc.fg_color,
-        bg_color: doc.bg_color,
-        category: doc.category,
-        created_at: doc.created_at,
-        owner_phone: doc.details?.ownerPhone || doc.phone_number || null,
-        owner_email: doc.details?.ownerEmail || null,
-        owner_name: doc.name || doc.assigned_to || doc.details?.ownerName || null,
-        notes: doc.details?.notes || null,
-        product_status: doc.status,
-      }));
+      return docs.map((doc) => {
+        let recoveryCode = doc.recovery_code;
+        if (!recoveryCode) {
+          recoveryCode = generateRecoveryCode();
+          const codeHash = hashRecoveryCode(recoveryCode);
+          Sticker.updateOne(
+            { _id: doc._id },
+            { $set: { recovery_code: recoveryCode, recovery_code_hash: codeHash } }
+          ).catch((err) => console.error('Failed to backfill recovery_code on sticker:', doc._id, err));
+        }
+
+        return {
+          id: doc._id,
+          client_id: doc.client_id,
+          status: doc.status,
+          scans_count: doc.scans_count,
+          last_scanned_at: doc.last_scanned_at,
+          template_name: doc.template_name,
+          fg_color: doc.fg_color,
+          bg_color: doc.bg_color,
+          category: doc.category,
+          created_at: doc.created_at,
+          owner_phone: doc.details?.ownerPhone || doc.phone_number || null,
+          owner_email: doc.details?.ownerEmail || null,
+          owner_name: doc.name || doc.assigned_to || doc.details?.ownerName || null,
+          notes: doc.details?.notes || null,
+          product_status: doc.status,
+          recovery_code: recoveryCode,
+        };
+      });
     } catch (err) {
       console.error('QrModel.getAll Error:', err);
       return [];
@@ -180,7 +193,7 @@ class QrModel {
   static async save(qrData) {
     try {
       const id = qrData.id || require('crypto').randomBytes(8).toString('hex');
-      const rawRecoveryCode = generateRecoveryCode();
+      const rawRecoveryCode = qrData.recoveryCode || generateRecoveryCode();
       const codeHash = hashRecoveryCode(rawRecoveryCode);
 
       const doc = await Sticker.create({
@@ -191,6 +204,7 @@ class QrModel {
         fg_color: qrData.fg || '000000',
         bg_color: qrData.bg || 'FFFFFF',
         category: qrData.category || 'car',
+        recovery_code: rawRecoveryCode,
         recovery_code_hash: codeHash,
         created_at: qrData.createdAt || new Date(),
       });
@@ -274,14 +288,14 @@ class QrModel {
    * Delete a QR Code record — soft delete: sets deleted_at rather than
    * removing the document, so its recovery_code_hash survives for a later
    * restoreByRecoveryCode call. Chat/alert history tied to it is still hard
-   * -deleted here (that history isn't part of what recovery brings back).
-   * Errors propagate (not caught-and-swallowed) so the caller gets a real
-   * failure instead of a false success.
+    * -deleted here (that history isn't part of what recovery brings back).
+    * Returns null when the sticker is not found, so the
+    * controller can return 404 instead of 500.
    */
   static async delete(qrId) {
     const target = await Sticker.findOne(buildStickerIdFilter(qrId)).select('_id').lean();
     if (!target) {
-      throw new Error(`QR code ${qrId} not found`);
+      return null;
     }
     const realId = target._id;
 

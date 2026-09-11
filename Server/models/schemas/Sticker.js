@@ -8,6 +8,8 @@ const stickerSchema = new Schema({
   // combinations) to make enumeration/guessing a real concern.
   _id: { type: String },
   status: { type: String, enum: ['active', 'inactive', 'lost', 'replaced'], default: 'inactive' },
+  // Plaintext recovery code for admin reference in the dashboard.
+  recovery_code: { type: String, default: null },
   // SHA-256 hash of a server-generated recovery code, shown to the admin
   // exactly once at creation and never stored/retrievable in plaintext.
   // Proves possession of the physical sticker's printed backup code before
@@ -51,7 +53,7 @@ const stickerSchema = new Schema({
     activatedAt: { type: Date, default: null },
   },
   created_at: { type: Date, default: Date.now },
-}, { _id: false, versionKey: false });
+}, { versionKey: false });
 
 stickerSchema.index({ created_at: -1 });
 stickerSchema.index({ user_id: 1 });

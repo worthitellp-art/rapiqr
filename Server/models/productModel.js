@@ -74,7 +74,7 @@ function buildStickerIdFilter(productId) {
 
   // If 8-hex prefix or UUID short-code is passed (e.g. 1FBD68FC from 1fbd68fc-...)
   if (/^[0-9a-f]{6,12}$/i.test(raw)) {
-    conditions.push({ _id: new RegExp(`^${raw}`, 'i') });
+    conditions.push({ _id: new RegExp(`^${raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i') });
   }
 
   return {

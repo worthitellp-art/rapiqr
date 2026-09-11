@@ -165,6 +165,9 @@ class QrController {
     try {
       const { id } = req.params;
       const deleted = await QrModel.delete(id);
+      if (!deleted) {
+        return res.status(404).json({ success: false, error: 'QR Code not found' });
+      }
       logger.rowDeleted('qr_codes', id);
       return res.json({ success: true, data: deleted });
     } catch (err) {
