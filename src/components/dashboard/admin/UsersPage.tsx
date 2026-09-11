@@ -22,15 +22,14 @@ export interface AdminUserRow {
   metadata?: { twoFactor?: { enabled?: boolean } };
 }
 
-export default function UsersPage({
-  searchQuery, setSearchQuery, setToast,
-}: {
-  searchQuery: string;
-  setSearchQuery: (q: string) => void;
-  setToast: (msg: string | null) => void;
-}) {
+ export default function UsersPage({
+   setToast,
+ }: {
+   setToast: (msg: string | null) => void;
+ }) {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
 
+  const [searchQuery, setSearchQuery] = useState("");
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -85,21 +84,21 @@ export default function UsersPage({
   });
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#18181B] font-body" style={{ background: "#F8F8F7" }}>
       {/* ── Section Header ─────────────────────── */}
       <div className="flex items-baseline justify-between flex-wrap gap-4">
         <div>
-          <h1 className="font-display text-[28px] font-bold text-[#17181A] leading-tight tracking-[-0.8px]">
+          <h1 className="font-display text-[28px] font-bold text-[#18181B] leading-tight tracking-[-0.8px]">
             User accounts & access management
           </h1>
-          <p className="text-[13px] text-[#777B80] mt-0.5">
+          <p className="text-[13px] text-[#71717A] mt-0.5">
             Overview of all registered accounts, roles, linked safety stickers, and administrative operations
           </p>
         </div>
 
         <button
           onClick={() => fetchUserAccounts(searchQuery)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[4px] border border-[#E5E5E7] bg-white text-[#17181A] font-semibold text-[13px] hover:bg-[#F7F7F8] transition-all cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-[#18181B] font-semibold text-[13px] hover:bg-[#F8F8F7] transition-all cursor-pointer"
         >
           <RefreshCw size={14} className={usersLoading ? "animate-spin" : ""} /> Refresh Accounts
         </button>
@@ -107,29 +106,29 @@ export default function UsersPage({
 
       {/* ── Metric Stat Cards Grid ─────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <div className="bg-white border border-[#E5E5E7] shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-6">
-          <span className="text-[12px] font-semibold text-[#777B80]">
+        <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] p-6">
+          <span className="text-[12px] font-semibold text-[#71717A]">
             Total Registered Users
           </span>
-          <div className="text-[30px] font-light text-[#17181A] tracking-[-1px] mt-1">
+          <div className="text-[30px] font-semibold text-[#18181B] tracking-[-1px] mt-1">
             {users.length}
           </div>
         </div>
 
-        <div className="bg-white border border-[#E5E5E7] shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-6">
-          <span className="text-[12px] font-semibold text-[#777B80]">
+        <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] p-6">
+          <span className="text-[12px] font-semibold text-[#71717A]">
             Administrators
           </span>
-          <div className="text-[30px] font-light text-[#17181A] tracking-[-1px] mt-1">
+          <div className="text-[30px] font-semibold text-[#18181B] tracking-[-1px] mt-1">
             {users.filter((u) => u.role === "admin").length}
           </div>
         </div>
 
-        <div className="bg-white border border-[#E5E5E7] shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-6">
-          <span className="text-[12px] font-semibold text-[#777B80]">
+        <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] p-6">
+          <span className="text-[12px] font-semibold text-[#71717A]">
             Client Accounts
           </span>
-          <div className="text-[30px] font-light text-[#17181A] tracking-[-1px] mt-1">
+          <div className="text-[30px] font-semibold text-[#18181B] tracking-[-1px] mt-1">
             {users.filter((u) => u.role !== "admin").length}
           </div>
         </div>
@@ -138,20 +137,32 @@ export default function UsersPage({
       {/* ── Toolbar Header ────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-baseline gap-3">
-          <h2 className="font-display text-[14px] font-semibold text-[#17181A]">
+          <h2 className="font-display text-[14px] font-semibold text-[#18181B]">
             All user accounts
           </h2>
-          <span className="text-[12px] text-[#777B80]">
+          <span className="text-[12px] text-[#71717A]">
             · {filteredUsers.length} total
           </span>
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Search */}
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1A1AA]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search accounts"
+              className="w-48 pl-9 pr-3 h-10 text-[13px] rounded-[10px] border border-[#E5E7EB] bg-white text-[#18181B] placeholder-[#A1A1AA] outline-none transition-all focus:border-[#F5C518] focus:ring-[3px] focus:ring-[#F5C518]/[0.35]"
+            />
+          </div>
+
           {/* Role Filter */}
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className="bg-white border border-[#E5E5E7] rounded-[4px] px-3.5 py-2 text-[13px] text-[#17181A] outline-none cursor-pointer focus:border-[#5C78DF]"
+            className="bg-white border border-[#E5E7EB] rounded-lg px-3.5 py-2 text-[13px] text-[#18181B] outline-none cursor-pointer focus:border-[#F5C518]"
           >
             <option value="all">All Roles</option>
             <option value="client">Client Accounts</option>
@@ -162,26 +173,26 @@ export default function UsersPage({
 
       {/* ── User Accounts Table ────────────────────────────────────── */}
       {usersLoading ? (
-        <div className="bg-white border border-[#E5E5E7] p-16 text-center space-y-2">
-          <div className="w-12 h-12 rounded-[4px] bg-[#E8EDFF] text-[#5271D5] flex items-center justify-center mx-auto">
+        <div className="bg-white border border-[#E5E7EB] p-16 text-center space-y-2">
+          <div className="w-12 h-12 rounded-lg bg-[#FDF4DB] text-[#A16207] flex items-center justify-center mx-auto">
             <Loader2 size={22} className="animate-spin" />
           </div>
-          <p className="text-[14px] font-semibold text-[#17181A]">Loading user accounts from database...</p>
+          <p className="text-[14px] font-semibold text-[#18181B]">Loading user accounts from database...</p>
         </div>
       ) : filteredUsers.length === 0 ? (
-        <div className="bg-white border border-[#E5E5E7] p-16 text-center space-y-2">
-          <div className="w-12 h-12 rounded-[4px] bg-[#F3F3F4] text-[#777B80] flex items-center justify-center mx-auto">
+        <div className="bg-white border border-[#E5E7EB] p-16 text-center space-y-2">
+          <div className="w-12 h-12 rounded-lg bg-[#F4F4F5] text-[#71717A] flex items-center justify-center mx-auto">
             <UsersIcon size={22} />
           </div>
-          <p className="text-[14px] text-[#17181A] font-semibold">
+          <p className="text-[14px] text-[#18181B] font-semibold">
             {searchQuery ? "No user accounts match that search query." : "No registered user accounts found."}
           </p>
         </div>
       ) : (
-        <div className="bg-white border border-[#E5E5E7] shadow-[0_1px_4px_rgba(0,0,0,0.03)] overflow-x-auto">
-          <table className="w-full min-w-[880px] text-sm text-[#17181A]">
+        <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] overflow-x-auto">
+          <table className="w-full min-w-[880px] text-sm text-[#18181B]">
             <thead>
-              <tr className="text-left font-display text-[12px] font-semibold text-[#777B80] tracking-normal bg-[#F7F7F8] border-b border-[#E5E5E7]">
+              <tr className="text-left font-display text-[12px] font-semibold text-[#71717A] tracking-normal bg-[#F8F8F7] border-b border-[#E5E7EB]">
                 <th className="px-6 py-3.5">User Profile</th>
                 <th className="px-3 py-3.5">Contact Email</th>
                 <th className="px-3 py-3.5">Mobile Phone</th>
@@ -191,58 +202,58 @@ export default function UsersPage({
                 <th className="px-6 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E5E5E7]">
+            <tbody className="divide-y divide-[#E5E7EB]">
               {filteredUsers.map((u) => {
                 const isAdminRole = u.role === "admin";
 
                 return (
-                  <tr key={u.id} className="hover:bg-[#F3F3F4] transition-colors">
+                  <tr key={u.id} className="hover:bg-[#F4F4F5] transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <InitialAvatar
                           name={u.full_name}
                           email={u.email}
                           size={36}
-                          className="border border-[#E5E5E7]"
+                          className="border border-[#E5E7EB]"
                         />
                         <div>
-                          <p className="font-display font-semibold text-[14px] text-[#17181A] leading-tight">
+                          <p className="font-display font-semibold text-[14px] text-[#18181B] leading-tight">
                             {u.full_name || u.email?.split("@")[0] || "User"}
                           </p>
-                          <p className="text-[11px] text-[#777B80]">{u.id}</p>
+                          <p className="text-[11px] text-[#71717A]">{u.id}</p>
                         </div>
                       </div>
                     </td>
 
-                    <td className="px-3 py-4 text-[13px] text-[#17181A]">
+                    <td className="px-3 py-4 text-[13px] text-[#18181B]">
                       {u.email}
                     </td>
 
                     <td className="px-3 py-4 text-[13px]">
                       {u.phone_number ? (
-                        <span className="text-[#17181A] font-semibold">{u.phone_number}</span>
+                        <span className="text-[#18181B] font-semibold">{u.phone_number}</span>
                       ) : (
-                        <span className="text-[#9CA0A6] italic text-[12px]">Unlinked</span>
+                        <span className="text-[#A1A1AA] italic text-[12px]">Unlinked</span>
                       )}
                     </td>
 
                     <td className="px-3 py-4">
                       {isAdminRole ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[4px] bg-[#E8EDFF] text-[#5271D5] font-semibold text-[11px]">
-                          <ShieldCheck size={12} className="text-[#5271D5]" /> Admin
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#FDF4DB] text-[#A16207] font-semibold text-[11px]">
+                          <ShieldCheck size={12} className="text-[#A16207]" /> Admin
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[4px] bg-[#F3F3F4] text-[#777B80] font-semibold text-[11px]">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#F4F4F5] text-[#71717A] font-semibold text-[11px]">
                           Client Account
                         </span>
                       )}
                     </td>
 
-                    <td className="px-3 py-4 text-[13px] font-bold text-[#17181A]">
+                    <td className="px-3 py-4 text-[13px] font-bold text-[#18181B]">
                       {u.stickerCount || 0}
                     </td>
 
-                    <td className="px-3 py-4 text-[11.5px] text-[#777B80]">
+                    <td className="px-3 py-4 text-[11.5px] text-[#71717A]">
                       {fmtDate(u.created_at)}
                     </td>
 
@@ -250,14 +261,14 @@ export default function UsersPage({
                       {!isAdminRole ? (
                         <button
                           onClick={() => setDeleteTargetUser(u)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] text-[#DC2626] border border-[#DC2626]/20 text-[12px] font-bold hover:bg-[#FDEAEA] transition-all cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[#EF4444] border border-[#EF4444]/20 text-[12px] font-bold hover:bg-[#FEF2F2] transition-all cursor-pointer"
                           title="Delete User Account"
                         >
                           <Trash2 size={13} />
                           <span>Delete</span>
                         </button>
                       ) : (
-                        <span className="text-[11.5px] font-semibold text-[#9CA0A6] italic">
+                        <span className="text-[11.5px] font-semibold text-[#A1A1AA] italic">
                           Protected Admin
                         </span>
                       )}
@@ -276,7 +287,7 @@ export default function UsersPage({
         title="Delete User Account?"
         message={
           <>
-            Are you sure you want to permanently delete user <span className="font-bold text-[#17181A]">{deleteTargetUser?.email}</span>?
+            Are you sure you want to permanently delete user <span className="font-bold text-[#18181B]">{deleteTargetUser?.email}</span>?
             All linked safety stickers and profile data will be permanently removed.
           </>
         }

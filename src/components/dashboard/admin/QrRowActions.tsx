@@ -25,8 +25,7 @@ export default function QrRowActions({ qr, openQuickLook, setDeleteTarget, openP
 
   const handleOpenLink = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const url = qrFullUrl(qr.id);
-    window.open(url, "_blank", "noopener,noreferrer");
+    window.open(qrFullUrl(qr.id), "_blank", "noopener,noreferrer");
   };
 
   const handleView = (e: React.MouseEvent) => {
@@ -40,68 +39,43 @@ export default function QrRowActions({ qr, openQuickLook, setDeleteTarget, openP
   };
 
   return (
-    <div className="flex items-center justify-end gap-1.5">
-      {/* Copy button */}
-      <button
-        onClick={handleCopyLink}
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs border ${
-          copied
-            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-            : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 hover:text-gray-900"
-        }`}
-        title={copied ? "Copied to clipboard!" : "Copy QR Link"}
-      >
-        {copied ? (
-          <Check size={13} className="text-emerald-600 flex-shrink-0" />
-        ) : (
-          <Copy size={13} className="text-gray-500 flex-shrink-0" />
-        )}
-        <span>{copied ? "Copied!" : "Copy"}</span>
-      </button>
-
-      {/* Open link button */}
-      <button
-        onClick={handleOpenLink}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/80 hover:bg-blue-100 transition-all cursor-pointer shadow-2xs"
-        title="Open QR public URL in new tab"
-      >
-        <ExternalLink size={13} className="text-blue-600 flex-shrink-0" />
-        <span>Open link</span>
-      </button>
-
-      {/* View button */}
+    <div className="flex items-center justify-end gap-0.5">
       <button
         onClick={handleView}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200 hover:bg-slate-200/80 transition-all cursor-pointer shadow-2xs"
-        title="Quick preview sticker"
+        className="w-7 h-7 rounded-md flex items-center justify-center text-[#71717A] hover:text-[#18181B] hover:bg-[#F4F4F5] transition-all cursor-pointer"
+        title="View"
       >
-        <Eye size={13} className="text-slate-600 flex-shrink-0" />
-        <span>View</span>
+        <Eye size={14} />
       </button>
-
-      {/* Print 18x12 Sheet button */}
+      <button
+        onClick={handleCopyLink}
+        className="w-7 h-7 rounded-md flex items-center justify-center text-[#71717A] hover:text-[#16A34A] hover:bg-[#F0FDF4] transition-all cursor-pointer"
+        title={copied ? "Copied!" : "Copy link"}
+      >
+        {copied ? <Check size={14} className="text-[#16A34A]" /> : <Copy size={14} />}
+      </button>
+      <button
+        onClick={handleOpenLink}
+        className="w-7 h-7 rounded-md flex items-center justify-center text-[#71717A] hover:text-[#2563EB] hover:bg-[#EFF6FF] transition-all cursor-pointer"
+        title="Open link"
+      >
+        <ExternalLink size={14} />
+      </button>
       {openPrintSheet && (
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            openPrintSheet(qr);
-          }}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#E8EDFF] text-[#3E52B8] border border-[#5C78DF]/30 hover:bg-[#DCE3FF] transition-all cursor-pointer shadow-2xs"
-          title="Generate 18×12″ print sheet (3×3 grid, 9 stickers)"
+          onClick={(e) => { e.stopPropagation(); openPrintSheet(qr); }}
+          className="w-7 h-7 rounded-md flex items-center justify-center text-[#71717A] hover:text-[#A16207] hover:bg-[#FDF4DB] transition-all cursor-pointer"
+          title="Print sheet"
         >
-          <Printer size={13} className="text-[#3E52B8] flex-shrink-0" />
-          <span>Print Sheet</span>
+          <Printer size={14} />
         </button>
       )}
-
-      {/* Delete button */}
       <button
         onClick={handleDelete}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200/80 hover:bg-rose-100 transition-all cursor-pointer shadow-2xs"
-        title="Delete QR code"
+        className="w-7 h-7 rounded-md flex items-center justify-center text-[#71717A] hover:text-[#DC2626] hover:bg-[#FEF2F2] transition-all cursor-pointer"
+        title="Delete"
       >
-        <Trash2 size={13} className="text-rose-600 flex-shrink-0" />
-        <span>Delete</span>
+        <Trash2 size={14} />
       </button>
     </div>
   );

@@ -1,0 +1,145 @@
+/**
+ * MSG91 WhatsApp templates catalogue — the SINGLE source of truth.
+ *
+ * These are the exact template definitions to submit in the MSG91 dashboard
+ * (control.msg91.com → WhatsApp → Templates → Create). Copy the `body` text
+ * verbatim, choose the correct category, and keep the named variable
+ * placeholders exactly as the `variables` object below.
+ *
+ * Rules MSG91/Meta enforce:
+ *  - Placeholders use named keys such as `{{label}}` and `{{message}}`.
+ *  - Every placeholder must map to a real token and match this file.
+ *  - Template names are lowercase, alphanumeric + underscore (they are).
+ *
+ * `notificationTemplates.js` imports these bodies at runtime, so the session
+ * fallback text and the submitted template can never drift apart.
+ */
+
+/**
+ * Trim untrusted, scanner-supplied text before it goes into a message.
+ * Mirrors the runtime clip in notificationTemplates.js (shared behaviour).
+ */
+function clip(value, max = 120) {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+/**
+ * MSG91_TEMPLATES[type] = {
+ *   name:       MSG91 template name (as submitted for approval),
+ *   audience:   'owner' | 'emergency_contact' | 'otp' — who receives it,
+ *   variables:  ordered variable names used as placeholders, for example
+ *              `['label', 'message', 'link']`,
+ *   defaults:   fallback text used ONLY by the runtime session/mock render
+ *               when a variable value is empty,
+ *   body:       the EXACT message you paste into MSG91, with named placeholders.
+ * }
+ */
+const MSG91_TEMPLATES = {
+  QR_SCAN_ALERT: {
+    name: 'qr_scan_alert',
+    audience: 'owner',
+    variables: ['label', 'message', 'link'],
+    defaults: { label: 'your tag' },
+    body: 'RepiQR alert: someone just scanned your registered tag "{{label}}" and reported the following: "{{message}}". Open your RepiQR dashboard here: {{link}} to view details and respond securely.',
+  },
+
+  EMERGENCY_ALERT: {
+    name: 'emergency_alert',
+    audience: 'owner',
+    variables: ['label', 'message', 'link'],
+    defaults: { label: 'your tag' },
+    body: 'RepiQR EMERGENCY: an urgent alert has been raised for "{{label}}". The person who scanned your tag reports: "{{message}}". Open your dashboard here: {{link}} to view visitor details and take action.',
+  },
+
+  EMERGENCY_CONTACT_ALERT: {
+    name: 'emergency_contact_alert',
+    audience: 'emergency_contact',
+    variables: ['label', 'message'],
+    defaults: { label: 'a registered tag' },
+    body: 'RepiQR EMERGENCY NOTIFICATION: an urgent alert was raised on the registered tag "{{label}}". The reporter states: "{{message}}". Please check on this situation immediately.',
+  },
+
+  LOCATION_SHARED: {
+    name: 'location_shared',
+    audience: 'owner',
+    variables: ['label', 'mapsUrl', 'link'],
+    defaults: { label: 'your tag' },
+    body: 'RepiQR location alert: someone shared their live GPS location for your tag "{{label}}". View the exact location on the map here: {{mapsUrl}}. Open your dashboard here: {{link}} to view full details and respond.',
+  },
+
+  CHAT_STARTED: {
+    name: 'chat_started',
+    audience: 'owner',
+    variables: ['label', 'link'],
+    defaults: { label: 'your tag' },
+    body: 'RepiQR chat alert: a visitor has started a conversation about your tag "{{label}}". They are waiting for your response. Open your dashboard here: {{link}} to view the message and reply securely.',
+  },
+
+  CHAT_MESSAGE: {
+    name: 'chat_message',
+    audience: 'owner',
+    variables: ['label', 'message', 'link'],
+    defaults: { label: 'your tag' },
+    body: 'RepiQR new message: you have a new message from a visitor regarding your tag "{{label}}". The message reads: "{{message}}". Open your dashboard here: {{link}} to read and respond.',
+  },
+
+  SAFE_STATUS: {
+    name: 'safe_status',
+    audience: 'emergency_contact',
+    variables: ['label', 'time'],
+    defaults: { label: 'a registered tag' },
+    body: 'RepiQR resolved: the emergency situation on the registered tag "{{label}}" has been marked as SAFE and resolved by the registered user. Time of resolution: {{time}}. No further action is needed.',
+  },
+
+  QR_ACTIVATED: {
+    name: 'qr_activated',
+    audience: 'owner',
+    variables: ['label'],
+    defaults: { label: '' },
+    body: 'RepiQR activation: congratulations! Your registered tag "{{label}}" is now active and protecting you. Your tag is live and ready to receive alerts from anyone who scans it.',
+  },
+
+  OTP: {
+    name: 'otp_verification',
+    audience: 'owner',
+    variables: ['code'],
+    defaults: { code: '' },
+    body: 'RepiQR verification: your one-time verification code is {{code}}. This code is valid for 10 minutes only. Do not share this code with anyone, including RepiQR support staff.',
+  },
+};
+
+/** Max clip length per variable key (message text tends to run long). */
+const CLIP_MAX = { label: 40, message: 80 };
+
+/**
+ * Render an MSG91 body with the runtime values filled into {{1}}, {{2}}, ...
+ * This is what the mock provider logs and what a session message sends, so it
+ * always matches the submitted template text.
+ */
+function renderBody(type, data = {}) {
+  const template = MSG91_TEMPLATES[type];
+  if (!template) return '';
+  const { body, variables, defaults = {} } = template;
+  return variables.reduce((text, key) => {
+    const max = CLIP_MAX[key];
+    const value = max ? clip(data[key], max) : String(data[key] ?? '');
+    const final = value || defaults[key] || '';
+    return text.replace(new RegExp(`\\{\\{${key}\\}\\}`), final);
+  }, body);
+}
+
+/** Named variable map for the WhatsApp template. */
+function buildVariables(type, data = {}) {
+  const template = MSG91_TEMPLATES[type];
+  if (!template) return {};
+  return Object.fromEntries(template.variables.map((key) => [key, String(data[key] ?? '')]));
+}
+
+module.exports = {
+  MSG91_TEMPLATES,
+  MSG91_TEMPLATE_NAMES: Object.values(MSG91_TEMPLATES).map((t) => t.name),
+  renderBody,
+  buildVariables,
+  clip,
+};

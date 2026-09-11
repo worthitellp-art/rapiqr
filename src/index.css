@@ -45,6 +45,280 @@
 .font-mono { font-family: 'JetBrains Mono', 'IBM Plex Mono', monospace; }
 .font-body { font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
 
+/* ── Admin Console design tokens ───────────────────────────────────────────
+   Clean, premium SaaS language (light-yellow accent system): off-white
+   canvas, pure-white cards, dark charcoal typography, soft warm-gray borders,
+   very light shadows, and a selective brand-yellow accent used only for
+   primary CTAs, active states, selections, badges, key indicators and small
+   highlights — never large surfaces. Consumers sit under `#root .ac-console`
+   (the admin dashboard root) so nothing leaks into the public site. */
+.ac-console {
+  --ac-bg: #F8F8F7;          /* page canvas (warm off-white) */
+  --ac-surface: #FFFFFF;     /* card surface                 */
+  --ac-border: #E5E7EB;      /* hairline borders             */
+  --ac-border-strong: #D4D4D8;
+  --ac-ink: #18181B;         /* dark charcoal text           */
+  --ac-ink-2: #3F3F46;       /* secondary text               */
+  --ac-muted: #71717A;       /* tertiary text                */
+  --ac-faint: #A1A1AA;       /* placeholder                  */
+  --ac-accent: #F5C518;      /* brand yellow (CTAs, active)  */
+  --ac-accent-strong: #EAB308;
+  --ac-accent-soft: #FDF4DB;
+  --ac-accent-soft-strong: #F8E9B0;
+  --ac-accent-ink: #A16207;  /* readable amber text on soft  */
+  --ac-on-accent: #18181B;   /* text placed on yellow        */
+  --ac-green: #22C55E;
+  --ac-green-ink: #16A34A;
+  --ac-green-soft: #F0FDF4;
+  --ac-red: #EF4444;
+  --ac-red-ink: #DC2626;
+  --ac-red-soft: #FEF2F2;
+  --ac-amber: #B54708;
+  --ac-amber-soft: #FEF6E7;
+  --ac-radius-card: 14px;
+  --ac-radius-control: 10px;
+  --ac-radius-pill: 8px;
+  --ac-shadow-card: 0 1px 2px rgba(24, 24, 27, 0.05), 0 1px 3px rgba(24, 24, 27, 0.04);
+  --ac-shadow-pop: 0 8px 24px rgba(24, 24, 27, 0.10), 0 2px 8px rgba(24, 24, 27, 0.06);
+
+  /* Base type size for the admin console — all Tailwind px text classes below
+     are scaled up by the "admin type scale" block further down, so 12px machine
+     output renders as a comfortable ~13.5px here. */
+  font-size: 15px;
+}
+
+/* ── Admin type scale ────────────────────────────────────────────────────────
+   The dashboard was built with compact 10–13px utility classes; this scoped
+   pass scales them all up by ~1–1.5px (plus the big display sizes) so the whole
+   console reads larger and more comfortable without touching layout spacing.
+   `.ac-console .text-...` beats Tailwind's `.text-...` on specificity. */
+.ac-console .text-\[8px\] { font-size: 9.5px; }
+.ac-console .text-\[9px\] { font-size: 10.5px; }
+.ac-console .text-\[10px\] { font-size: 11.5px; }
+.ac-console .text-\[10\.5px\] { font-size: 12px; }
+.ac-console .text-\[11px\] { font-size: 12.5px; }
+.ac-console .text-\[11\.5px\] { font-size: 13px; }
+.ac-console .text-\[12px\] { font-size: 13.5px; }
+.ac-console .text-\[12\.5px\] { font-size: 14px; }
+.ac-console .text-\[13px\] { font-size: 14.5px; }
+.ac-console .text-\[13\.5px\] { font-size: 15px; }
+.ac-console .text-\[14px\] { font-size: 15.5px; }
+.ac-console .text-\[15px\] { font-size: 16.5px; }
+.ac-console .text-\[15\.5px\] { font-size: 17px; }
+.ac-console .text-\[16px\] { font-size: 17.5px; }
+.ac-console .text-\[17px\] { font-size: 18.5px; }
+.ac-console .text-\[18px\] { font-size: 19.5px; }
+.ac-console .text-\[20px\] { font-size: 21.5px; }
+.ac-console .text-\[21px\] { font-size: 22.5px; }
+.ac-console .text-\[24px\] { font-size: 26px; }
+.ac-console .text-\[26px\] { font-size: 28px; }
+.ac-console .text-\[28px\] { font-size: 30px; }
+.ac-console .text-\[30px\] { font-size: 32px; }
+
+/* Card — the atomic surface unit. */
+.ac-card {
+  background: var(--ac-surface);
+  border: 1px solid var(--ac-border);
+  border-radius: var(--ac-radius-card);
+  box-shadow: var(--ac-shadow-card);
+}
+
+/* Card header band — title + optional actions, with a hairline divider. */
+.ac-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--ac-border);
+}
+
+/* Card body padding */
+.ac-card-body { padding: 20px; }
+
+/* Compact, scannable section headings. */
+.ac-section-title {
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ac-ink);
+}
+.ac-card-title {
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ac-ink);
+}
+.ac-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ac-muted);
+}
+
+/* Buttons — one primary-action system, 40–44px tall, 10px radius, bold text. */
+.ac-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 18px;
+  border-radius: var(--ac-radius-control);
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease, transform .05s ease;
+}
+.ac-btn:active { transform: scale(0.98); }
+.ac-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ac-btn-primary { background: var(--ac-ink); color: #FFFFFF; }
+.ac-btn-primary:hover:not(:disabled) { background: #27272A; }
+
+.ac-btn-accent { background: var(--ac-accent); color: var(--ac-on-accent); }
+.ac-btn-accent:hover:not(:disabled) { background: var(--ac-accent-strong); }
+
+.ac-btn-secondary {
+  background: var(--ac-surface);
+  border-color: var(--ac-border-strong);
+  color: var(--ac-ink);
+}
+.ac-btn-secondary:hover:not(:disabled) { background: #F4F4F5; }
+
+.ac-btn-ghost { background: transparent; color: var(--ac-muted); }
+.ac-btn-ghost:hover:not(:disabled) { background: #F4F4F5; color: var(--ac-ink); }
+
+.ac-btn-danger { background: var(--ac-red); color: #FFFFFF; }
+.ac-btn-danger:hover:not(:disabled) { background: var(--ac-red-ink); }
+
+/* Inputs / selects / textareas — 40–44px tall, 10px radius. */
+.ac-input, .ac-select {
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: var(--ac-radius-control);
+  border: 1px solid var(--ac-border-strong);
+  background: var(--ac-surface);
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 15px;
+  color: var(--ac-ink);
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.ac-input::placeholder { color: var(--ac-faint); }
+.ac-input:focus, .ac-select:focus {
+  border-color: var(--ac-accent-strong);
+  box-shadow: 0 0 0 3px rgba(245, 197, 24, 0.30);
+}
+.ac-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--ac-radius-control);
+  border: 1px solid var(--ac-border-strong);
+  background: var(--ac-surface);
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 15px;
+  color: var(--ac-ink);
+  outline: none;
+  resize: vertical;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.ac-textarea::placeholder { color: var(--ac-faint); }
+.ac-textarea:focus {
+  border-color: var(--ac-accent-strong);
+  box-shadow: 0 0 0 3px rgba(245, 197, 24, 0.30);
+}
+
+/* Pills / badges / status chips. */
+.ac-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: var(--ac-radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.ac-pill-dot { width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0; }
+
+/* Small square icon tile. */
+.ac-icon-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+/* Data tables. */
+.ac-table { width: 100%; border-collapse: collapse; }
+.ac-th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ac-muted);
+  background: #F8F8F7;
+  border-bottom: 1px solid var(--ac-border);
+  white-space: nowrap;
+}
+.ac-td {
+  padding: 16px;
+  font-size: 14.5px;
+  color: var(--ac-ink);
+  border-bottom: 1px solid var(--ac-border);
+  vertical-align: middle;
+}
+.ac-tr-row { transition: background-color .12s ease; }
+.ac-tr-row:hover { background: #F8F8F7; }
+tbody .ac-tr-row:last-child .ac-td { border-bottom: none; }
+
+/* Filters / tab chips. */
+.ac-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid var(--ac-border-strong);
+  background: var(--ac-surface);
+  color: var(--ac-muted);
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+}
+.ac-chip:hover { color: var(--ac-ink); border-color: var(--ac-border-strong); }
+.ac-chip-active {
+  background: var(--ac-accent);
+  border-color: var(--ac-accent);
+  color: var(--ac-on-accent);
+}
+
+/* Docked modal surface. */
+.ac-modal {
+  background: var(--ac-surface);
+  border: 1px solid var(--ac-border);
+  border-radius: 16px;
+  box-shadow: var(--ac-shadow-pop);
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  color: var(--ac-ink);
+}
+
 * { box-sizing: border-box; }
 html { height: 100%; }
 body { height: 100%; -webkit-font-smoothing: antialiased; }
@@ -62,6 +336,11 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+.custom-scrollbar-light::-webkit-scrollbar { width: 5px; }
+.custom-scrollbar-light::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar-light::-webkit-scrollbar-thumb { background: #D0D5DD; border-radius: 3px; }
+.custom-scrollbar-light::-webkit-scrollbar-thumb:hover { background: #98A2B3; }
 
 @media(prefers-reduced-motion:reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }

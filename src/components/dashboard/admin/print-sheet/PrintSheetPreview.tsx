@@ -29,78 +29,60 @@ export default function PrintSheetPreview({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[12px] font-bold text-[#17181A] uppercase tracking-wider">
-            Live 18×12″ Sheet Preview
-          </span>
-          {totalSheets > 1 && hasSelection && (
-            <span className="text-[11px] font-bold bg-[#E8EDFF] text-[#3E52B8] px-2 py-0.5 rounded">
-              Sheet {currentPage + 1} of {totalSheets} (Stickers {currentSheetStartSticker}–{currentSheetEndSticker})
+      <div className="flex items-center justify-between">
+        <span className="text-[12px] font-semibold text-[#18181B]">
+          Preview
+        </span>
+
+        {totalSheets > 1 && hasSelection && (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onPreviousPage}
+              disabled={currentPage === 0}
+              className="p-1 rounded bg-white border border-[#E5E7EB] hover:bg-[#F4F4F5] text-[#18181B] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+              title="Previous Sheet"
+            >
+              <ChevronLeft size={13} />
+            </button>
+            <span className="text-[11px] font-medium text-[#71717A] px-1">
+              {currentPage + 1} / {totalSheets}
             </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3">
-          {totalSheets > 1 && hasSelection && (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={onPreviousPage}
-                disabled={currentPage === 0}
-                className="p-1 rounded bg-white border border-[#E5E5E7] hover:bg-[#F3F3F4] text-[#17181A] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                title="Previous Sheet"
-              >
-                <ChevronLeft size={14} />
-              </button>
-              <span className="text-[11px] font-mono text-[#777B80] px-1">
-                {currentPage + 1} / {totalSheets}
-              </span>
-              <button
-                type="button"
-                onClick={onNextPage}
-                disabled={currentPage >= totalSheets - 1}
-                className="p-1 rounded bg-white border border-[#E5E5E7] hover:bg-[#F3F3F4] text-[#17181A] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                title="Next Sheet"
-              >
-                <ChevronRight size={14} />
-              </button>
-            </div>
-          )}
-
-          <span className="text-[11px] text-[#777B80] font-mono hidden sm:inline">
-            Ratio: 18:12 (3:2) · 9 Unique Slots · Cut lines
-          </span>
-        </div>
+            <button
+              type="button"
+              onClick={onNextPage}
+              disabled={currentPage >= totalSheets - 1}
+              className="p-1 rounded bg-white border border-[#E5E7EB] hover:bg-[#F4F4F5] text-[#18181B] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+              title="Next Sheet"
+            >
+              <ChevronRight size={13} />
+            </button>
+          </div>
+        )}
       </div>
 
-      <div className="w-full bg-[#EAEBED] rounded-xl border border-[#DCDDE0] p-4 flex items-center justify-center relative min-h-[260px] max-h-[360px] overflow-hidden">
+      <div className="w-full bg-[#F8F8F7] rounded-lg border border-[#E5E7EB] p-3 flex items-center justify-center relative min-h-[220px] max-h-[340px] overflow-hidden">
         {isLoading ? (
-          <div className="flex flex-col items-center gap-2 text-[#777B80]">
-            <Loader2 size={24} className="animate-spin text-[#5C78DF]" />
-            <span className="text-[12px] font-medium">Rendering unique 3×3 sticker sheet...</span>
+          <div className="flex items-center gap-2 text-[#71717A] text-[12px]">
+            <Loader2 size={16} className="animate-spin text-[#EAB308]" />
+            <span>Rendering preview...</span>
           </div>
         ) : errorMessage ? (
-          <div className="flex flex-col items-center gap-2 text-[#DC2626] text-center p-4 max-w-sm">
-            <AlertCircle size={24} />
-            <span className="text-[13px] font-medium">{errorMessage}</span>
+          <div className="text-[12px] text-[#EF4444] text-center p-2">
+            {errorMessage}
           </div>
         ) : !hasSelection ? (
-          <div className="flex flex-col items-center gap-2 text-[#777B80] text-center p-4">
-            <EyeOff size={26} className="text-[#9CA0A6]" />
-            <span className="text-[13px] font-medium text-[#17181A]">No stickers selected</span>
-            <span className="text-[11.5px] text-[#777B80]">
-              Select stickers above to preview the unique 3×3 sheet layout.
-            </span>
+          <div className="text-[12px] text-[#A1A1AA] text-center p-4">
+            Select stickers to preview sheet
           </div>
         ) : previewBlobUrl ? (
           <img
             src={previewBlobUrl}
             alt="Print sheet preview"
-            className="w-full h-auto max-h-[320px] object-contain rounded shadow-md border border-white"
+            className="w-full h-auto max-h-[310px] object-contain rounded border border-[#E5E7EB] shadow-xs"
           />
         ) : (
-          <div className="text-[12px] text-[#777B80]">No preview available</div>
+          <div className="text-[12px] text-[#A1A1AA]">No preview</div>
         )}
       </div>
     </div>

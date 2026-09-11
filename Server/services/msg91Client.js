@@ -94,6 +94,32 @@ function callMsg91Api(method, apiPath, payload = null, customHeaders = {}) {
 }
 
 /**
+ * Turn an MSG91 API response into a human-readable error, mapping the common
+ * API Security (418) and auth (401) rejections to actionable messages.
+ */
+function msg91ErrorText(response) {
+  const body = response && response.body;
+  if (!body) return '';
+  if (typeof body === 'string') return body;
+  if (body.apiError === '418') {
+    return 'MSG91 API Security (418): server IP is not whitelisted for this auth key — add it in MSG91 dashboard → Authkey → API Security, or disable the toggle';
+  }
+  if (String(body.code) === '401' || body.apiError === '401') {
+    return 'MSG91 Unauthorized (401): MSG91_AUTH_KEY was rejected or has no WhatsApp access';
+  }
+  return (
+    body.message ||
+    body.error ||
+    (typeof body.errors === 'string'
+      ? body.errors
+      : Array.isArray(body.errors)
+      ? body.errors.map((e) => e?.message || JSON.stringify(e)).join('; ')
+      : '') ||
+    ''
+  );
+}
+
+/**
  * Dispatches transactional SMS via MSG91 Flow API.
  * Flow API is standard for DLT-compliant transactional and promotional SMS in India.
  *
@@ -220,10 +246,10 @@ async function verifyMsg91Otp({ mobile, otp }) {
  * Builds the components mapping required by MSG91 WhatsApp Outbound Bulk Template API.
  * Supports arrays of parameters, explicit key-value mappings, and plain text fallbacks.
  *
- * @param {{ variables?: Array<string|number> | Record<string, any>, components?: Record<string, any>, body?: string, headerMediaUrl?: string }} params
+ * @param {{ variables?: Record<string, any>, components?: Record<string, any>, body?: string, headerMediaUrl?: string }} params
  * @returns {Record<string, { type: string, value: string }>}
  */
-function buildMsg91WhatsAppComponents({ variables = [], components = {}, body = '', headerMediaUrl = '' } = {}) {
+function buildMsg91WhatsAppComponents({ variables = {}, components = {}, body = '', headerMediaUrl = '' } = {}) {
   const result = {};
 
   // 1. If pre-structured components object is provided, normalize each field
@@ -237,16 +263,9 @@ function buildMsg91WhatsAppComponents({ variables = [], components = {}, body = 
     }
   }
 
-  // 2. If variables array is provided, map items sequentially to body_1, body_2, etc.
-  if (Array.isArray(variables) && variables.length > 0) {
-    variables.forEach((val, index) => {
-      const key = `body_${index + 1}`;
-      if (!result[key]) {
-        result[key] = { type: 'text', value: String(val) };
-      }
-    });
-  } else if (variables && typeof variables === 'object' && Object.keys(variables).length > 0) {
-    // If variables is key-value object (e.g. { name: 'Alice' } or { 1: 'Alice' } or { body_1: 'Alice' })
+  // 2. Named variables map directly to named MSG91 body components.
+  if (variables && typeof variables === 'object' && Object.keys(variables).length > 0) {
+    // Keys are template variable names, e.g. { label: 'Car', link: 'https://...' }.
     for (const [key, val] of Object.entries(variables)) {
       const formattedKey = key.startsWith('body_') || key.startsWith('header_') || key.startsWith('button_')
         ? key
@@ -277,7 +296,7 @@ function buildMsg91WhatsAppComponents({ variables = [], components = {}, body = 
 /**
  * Dispatches WhatsApp Message via MSG91 Outbound WhatsApp Template API (V5 bulk endpoint).
  *
- * @param {{ to: string|string[], templateName?: string, integratedNumber?: string, variables?: Array<string|number>|Record<string, any>, components?: Record<string, any>, body?: string, languageCode?: string, headerMediaUrl?: string }} params
+ * @param {{ to: string|string[], templateName?: string, integratedNumber?: string, variables?: Record<string, any>, components?: Record<string, any>, body?: string, languageCode?: string, headerMediaUrl?: string }} params
  * @returns {Promise<{ success: boolean, simulated: boolean, statusCode?: number, response?: any, messageId?: string|null, error?: string|null, reason?: string }>}
  */
 async function sendMsg91WhatsApp({
@@ -347,9 +366,7 @@ async function sendMsg91WhatsApp({
     (Array.isArray(response.body?.data) ? response.body.data[0]?.message_id : null) ||
     null;
 
-  const errorMessage = isOk
-    ? null
-    : response.body?.message || response.body?.error || response.body?.errors?.[0]?.message || 'MSG91 WhatsApp send failed';
+  const errorMessage = isOk ? null : msg91ErrorText(response) || 'MSG91 WhatsApp send failed';
 
   return {
     success: isOk,
@@ -399,9 +416,7 @@ async function sendMsg91SessionWhatsApp({ to, text, integratedNumber }) {
     response.body?.type !== 'error';
 
   const messageId = response.body?.request_id || response.body?.message_id || null;
-  const errorMessage = isOk
-    ? null
-    : response.body?.message || response.body?.error || 'MSG91 WhatsApp session message failed';
+  const errorMessage = isOk ? null : msg91ErrorText(response) || 'MSG91 WhatsApp session message failed';
 
   return {
     success: isOk,

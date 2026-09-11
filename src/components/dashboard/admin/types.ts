@@ -16,6 +16,7 @@ export interface QrRecord {
   ownerPhone?: string;
   ownerName?: string;
   phoneNumber?: string;
+  recoveryCode?: string;
 }
 
 export interface Template {

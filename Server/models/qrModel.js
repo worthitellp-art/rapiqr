@@ -6,6 +6,20 @@ const Alert = require('./schemas/Alert');
 const User = require('./schemas/User');
 const { normalizePhone, isSamePhone } = require('../utils/phone');
 
+const DUPLICATE_ERROR_CODES = ['E11000', '11000'];
+
+function isDuplicateError(err) {
+  return err && DUPLICATE_ERROR_CODES.some((code) => String(err.code) === code || String(err.errmsg || '').includes('duplicate key'));
+}
+
+function getDuplicateDetails(err) {
+  const msg = String(err.errmsg || '');
+  const match = msg.match(/category:\s*(\w+),\s*normalized_phone_number:\s*(\S+)/);
+  if (match) return { category: match[1], phone: match[2] };
+  const match2 = msg.match(/normalized_phone_number:\s*(\S+)/);
+  return match2 ? { phone: match2[1] } : null;
+}
+
 // Fields safe to return from the PUBLIC scan/activate/record-scan endpoints —
 // deliberately excludes user_id/name/assigned_to/vehicle_number/details, which
 // hold the owner's PII (phone, email, address, blood group, emergency
@@ -195,6 +209,9 @@ class QrModel {
       const id = qrData.id || require('crypto').randomBytes(8).toString('hex');
       const rawRecoveryCode = qrData.recoveryCode || generateRecoveryCode();
       const codeHash = hashRecoveryCode(rawRecoveryCode);
+      const category = qrData.category || 'car';
+      const ownerPhone = qrData.ownerPhone || qrData.phone_number || qrData.owner_phone || null;
+      const normalizedPhone = ownerPhone ? normalizePhone(ownerPhone) : null;
 
       const doc = await Sticker.create({
         _id: id,
@@ -203,7 +220,9 @@ class QrModel {
         template_name: qrData.template || 'Standard Tag',
         fg_color: qrData.fg || '000000',
         bg_color: qrData.bg || 'FFFFFF',
-        category: qrData.category || 'car',
+        category,
+        phone_number: ownerPhone,
+        normalized_phone_number: normalizedPhone,
         recovery_code: rawRecoveryCode,
         recovery_code_hash: codeHash,
         created_at: qrData.createdAt || new Date(),
@@ -211,6 +230,12 @@ class QrModel {
 
       return { ...toPublicQr(doc), recoveryCode: rawRecoveryCode };
     } catch (err) {
+      if (isDuplicateError(err)) {
+        const dup = getDuplicateDetails(err);
+        const errObj = new Error(`A tag with phone number ${dup?.phone || 'unknown'} already exists in category ${dup?.category || category || 'car'}`);
+        errObj.code = 'DUPLICATE_PHONE';
+        throw errObj;
+      }
       console.error('QrModel.save Error:', err);
       return null;
     }
@@ -227,6 +252,7 @@ class QrModel {
     }
 
     const update = { status: 'active' };
+    let normalizedPhone = null;
 
     if (activationData.ownerName || activationData.ownerPhone || activationData.notes || activationData.message) {
       const requestedUserId = activationData.userId || activationData.user_id || null;
@@ -236,6 +262,8 @@ class QrModel {
       if (activationData.ownerPhone) {
         details.ownerPhone = activationData.ownerPhone;
         update.phone_number = activationData.ownerPhone;
+        normalizedPhone = normalizePhone(activationData.ownerPhone);
+        update.normalized_phone_number = normalizedPhone;
       }
       if (activationData.ownerEmail) details.ownerEmail = activationData.ownerEmail;
       if (activationData.notes) details.notes = activationData.notes;
@@ -258,11 +286,20 @@ class QrModel {
       update.user_id = ownerId || current.user_id || null;
     }
 
-    const doc = await Sticker.findByIdAndUpdate(current._id, { $set: update }, { new: true })
-      .select(PUBLIC_QR_FIELDS)
-      .lean();
-
-    return toPublicQr(doc);
+    try {
+      const doc = await Sticker.findByIdAndUpdate(current._id, { $set: update }, { new: true })
+        .select(PUBLIC_QR_FIELDS)
+        .lean();
+      return toPublicQr(doc);
+    } catch (err) {
+      if (isDuplicateError(err)) {
+        const dup = getDuplicateDetails(err);
+        const errObj = new Error(`A tag with phone number ${dup?.phone || 'unknown'} already exists in category ${dup?.category || current.category || 'car'}`);
+        errObj.code = 'DUPLICATE_PHONE';
+        throw errObj;
+      }
+      throw err;
+    }
   }
 
   /**

@@ -136,20 +136,20 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
   const orphans = providers.filter((p: any) => !known.has(providerSlug(p)));
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#18181B] font-body" style={{ background: "#F8F8F7" }}>
       {/* Add Provider Form */}
-      <div className="bg-white border border-[#E5E5E7] p-6 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
-        <h3 className="font-display font-semibold text-[#17181A] text-[14px] mb-5 flex items-center gap-2">
-          <Phone size={15} className="text-[#B8863F]" /> Add Service Provider
+      <div className="bg-white border border-[#E5E7EB] p-6 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+        <h3 className="font-display font-semibold text-[#18181B] text-[14px] mb-5 flex items-center gap-2">
+          <Phone size={15} className="text-[#B54708]" /> Add Service Provider
         </h3>
         <form onSubmit={handleAdd} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
-              <label className="block text-[10px] font-extrabold text-[#777B80] mb-1.5 uppercase tracking-wider">Service Type</label>
+              <label className="block text-[10px] font-extrabold text-[#71717A] mb-1.5 uppercase tracking-wider">Service Type</label>
               <select
                 value={serviceType}
                 onChange={(e) => setServiceType(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-sm rounded-[4px] border border-[#E5E5E7] bg-white outline-none focus:border-[#5C78DF] transition-all font-semibold text-[#17181A]"
+                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-[#E5E7EB] bg-white outline-none focus:border-[#F5C518] transition-all font-semibold text-[#18181B]"
               >
                 {SERVICE_TYPES.map((s) => (
                   <option key={s.slug} value={s.slug}>{s.label}</option>
@@ -157,23 +157,23 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-extrabold text-[#777B80] mb-1.5 uppercase tracking-wider">Provider Name</label>
+              <label className="block text-[10px] font-extrabold text-[#71717A] mb-1.5 uppercase tracking-wider">Provider Name</label>
               <input
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder={meta.placeholder}
-                className="w-full px-3.5 py-2.5 text-sm rounded-[4px] border border-[#E5E5E7] bg-white outline-none focus:border-[#5C78DF] transition-all font-semibold text-[#17181A]"
+                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-[#E5E7EB] bg-white outline-none focus:border-[#F5C518] transition-all font-semibold text-[#18181B]"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-extrabold text-[#777B80] mb-1.5 uppercase tracking-wider">Phone Number</label>
+              <label className="block text-[10px] font-extrabold text-[#71717A] mb-1.5 uppercase tracking-wider">Phone Number</label>
               <PhoneInputWithCountry value={phone} onChange={(full) => setPhone(full)} />
             </div>
             <div className="flex items-end">
               <button
                 type="submit"
                 disabled={!label.trim() || !phone.trim() || saving}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-[4px] bg-[#17181A] hover:bg-[#2A2B2E] text-white text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#F5C518] hover:bg-[#EAB308] text-[#18181B] text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
                 <Plus size={14} /> {saving ? "Saving…" : "Add"}
               </button>
@@ -182,9 +182,9 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
 
           {/* Category scope */}
           <div>
-            <label className="block text-[10px] font-extrabold text-[#777B80] mb-2 uppercase tracking-wider">
+            <label className="block text-[10px] font-extrabold text-[#71717A] mb-2 uppercase tracking-wider">
               Applicable Categories
-              <span className="ml-2 font-semibold normal-case tracking-normal text-[#9CA0A6]">
+              <span className="ml-2 font-semibold normal-case tracking-normal text-[#A1A1AA]">
                 — leave all unselected to make this provider available to every category
               </span>
             </label>
@@ -196,10 +196,10 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
                     key={c.value}
                     type="button"
                     onClick={() => toggleCategory(c.value)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-[4px] text-[11px] font-bold border transition-all cursor-pointer ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
                       on
-                        ? "bg-[#17181A] border-[#17181A] text-white"
-                        : "bg-white border-[#E5E5E7] text-[#777B80] hover:border-[#9CA0A6]"
+                        ? "bg-[#F5C518] border-[#F5C518] text-[#18181B]"
+                        : "bg-white border-[#E5E7EB] text-[#71717A] hover:border-[#A1A1AA]"
                     }`}
                   >
                     {on && <Check size={11} />} {c.label}
@@ -217,14 +217,14 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
           {grouped.map(({ type, items }) => {
             const m = getServiceMeta(type.slug);
             return (
-              <div key={type.slug} className="bg-white border border-[#E5E5E7] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
-                <div className="px-5 py-3 border-b border-[#E5E5E7] bg-[#F7F7F8] flex items-center gap-2.5">
-                  <div className="w-6 h-6 rounded-[4px] flex items-center justify-center" style={{ background: m.bg, color: m.color }}>
+              <div key={type.slug} className="bg-white border border-[#E5E7EB] overflow-hidden rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+                <div className="px-5 py-3 border-b border-[#E5E7EB] bg-[#F8F8F7] flex items-center gap-2.5">
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: m.bg, color: m.color }}>
                     <m.Icon size={14} />
                   </div>
-                  <span className="text-xs font-extrabold text-[#17181A] uppercase tracking-wider">{type.label}</span>
-                  <span className="text-[10px] text-[#777B80] font-semibold bg-[#F3F3F4] px-1.5 py-0.5 rounded-[4px]">{items.length}</span>
-                  <span className="text-[10px] text-[#9CA0A6] font-mono ml-auto">{type.slug}</span>
+                  <span className="text-xs font-extrabold text-[#18181B] uppercase tracking-wider">{type.label}</span>
+                  <span className="text-[10px] text-[#71717A] font-semibold bg-[#F4F4F5] px-1.5 py-0.5 rounded-lg">{items.length}</span>
+                  <span className="text-[10px] text-[#A1A1AA] font-mono ml-auto">{type.slug}</span>
                 </div>
 
                 {items.map((p: any) => {
@@ -236,30 +236,30 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
                   return (
                     <div
                       key={p.id}
-                      className={`flex items-center justify-between px-5 py-3.5 border-b border-[#E5E5E7] last:border-0 hover:bg-[#F3F3F4] transition-colors ${inactive ? "opacity-55" : ""}`}
+                      className={`flex items-center justify-between px-5 py-3.5 border-b border-[#E5E7EB] last:border-0 hover:bg-[#F4F4F5] transition-colors ${inactive ? "opacity-55" : ""}`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-[4px] flex items-center justify-center flex-shrink-0" style={{ background: m.bg, color: m.color }}>
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.bg, color: m.color }}>
                           <m.Icon size={14} />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-[#17181A] truncate flex items-center gap-1.5">
+                          <p className="text-xs font-bold text-[#18181B] truncate flex items-center gap-1.5">
                             {p.label}
                             {isApplication && (
-                              <span className="px-1.5 py-0.5 rounded-[3px] bg-[#FBF3E4] text-[#B8863F] text-[9px] font-extrabold uppercase tracking-wider flex-shrink-0">
+                              <span className="px-1.5 py-0.5 rounded-md bg-[#FEF6E7] text-[#B54708] text-[9px] font-extrabold uppercase tracking-wider flex-shrink-0">
                                 Applied
                               </span>
                             )}
                           </p>
-                          <p className="text-[11px] text-[#777B80] font-mono font-semibold mt-0.5">{p.phone}</p>
+                          <p className="text-[11px] text-[#71717A] font-mono font-semibold mt-0.5">{p.phone}</p>
                           {(p.city || p.email) && (
-                            <p className="text-[10px] text-[#777B80] font-semibold mt-1 flex items-center gap-2.5 flex-wrap">
+                            <p className="text-[10px] text-[#71717A] font-semibold mt-1 flex items-center gap-2.5 flex-wrap">
                               {p.city && <span className="flex items-center gap-1"><MapPin size={10} /> {p.city}</span>}
                               {p.email && <span className="flex items-center gap-1"><Mail size={10} /> {p.email}</span>}
                             </p>
                           )}
-                          {p.notes && <p className="text-[10px] text-[#777B80] mt-1 line-clamp-2">{p.notes}</p>}
-                          <p className="text-[10px] text-[#9CA0A6] font-semibold mt-1">
+                          {p.notes && <p className="text-[10px] text-[#71717A] mt-1 line-clamp-2">{p.notes}</p>}
+                          <p className="text-[10px] text-[#A1A1AA] font-semibold mt-1">
                             {scope.length === 0
                               ? "All categories"
                               : scope.map((s) => STICKER_CATEGORIES.find((c) => c.value === s)?.label || s).join(" · ")}
@@ -270,17 +270,17 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <button
                           onClick={() => handleToggleActive(p)}
-                          className={`px-2.5 py-1 rounded-[4px] text-[10px] font-extrabold uppercase tracking-wider border transition-all cursor-pointer ${
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider border transition-all cursor-pointer ${
                             inactive
-                              ? "bg-white border-[#E5E5E7] text-[#9CA0A6] hover:border-[#2E9E5B] hover:text-[#2E9E5B]"
-                              : "bg-[#E9F9EF] border-[#2E9E5B]/30 text-[#2E9E5B] hover:bg-[#D7F2E2]"
+                              ? "bg-white border-[#E5E7EB] text-[#A1A1AA] hover:border-[#16A34A] hover:text-[#16A34A]"
+                              : "bg-[#F0FDF4] border-[#16A34A]/30 text-[#16A34A] hover:bg-[#D7F2E2]"
                           }`}
                         >
                           {inactive ? (isApplication ? "Approve" : "Inactive") : "Active"}
                         </button>
                         <button
                           onClick={() => handleRemove(p.id)}
-                          className="w-7 h-7 rounded-[4px] hover:bg-[#FDEAEA] hover:text-[#DC2626] flex items-center justify-center text-[#9CA0A6] transition-all cursor-pointer"
+                          className="w-7 h-7 rounded-lg hover:bg-[#FEF2F2] hover:text-[#EF4444] flex items-center justify-center text-[#A1A1AA] transition-all cursor-pointer"
                         >
                           <Trash2 size={13} />
                         </button>
@@ -293,24 +293,24 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
           })}
 
           {orphans.length > 0 && (
-            <div className="bg-white border border-[#E5E5E7] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
-              <div className="px-5 py-3 border-b border-[#E5E5E7] bg-[#FBF3E4] flex items-center gap-2.5">
-                <div className="w-6 h-6 rounded-[4px] flex items-center justify-center" style={{ background: "#FDEAEA", color: "#B8863F" }}>
+            <div className="bg-white border border-[#E5E7EB] overflow-hidden rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+              <div className="px-5 py-3 border-b border-[#E5E7EB] bg-[#FEF6E7] flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: "#FEF2F2", color: "#B54708" }}>
                   <AlertTriangle size={14} />
                 </div>
-                <span className="text-xs font-extrabold text-[#17181A] uppercase tracking-wider">Unrecognised service type</span>
-                <span className="text-[10px] text-[#777B80] font-semibold">These won't be matched by any scan-page button</span>
+                <span className="text-xs font-extrabold text-[#18181B] uppercase tracking-wider">Unrecognised service type</span>
+                <span className="text-[10px] text-[#71717A] font-semibold">These won't be matched by any scan-page button</span>
               </div>
               {orphans.map((p: any) => (
-                <div key={p.id} className="flex items-center justify-between px-5 py-3.5 border-b border-[#E5E5E7] last:border-0">
+                <div key={p.id} className="flex items-center justify-between px-5 py-3.5 border-b border-[#E5E7EB] last:border-0">
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-[#17181A] truncate">{p.label}</p>
-                    <p className="text-[11px] text-[#777B80] font-mono font-semibold mt-0.5">{p.phone}</p>
-                    <p className="text-[10px] text-[#9CA0A6] font-mono mt-1">{p.category || "—"} → {providerSlug(p) || "—"}</p>
+                    <p className="text-xs font-bold text-[#18181B] truncate">{p.label}</p>
+                    <p className="text-[11px] text-[#71717A] font-mono font-semibold mt-0.5">{p.phone}</p>
+                    <p className="text-[10px] text-[#A1A1AA] font-mono mt-1">{p.category || "—"} → {providerSlug(p) || "—"}</p>
                   </div>
                   <button
                     onClick={() => handleRemove(p.id)}
-                    className="w-7 h-7 rounded-[4px] hover:bg-[#FDEAEA] hover:text-[#DC2626] flex items-center justify-center text-[#9CA0A6] transition-all cursor-pointer flex-shrink-0"
+                    className="w-7 h-7 rounded-lg hover:bg-[#FEF2F2] hover:text-[#EF4444] flex items-center justify-center text-[#A1A1AA] transition-all cursor-pointer flex-shrink-0"
                   >
                     <Trash2 size={13} />
                   </button>
@@ -320,12 +320,12 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
           )}
         </div>
       ) : (
-        <div className="bg-white border border-[#E5E5E7] p-12 text-center shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
-          <div className="w-12 h-12 rounded-[4px] bg-[#F3F3F4] flex items-center justify-center mx-auto mb-3">
-            <Phone size={20} className="text-[#9CA0A6]" />
+        <div className="bg-white border border-[#E5E7EB] p-12 text-center rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+          <div className="w-12 h-12 rounded-lg bg-[#F4F4F5] flex items-center justify-center mx-auto mb-3">
+            <Phone size={20} className="text-[#A1A1AA]" />
           </div>
-          <p className="text-sm font-semibold text-[#17181A]">No providers added yet</p>
-          <p className="text-xs text-[#777B80] mt-1">Add your first service provider above</p>
+          <p className="text-sm font-semibold text-[#18181B]">No providers added yet</p>
+          <p className="text-xs text-[#71717A] mt-1">Add your first service provider above</p>
         </div>
       )}
     </div>

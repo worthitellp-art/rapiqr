@@ -74,6 +74,15 @@ import activationArt from "../../assets/illustrations/activation-art.jpg";
 import guardianArt from "../../assets/illustrations/guardian-art.jpg";
 import deepinspireScene from "../../assets/illustrations/deepinspire-scene.jpg";
 
+/* WhatsApp logo SVG — matches the CategoryScanView WhatsAppIcon */
+function WhatsAppSvg({ size = 16, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.29.173-1.414-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+    </svg>
+  );
+}
+
 /* ---------------------------------------------------------------------- */
 /*  Types                                                                   */
 /* ---------------------------------------------------------------------- */
@@ -590,8 +599,9 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   }, [qrData]);
 
   // Emergency and Quick-issue alert dispatch:
-  // Dispatches alert to backend, saves in localStorage alert history, opens WhatsApp emergency draft,
-  // and syncs with the visitor's in-app RepiChat thread.
+  // Dispatches alert to backend (which auto-sends WhatsApp via MSG91 to the
+  // owner), saves in localStorage alert history, and syncs with the visitor's
+  // in-app RepiChat thread. The visitor never sees the owner's number.
   const sendQuickIssueAlert = async (alertType: string, defaultMessage: string) => {
     if (!qrData) return;
     const locationText = location ? `\n📍 Location: https://www.google.com/maps?q=${location.lat},${location.lng}` : "";
@@ -646,18 +656,9 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       /* ignore non-critical backend logger failure */
     }
 
-    // 3. Resolve Owner Phone & open WhatsApp emergency message
-    const contactsList = getTowingContacts();
-    const primaryContact = contactsList.find((c) => c.primary) || contactsList[0];
-    const rawOwnerPhone = primaryContact?.phone || (qrData.vehicleNumber && !qrData.vehicleNumber.startsWith("REG-") ? qrData.vehicleNumber : "");
-    const cleanedDigits = rawOwnerPhone.replace(/\D/g, "");
-    const formattedWaPhone = cleanedDigits.length === 10 ? `91${cleanedDigits}` : cleanedDigits;
-
-    const whatsappUrl = formattedWaPhone
-      ? `https://api.whatsapp.com/send?phone=${formattedWaPhone}&text=${encodeURIComponent(fullMessage)}`
-      : `https://api.whatsapp.com/send?text=${encodeURIComponent(fullMessage)}`;
-
-    window.open(whatsappUrl, "_blank");
+    // 3. WhatsApp is dispatched automatically by the backend (via MSG91) straight
+    // to the owner — the visitor never sees the owner's number. Opening
+    // api.whatsapp.com here would leak that number, so it is deliberately not done.
 
     setChatInitialMessage(undefined);
     setChatOpen(true);
@@ -1161,13 +1162,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
       if (result.kind === "sms") {
         // Report what actually happened — the alert is always saved, but the
-        // SMS itself can be simulated (no provider configured) or fail.
+        // WhatsApp itself can be simulated (no provider configured) or fail.
         flashVariantBanner(
           result.ownerNotified
-            ? "SMS sent — the owner has been notified."
+            ? "WhatsApp sent — the owner has been notified."
             : result.simulated
-              ? "Logged for the owner. SMS is in test mode, so nothing was delivered."
-              : "Saved to the owner's alert history, but the SMS could not be delivered."
+              ? "Logged for the owner. WhatsApp is in test mode, so nothing was delivered."
+              : "Saved to the owner's alert history, but the WhatsApp could not be delivered."
         );
       }
     } finally {
@@ -2317,7 +2318,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                         Message Vehicle Owner
                       </h4>
                       <p className="text-[11.5px] text-gray-400 font-medium mt-0.5">
-                        Start a private chat. The owner receives an SMS alert automatically.
+                        Start a private chat. The owner receives a WhatsApp alert automatically.
                       </p>
                     </div>
                   </div>
@@ -2468,6 +2469,30 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                           {locationSharing ? <Loader2 size={14} className="animate-spin" /> : <Navigation size={14} />} SEND
                         </div>
                       </button>
+                      {/* Button 4: Alert Owner on WhatsApp */}
+                      <button
+                        onClick={() => {
+                          sendQuickIssueAlert("Emergency Alert", qrData?.category === "car"
+                            ? "I scanned the RepiQR tag on your car — there is an emergency at the vehicle."
+                            : "I scanned the RepiQR tag on your bike — there is an emergency at the vehicle.");
+                          flashVariantBanner("WhatsApp alert sent — the owner has been notified.");
+                        }}
+                        className="w-full bg-gradient-to-r from-[#22C55E] to-[#15A34A] hover:from-[#16A34A] hover:to-[#15803D] text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-green-600/20 active:scale-[0.98] transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center flex-shrink-0">
+                            <WhatsAppSvg size={22} />
+                          </div>
+                          <div className="text-left min-w-0">
+                            <p className="text-sm font-black text-white tracking-tight">Alert Owner on WhatsApp</p>
+                            <p className="text-[11px] font-medium text-white/80">Sends alert + location to owner</p>
+                          </div>
+                        </div>
+                        <div className="bg-white text-green-700 font-black text-xs px-3 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
+                          <WhatsAppSvg size={12} /> SEND
+                        </div>
+                      </button>
+
                       {locationShareBanner && (
                         <p className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-1.5">
                           <CheckCircle2 size={13} /> {locationShareBanner}
@@ -2497,13 +2522,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       {/* Manual Full-Colored RepiChat Action Card */}
                       <div className="bg-amber-50/60 border border-amber-100 rounded-2xl p-4 text-center space-y-2">
                         <p className="text-xs font-bold text-gray-900">Need Mechanic Assistance?</p>
-                        <p className="text-[11px] text-gray-500 font-medium">Send a direct RepiChat notification to the owner to report a mechanical issue.</p>
+                        <p className="text-[11px] text-gray-500 font-medium">Send a direct WhatsApp notification to the owner to report a mechanical issue.</p>
                         <button
                           onClick={() => sendQuickIssueAlert("Mechanic Needed", "Vehicle mechanical issue reported. Mechanic assistance requested.")}
-                          className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
+                          className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#22C55E] to-[#15A34A] hover:from-[#16A34A] hover:to-[#15803D] text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
                         >
-                          <MessageCircle className="w-5 h-5" />
-                          <span>Alert Owner via RepiChat</span>
+                          <WhatsAppSvg className="w-5 h-5" />
+                          <span>Alert Owner on WhatsApp</span>
                         </button>
                       </div>
 
@@ -2564,13 +2589,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       {/* Manual Full-Colored RepiChat Action Card */}
                       <div className="bg-red-50/60 border border-red-100 rounded-2xl p-4 text-center space-y-2">
                         <p className="text-xs font-bold text-gray-900">Towing / Breakdown Recovery?</p>
-                        <p className="text-[11px] text-gray-500 font-medium">Alert the owner via RepiChat to request towing assistance for this vehicle.</p>
+                        <p className="text-[11px] text-gray-500 font-medium">Alert the owner on WhatsApp to request towing assistance for this vehicle.</p>
                         <button
                           onClick={() => sendQuickIssueAlert("Towing Service Needed", "Roadside breakdown / towing assistance requested for your vehicle.")}
-                          className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
+                          className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#22C55E] to-[#15A34A] hover:from-[#16A34A] hover:to-[#15803D] text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
                         >
-                          <MessageCircle className="w-5 h-5" />
-                          <span>Alert Owner via RepiChat</span>
+                          <WhatsAppSvg className="w-5 h-5" />
+                          <span>Alert Owner on WhatsApp</span>
                         </button>
                       </div>
 
@@ -2745,13 +2770,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       {/* Manual Full-Colored RepiChat Action Card */}
                       <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-4 text-center space-y-2">
                         <p className="text-xs font-bold text-gray-900">Vehicle Blocking Path?</p>
-                        <p className="text-[11px] text-gray-500 font-medium">Send a direct RepiChat notification to the owner to request moving their vehicle.</p>
+                        <p className="text-[11px] text-gray-500 font-medium">Send a direct WhatsApp notification to the owner to request moving their vehicle.</p>
                         <button
                           onClick={() => sendQuickIssueAlert("Parking Issue", "Hi, your vehicle is blocking a path/driveway. Please move it as soon as possible.")}
-                          className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
+                          className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#22C55E] to-[#15A34A] hover:from-[#16A34A] hover:to-[#15803D] text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
                         >
-                          <MessageCircle className="w-5 h-5" />
-                          <span>Alert Owner via RepiChat</span>
+                          <WhatsAppSvg className="w-5 h-5" />
+                          <span>Alert Owner on WhatsApp</span>
                         </button>
                       </div>
 
@@ -2804,13 +2829,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       {/* Manual Full-Colored RepiChat Action Card */}
                       <div className="bg-amber-50/60 border border-amber-100 rounded-2xl p-4 text-center space-y-2">
                         <p className="text-xs font-bold text-gray-900">Headlights Left On?</p>
-                        <p className="text-[11px] text-gray-500 font-medium">Alert the owner immediately via RepiChat so their vehicle battery doesn't drain.</p>
+                        <p className="text-[11px] text-gray-500 font-medium">Alert the owner immediately on WhatsApp so their vehicle battery doesn't drain.</p>
                         <button
                           onClick={() => sendQuickIssueAlert("Headlights On", "Hi, your vehicle's headlights are left turned on. Please check them.")}
-                          className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
+                          className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#22C55E] to-[#15A34A] hover:from-[#16A34A] hover:to-[#15803D] text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
                         >
-                          <MessageCircle className="w-5 h-5" />
-                          <span>Alert Owner via RepiChat</span>
+                          <WhatsAppSvg className="w-5 h-5" />
+                          <span>Alert Owner on WhatsApp</span>
                         </button>
                       </div>
 
@@ -2863,13 +2888,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       {/* Manual Full-Colored RepiChat Action Card */}
                       <div className="bg-rose-50/60 border border-rose-100 rounded-2xl p-4 text-center space-y-2">
                         <p className="text-xs font-bold text-gray-900">Suspicious Activity / Tampering?</p>
-                        <p className="text-[11px] text-gray-500 font-medium">Send an emergency alert directly to the owner via RepiChat.</p>
+                        <p className="text-[11px] text-gray-500 font-medium">Send an emergency alert directly to the owner on WhatsApp.</p>
                         <button
                           onClick={() => sendQuickIssueAlert("Theft Alert", "EMERGENCY: Someone reported suspicious activity or potential theft regarding your vehicle.")}
-                          className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
+                          className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#22C55E] to-[#15A34A] hover:from-[#16A34A] hover:to-[#15803D] text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
                         >
-                          <MessageCircle className="w-5 h-5" />
-                          <span>Send Emergency RepiChat Alert</span>
+                          <WhatsAppSvg className="w-5 h-5" />
+                          <span>Send Emergency WhatsApp Alert</span>
                         </button>
                       </div>
 
@@ -2922,13 +2947,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       {/* Manual Full-Colored RepiChat Action Card */}
                       <div className="bg-purple-50/60 border border-purple-100 rounded-2xl p-4 text-center space-y-2">
                         <p className="text-xs font-bold text-gray-900">Flat Tyre Detected?</p>
-                        <p className="text-[11px] text-gray-500 font-medium">Send a RepiChat alert to the vehicle owner.</p>
+                        <p className="text-[11px] text-gray-500 font-medium">Send a WhatsApp alert to the vehicle owner.</p>
                         <button
                           onClick={() => sendQuickIssueAlert("Flat Tyre", "Hi, noticed a flat tyre on your vehicle. Please check it.")}
-                          className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
+                          className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#22C55E] to-[#15A34A] hover:from-[#16A34A] hover:to-[#15803D] text-white font-extrabold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer mt-1"
                         >
-                          <MessageCircle className="w-5 h-5" />
-                          <span>Alert Owner via RepiChat</span>
+                          <WhatsAppSvg className="w-5 h-5" />
+                          <span>Alert Owner on WhatsApp</span>
                         </button>
                       </div>
 

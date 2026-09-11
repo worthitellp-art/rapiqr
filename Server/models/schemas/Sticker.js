@@ -36,6 +36,7 @@ const stickerSchema = new Schema({
 
   user_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
   phone_number: { type: String, default: null, index: true },
+  normalized_phone_number: { type: String, default: null, index: true },
   name: { type: String, default: null },
   assigned_to: { type: String, default: null },
   vehicle_number: { type: String, default: null },
@@ -55,8 +56,20 @@ const stickerSchema = new Schema({
   created_at: { type: Date, default: Date.now },
 }, { versionKey: false });
 
+const { normalizePhone } = require('../../utils/phone');
+
+stickerSchema.pre('save', function(next) {
+  if (this.phone_number) {
+    this.normalized_phone_number = normalizePhone(this.phone_number);
+  } else {
+    this.normalized_phone_number = null;
+  }
+  next();
+});
+
 stickerSchema.index({ created_at: -1 });
 stickerSchema.index({ user_id: 1 });
 stickerSchema.index({ 'details.ownerPhone': 1 });
+stickerSchema.index({ category: 1, normalized_phone_number: 1 }, { unique: true, sparse: true });
 
 module.exports = model('Sticker', stickerSchema);

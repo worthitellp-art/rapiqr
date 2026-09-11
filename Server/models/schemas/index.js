@@ -12,4 +12,5 @@ module.exports = {
   ShopProduct: require('./ShopProduct'),
   Template: require('./Template'),
   PushSubscription: require('./PushSubscription'),
+  AuditLog: require('./AuditLog'),
 };

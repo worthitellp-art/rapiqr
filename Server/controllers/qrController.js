@@ -55,6 +55,9 @@ class QrController {
       logger.rowInserted('qr_codes', saved.id, { category: saved.category, template: saved.template_name, status: saved.status });
       return res.json({ success: true, data: saved });
     } catch (err) {
+      if (err.code === 'DUPLICATE_PHONE') {
+        return res.status(409).json({ success: false, error: err.message });
+      }
       logger.error('QR_SAVE', 'Error saving QR Code record', err);
       return res.status(500).json({ success: false, error: err.message });
     }
@@ -71,6 +74,9 @@ class QrController {
       logger.rowUpdated('qr_codes', id, { action: 'activated', status: 'active' });
       return res.json({ success: true, data: activated });
     } catch (err) {
+      if (err.code === 'DUPLICATE_PHONE') {
+        return res.status(409).json({ success: false, error: err.message });
+      }
       logger.error('QR_ACTIVATE', `Failed to activate QR Code: ${req.params.id}`, err);
       return res.status(500).json({ success: false, error: err.message });
     }

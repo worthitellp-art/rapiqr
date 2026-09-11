@@ -1,0 +1,143 @@
+REPIQR MSG91 WHATSAPP TEMPLATE CONFIGURATION
+
+LANGUAGE
+English en
+
+GENERAL RULES
+Use the exact template names below.
+Use the Utility category unless another category is specified.
+Use named variables exactly as written.
+Do not replace named variables with numbered variables.
+Do not put a variable at the beginning or end of a template.
+For Add Sample, enter a value in every variable field.
+Use demo values only. Do not use real customer data.
+
+TEMPLATE 1
+Name: qr_scan_alert
+Category: Utility
+Variables:
+{{label}} = tag label
+{{message}} = visitor message
+{{link}} = dashboard URL
+Body:
+RepiQR alert: someone just scanned your registered tag "{{label}}" and reported the following: "{{message}}". Open your RepiQR dashboard here: {{link}} to view details and respond securely.
+Sample values:
+{{label}} = Demo Tag 1234
+{{message}} = A visitor sent a test alert.
+{{link}} = https://example.com/dashboard
+
+TEMPLATE 2
+Name: emergency_alert
+Category: Utility
+Variables:
+{{label}} = tag label
+{{message}} = emergency message
+{{link}} = dashboard URL
+Body:
+RepiQR EMERGENCY: an urgent alert has been raised for "{{label}}". The person who scanned your tag reports: "{{message}}". Open your dashboard here: {{link}} to view visitor details and take action.
+Sample values:
+{{label}} = Demo Tag 1234
+{{message}} = This is a test emergency alert.
+{{link}} = https://example.com/dashboard
+
+TEMPLATE 3
+Name: emergency_contact_alert
+Category: Utility
+Variables:
+{{label}} = tag label
+{{message}} = emergency message
+Body:
+RepiQR EMERGENCY NOTIFICATION: an urgent alert was raised on the registered tag "{{label}}". The reporter states: "{{message}}". Please check on this situation immediately.
+Sample values:
+{{label}} = Demo Tag 1234
+{{message}} = This is a test emergency alert.
+
+
+
+
+
+
+TEMPLATE 4
+Name: location_shared
+Category: Utility
+Variables:
+{{label}} = tag label
+{{mapsUrl}} = Google Maps URL
+{{link}} = dashboard URL
+Body:
+RepiQR location alert: someone shared their live GPS location for your tag "{{label}}". View the exact location on the map here: {{mapsUrl}}. Open your dashboard here: {{link}} to view full details and respond.
+Sample values:
+{{label}} = Demo Tag 1234
+{{mapsUrl}} = https://maps.google.com/?q=19.0760,72.8777
+{{link}} = https://example.com/dashboard
+
+
+
+
+
+TEMPLATE 5
+Name: chat_started
+Category: Utility
+Variables:
+{{label}} = tag label
+{{link}} = dashboard URL
+Body:
+RepiQR chat alert: a visitor has started a conversation about your tag "{{label}}". They are waiting for your response. Open your dashboard here: {{link}} to view the message and reply securely.
+Sample values:
+{{label}} = Demo Tag 1234
+{{link}} = https://example.com/dashboard
+
+
+
+
+TEMPLATE 6
+Name: chat_message
+Category: Utility
+Variables:
+{{label}} = tag label
+{{message}} = visitor message
+{{link}} = dashboard URL
+Body:
+RepiQR new message: you have a new message from a visitor regarding your tag "{{label}}". The message reads: "{{message}}". Open your dashboard here: {{link}} to read and respond.
+Sample values:
+{{label}} = Demo Tag 1234
+{{message}} = This is a test visitor message.
+{{link}} = https://example.com/dashboard
+
+TEMPLATE 7
+Name: safe_status
+Category: Utility
+Variables:
+{{label}} = tag label
+{{time}} = resolution time
+Body:
+RepiQR resolved: the emergency situation on the registered tag "{{label}}" has been marked as SAFE and resolved by the registered user. Time of resolution: {{time}}. No further action is needed.
+Sample values:
+{{label}} = Demo Tag 1234
+{{time}} = 11:30 AM
+
+TEMPLATE 8
+Name: qr_activated
+Category: Utility
+Variables:
+{{label}} = tag label
+Body:
+RepiQR activation: congratulations! Your registered tag "{{label}}" is now active and protecting you. Your tag is live and ready to receive alerts from anyone who scans it.
+Sample values:
+{{label}} = Demo Tag 1234
+
+TEMPLATE 9
+Name: otp_verification
+Category: Authentication
+Variables:
+{{code}} = one time verification code
+Body:
+RepiQR verification: your one-time verification code is {{code}}. This code is valid for 10 minutes only. Do not share this code with anyone, including RepiQR support staff.
+Sample values:
+{{code}} = 123456
+
+AFTER APPROVAL
+Run this command to check the named variable payload:
+node Server/scripts/testMsg91WhatsApp.js --dry-run
+
+Enable live delivery only after the templates are approved and the required NOTIFY event names are present in WHATSAPP_LIVE_EVENTS.

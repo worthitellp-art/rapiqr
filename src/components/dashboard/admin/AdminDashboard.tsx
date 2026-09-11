@@ -222,7 +222,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
             />
           )}
           {page === "repichat" && <RepiChatPage />}
-          {page === "users" && <UsersPage searchQuery={searchQuery} setSearchQuery={setSearchQuery} setToast={setToast} />}
+           {page === "users" && <UsersPage setToast={setToast} />}
 
           {page === "customize" && (
             <CustomizePage

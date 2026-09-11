@@ -170,7 +170,7 @@ async function sendSms({ to, body, event = 'SMS_SEND', flowId, variables }) {
  * Dispatches a WhatsApp notification using MSG91 WhatsApp Outbound API or Twilio WhatsApp.
  * Supports template outbound messages with components, session messages, test redirects, and database logging.
  *
- * @param {{ to: string|string[], body?: string, event?: string, templateName?: string, variables?: Array<string|number>|Record<string, any>, components?: Record<string, any>, headerMediaUrl?: string, isSessionMessage?: boolean }} opts
+ * @param {{ to: string|string[], body?: string, event?: string, templateName?: string, variables?: Record<string, any>, components?: Record<string, any>, headerMediaUrl?: string, isSessionMessage?: boolean }} opts
  * @returns {Promise<{ sent: boolean, simulated: boolean, sid?: string, error?: string, reason?: string }>}
  */
 async function sendWhatsApp({

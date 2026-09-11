@@ -14,6 +14,8 @@ const { createResetLink, findUserByResetToken } = require('../services/passwordR
 const { sendEmail } = require('../services/emailService');
 const { deleteUserAccount } = require('../services/accountDeletionService');
 const loginAttemptTracker = require('../utils/loginAttemptTracker');
+const SecurityEventTypes = require('../utils/securityEventTypes');
+const { logAuditEvent } = require('../services/auditService');
 
 // Same IP/origin extraction the request logger uses (loggerMiddleware.js), kept
 // local here since these are recorded onto the user record, not just logged.
@@ -100,6 +102,18 @@ class AuthController {
 
       logger.success('AUTH_SIGNUP', `User registered successfully: ${profile.email} (${profile.role})`);
 
+      await logAuditEvent({
+        eventType: SecurityEventTypes.USER_CREATED,
+        actorType: 'USER',
+        req,
+        userId: profile.id,
+        userEmail: profile.email,
+        resourceType: 'USER',
+        resourceId: profile.id,
+        statusCode: 200,
+        metadata: { role: profile.role, fullName: profile.fullName },
+      });
+
       return res.json({
         success: true,
         token,
@@ -184,6 +198,17 @@ class AuthController {
         if (failCount >= loginAttemptTracker.SUSPICIOUS_THRESHOLD) {
           logger.security('SUSPICIOUS_LOGIN_ATTEMPTS', `${failCount} failed sign-in attempts for ${email} within 15 minutes`, { email: normalizedEmail, ip, userAgent, failCount });
         }
+
+        await logAuditEvent({
+          eventType: SecurityEventTypes.AUTH_LOGIN_FAILED,
+          actorType: 'ANONYMOUS',
+          req,
+          userEmail: normalizedEmail,
+          statusCode: 401,
+          reason: 'Invalid email or password',
+          metadata: { failCount },
+        });
+
         return res.status(401).json({ success: false, error: 'Invalid email or password' });
       }
 
@@ -209,6 +234,16 @@ class AuthController {
       });
 
       logger.success('AUTH_SIGNIN', `User signed in successfully: ${email}`, { ip, userAgent }, { userId: profile.id });
+
+      await logAuditEvent({
+        eventType: SecurityEventTypes.AUTH_LOGIN_SUCCESS,
+        actorType: profile.role === 'admin' ? 'ADMIN' : 'USER',
+        req,
+        userId: profile.id,
+        userEmail: profile.email,
+        statusCode: 200,
+        metadata: { role: profile.role },
+      });
 
       return res.json({
         success: true,
@@ -256,6 +291,17 @@ class AuthController {
         // repeated failure here (not just past the suspicious threshold) is
         // worth a SECURITY-category entry, not just a WARN one.
         logger.security('ADMIN_LOGIN_FAILED', `Failed admin sign-in attempt using email ${email}`, { attemptedEmail: email, ip, userAgent, failCount });
+
+        await logAuditEvent({
+          eventType: SecurityEventTypes.AUTH_LOGIN_FAILED,
+          actorType: 'ANONYMOUS',
+          req,
+          userEmail: inputEmail,
+          statusCode: 401,
+          reason: 'Invalid admin credentials',
+          metadata: { target: 'admin', failCount },
+        });
+
         return res.status(401).json({ success: false, error: 'Invalid admin credentials.' });
       }
 
@@ -288,6 +334,16 @@ class AuthController {
       );
 
       logger.success('AUTH_ADMIN_SIGNIN', `Admin signed in: ${ADMIN_EMAIL}`, { ip, userAgent }, { userId: profile.id });
+
+      await logAuditEvent({
+        eventType: SecurityEventTypes.ADMIN_ACCESS,
+        actorType: 'ADMIN',
+        req,
+        userId: profile.id,
+        userEmail: configuredAdminEmail,
+        statusCode: 200,
+        metadata: { action: 'ADMIN_SIGNIN' },
+      });
 
       return res.json({
         success: true,
@@ -420,6 +476,15 @@ class AuthController {
         const userAgent = getUserAgent(req);
         await UserModel.recordLogout(req.user.id);
         logger.security('LOGOUT', `User signed out: ${req.user.email || req.user.id}`, { ip, userAgent }, { userId: req.user.id });
+
+        await logAuditEvent({
+          eventType: SecurityEventTypes.AUTH_LOGOUT,
+          actorType: req.user?.role === 'admin' ? 'ADMIN' : 'USER',
+          req,
+          userId: req.user?.id,
+          userEmail: req.user?.email,
+          statusCode: 200,
+        });
       }
       return res.json({ success: true, message: 'Signed out' });
     } catch (err) {

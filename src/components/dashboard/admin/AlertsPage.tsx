@@ -6,12 +6,12 @@ import { QrRecord, Template, SystemAlertItem } from "./types";
 import { fmtDateTime } from "./helpers";
 import { apiClient } from "../../../lib/apiClient";
 
-export default function AlertsPage({
-  qrList, setQrList, templates, setToast, searchQuery, isAdmin,
-}: {
-  qrList: QrRecord[]; setQrList: React.Dispatch<React.SetStateAction<QrRecord[]>>;
-  templates: Template[]; setToast: (msg: string | null) => void; searchQuery: string; isAdmin: boolean;
-}) {
+ export default function AlertsPage({
+   qrList, setQrList, templates, setToast, isAdmin, searchQuery,
+ }: {
+   qrList: QrRecord[]; setQrList: React.Dispatch<React.SetStateAction<QrRecord[]>>;
+   templates: Template[]; setToast: (msg: string | null) => void; isAdmin: boolean; searchQuery: string;
+ }) {
   const [filter, setFilter] = useState<"all" | "emergency" | "assistance" | "activation" | "scan">("all");
   const [reports, setReports] = useState<any[]>([]);
   const [expandedAlert, setExpandedAlert] = useState<string | null>(null);
@@ -126,10 +126,6 @@ export default function AlertsPage({
 
   const filteredAlerts = unifiedAlerts.filter((a) => {
     if (filter !== "all" && a.category !== filter) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return a.title.toLowerCase().includes(q) || a.subtitle.toLowerCase().includes(q);
-    }
     return true;
   });
 
@@ -142,38 +138,38 @@ export default function AlertsPage({
   };
 
   const categoryColors: Record<string, string> = {
-    emergency: "#DC2626",
-    assistance: "#B8863F",
-    activation: "#B8863F",
-    scan: "#5C78DF",
-    fleet: "#777B80",
+    emergency: "#EF4444",
+    assistance: "#B54708",
+    activation: "#B54708",
+    scan: "#F5C518",
+    fleet: "#71717A",
   };
 
   const categoryBgs: Record<string, string> = {
-    emergency: "#FDEAEA",
-    assistance: "#FBF3E4",
-    activation: "#FBF3E4",
+    emergency: "#FEF2F2",
+    assistance: "#FEF6E7",
+    activation: "#FEF6E7",
     scan: "#EDEDFB",
     fleet: "#F1F1F2",
   };
 
   const statusBadge = (s: string) => {
-    if (s === "unread") return <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-[4px]" style={{ background: "#FDEAEA", color: "#DC2626" }}>NEW</span>;
-    if (s === "active") return <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-[4px]" style={{ background: "#FBF3E4", color: "#B8863F" }}>ACTIVE</span>;
-    if (s === "resolved") return <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-[4px]" style={{ background: "#E9F9EF", color: "#2E9E5B" }}>RESOLVED</span>;
-    return <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-[4px]" style={{ background: "#F1F1F2", color: "#777B80" }}>INFO</span>;
+    if (s === "unread") return <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-lg" style={{ background: "#FEF2F2", color: "#EF4444" }}>NEW</span>;
+    if (s === "active") return <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-lg" style={{ background: "#FEF6E7", color: "#B54708" }}>ACTIVE</span>;
+    if (s === "resolved") return <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-lg" style={{ background: "#F0FDF4", color: "#16A34A" }}>RESOLVED</span>;
+    return <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-lg" style={{ background: "#F1F1F2", color: "#71717A" }}>INFO</span>;
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#17181A] font-body" style={{ background: "#F7F7F8" }}>
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#18181B] font-body" style={{ background: "#F8F8F7" }}>
       {/* True Emergency Banner — impossible to miss when a real SOS is active */}
       {trueEmergencyCount > 0 && (
-        <div className="flex items-center gap-3 border border-[#DC2626] bg-[#FDEAEA] px-4 py-3">
+        <div className="flex items-center gap-3 border border-[#EF4444] bg-[#FEF2F2] px-4 py-3">
           <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#DC2626] opacity-75" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#DC2626]" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#EF4444] opacity-75" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#EF4444]" />
           </span>
-          <p className="text-[13px] font-bold text-[#DC2626]">
+          <p className="text-[13px] font-bold text-[#EF4444]">
             {trueEmergencyCount} true emergenc{trueEmergencyCount === 1 ? "y" : "ies"} awaiting response — live SOS location shared from the visitor's phone.
           </p>
         </div>
@@ -185,27 +181,27 @@ export default function AlertsPage({
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`rounded-[4px] border px-3.5 py-1.5 text-[12.5px] font-semibold transition-all cursor-pointer ${
+            className={`rounded-lg border px-3.5 py-1.5 text-[12.5px] font-semibold transition-all cursor-pointer ${
               filter === f
-                ? "bg-[#17181A] text-white border-[#17181A]"
-                : "bg-transparent border-[#E5E5E7] text-[#777B80] hover:bg-[#F3F3F4]"
+                ? "bg-[#F5C518] text-[#18181B] border-[#F5C518]"
+                : "bg-transparent border-[#E5E7EB] text-[#71717A] hover:bg-[#F4F4F5]"
             }`}
           >
             {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
         ))}
-        <span className="text-[11px] text-[#777B80] font-semibold ml-auto">{filteredAlerts.length} alerts</span>
+        <span className="text-[11px] text-[#71717A] font-semibold ml-auto">{filteredAlerts.length} alerts</span>
       </div>
 
       {/* Alerts Feed */}
       <div className="space-y-2">
         {filteredAlerts.length === 0 ? (
-          <div className="bg-white border border-[#E5E5E7] p-12 text-center shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
-            <div className="w-12 h-12 rounded-[4px] flex items-center justify-center mx-auto mb-4" style={{ background: "#E8EDFF", color: "#5271D5" }}>
+          <div className="bg-white border border-[#E5E7EB] p-12 text-center rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-4" style={{ background: "#FDF4DB", color: "#A16207" }}>
               <CheckCircle2 size={22} />
             </div>
-            <p className="font-bold text-[#17181A] text-sm">All clear</p>
-            <p className="text-xs text-[#777B80] mt-1 font-medium">No alerts matching your current filter.</p>
+            <p className="font-bold text-[#18181B] text-sm">All clear</p>
+            <p className="text-xs text-[#71717A] mt-1 font-medium">No alerts matching your current filter.</p>
           </div>
         ) : (
           filteredAlerts.map((alert) => {
@@ -214,8 +210,8 @@ export default function AlertsPage({
             return (
               <div
                 key={alert.id}
-                className={`bg-white overflow-hidden transition-all shadow-[0_1px_4px_rgba(0,0,0,0.03)] hover:bg-[#F3F3F4] ${
-                  isLiveEmergency ? "border-2 border-[#DC2626]" : "border border-[#E5E5E7]"
+                className={`bg-white overflow-hidden transition-all rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] hover:bg-[#F4F4F5] ${
+                  isLiveEmergency ? "border-2 border-[#EF4444]" : "border border-[#E5E7EB]"
                 }`}
                 style={{
                   borderLeft: `4px solid ${categoryColors[alert.category]}`,
@@ -226,12 +222,12 @@ export default function AlertsPage({
                   className="w-full flex items-center gap-4 px-5 py-3.5 text-left cursor-pointer"
                 >
                   <div
-                    className="w-9 h-9 rounded-[4px] flex items-center justify-center flex-shrink-0"
+                    className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                     style={{ background: categoryBgs[alert.category], color: categoryColors[alert.category] }}
                   >
                     {isLiveEmergency ? (
                       <span className="relative flex h-9 w-9 items-center justify-center">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-[4px] bg-[#DC2626] opacity-30" />
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-lg bg-[#EF4444] opacity-30" />
                         {categoryIcons[alert.category]}
                       </span>
                     ) : (
@@ -240,45 +236,45 @@ export default function AlertsPage({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className={`text-xs truncate ${isLiveEmergency ? "font-bold text-[#DC2626]" : "font-bold text-[#17181A]"}`}>{alert.title}</p>
+                      <p className={`text-xs truncate ${isLiveEmergency ? "font-bold text-[#EF4444]" : "font-bold text-[#18181B]"}`}>{alert.title}</p>
                       {isLiveEmergency ? (
-                        <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-[4px] bg-[#DC2626] text-white">Live</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-lg bg-[#EF4444] text-white">Live</span>
                       ) : (
                         statusBadge(alert.status)
                       )}
                     </div>
-                    <p className="text-[11px] text-[#777B80] font-medium mt-0.5 truncate">{alert.subtitle}</p>
+                    <p className="text-[11px] text-[#71717A] font-medium mt-0.5 truncate">{alert.subtitle}</p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-[10px] text-[#9CA0A6] font-mono font-semibold">{fmtDateTime(alert.timestamp)}</span>
-                    <ChevronRight size={14} className={`text-[#9CA0A6] transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                    <span className="text-[10px] text-[#A1A1AA] font-mono font-semibold">{fmtDateTime(alert.timestamp)}</span>
+                    <ChevronRight size={14} className={`text-[#A1A1AA] transition-transform ${isExpanded ? "rotate-90" : ""}`} />
                   </div>
                 </button>
 
                 {isExpanded && (
-                  <div className="px-5 pb-4 pt-0 border-t border-[#E5E5E7]">
-                    <div className="mt-3 space-y-2 text-xs text-[#17181A]">
+                  <div className="px-5 pb-4 pt-0 border-t border-[#E5E7EB]">
+                    <div className="mt-3 space-y-2 text-xs text-[#18181B]">
                       {alert.message && (
                         <div className="flex items-start gap-2">
-                          <MessageSquare size={12} className="text-[#9CA0A6] mt-0.5 flex-shrink-0" />
+                          <MessageSquare size={12} className="text-[#A1A1AA] mt-0.5 flex-shrink-0" />
                           <span className="font-medium">{alert.message}</span>
                         </div>
                       )}
                       {alert.reporterPhone && (
                         <div className="flex items-center gap-2">
-                          <Phone size={12} className="text-[#9CA0A6] flex-shrink-0" />
+                          <Phone size={12} className="text-[#A1A1AA] flex-shrink-0" />
                           <span className="font-mono font-medium">{alert.reporterPhone}</span>
                         </div>
                       )}
                       {alert.location && (
                         <div className="flex items-center gap-2">
-                          <MapPin size={12} className="text-[#9CA0A6] flex-shrink-0" />
+                          <MapPin size={12} className="text-[#A1A1AA] flex-shrink-0" />
                           <span className="font-medium">{alert.location}</span>
                         </div>
                       )}
                       {alert.qrId && (
                         <div className="flex items-center gap-2">
-                          <Info size={12} className="text-[#9CA0A6] flex-shrink-0" />
+                          <Info size={12} className="text-[#A1A1AA] flex-shrink-0" />
                           <span className="font-mono font-medium">QR ID: {alert.qrId}</span>
                         </div>
                       )}

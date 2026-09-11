@@ -1,15 +1,14 @@
 import QRCode from "qrcode";
 import { QrRecord, StickerPos } from "./types";
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
+import {
+  generateRepeatedStickerSheetBlob,
+  generateBatchStickersSheetBlobs,
+} from "../../../services/stickerPrintSheetService";
 
 const STICKER_SRC = stickerTemplateImg;
 const EDITOR_DISPLAY = { w: 320, h: 200 };
 
-// Generated entirely client-side (no network call, no third-party service) —
-// the exact same (data, fg, bg, size) always produces the exact same PNG data
-// URL, so there is nothing to store: it can be regenerated on demand, forever,
-// from just the sticker's own id and colors. Cached in memory since the admin
-// fleet list can render the same QR many times per session (list + thumbnail).
 const qrDataUrlCache = new Map<string, string>();
 
 export async function generateQrDataUrl(data: string, fg: string, bg: string, size = 220): Promise<string> {
@@ -25,7 +24,6 @@ export async function generateQrDataUrl(data: string, fg: string, bg: string, si
   qrDataUrlCache.set(key, url);
   return url;
 }
-
 
 export function fmtDate(d: string) {
   try {
@@ -44,13 +42,22 @@ export function fmtDateTime(d: string) {
 }
 
 /**
- * A sticker's own id — cryptographically random (Web Crypto's CSPRNG), unlike
- * uid() below which uses Math.random() and a namespace small enough to be
- * guessable. Used directly in the QR/scan URL; the backend also mints a
- * separate hashed recovery code at creation for admin-only restore.
+ * A sticker's own id — cryptographically random (Web Crypto's CSPRNG).
  */
 export function generateStickerId(): string {
   return crypto.randomUUID();
+}
+
+/**
+ * 12-character hex recovery code generated client-side with CSPRNG.
+ */
+export function generateClientRecoveryCode(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const randomBytes = new Uint8Array(6);
+    crypto.getRandomValues(randomBytes);
+    return Array.from(randomBytes, (byte) => byte.toString(16).padStart(2, "0")).join("").toUpperCase();
+  }
+  return Math.random().toString(36).substring(2, 14).toUpperCase();
 }
 
 export function uid(prefix = "QR") {
@@ -135,10 +142,6 @@ export async function compositeQrOnSticker(qrDataUrl: string, pos: StickerPos): 
 
 /**
  * Generate the composed sticker image for a QR record entirely client-side.
- * Nothing is uploaded or persisted — every input (id, colors, template
- * placement) is already in the sticker record, so this can be called again
- * at any time (list rendering, print export, "restore") and always produces
- * the identical result.
  */
 export async function generateStickerBlob(rec: QrRecord, pos: StickerPos): Promise<Blob | null> {
   try {
@@ -150,24 +153,6 @@ export async function generateStickerBlob(rec: QrRecord, pos: StickerPos): Promi
   }
 }
 
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
-
-// The sticker template is one shared image reused across every cell of every
-// sheet — loaded once and cached, rather than once per sticker per sheet.
-let stickerTemplateImgPromise: Promise<HTMLImageElement> | null = null;
-function loadStickerTemplateImage(): Promise<HTMLImageElement> {
-  if (!stickerTemplateImgPromise) stickerTemplateImgPromise = loadImage(STICKER_SRC);
-  return stickerTemplateImgPromise;
-}
-
 export interface SheetOptions {
   dpi?: number;
   sheetWidthIn?: number;
@@ -177,11 +162,6 @@ export interface SheetOptions {
   cols?: number;
   rows?: number;
 }
-
-import {
-  generateRepeatedStickerSheetBlob,
-  generateBatchStickersSheetBlobs,
-} from "../../../services/stickerPrintSheetService";
 
 /**
  * Print-ready sheet export: tiles selected stickers onto 18x12in canvas at 300 DPI in a

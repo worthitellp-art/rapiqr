@@ -160,7 +160,7 @@ export default function BackupPage({
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 text-[#17181A] font-body">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 text-[#18181B] font-body">
       
       {/* ── Page Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-[#E8ECF4] p-6 rounded-2xl shadow-xs">
@@ -173,8 +173,8 @@ export default function BackupPage({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-[#F8FAFC] border border-[#E2E8F0] px-4 py-2 rounded-xl shrink-0">
-          <Layers size={16} className="text-[#5C78DF]" />
+        <div className="flex items-center gap-2 bg-[#F8F8F7] border border-[#E2E8F0] px-4 py-2 rounded-xl shrink-0">
+          <Layers size={16} className="text-[#EAB308]" />
           <span className="text-xs font-bold text-[#1E293B]">{qrList.length} Active Stickers</span>
         </div>
       </div>
@@ -185,7 +185,7 @@ export default function BackupPage({
         {/* Card 1: Download All Data */}
         <div className="bg-white border border-[#E8ECF4] rounded-2xl p-6 shadow-xs flex flex-col justify-between space-y-5 hover:border-[#CBD5E1] transition-all">
           <div className="space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-[#E8EDFF] text-[#5C78DF] flex items-center justify-center shadow-2xs">
+            <div className="w-12 h-12 rounded-2xl bg-[#FDF4DB] text-[#A16207] flex items-center justify-center shadow-2xs">
               <Database size={24} />
             </div>
             <div>
@@ -195,7 +195,7 @@ export default function BackupPage({
               </p>
             </div>
 
-            <div className="bg-[#F8FAFC] border border-[#E8ECF4] rounded-xl p-3.5 space-y-1.5 text-xs font-mono text-[#64748B]">
+            <div className="bg-[#F8F8F7] border border-[#E8ECF4] rounded-xl p-3.5 space-y-1.5 text-xs font-mono text-[#64748B]">
               <div className="flex justify-between">
                 <span>Total records:</span>
                 <span className="font-bold text-[#1E293B]">{qrList.length} stickers</span>
@@ -247,7 +247,7 @@ export default function BackupPage({
             )}
 
             {!isZippingStickers && (
-              <div className="bg-[#F8FAFC] border border-[#E8ECF4] rounded-xl p-3.5 space-y-1.5 text-xs font-mono text-[#64748B]">
+              <div className="bg-[#F8F8F7] border border-[#E8ECF4] rounded-xl p-3.5 space-y-1.5 text-xs font-mono text-[#64748B]">
                 <div className="flex justify-between">
                   <span>Included images:</span>
                   <span className="font-bold text-[#1E293B]">{qrList.length} PNG files</span>
@@ -264,7 +264,7 @@ export default function BackupPage({
             type="button"
             onClick={handleDownloadAllStickersZip}
             disabled={isZippingStickers || qrList.length === 0}
-            className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#5C78DF] hover:bg-[#4A64C2] text-white text-xs font-bold transition-all disabled:opacity-60 cursor-pointer shadow-xs active:scale-[0.99]"
+            className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#F5C518] hover:bg-[#EAB308] text-[#18181B] text-xs font-bold transition-all disabled:opacity-60 cursor-pointer shadow-xs active:scale-[0.99]"
           >
             {isZippingStickers ? (
               <>
@@ -308,11 +308,11 @@ export default function BackupPage({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={isRestoring}
-          className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-[#1E293B] text-xs font-bold transition-all cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
+          className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-[#CBD5E1] bg-white hover:bg-[#F8F8F7] text-[#1E293B] text-xs font-bold transition-all cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
         >
           {isRestoring ? (
             <span className="flex items-center gap-2">
-              <RefreshCw size={13} className="animate-spin text-[#5C78DF]" /> Restoring...
+              <RefreshCw size={13} className="animate-spin text-[#EAB308]" /> Restoring...
             </span>
           ) : (
             <span className="flex items-center gap-2">

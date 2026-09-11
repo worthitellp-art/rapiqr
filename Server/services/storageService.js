@@ -51,6 +51,24 @@ async function uploadPublicFile(key, buffer, contentType) {
   return publicUrlFor(key);
 }
 
+/**
+ * Upload private objects (such as compliance log archives).
+ * Does not expose public URL and supports custom metadata/encryption.
+ */
+async function uploadPrivateFile(key, buffer, contentType = 'application/octet-stream', metadata = {}) {
+  const s3 = getClient();
+  const bucket = process.env.S3_AUDIT_BUCKET || process.env.S3_BUCKET;
+  await s3.send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+    ServerSideEncryption: process.env.S3_ENDPOINT ? undefined : 'AES256',
+    Metadata: metadata,
+  }));
+  return { bucket, key };
+}
+
 // Best-effort: callers treat storage cleanup failures as non-fatal (an
 // orphaned file is a cost/tidiness issue, not a correctness one).
 async function deleteFiles(keys) {
@@ -75,4 +93,4 @@ async function listKeys(prefix) {
   return out;
 }
 
-module.exports = { uploadPublicFile, deleteFiles, listKeys };
+module.exports = { uploadPublicFile, uploadPrivateFile, deleteFiles, listKeys };

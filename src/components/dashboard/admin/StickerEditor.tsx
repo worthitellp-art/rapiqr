@@ -1,6 +1,6 @@
 import type React from "react";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Save, Grid3X3, Lock, Unlock, Magnet, Check, ShieldCheck, Printer } from "lucide-react";
+import { Save, Grid3X3, Lock, Unlock, Magnet, Check, ShieldCheck, Printer, SaveAll } from "lucide-react";
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
 import QrCodeImage from "./QrCodeImage";
 import { StickerPos } from "./types";
@@ -152,31 +152,29 @@ export default function StickerEditor({
   const previewSize = 360;
 
   return (
-    <div className="space-y-6 text-[#17181A] font-body">
+    <div className="space-y-6 text-[#18181B] font-body">
       {/* Top Header */}
       <div className="flex items-baseline justify-between flex-wrap gap-4">
         <div>
-          <h1 className="font-display text-[22px] font-semibold text-[#17181A]">
+          <h1 className="font-display text-[22px] font-semibold text-[#18181B]">
             Sticker QR Placement
           </h1>
-          <p className="text-[13.5px] text-[#777B80] mt-1">
-            Adjust and save the default QR code position for all generated stickers
-          </p>
+          
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Interactive Canvas Box */}
-        <div className="lg:col-span-7 bg-white border border-[#E5E5E7] p-5.5 shadow-[0_1px_4px_rgba(0,0,0,0.03)] flex flex-col justify-between">
+        <div className="lg:col-span-7 bg-white border border-[#E5E7EB] p-5.5 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display text-[13px] font-semibold text-[#17181A]">
+            <h3 className="font-display text-[13px] font-semibold text-[#18181B]">
               Sticker Canvas & Placement
             </h3>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowGrid(!showGrid)}
-                className={`p-2 rounded-[4px] border transition-all cursor-pointer ${
-                  showGrid ? "bg-[#5C78DF] text-white border-[#5C78DF]" : "bg-[#F3F3F4] border-[#E5E5E7] text-[#9CA0A6] hover:text-[#17181A]"
+                className={`p-2 rounded-lg border transition-all cursor-pointer ${
+                  showGrid ? "bg-[#F5C518] text-[#18181B] border-[#F5C518]" : "bg-[#F4F4F5] border-[#E5E7EB] text-[#A1A1AA] hover:text-[#18181B]"
                 }`}
                 title="Toggle grid overlay"
               >
@@ -184,8 +182,8 @@ export default function StickerEditor({
               </button>
               <button
                 onClick={() => setSnapEnabled(!snapEnabled)}
-                className={`p-2 rounded-[4px] border transition-all cursor-pointer ${
-                  snapEnabled ? "bg-[#5C78DF] text-white border-[#5C78DF]" : "bg-[#F3F3F4] border-[#E5E5E7] text-[#9CA0A6] hover:text-[#17181A]"
+                className={`p-2 rounded-lg border transition-all cursor-pointer ${
+                  snapEnabled ? "bg-[#F5C518] text-[#18181B] border-[#F5C518]" : "bg-[#F4F4F5] border-[#E5E7EB] text-[#A1A1AA] hover:text-[#18181B]"
                 }`}
                 title={`Snap to ${SNAP}px grid`}
               >
@@ -193,14 +191,14 @@ export default function StickerEditor({
               </button>
               <button
                 onClick={() => setLockAspect(!lockAspect)}
-                className={`p-2 rounded-[4px] border transition-all cursor-pointer ${
-                  lockAspect ? "bg-[#5C78DF] text-white border-[#5C78DF]" : "bg-[#F3F3F4] border-[#E5E5E7] text-[#9CA0A6] hover:text-[#17181A]"
+                className={`p-2 rounded-lg border transition-all cursor-pointer ${
+                  lockAspect ? "bg-[#F5C518] text-[#18181B] border-[#F5C518]" : "bg-[#F4F4F5] border-[#E5E7EB] text-[#A1A1AA] hover:text-[#18181B]"
                 }`}
                 title="Lock aspect ratio"
               >
                 {lockAspect ? <Lock size={14} /> : <Unlock size={14} />}
               </button>
-              <span className="font-mono text-[11px] font-bold text-[#5271D5] bg-[#E8EDFF] px-2.5 py-1 rounded-[4px]">
+              <span className="font-mono text-[11px] font-bold text-[#A16207] bg-[#FDF4DB] px-2.5 py-1 rounded-lg">
                 {stickerPos.w}×{stickerPos.h} @ {stickerPos.x},{stickerPos.y}
               </span>
             </div>
@@ -209,7 +207,7 @@ export default function StickerEditor({
           {/* Interactive Canvas */}
           <div
             ref={containerRef}
-            className="relative mx-auto overflow-hidden select-none border-2 border-[#17181A] rounded-[4px] shadow-[0_1px_4px_rgba(0,0,0,0.05)] bg-[#F3F3F4]"
+            className="relative mx-auto overflow-hidden select-none border-2 border-[#18181B] rounded-lg shadow-[0_4px_12px_rgba(16,24,40,0.06)] bg-[#F4F4F5]"
             style={{
               width: previewSize,
               height: Math.round(previewSize * (EDITOR_DISPLAY.h / EDITOR_DISPLAY.w)),
@@ -230,7 +228,7 @@ export default function StickerEditor({
             {/* Draggable & Resizable QR Placement Overlay */}
             <div
               onMouseDown={handleDragDown}
-              className="absolute cursor-move border-2 border-[#17181A] rounded-[4px] shadow-[0_4px_10px_rgba(0,0,0,0.15)] flex items-center justify-center bg-white p-1"
+              className="absolute cursor-move border-2 border-[#18181B] rounded-lg shadow-[0_4px_10px_rgba(0,0,0,0.15)] flex items-center justify-center bg-white p-1"
               style={{
                 left: Math.round(stickerPos.x * (previewSize / EDITOR_DISPLAY.w)),
                 top: Math.round(stickerPos.y * (previewSize * (EDITOR_DISPLAY.h / EDITOR_DISPLAY.w) / EDITOR_DISPLAY.h)),
@@ -252,7 +250,7 @@ export default function StickerEditor({
                 <div
                   key={dir}
                   onMouseDown={handleResizeDown(dir)}
-                  className={`absolute w-3.5 h-3.5 bg-[#5C78DF] border-2 border-[#17181A] rounded-full transition-transform hover:scale-125 cursor-${dir}-resize ${
+                  className={`absolute w-3.5 h-3.5 bg-[#F5C518] border-2 border-[#18181B] rounded-full transition-transform hover:scale-125 cursor-${dir}-resize ${
                     dir === "nw" ? "-top-2 -left-2" : dir === "ne" ? "-top-2 -right-2" : dir === "sw" ? "-bottom-2 -left-2" : "-bottom-2 -right-2"
                   }`}
                 />
@@ -260,63 +258,48 @@ export default function StickerEditor({
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-[#E5E5E7] text-[11.5px] text-[#9CA0A6] flex items-center justify-between">
-            <span>Click & drag box to move placement</span>
-            <span>Drag corner dots to scale box</span>
-          </div>
+          
         </div>
 
         {/* Right: Controls & Single Save Panel */}
-        <div className="lg:col-span-5 bg-white border border-[#E5E5E7] p-5.5 shadow-[0_1px_4px_rgba(0,0,0,0.03)] space-y-4 flex flex-col justify-between">
+        <div className="lg:col-span-5 bg-white border border-[#E5E7EB] p-5.5 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] space-y-4 flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2.5 mb-3">
-              <div className="w-8 h-8 rounded-[4px] bg-[#E8EDFF] text-[#5271D5] flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-[#FDF4DB] text-[#A16207] flex items-center justify-center">
                 <ShieldCheck size={18} />
               </div>
-              <h3 className="font-display text-[13px] font-semibold text-[#17181A]">
+              <h3 className="font-display text-[13px] font-semibold text-[#18181B]">
                 Placement Controls
               </h3>
             </div>
 
-            <p className="text-[13.5px] text-[#777B80] leading-relaxed mb-4">
-              Position the QR code overlay box on your sticker template. When saved, this single position applies as the default for all sticker views and batch prints.
-            </p>
-
+           
             {/* Position Readout */}
-            <div className="bg-[#F7F7F8] border border-[#E5E5E7] rounded-[4px] p-3.5 space-y-2 mb-4">
-              <p className="text-[11px] font-body font-semibold text-[#777B80] uppercase tracking-wider">
-                Live Coordinates & Dimensions
+            <div className="bg-[#F8F8F7] border border-[#E5E7EB] rounded-lg p-3.5 space-y-2 mb-4">
+              <p className="text-[11px] font-body font-semibold text-[#71717A] uppercase tracking-wider">
+               Dimensions
               </p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-2 font-mono text-[13px] font-bold text-[#17181A]">
-                <div className="flex items-center justify-between bg-white p-2 rounded-[4px] border border-[#E5E5E7]">
-                  <span className="text-[#777B80]">X:</span>
-                  <span className="text-[#17181A]">{stickerPos.x}px</span>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2 font-mono text-[13px] font-bold text-[#18181B]">
+                <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#E5E7EB]">
+                  <span className="text-[#71717A]">X:</span>
+                  <span className="text-[#18181B]">{stickerPos.x}px</span>
                 </div>
-                <div className="flex items-center justify-between bg-white p-2 rounded-[4px] border border-[#E5E5E7]">
-                  <span className="text-[#777B80]">Y:</span>
-                  <span className="text-[#17181A]">{stickerPos.y}px</span>
+                <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#E5E7EB]">
+                  <span className="text-[#71717A]">Y:</span>
+                  <span className="text-[#18181B]">{stickerPos.y}px</span>
                 </div>
-                <div className="flex items-center justify-between bg-white p-2 rounded-[4px] border border-[#E5E5E7]">
-                  <span className="text-[#777B80]">Width:</span>
-                  <span className="text-[#17181A]">{stickerPos.w}px</span>
+                <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#E5E7EB]">
+                  <span className="text-[#71717A]">Width:</span>
+                  <span className="text-[#18181B]">{stickerPos.w}px</span>
                 </div>
-                <div className="flex items-center justify-between bg-white p-2 rounded-[4px] border border-[#E5E5E7]">
-                  <span className="text-[#777B80]">Height:</span>
-                  <span className="text-[#17181A]">{stickerPos.h}px</span>
+                <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#E5E7EB]">
+                  <span className="text-[#71717A]">Height:</span>
+                  <span className="text-[#18181B]">{stickerPos.h}px</span>
                 </div>
               </div>
             </div>
 
-            <div className="p-3.5 rounded-[4px] bg-[#F3F3F4] border border-[#E5E5E7] font-mono text-[12px] text-[#17181A] space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[#777B80]">QR Color:</span>
-                <span className="font-bold">#000000 (Pure Black)</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[#777B80]">Mode:</span>
-                <span className="font-bold text-[#2E9E5B]">Single Default Layout</span>
-              </div>
-            </div>
+            
           </div>
 
           <div className="space-y-2.5">
@@ -324,7 +307,7 @@ export default function StickerEditor({
             <button
               onClick={handleSaveDefaultPosition}
               disabled={saveState !== "idle"}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-[4px] bg-[#17181A] text-white font-semibold text-[14.5px] hover:bg-[#2A2B2E] active:scale-95 disabled:opacity-60 transition-all cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-lg bg-[#F5C518] text-[#18181B] font-bold text-[14.5px] hover:bg-[#EAB308] active:scale-95 disabled:opacity-60 transition-all cursor-pointer"
             >
               {saveState === "saving" ? (
                 "Saving Position..."
@@ -334,7 +317,7 @@ export default function StickerEditor({
                 </>
               ) : (
                 <>
-                  <Save size={16} strokeWidth={2.4} /> Save Default Position
+                   Save Default Position
                 </>
               )}
             </button>
@@ -349,9 +332,9 @@ export default function StickerEditor({
                   setIsLocalPrintOpen(true);
                 }
               }}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-[4px] bg-[#E8EDFF] hover:bg-[#DCE3FF] text-[#3E52B8] border border-[#5C78DF]/30 font-semibold text-[13.5px] active:scale-95 transition-all cursor-pointer shadow-2xs"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-lg bg-[#FDF4DB] hover:bg-[#F8E9B0] text-[#A16207] border border-[#EAB308]/50 font-semibold text-[13.5px] active:scale-95 transition-all cursor-pointer shadow-2xs"
             >
-              <Printer size={16} strokeWidth={2.2} /> Print Test Sheet (18×12″)
+              <Printer size={16} strokeWidth={2.2} /> Print
             </button>
           </div>
         </div>
