@@ -56,7 +56,8 @@ export interface SystemAlertItem {
   vehicleNumber?: string;
   reporterPhone?: string;
   message?: string;
-  location?: string;
+  /** A pre-formatted string (legacy) or the real GPS fix the Alert schema stores. */
+  location?: string | { lat: number; lng: number; accuracy?: number | null; timestamp?: string };
   details?: string;
   /** True only for a real SOS/accident location-share from the emergency screen — not a routine assistance request. */
   isTrueEmergency?: boolean;

@@ -274,7 +274,7 @@ async function writeLogToDatabase(payload) {
   pushToMemoryBuffer(logItem);
 
   // Only persist important user activity, security events, and errors to MongoDB
-  if (!shouldPersistToDatabase(logItem)) {
+  if (!DB_LOGS_ENABLED || !shouldPersistToDatabase(logItem)) {
     return;
   }
 
@@ -321,6 +321,18 @@ function inferCategory(tag) {
 
 /* ── Logging core ───────────────────────────────────────────────────────── */
 
+// Console output turned off for now (terminal noise during dev) — set
+// SERVER_CONSOLE_LOGS=true in Server/.env to bring it back. Nothing else
+// changes: the in-memory buffer (admin Live Logs) and DB persistence for
+// significant events still run exactly as before.
+const CONSOLE_LOGS_ENABLED = String(process.env.SERVER_CONSOLE_LOGS || '').toLowerCase() === 'true';
+
+// DB persistence turned off for now too — set SERVER_DB_LOGS=true in
+// Server/.env to resume writing to the ServerLog collection. The in-memory
+// buffer (admin Live Logs page, live within this process's uptime) keeps
+// working regardless — only the database write is skipped.
+const DB_LOGS_ENABLED = String(process.env.SERVER_DB_LOGS || '').toLowerCase() === 'true';
+
 function emit(payload) {
   const meta = {
     level: payload.level || 'INFO',
@@ -328,17 +340,20 @@ function emit(payload) {
     message: payload.message || '',
     details: payload.details || payload.metadata || null
   };
-  const emoji = payload.emoji || '';
-  const line = emoji
-    ? `[${formatTimestamp()}] ${emoji} [${meta.tag}] ${meta.message}`
-    : `[${formatTimestamp()}] ${meta.level} [${meta.tag}] ${meta.message}`;
 
-  if (meta.level === 'ERROR' || meta.level === 'FATAL') {
-    console.error(line, meta.details ? JSON.stringify(sanitize(meta.details)) : '');
-  } else if (meta.level === 'WARN') {
-    console.warn(line, meta.details ? JSON.stringify(sanitize(meta.details)) : '');
-  } else {
-    console.log(line, meta.details ? JSON.stringify(sanitize(meta.details)) : '');
+  if (CONSOLE_LOGS_ENABLED) {
+    const emoji = payload.emoji || '';
+    const line = emoji
+      ? `[${formatTimestamp()}] ${emoji} [${meta.tag}] ${meta.message}`
+      : `[${formatTimestamp()}] ${meta.level} [${meta.tag}] ${meta.message}`;
+
+    if (meta.level === 'ERROR' || meta.level === 'FATAL') {
+      console.error(line, meta.details ? JSON.stringify(sanitize(meta.details)) : '');
+    } else if (meta.level === 'WARN') {
+      console.warn(line, meta.details ? JSON.stringify(sanitize(meta.details)) : '');
+    } else {
+      console.log(line, meta.details ? JSON.stringify(sanitize(meta.details)) : '');
+    }
   }
 
   writeLogToDatabase(payload);
@@ -380,7 +395,9 @@ const logger = {
     const url = req.originalUrl || req.url;
     const badge = getStatusBadge(res.statusCode);
     const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
-    console.log(`[${formatTimestamp()}] ${badge} [HTTP ${req.method}] ${url} (${res.statusCode}) finished in ${durationMs}ms`);
+    if (CONSOLE_LOGS_ENABLED) {
+      console.log(`[${formatTimestamp()}] ${badge} [HTTP ${req.method}] ${url} (${res.statusCode}) finished in ${durationMs}ms`);
+    }
     emit({
       level: res.statusCode >= 500 ? 'ERROR' : res.statusCode >= 400 ? 'WARN' : 'HTTP',
       category: 'HTTP',

@@ -210,6 +210,16 @@ class UserModel {
   }
 
   /**
+   * Records that this Google sub has successfully signed in as this account —
+   * see authController.googleAuth, which only reaches this call once it has
+   * already confirmed the account is safe to link (no password set, or
+   * already linked to this exact sub).
+   */
+  static async linkGoogleId(userId, googleId) {
+    await User.findByIdAndUpdate(userId, { $set: { google_id: googleId } });
+  }
+
+  /**
    * Login/logout audit fields (last_login_ip etc.) are select:false — this is
    * the one place they're read, for new-device detection and admin review.
    */

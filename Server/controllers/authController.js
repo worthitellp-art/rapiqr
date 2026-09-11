@@ -426,8 +426,34 @@ class AuthController {
         if (avatarUrl) {
           profile = await UserModel.updateProfile(profile.id, { avatarUrl });
         }
-      } else if (isDesignatedAdmin && profile.role !== 'admin') {
-        profile = await UserModel.reconcileAdminRole(profile);
+      } else {
+        // An account with this email already exists — before signing the
+        // caller into it, confirm this Google identity actually IS that
+        // account, not just an email-string match. Manual signup accepts any
+        // typed email with no confirmation step, so without this check
+        // someone could pre-register somebody else's email with a password
+        // of their choosing and silently inherit whatever account the real
+        // owner logs into later via Google — the Google token alone was
+        // previously treated as sufficient proof to sign into ANY existing
+        // account sharing that email, password or not.
+        const authRecord = await UserModel.findAuthByEmail(email);
+        const hasPassword = Boolean(authRecord?.password_hash);
+        const alreadyLinkedToThisGoogleAccount = sub && authRecord?.google_id === sub;
+
+        if (hasPassword && !alreadyLinkedToThisGoogleAccount) {
+          logger.security('AUTH_GOOGLE_LINK_BLOCKED', `Google sign-in for ${email} matched an existing password account — blocked`, { userId: profile.id });
+          return res.status(409).json({
+            success: false,
+            error: 'An account with this email already uses a password. Sign in with your password instead.',
+          });
+        }
+
+        if (isDesignatedAdmin && profile.role !== 'admin') {
+          profile = await UserModel.reconcileAdminRole(profile);
+        }
+        if (sub && authRecord?.google_id !== sub) {
+          await UserModel.linkGoogleId(profile.id, sub);
+        }
       }
 
       const ip = getClientIp(req);

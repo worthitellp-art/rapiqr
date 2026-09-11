@@ -19,7 +19,6 @@ import CustomizePage from "./CustomizePage";
 import DistributorsPage from "./DistributorsPage";
 import OrdersPage from "./OrdersPage";
 import RepiChatPage from "./RepiChatPage";
-import BackupPage from "./BackupPage";
 import PrintSheetModal from "./PrintSheetModal";
 import { apiClient } from "../../../lib/apiClient";
 
@@ -157,6 +156,11 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
     if (isAdmin && page === "repichat") {
       setPage("overview");
     }
+    // Backup & Restore was removed — a stale localStorage value shouldn't
+    // strand anyone on a page with no nav entry and no component behind it.
+    if (page === "backup") {
+      setPage(isAdmin ? "overview" : "qr");
+    }
     setSearchQuery("");
   }, [page, isAdmin]);
 
@@ -168,8 +172,8 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
 
   return (
     <div
-      className="h-screen w-full flex overflow-hidden text-[#17181A]"
-      style={{ "--accent": "#5C78DF", fontFamily: "'Inter', sans-serif", background: "#F7F7F8" } as React.CSSProperties}
+      className="h-screen w-full flex overflow-hidden text-[#211922]"
+      style={{ "--accent": "#F6C000", fontFamily: "'Inter', sans-serif", background: "#FBFBF9" } as React.CSSProperties}
     >
       {/* Mobile drawer backdrop — md+ docks the sidebar so it never renders there */}
       {sidebarOpen && (
@@ -186,7 +190,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
         isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)}
       />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: "#F7F7F8" }}>
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: "#FBFBF9" }}>
         <TopBar
           admin={admin} searchQuery={searchQuery} setSearchQuery={setSearchQuery}
           page={page} setPage={setPage}
@@ -230,14 +234,6 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
               stickerPos={stickerPos} setStickerPos={setStickerPos}
               setToast={setToast}
               openPrintSheet={() => handleOpenPrintSheet()}
-            />
-          )}
-
-          {page === "backup" && (
-            <BackupPage
-              qrList={qrList} setQrList={setQrList}
-              stickerPos={stickerPos} setStickerPos={setStickerPos}
-              setToast={setToast}
             />
           )}
         </div>

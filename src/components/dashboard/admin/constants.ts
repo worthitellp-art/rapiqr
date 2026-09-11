@@ -1,4 +1,4 @@
-import { LayoutGrid, Plus, PhoneCall, Bell, Users, Palette, Store, ShoppingBag, MessageCircle, CloudUpload, Send } from "lucide-react";
+import { LayoutGrid, Plus, PhoneCall, Bell, Users, Palette, Store, ShoppingBag, MessageCircle, Send } from "lucide-react";
 
 export const FONT_OPTIONS = [
   { id: "Plus Jakarta Sans", label: "Jakarta Sans", css: "'Plus Jakarta Sans', ui-sans-serif, system-ui" },
@@ -19,7 +19,6 @@ export const NAV_ITEMS = [
   { id: "alerts", label: "Alerts", icon: Bell },
   { id: "users", label: "Users", icon: Users },
   { id: "customize", label: "Customization", icon: Palette },
-  { id: "backup", label: "Backup & Restore", icon: CloudUpload },
 ];
 
 // Client (sticker owner) only nav item — their link into the RepiChat inbox.

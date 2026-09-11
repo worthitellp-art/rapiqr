@@ -266,12 +266,25 @@ import { apiClient } from "../../../lib/apiClient";
                           <span className="font-mono font-medium">{alert.reporterPhone}</span>
                         </div>
                       )}
-                      {alert.location && (
+                      {alert.location && typeof alert.location === "object" && alert.location.lat != null ? (
+                        <div className="flex items-center gap-2">
+                          <MapPin size={12} className="text-[#A1A1AA] flex-shrink-0" />
+                          <a
+                            href={`https://www.google.com/maps?q=${alert.location.lat},${alert.location.lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-[#2B5FD9] hover:underline"
+                          >
+                            {alert.location.lat.toFixed(5)}, {alert.location.lng.toFixed(5)}
+                            {alert.location.accuracy != null ? ` (±${Math.round(alert.location.accuracy)}m)` : ""}
+                          </a>
+                        </div>
+                      ) : alert.location && typeof alert.location === "string" ? (
                         <div className="flex items-center gap-2">
                           <MapPin size={12} className="text-[#A1A1AA] flex-shrink-0" />
                           <span className="font-medium">{alert.location}</span>
                         </div>
-                      )}
+                      ) : null}
                       {alert.qrId && (
                         <div className="flex items-center gap-2">
                           <Info size={12} className="text-[#A1A1AA] flex-shrink-0" />

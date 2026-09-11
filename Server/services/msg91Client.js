@@ -253,6 +253,13 @@ async function verifyMsg91Otp({ mobile, otp }) {
  * @param {{ variables?: Record<string, any>, components?: Record<string, any>, body?: string, headerMediaUrl?: string }} params
  * @returns {Record<string, { type: string, value: string }>}
  */
+// MSG91 rejects embedded newlines in a text body/component value outright
+// (see sendMsg91SessionWhatsApp) — applied everywhere a text value is built
+// here too, since template component values hit the same restriction.
+function stripNewlines(value) {
+  return String(value).replace(/\r?\n+/g, ' — ').trim();
+}
+
 function buildMsg91WhatsAppComponents({ variables = {}, components = {}, body = '', headerMediaUrl = '' } = {}) {
   const result = {};
 
@@ -260,9 +267,10 @@ function buildMsg91WhatsAppComponents({ variables = {}, components = {}, body = 
   if (components && typeof components === 'object' && Object.keys(components).length > 0) {
     for (const [key, val] of Object.entries(components)) {
       if (val && typeof val === 'object' && val.value !== undefined) {
-        result[key] = { type: val.type || 'text', value: String(val.value) };
+        const type = val.type || 'text';
+        result[key] = { type, value: type === 'text' ? stripNewlines(val.value) : String(val.value) };
       } else if (val !== undefined && val !== null) {
-        result[key] = { type: 'text', value: String(val) };
+        result[key] = { type: 'text', value: stripNewlines(val) };
       }
     }
   }
@@ -278,7 +286,7 @@ function buildMsg91WhatsAppComponents({ variables = {}, components = {}, body = 
         : `body_${key}`;
 
       if (!result[formattedKey]) {
-        result[formattedKey] = { type: 'text', value: String(val) };
+        result[formattedKey] = { type: 'text', value: stripNewlines(val) };
       }
     }
   }
@@ -286,7 +294,7 @@ function buildMsg91WhatsAppComponents({ variables = {}, components = {}, body = 
   // 3. Fallback to body text if no body components were generated
   const hasBodyComponent = Object.keys(result).some((k) => k.startsWith('body_'));
   if (!hasBodyComponent && body) {
-    result.body_1 = { type: 'text', value: String(body) };
+    result.body_1 = { type: 'text', value: stripNewlines(body) };
   }
 
   // 4. Header media attachment (image / document / video) if specified
@@ -412,12 +420,18 @@ async function sendMsg91SessionWhatsApp({ to, text, integratedNumber }) {
     return { success: false, simulated: false, error: 'Recipient phone number is invalid or empty' };
   }
 
+  // MSG91's plain-text WhatsApp body rejects embedded newlines outright
+  // ("next line(\n) is not supported for body value") — every alert message
+  // this app builds is multi-line, so every session-message send was failing
+  // 100% of the time. Collapse to a single line rather than dropping content.
+  const singleLineText = String(text || '').replace(/\r?\n+/g, ' — ').trim();
+
   const payload = {
     integrated_number: senderNumber,
     content_type: 'text',
     payload: {
       to: recipient,
-      text: String(text || ''),
+      text: singleLineText,
     },
   };
 

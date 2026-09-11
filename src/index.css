@@ -46,27 +46,30 @@
 .font-body { font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
 
 /* ── Admin Console design tokens ───────────────────────────────────────────
-   Clean, premium SaaS language (light-yellow accent system): off-white
-   canvas, pure-white cards, dark charcoal typography, soft warm-gray borders,
-   very light shadows, and a selective brand-yellow accent used only for
-   primary CTAs, active states, selections, badges, key indicators and small
-   highlights — never large surfaces. Consumers sit under `#root .ac-console`
-   (the admin dashboard root) so nothing leaks into the public site. */
+   Pinterest-style system (see DESIGN-pinterest.md), yellow standing in for
+   Pinterest's brand red as the single accent color: warm-cream canvas, true-
+   white cards, ink/body/mute/ash text scale, a two-radius shape vocabulary
+   (16px standard, pill for circular/chip elements), and flat cards with no
+   drop shadow — shadow is reserved for the modal layer only, per the
+   reference system's "Elevation & Depth" table. Consumers sit under
+   `#root .ac-console` (the admin dashboard root) so nothing leaks into the
+   public site — also mirrored at `:root` below so ac-* classes never render
+   with undefined variables outside that wrapper. */
 .ac-console {
-  --ac-bg: #F8F8F7;          /* page canvas (warm off-white) */
-  --ac-surface: #FFFFFF;     /* card surface                 */
-  --ac-border: #E5E7EB;      /* hairline borders             */
-  --ac-border-strong: #D4D4D8;
-  --ac-ink: #18181B;         /* dark charcoal text           */
-  --ac-ink-2: #3F3F46;       /* secondary text               */
-  --ac-muted: #71717A;       /* tertiary text                */
-  --ac-faint: #A1A1AA;       /* placeholder                  */
-  --ac-accent: #F5C518;      /* brand yellow (CTAs, active)  */
+  --ac-bg: #FBFBF9;          /* page canvas — Pinterest surface-soft */
+  --ac-surface: #FFFFFF;     /* card surface — Pinterest canvas      */
+  --ac-border: #DADAD3;      /* hairline — Pinterest hairline        */
+  --ac-border-strong: #C8C8C1; /* Pinterest stone */
+  --ac-ink: #211922;         /* Pinterest ink-soft */
+  --ac-ink-2: #33332E;       /* Pinterest body */
+  --ac-muted: #62625B;       /* Pinterest mute */
+  --ac-faint: #91918C;       /* Pinterest ash */
+  --ac-accent: #F5C518;      /* brand yellow standing in for Pinterest red */
   --ac-accent-strong: #EAB308;
   --ac-accent-soft: #FDF4DB;
   --ac-accent-soft-strong: #F8E9B0;
   --ac-accent-ink: #A16207;  /* readable amber text on soft  */
-  --ac-on-accent: #18181B;   /* text placed on yellow        */
+  --ac-on-accent: #211922;   /* text placed on yellow        */
   --ac-green: #22C55E;
   --ac-green-ink: #16A34A;
   --ac-green-soft: #F0FDF4;
@@ -75,10 +78,10 @@
   --ac-red-soft: #FEF2F2;
   --ac-amber: #B54708;
   --ac-amber-soft: #FEF6E7;
-  --ac-radius-card: 14px;
-  --ac-radius-control: 10px;
-  --ac-radius-pill: 8px;
-  --ac-shadow-card: 0 1px 2px rgba(24, 24, 27, 0.05), 0 1px 3px rgba(24, 24, 27, 0.04);
+  --ac-radius-card: 16px;     /* Pinterest rounded.md */
+  --ac-radius-control: 16px;  /* Pinterest rounded.md — buttons & inputs */
+  --ac-radius-pill: 9999px;   /* Pinterest rounded.full */
+  --ac-shadow-card: none;     /* Pinterest cards are flat — no drop shadow */
   --ac-shadow-pop: 0 8px 24px rgba(24, 24, 27, 0.10), 0 2px 8px rgba(24, 24, 27, 0.06);
 
   /* Base type size for the admin console — all Tailwind px text classes below
@@ -257,7 +260,7 @@
   justify-content: center;
   width: 38px;
   height: 38px;
-  border-radius: 10px;
+  border-radius: 12px;
   flex-shrink: 0;
 }
 
@@ -271,7 +274,7 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ac-muted);
-  background: #F8F8F7;
+  background: var(--ac-bg);
   border-bottom: 1px solid var(--ac-border);
   white-space: nowrap;
 }
@@ -283,7 +286,7 @@
   vertical-align: middle;
 }
 .ac-tr-row { transition: background-color .12s ease; }
-.ac-tr-row:hover { background: #F8F8F7; }
+.ac-tr-row:hover { background: var(--ac-bg); }
 tbody .ac-tr-row:last-child .ac-td { border-bottom: none; }
 
 /* Filters / tab chips. */
@@ -309,11 +312,12 @@ tbody .ac-tr-row:last-child .ac-td { border-bottom: none; }
   color: var(--ac-on-accent);
 }
 
-/* Docked modal surface. */
+/* Docked modal surface — Pinterest rounded.lg (32px), the system's only
+   surface that gets a real shadow. */
 .ac-modal {
   background: var(--ac-surface);
   border: 1px solid var(--ac-border);
-  border-radius: 16px;
+  border-radius: 32px;
   box-shadow: var(--ac-shadow-pop);
   font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   color: var(--ac-ink);
@@ -555,20 +559,20 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
    legacy classes get their intended values everywhere, not just under a
    wrapper that was never applied. */
 :root {
-  --ac-bg: #F8F8F7;
+  --ac-bg: #FBFBF9;
   --ac-surface: #FFFFFF;
-  --ac-border: #E5E7EB;
-  --ac-border-strong: #D4D4D8;
-  --ac-ink: #18181B;
-  --ac-ink-2: #3F3F46;
-  --ac-muted: #71717A;
-  --ac-faint: #A1A1AA;
+  --ac-border: #DADAD3;
+  --ac-border-strong: #C8C8C1;
+  --ac-ink: #211922;
+  --ac-ink-2: #33332E;
+  --ac-muted: #62625B;
+  --ac-faint: #91918C;
   --ac-accent: #F5C518;
   --ac-accent-strong: #EAB308;
   --ac-accent-soft: #FDF4DB;
   --ac-accent-soft-strong: #F8E9B0;
   --ac-accent-ink: #A16207;
-  --ac-on-accent: #18181B;
+  --ac-on-accent: #211922;
   --ac-green: #22C55E;
   --ac-green-ink: #16A34A;
   --ac-green-soft: #F0FDF4;
@@ -577,10 +581,10 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
   --ac-red-soft: #FEF2F2;
   --ac-amber: #B54708;
   --ac-amber-soft: #FEF6E7;
-  --ac-radius-card: 14px;
-  --ac-radius-control: 10px;
-  --ac-radius-pill: 8px;
-  --ac-shadow-card: 0 1px 2px rgba(24, 24, 27, 0.05), 0 1px 3px rgba(24, 24, 27, 0.04);
+  --ac-radius-card: 16px;
+  --ac-radius-control: 16px;
+  --ac-radius-pill: 9999px;
+  --ac-shadow-card: none;
   --ac-shadow-pop: 0 8px 24px rgba(24, 24, 27, 0.10), 0 2px 8px rgba(24, 24, 27, 0.06);
 }
 
