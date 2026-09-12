@@ -1023,64 +1023,6 @@ export default function CheckoutPage({
                   </div>
                 </div>
 
-                {/* ── 3. Delivery Method ── */}
-                <div className="space-y-3.5 rounded-xl border border-gray-200 bg-white p-5">
-                  <div className="flex items-center gap-2.5 pb-2.5 border-b border-gray-100">
-                    <span className="w-5 h-5 rounded-full bg-gray-950 text-amber-300 text-[11px] font-bold flex items-center justify-center">
-                      3
-                    </span>
-                    <h2 className="font-bold text-sm text-gray-950">Delivery Method</h2>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    <button
-                      type="button"
-                      onClick={() => setDelivery('standard')}
-                      className={`p-3.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
-                        delivery === 'standard'
-                          ? 'border-amber-400 bg-amber-50/60 ring-1 ring-amber-400/30'
-                          : 'border-gray-200 bg-white hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-700">
-                          <Truck size={16} />
-                        </div>
-                        <div>
-                          <div className="font-bold text-[13px] text-gray-900">Standard Delivery</div>
-                          <div className="text-[11px] text-gray-500">4–6 business days</div>
-                        </div>
-                      </div>
-                      <span className="font-bold text-[11px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                        FREE
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setDelivery('express')}
-                      className={`p-3.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
-                        delivery === 'express'
-                          ? 'border-amber-400 bg-amber-50/60 ring-1 ring-amber-400/30'
-                          : 'border-gray-200 bg-white hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-700">
-                          <Clock size={16} />
-                        </div>
-                        <div>
-                          <div className="font-bold text-[13px] text-gray-900">Express Priority</div>
-                          <div className="text-[11px] text-gray-500">1–2 business days</div>
-                        </div>
-                      </div>
-                      <span className="font-bold text-[11px] text-gray-900 bg-amber-200 px-2 py-0.5 rounded-full">
-                        ₹99
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
                 {/* Error Banner */}
                 {error && (
                   <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2.5">

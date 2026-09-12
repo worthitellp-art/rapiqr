@@ -17,6 +17,7 @@ import MessageManagerPage from "./MessageManagerPage";
 import UsersPage from "./UsersPage";
 import CustomizePage from "./CustomizePage";
 import DistributorsPage from "./DistributorsPage";
+import ShopProductsPage from "./ShopProductsPage";
 import OrdersPage from "./OrdersPage";
 import RepiChatPage from "./RepiChatPage";
 import PrintSheetModal from "./PrintSheetModal";
@@ -160,7 +161,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
     try {
       localStorage.setItem("repiqr-admin-active-menu", page);
     } catch { /* fallback */ }
-    if (!isAdmin && (page === "overview" || page === "orders" || page === "distributors" || page === "users" || page === "communication" || page === "messages" || page === "customize")) {
+    if (!isAdmin && (page === "overview" || page === "orders" || page === "distributors" || page === "users" || page === "communication" || page === "messages" || page === "customize" || page === "products")) {
       setPage("qr");
     }
     // Admin has no RepiChat inbox (see "Online Now" on Overview instead) — a
@@ -239,6 +240,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
           )}
           {page === "repichat" && <RepiChatPage />}
            {page === "users" && <UsersPage setToast={setToast} />}
+          {page === "products" && <ShopProductsPage setToast={setToast} />}
 
           {page === "customize" && (
             <CustomizePage

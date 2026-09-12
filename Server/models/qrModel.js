@@ -359,7 +359,7 @@ class QrModel {
       .select('+recovery_code_hash id_scheme_version deleted_at category normalized_phone_number '
         + 'qr_payload qr_version qr_ecc_level qr_mask_pattern module_size_px margin_modules '
         + 'fg_color bg_color encoder_name encoder_version rendered_image_sha256 '
-        + 'status client_id template_name scans_count last_scanned_at created_at')
+        + 'status client_id template_name scans_count last_scanned_at created_at details.activatedAt')
       .lean();
 
     if (!doc || doc.id_scheme_version !== ID_SCHEME_VERSION_V2) return { ok: false, reason: 'not_found' };
@@ -565,7 +565,7 @@ class QrModel {
   static async restoreByRecoveryCode(id, rawRecoveryCode) {
     if (!id || !rawRecoveryCode) return { ok: false, reason: 'missing_fields' };
 
-    const doc = await Sticker.findById(id).select('+recovery_code_hash deleted_at category normalized_phone_number').lean();
+    const doc = await Sticker.findById(id).select('+recovery_code_hash deleted_at category normalized_phone_number details.activatedAt').lean();
     if (!doc || !doc.recovery_code_hash) return { ok: false, reason: 'not_found' };
     if (hashRecoveryCode(rawRecoveryCode) !== doc.recovery_code_hash) return { ok: false, reason: 'not_found' };
 
@@ -583,7 +583,7 @@ class QrModel {
   static async restoreOwnedByUser(id, userId) {
     if (!id || !userId) return { ok: false, reason: 'missing_fields' };
 
-    const doc = await Sticker.findById(id).select('deleted_at category normalized_phone_number user_id').lean();
+    const doc = await Sticker.findById(id).select('deleted_at category normalized_phone_number user_id details.activatedAt').lean();
     if (!doc) return { ok: false, reason: 'not_found' };
     if (!doc.user_id || String(doc.user_id) !== String(userId)) return { ok: false, reason: 'not_owner' };
 
@@ -595,6 +595,15 @@ class QrModel {
    * restore `id` (by recovery code or by ownership) — re-checks it's actually
    * deleted, re-checks the (category, phone) slot is still free (soft-delete
    * freed it; another tag may have taken it since), then clears deleted_at.
+   *
+   * QrModel.delete() forces status to 'inactive' on every soft-delete so a
+   * deleted sticker never reads as scannable — but that means the sticker's
+   * PRE-delete status is gone by the time it gets here. `details.activatedAt`
+   * is set once at first activation and is never touched by delete(), so it's
+   * the one surviving signal of "this sticker was already registered" — used
+   * to flip status back to 'active' on restore instead of leaving the owner's
+   * recovered sticker looking unregistered and re-prompting for phone/details
+   * on the next scan.
    */
   static async _restoreDeletedSticker(id, doc) {
     if (!doc.deleted_at) return { ok: false, reason: 'not_deleted' };
@@ -609,10 +618,18 @@ class QrModel {
       if (conflict) return { ok: false, reason: 'duplicate_phone' };
     }
 
+    const wasAlreadyRegistered = Boolean(doc.details?.activatedAt);
+
     try {
       const restored = await Sticker.findByIdAndUpdate(
         id,
-        { $set: { deleted_at: null, recovered_at: new Date() } },
+        {
+          $set: {
+            deleted_at: null,
+            recovered_at: new Date(),
+            ...(wasAlreadyRegistered ? { status: 'active' } : {}),
+          },
+        },
         { new: true }
       ).select(PUBLIC_QR_FIELDS).lean();
 

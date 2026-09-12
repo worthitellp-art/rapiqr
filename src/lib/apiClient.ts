@@ -835,21 +835,21 @@ export const apiClient = {
     },
 
     async create(product: Record<string, any>) {
-      return request<{ success: boolean; data: any }>('/shop-products', {
+      return request<{ success: boolean; data: any; error?: string }>('/shop-products', {
         method: 'POST',
         body: JSON.stringify(product),
       });
     },
 
     async update(id: string, updates: Record<string, any>) {
-      return request<{ success: boolean; data: any }>(`/shop-products/${id}`, {
+      return request<{ success: boolean; data: any; error?: string }>(`/shop-products/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(updates),
       });
     },
 
     async remove(id: string) {
-      return request<{ success: boolean }>(`/shop-products/${id}`, {
+      return request<{ success: boolean; error?: string }>(`/shop-products/${id}`, {
         method: 'DELETE',
       });
     },

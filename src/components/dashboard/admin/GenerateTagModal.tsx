@@ -13,12 +13,6 @@ function normalizePhone(phone: string): string | null {
   return digits.slice(-10);
 }
 
-function formatRecovery(code: string): string {
-  const c = String(code || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-  if (!c) return "";
-  return (c.match(/.{1,4}/g) || []).join("-");
-}
-
 interface GenerateTagModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -267,7 +261,7 @@ export default function GenerateTagModal({
               <div style={{ fontSize: 12, fontWeight: 600, color: "var(--fx-faint)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>Recovery code</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--fx-canvas)", border: "1px solid var(--fx-border)", borderRadius: 8, padding: "6px 8px" }}>
                 <span className="fx-mono" style={{ flex: 1, fontSize: 15, fontWeight: 600, letterSpacing: "0.08em", color: "var(--fx-ink)", userSelect: "all" }}>
-                  {formatRecovery(recoveryCode)}
+                  {recoveryCode}
                 </span>
                 <button className="fx-icon-btn" title="Copy recovery code" onClick={copyCode}>
                   {codeCopied ? <Check size={14} style={{ color: "var(--fx-green)" }} /> : <Copy size={14} />}

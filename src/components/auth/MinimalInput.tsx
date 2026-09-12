@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { LucideIcon, Eye, EyeOff } from 'lucide-react';
 
 interface MinimalInputProps {
   id: string;
@@ -12,6 +13,7 @@ interface MinimalInputProps {
   disabled?: boolean;
   error?: string;
   autoFocus?: boolean;
+  icon?: LucideIcon;
 }
 
 export default function MinimalInput({
@@ -26,6 +28,7 @@ export default function MinimalInput({
   disabled = false,
   error,
   autoFocus = false,
+  icon: LeadingIcon,
 }: MinimalInputProps) {
   const [isPasswordRevealed, setIsPasswordRevealed] = useState(false);
   const isPasswordField = type === 'password';
@@ -43,13 +46,18 @@ export default function MinimalInput({
     <div className="w-full space-y-1.5 text-left">
       <label
         htmlFor={id}
-        className="block text-xs font-semibold uppercase tracking-wider text-slate-600"
+        className="block text-xs font-normal text-slate-600"
       >
         {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
 
       <div className="relative">
+        {LeadingIcon && (
+          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+            <LeadingIcon size={16} />
+          </div>
+        )}
+
         <input
           id={id}
           type={effectiveInputType}
@@ -60,11 +68,13 @@ export default function MinimalInput({
           autoComplete={autoComplete}
           disabled={disabled}
           autoFocus={autoFocus}
-          className={`w-full h-12 px-4 rounded-xl border bg-slate-50/60 text-slate-900 text-sm md:text-base transition-all outline-none placeholder:text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed ${
+          className={`w-full h-10 rounded-lg border bg-white text-slate-900 text-xs sm:text-sm transition-all outline-none placeholder:text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed ${
+            LeadingIcon ? 'pl-9 pr-3.5' : 'px-3.5'
+          } ${isPasswordField ? 'pr-10' : ''} ${
             error
-              ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/10'
-              : 'border-slate-200 hover:border-slate-300 focus:border-black focus:ring-1 focus:ring-black focus:bg-white'
-          } ${isPasswordField ? 'pr-14' : ''}`}
+              ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+              : 'border-slate-200 hover:border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900'
+          }`}
         />
 
         {isPasswordField && (
@@ -72,9 +82,10 @@ export default function MinimalInput({
             type="button"
             onClick={handleTogglePasswordVisibility}
             tabIndex={-1}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 hover:text-slate-800 transition-colors cursor-pointer select-none"
+            aria-label={isPasswordRevealed ? 'Hide password' : 'Show password'}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer select-none"
           >
-            {isPasswordRevealed ? 'Hide' : 'Show'}
+            {isPasswordRevealed ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         )}
       </div>
@@ -82,4 +93,6 @@ export default function MinimalInput({
       {error && <p className="text-xs font-medium text-red-500 mt-1">{error}</p>}
     </div>
   );
+
 }
+

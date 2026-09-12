@@ -52,6 +52,7 @@ import { apiClient } from '../../lib/apiClient';
 import { SERVICE_TYPES } from '../scan/tileActions';
 import { getServiceMeta } from '../scan/serviceMeta';
 import { STICKER_CATEGORIES } from '../../stickerModules';
+import { DEFAULT_PRODUCTS, mapApiShopProduct, type ProductItem } from '../../data/products';
 
 // Image assets
 import stepImg1 from '../../../assets/landing-step-1.webp';
@@ -111,21 +112,8 @@ export interface LandingPageMasterProps {
   onOpenCheckout?: () => void;
   onOpenJoinUs?: (serviceType?: string) => void;
   onOpenTrackOrder?: () => void;
+  onOpenPrivacy?: () => void;
   isEmbeddedInDashboard?: boolean;
-}
-
-interface ProductItem {
-  id: string;
-  name: string;
-  desc: string;
-  price: number;
-  mrp: number;
-  category: 'Vehicle' | 'Home' | 'Family' | 'Travel';
-  badge: string;
-  img: string;
-  features: string[];
-  rating?: number;
-  reviewsCount?: number;
 }
 
 interface CartItem {
@@ -158,61 +146,6 @@ const JOIN_BENEFITS = [
   'A scan near you rings your phone through a masked bridge — the caller never sees your number.',
   'Choose which sticker categories you cover, or serve every one of them.',
   'No listing fee. Our team verifies your details before you go live.',
-];
-
-const PRODUCTS: ProductItem[] = [
-  {
-    id: 'car-qr',
-    name: 'Automobile Safety Tag',
-    desc: 'Windshield and rear-glass tag that keeps your phone number off the glass.',
-    price: 299,
-    mrp: 599,
-    category: 'Vehicle',
-    badge: 'For vehicles',
-    img: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=1200&q=85',
-    rating: 4.9,
-    reviewsCount: 3840,
-    features: ['Parking issue masked call', 'Tow & emergency alert', 'Works with any phone camera'],
-  },
-  {
-    id: 'home-qr',
-    name: 'Gate & Doorbell Plate',
-    desc: 'Never miss deliveries or emergency visitors while keeping your number private.',
-    price: 349,
-    mrp: 699,
-    category: 'Home',
-    badge: 'For gates & doors',
-    img: 'https://images.unsplash.com/photo-1558008258-3256797b43f3?auto=format&fit=crop&w=1200&q=85',
-    rating: 4.8,
-    reviewsCount: 2190,
-    features: ['Virtual visitor doorbell', 'Zero app required', 'Instant WhatsApp alert'],
-  },
-  {
-    id: 'child-qr',
-    name: 'Pet & Kid Safety Charm',
-    desc: 'Compact charm for pet collars, backpacks, and school bags.',
-    price: 249,
-    mrp: 499,
-    category: 'Family',
-    badge: 'For pets & kids',
-    img: 'https://images.unsplash.com/photo-1558788353-f76d92427f16?auto=format&fit=crop&w=1200&q=85',
-    rating: 4.9,
-    reviewsCount: 1740,
-    features: ['GPS location share', 'Multi-contact emergency tree', 'Masked call to guardians'],
-  },
-  {
-    id: 'travel-qr',
-    name: 'Luggage & Key Smart Tag',
-    desc: 'Durable tag for suitcases and keychains to recover lost bags at airports.',
-    price: 299,
-    mrp: 599,
-    category: 'Travel',
-    badge: 'For bags & keys',
-    img: 'https://images.unsplash.com/photo-1553531384-cc64ac80f931?auto=format&fit=crop&w=1200&q=85',
-    rating: 4.9,
-    reviewsCount: 2860,
-    features: ['Airport baggage recovery', 'Instant finder chat', 'No app for the finder'],
-  },
 ];
 
 const HOW_IT_WORKS_STEPS = [
@@ -925,6 +858,7 @@ export default function LandingPageMaster({
   onOpenCheckout,
   onOpenJoinUs,
   onOpenTrackOrder,
+  onOpenPrivacy,
   isEmbeddedInDashboard = false,
 }: LandingPageMasterProps) {
   const { isLoggedIn, profile } = useAuth();
@@ -965,6 +899,23 @@ export default function LandingPageMaster({
     const timeout = window.setTimeout(() => setCartNotice(null), 3200);
     return () => window.clearTimeout(timeout);
   }, [cartNotice]);
+
+  // Shop catalog — admin-managed via /api/shop-products (ShopProductsPage in
+  // the admin dashboard); falls back to the built-in DEFAULT_PRODUCTS if the
+  // admin hasn't added any yet or the request fails, so the shop is never blank.
+  const [products, setProducts] = useState<ProductItem[]>(DEFAULT_PRODUCTS);
+  useEffect(() => {
+    apiClient.shopProducts
+      .list()
+      .then((res) => {
+        if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+          setProducts(res.data.map(mapApiShopProduct));
+        }
+      })
+      .catch(() => {
+        /* keep the built-in fallback catalog */
+      });
+  }, []);
 
   // Category filter
   const [activeCategory, setActiveCategory] =
@@ -1294,8 +1245,8 @@ export default function LandingPageMaster({
   };
 
   const filteredProducts = useMemo(
-    () => (activeCategory === 'All' ? PRODUCTS : PRODUCTS.filter((p) => p.category === activeCategory)),
-    [activeCategory]
+    () => (activeCategory === 'All' ? products : products.filter((p) => p.category === activeCategory)),
+    [activeCategory, products]
   );
 
   const cartSubtotal = cart.reduce((sum, i) => sum + i.product.price * i.qty, 0);
@@ -1882,7 +1833,7 @@ export default function LandingPageMaster({
                   <Truck size={18} />
                 </div>
                 <div>
-                  <h4 className="text-[13px] font-semibold text-white">Free Express Shipping</h4>
+                  <h4 className="text-[13px] font-semibold text-white">Free Shipping</h4>
                   <p className="text-[11px] text-white/50">Doorstep delivery across India</p>
                 </div>
               </div>
@@ -1953,7 +1904,7 @@ export default function LandingPageMaster({
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-5 text-[11px] uppercase tracking-[0.14em] text-black/60">
-              <span><strong className="text-black">{PRODUCTS.length}</strong> tag styles</span>
+              <span><strong className="text-black">{products.length}</strong> tag styles</span>
               <span className="h-5 w-px bg-black/15" />
               <span><strong className="text-black">∞</strong> validity</span>
             </div>
@@ -2658,7 +2609,14 @@ export default function LandingPageMaster({
                       Contact
                     </a>
                   </li>
-                  <li>Privacy Policy</li>
+                  <li>
+                    <button
+                      onClick={onOpenPrivacy}
+                      className="cursor-pointer text-left transition-colors hover:text-white"
+                    >
+                      Privacy Policy
+                    </button>
+                  </li>
                   <li>Terms &amp; Conditions</li>
                 </ul>
               </div>
@@ -2931,26 +2889,8 @@ export default function LandingPageMaster({
                     <span className="font-medium text-[#0B0B0C]">
                       {partnerForm.name || userAppStatus?.userName || 'partner'}
                     </span>
-                    . Your application has been sent to the RepiQR team.
+                    . Please wait — our team will accept your distributor request and contact you shortly.
                   </p>
-                  <div className="space-y-2.5 rounded-2xl bg-black/[0.03] p-4 text-left text-[12px] font-light text-black/55">
-                    <div className="flex justify-between">
-                      <span>City / territory</span>
-                      <span className="font-medium text-[#0B0B0C]">
-                        {partnerForm.city || userAppStatus?.city || '—'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Package tier</span>
-                      <span className="font-medium text-[#0B0B0C]">
-                        {partnerForm.tier || userAppStatus?.tier}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Status</span>
-                      <span className="font-medium text-[#0B0B0C]">Pending review</span>
-                    </div>
-                  </div>
                   <button
                     onClick={() => {
                       setIsPartnerModalOpen(false);
@@ -3018,46 +2958,6 @@ export default function LandingPageMaster({
                         className="w-full rounded-xl border border-black/12 px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#0B0B0C] sm:text-[14px]"
                         />
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
-                        Business type
-                      </label>
-                      <select
-                        value={partnerForm.business}
-                        onChange={(e) => setPartnerForm({ ...partnerForm, business: e.target.value })}
-                        className="w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#0B0B0C] sm:text-[14px]"
-                      >
-                        <option value="Auto Accessories Shop">Auto accessories / helmet shop</option>
-                        <option value="Car Dealership / Service Center">
-                          Car dealership / service centre
-                        </option>
-                        <option value="Security Agency / Society Admin">
-                          Security agency / society admin
-                        </option>
-                        <option value="Retail Store / Gift Shop">Retail store / general merchant</option>
-                        <option value="Individual Reseller">Individual reseller</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
-                        Interested package
-                      </label>
-                      <select
-                        value={partnerForm.tier}
-                        onChange={(e) => setPartnerForm({ ...partnerForm, tier: e.target.value })}
-                        className="w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#0B0B0C] sm:text-[14px]"
-                      >
-                        <option value="Retail Kit (50 Units)">Retail partner kit (50 stickers)</option>
-                        <option value="City Franchise (300 Units)">
-                          City master franchise (300 stickers)
-                        </option>
-                        <option value="State Partner (2500+ Units)">
-                          State master partner (2,500+ stickers)
-                        </option>
-                      </select>
                     </div>
 
                     <button

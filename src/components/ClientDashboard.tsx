@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getCategoryIcon, getCategoryLabel } from '../stickerModules';
 import {
@@ -32,8 +32,11 @@ import {
   ArrowRight,
   MessageSquare,
   MessageCircle,
-  Package
+  Package,
+  Zap,
 } from 'lucide-react';
+import { DEFAULT_PRODUCTS, mapApiShopProduct, type ProductItem } from '../data/products';
+
 import type { DashboardSticker } from './dashboard/client/types';
 import PhoneVerificationCard from './auth/PhoneVerificationCard';
 import { mapProductRow } from './dashboard/client/types';
@@ -130,6 +133,7 @@ async function getProductHistoryFromDb(productId: string): Promise<any[]> {
 
 interface ClientDashboardProps {
   onBack: () => void;
+  onPurchaseSticker?: () => void;
   switchToDistributor?: () => void;
 }
 
@@ -167,15 +171,60 @@ type ModalState =
   | { type: 'recover'; prefillId?: string }
   | null;
 
-export default function ClientDashboard({ onBack }: ClientDashboardProps) {
+export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDashboardProps) {
   const { profile, signOut, sendPhoneOtp, verifyPhoneOtp } = useAuth();
   // The admin account never links stickers by phone — the fleet console already sees
   // every sticker. Prompting it to verify a number only put the admin in competition
   // with the real owner for the stickers registered under that number.
   const isAdminAccount = profile?.role === 'admin';
 
+  const handlePurchaseStickerClick = () => {
+    if (onPurchaseSticker) {
+      onPurchaseSticker();
+      return;
+    }
+    onBack();
+  };
+
+  // Pre-purchase shop's "Buy this sticker" — merges into the same cart the
+  // public shop writes to, so checkout (and the shared 'namoqr-cart'/
+  // 'repiqr-cart' keys) sees it exactly like a landing-page purchase would.
+  const handleBuyProduct = (product: ProductItem) => {
+    try {
+      const raw = localStorage.getItem('namoqr-cart') || localStorage.getItem('repiqr-cart');
+      const existingCart: { product: ProductItem; qty: number }[] = raw ? JSON.parse(raw) : [];
+      const already = existingCart.find((item) => item.product.id === product.id);
+      const updatedCart = already
+        ? existingCart.map((item) => (item.product.id === product.id ? { ...item, qty: item.qty + 1 } : item))
+        : [...existingCart, { product, qty: 1 }];
+      localStorage.setItem('repiqr-cart', JSON.stringify(updatedCart));
+      localStorage.setItem('namoqr-cart', JSON.stringify(updatedCart));
+    } catch {
+      /* ignore */
+    }
+    handlePurchaseStickerClick();
+  };
+
+  // Pre-purchase shop catalog — same admin-managed /api/shop-products list the
+  // landing page shows, so a product the admin adds/edits appears here too.
+  // Falls back to the built-in DEFAULT_PRODUCTS if none are configured yet.
+  const [shopProducts, setShopProducts] = useState<ProductItem[]>(DEFAULT_PRODUCTS);
+  useEffect(() => {
+    apiClient.shopProducts
+      .list()
+      .then((res) => {
+        if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+          setShopProducts(res.data.map(mapApiShopProduct));
+        }
+      })
+      .catch(() => {
+        /* keep the built-in fallback catalog */
+      });
+  }, []);
+
   // ─── DASHBOARD PREPARATION SPLASH ANIMATION ───
   const [isPreparing, setIsPreparing] = useState(true);
+
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -256,8 +305,48 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
 
   const missingPhone = !isAdminAccount && !profile?.phoneNumber;
   const missingEmail = !profile?.email || profile.email.endsWith('.repiqr.local');
-  const [profilePopupDismissed, setProfilePopupDismissed] = useState(false);
-  const showCompleteProfilePopup = Boolean(profile) && (missingPhone || missingEmail) && !profilePopupDismissed;
+
+  // Once the user fills the phone number or dismisses the prompt, never ask again
+  const [profilePopupDismissed, setProfilePopupDismissed] = useState(() => {
+    try {
+      const alreadyFilled = localStorage.getItem('rapiqr-phone-number-filled') === 'true';
+      const alreadyAsked = localStorage.getItem('rapiqr-phone-asked-once') === 'true';
+      const hasPhone = Boolean(profile?.phoneNumber);
+      return alreadyFilled || alreadyAsked || hasPhone;
+    } catch {
+      return false;
+    }
+  });
+
+  // Automatically remember when profile has phone number so it is never prompted again
+  useEffect(() => {
+    if (profile?.phoneNumber) {
+      try {
+        localStorage.setItem('rapiqr-phone-number-filled', 'true');
+        localStorage.setItem('rapiqr-phone-asked-once', 'true');
+      } catch {
+        // Ignore storage errors
+      }
+    }
+  }, [profile?.phoneNumber]);
+
+  const handleDismissProfilePopup = () => {
+    setProfilePopupDismissed(true);
+    try {
+      localStorage.setItem('rapiqr-phone-asked-once', 'true');
+    } catch {
+      // Ignore storage errors
+    }
+  };
+
+  const showCompleteProfilePopup =
+    Boolean(profile) &&
+    (missingPhone || missingEmail) &&
+    !profilePopupDismissed &&
+    typeof window !== 'undefined' &&
+    localStorage.getItem('rapiqr-phone-asked-once') !== 'true' &&
+    localStorage.getItem('rapiqr-phone-number-filled') !== 'true';
+
 
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     try {
@@ -680,6 +769,103 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
     );
   }
 
+  // ─── PRE-PURCHASE GATE ───
+  // A signed-in user with zero stickers has nothing for the dashboard to
+  // manage yet. Rather than build/show the full sidebar+tabs dashboard shell
+  // around an empty state, show only a minimal "you're logged in" header and
+  // a full-page shop — the real dashboard is created the moment they own a
+  // sticker (loadProducts() finding one flips products.length > 0). Admin
+  // accounts previewing the client dashboard skip this gate entirely.
+  if (!isAdminAccount && !productsLoading && products.length === 0) {
+    return (
+      <div className="fx-shell min-h-screen w-full bg-[var(--fx-canvas)] text-[var(--fx-ink)] font-body">
+        <header className="flex items-center justify-between border-b border-[var(--fx-border)] bg-white px-5 py-4 sm:px-8">
+          <button onClick={onBack} className="flex items-center gap-2 cursor-pointer">
+            <AppLogo variant="light" className="h-8 w-auto object-contain" />
+          </button>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-xs font-medium text-[var(--fx-ink-2)] sm:inline">
+              Logged in as{' '}
+              <span className="font-semibold text-[var(--fx-ink)]">
+                {profile?.fullName || profile?.email || 'you'}
+              </span>
+            </span>
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--fx-border)] px-3 py-2 text-xs font-semibold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] cursor-pointer"
+            >
+              <LogOut size={14} /> Log out
+            </button>
+          </div>
+        </header>
+
+        <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
+          <div className="mb-10 text-center">
+
+            <h1 className="text-2xl font-black tracking-tight text-[var(--fx-ink)] sm:text-3xl">
+              Purchase a Safety Sticker to Create &amp; Activate Your Dashboard
+            </h1>
+
+            <button
+              onClick={() => setModal({ type: 'recover' })}
+              className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--fx-accent)] hover:underline cursor-pointer"
+            >
+              <QrCode size={20} /> Already have a tag? Link it by recovery code
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {shopProducts.map((product) => (
+              <div
+                key={product.id}
+                className="flex flex-col overflow-hidden rounded-2xl border border-[var(--fx-border)] bg-white shadow-sm"
+              >
+                <div className="relative aspect-[16/10] overflow-hidden">
+                  <img src={product.img} alt={product.name} className="h-full w-full object-cover" />
+                  <span className="absolute left-3 top-3 rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-medium text-white backdrop-blur-sm">
+                    {product.badge}
+                  </span>
+                </div>
+                <div className="flex flex-1 flex-col justify-between p-4">
+                  <div>
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="text-sm font-bold text-[var(--fx-ink)]">{product.name}</h3>
+                      <div className="shrink-0 text-right">
+                        <div className="text-sm font-bold text-[var(--fx-ink)]">₹{product.price}</div>
+                        <div className="text-[11px] text-[var(--fx-faint)] line-through">₹{product.mrp}</div>
+                      </div>
+                    </div>
+                    <p className="mt-1.5 text-xs text-[var(--fx-ink-2)]">{product.desc}</p>
+                  </div>
+                  <button
+                    onClick={() => handleBuyProduct(product)}
+                    className="mt-4 flex items-center justify-center gap-1.5 rounded-lg bg-[var(--fx-ink)] py-2.5 text-xs font-bold text-white hover:opacity-90 cursor-pointer"
+                  >
+                    <ShoppingBag size={13} /> Buy this sticker <ArrowRight size={13} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {modal?.type === 'recover' && (
+          <RecoverStickerModal
+            prefillId={modal.prefillId}
+            onClose={() => setModal(null)}
+            onRecover={handleRecoverSticker}
+          />
+        )}
+
+        {toastMsg && (
+          <div className="fixed bottom-6 right-6 z-[120] rounded-[9px] border border-[var(--fx-accent)] bg-[var(--fx-ink)] px-4 py-2.5 font-mono text-[13px] text-white shadow-lg">
+            {toastMsg}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="fx-shell min-h-screen w-full flex flex-col overflow-x-hidden text-[var(--fx-ink)] bg-[var(--fx-canvas)] font-body pb-16">
 
@@ -819,7 +1005,15 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 sm:gap-4 text-xs flex-shrink-0">
+            <div className="flex items-center gap-2.5 sm:gap-3 text-xs flex-shrink-0">
+              <button
+                onClick={handlePurchaseStickerClick}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 active:scale-[0.99] text-slate-950 font-bold text-xs shadow-xs transition-all cursor-pointer"
+              >
+                <ShoppingBag size={13} />
+                <span>Buy Sticker</span>
+              </button>
+
               <span className="font-semibold text-[var(--fx-accent-ink)] hidden sm:inline-flex items-center gap-1.5 bg-[var(--fx-accent-soft)] px-2.5 py-1 rounded-full text-xs">
                 ◆ Pro Protection
               </span>
@@ -843,8 +1037,8 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
           <main className="max-w-[1360px] w-full mx-auto p-4 sm:p-7 lg:p-9 space-y-7">
 
             {/* ── MANDATORY PHONE VERIFICATION ALERT BANNER ── */}
-            {(!isAdminAccount && !profile?.isPhoneVerified && (!profile?.phoneNumber || profile?.isPhoneVerified === false)) && (
-              <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-fade-in">
+            {(!isAdminAccount && !profile?.isPhoneVerified && (!profile?.phoneNumber || profile?.isPhoneVerified === false) && !profilePopupDismissed) && (
+              <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-fade-in relative">
                 <div className="flex items-start gap-3.5">
                   <div className="w-10 h-10 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-700 flex-shrink-0 mt-0.5 sm:mt-0">
                     <AlertTriangle size={20} />
@@ -862,19 +1056,30 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setActiveTab('settings');
-                    setOtpStep('input');
-                  }}
-                  className="w-full sm:w-auto px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-2 flex-shrink-0 shadow-xs cursor-pointer"
-                >
-                  <Smartphone size={14} />
-                  <span>{profile?.phoneNumber ? 'Verify Phone via OTP' : 'Add & Verify Mobile Number'}</span>
-                  <ArrowRight size={14} />
-                </button>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={() => {
+                      setActiveTab('settings');
+                      setOtpStep('input');
+                    }}
+                    className="flex-1 sm:flex-initial px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-2 flex-shrink-0 shadow-xs cursor-pointer"
+                  >
+                    <Smartphone size={14} />
+                    <span>{profile?.phoneNumber ? 'Verify Phone via OTP' : 'Add & Verify Mobile Number'}</span>
+                    <ArrowRight size={14} />
+                  </button>
+                  <button
+                    onClick={handleDismissProfilePopup}
+                    className="p-2 text-amber-700 hover:text-amber-900 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer"
+                    title="Dismiss alert"
+                    aria-label="Dismiss alert"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
             )}
+
 
             {/* ════ SETUP GUIDE PAGE ════ */}
             {activeTab === 'setup' && (
@@ -990,6 +1195,49 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                   </div>
                 </div>
 
+                {/* ─── STICKER PURCHASE REQUIRED HERO CARD (When 0 stickers) ─── */}
+                {products.length === 0 && !productsLoading && (
+                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0F1015] via-[#161822] to-[#0A0B0E] text-white p-6 sm:p-7 border border-amber-500/30 shadow-xl">
+                    <div className="pointer-events-none absolute -top-16 -right-16 w-64 h-64 bg-amber-400/15 rounded-full blur-3xl" />
+
+                    <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+                      <div className="max-w-xl space-y-2 text-left">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-400 text-[11px] font-bold tracking-wide uppercase">
+                          <Sparkles size={13} /> Sticker Purchase Required
+                        </div>
+                        <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white font-display">
+                          Purchase a Safety Sticker to Create & Activate Your Dashboard
+                        </h2>
+                        <p className="text-zinc-300 text-xs sm:text-sm leading-relaxed">
+                          Your account is ready! To generate your vehicle QR plate, emergency responder tree, and instant WhatsApp parking alerts, purchase your RapiQR smart safety tag.
+                        </p>
+                        <div className="flex flex-wrap items-center gap-4 pt-1 text-xs text-zinc-400">
+                          <span className="flex items-center gap-1"><ShieldCheck size={14} className="text-emerald-400" /> 100% Number Masking</span>
+                          <span className="flex items-center gap-1"><Zap size={14} className="text-amber-400" /> 0.4s Instant Alerts</span>
+                          <span className="flex items-center gap-1"><CheckCircle2 size={14} className="text-emerald-400" /> Free Delivery</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 shrink-0">
+                        <button
+                          onClick={handlePurchaseStickerClick}
+                          className="h-11 px-6 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-[0.99] text-black font-extrabold text-sm shadow-lg shadow-amber-400/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                        >
+                          <ShoppingBag size={17} />
+                          <span>Purchase Sticker (₹199) →</span>
+                        </button>
+                        <button
+                          onClick={() => setModal({ type: 'recover' })}
+                          className="h-9 px-4 rounded-lg border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 active:scale-[0.99] text-zinc-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <QrCode size={13} />
+                          <span>Have a Tag? Link by Code</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* HoneyBook Stats Bar (4 columns) */}
                 <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.04)] grid grid-cols-2 lg:grid-cols-4 rounded-lg overflow-hidden divide-x divide-y lg:divide-y-0 divide-[var(--fx-border)]">
                   <div className="p-6">
@@ -1070,9 +1318,20 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                       {productsLoading ? (
                         <div className="py-12 text-center text-xs text-[var(--fx-ink-2)]">Loading stickers...</div>
                       ) : products.length === 0 ? (
-                        <div className="py-12 text-center text-xs text-[var(--fx-ink-2)]">
-                          <p className="font-semibold mb-1 text-[var(--fx-ink)]">No safety stickers linked yet.</p>
-                          <p>Verify phone number to fetch stickers.</p>
+                        <div className="py-8 text-center text-xs text-[var(--fx-ink-2)] space-y-3">
+                          <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-400/10 text-amber-500 flex items-center justify-center">
+                            <ShoppingBag size={22} />
+                          </div>
+                          <div>
+                            <p className="font-bold text-sm text-[var(--fx-ink)]">No Safety Stickers Linked Yet</p>
+                            <p className="text-[11px] text-[var(--fx-ink-2)] mt-0.5">Purchase your first sticker to create your vehicle plate.</p>
+                          </div>
+                          <button
+                            onClick={handlePurchaseStickerClick}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-black hover:bg-zinc-800 active:scale-[0.99] text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
+                          >
+                            <Plus size={14} /> Buy Safety Sticker
+                          </button>
                         </div>
                       ) : (
                         <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
@@ -1100,6 +1359,7 @@ export default function ClientDashboard({ onBack }: ClientDashboardProps) {
                           ))}
                         </div>
                       )}
+
 
                       {removedStickers.length > 0 && (
                         <div className="mt-3 pt-3 border-t border-[var(--fx-canvas)] space-y-2">

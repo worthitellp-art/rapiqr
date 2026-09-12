@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { ShieldCheck, Loader2, Check, X, Mail, Smartphone } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
@@ -51,6 +51,15 @@ export default function CompleteProfilePopup({
     setMsg({ tone: 'success', text: 'Code sent! Enter it below (or use 000000 as a bypass code).' });
   };
 
+  const handleDismissForever = () => {
+    try {
+      localStorage.setItem('rapiqr-phone-asked-once', 'true');
+    } catch {
+      // Ignore storage errors
+    }
+    onDismiss();
+  };
+
   const handleVerifyOtp = async () => {
     if (!otpCode.trim()) {
       setMsg({ tone: 'error', text: 'Enter the code sent to your phone.' });
@@ -64,6 +73,15 @@ export default function CompleteProfilePopup({
       setMsg({ tone: 'error', text: res.error || 'Verification failed.' });
       return;
     }
+
+    // Mark as filled so user is never asked for a phone number again
+    try {
+      localStorage.setItem('rapiqr-phone-number-filled', 'true');
+      localStorage.setItem('rapiqr-phone-asked-once', 'true');
+    } catch {
+      // Ignore storage errors
+    }
+
     await refreshProfile();
     await onProductsLinked?.();
     if (!missingEmail) {
@@ -81,7 +99,7 @@ export default function CompleteProfilePopup({
     >
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 border border-gray-100 relative">
         <button
-          onClick={onDismiss}
+          onClick={handleDismissForever}
           className="absolute top-4 right-4 w-8 h-8 rounded-full bg-[var(--fx-canvas)] flex items-center justify-center text-gray-500 hover:text-gray-900 cursor-pointer"
         >
           <X size={16} />
@@ -93,6 +111,7 @@ export default function CompleteProfilePopup({
         <h3 className="font-bold text-lg text-[var(--fx-ink)]">
           {missingPhone && !missingEmail ? 'Enter your phone number to get your stickers' : 'Finish setting up your account'}
         </h3>
+
         <p className="text-xs text-[var(--fx-ink-2)] mt-1 mb-5">
           {missingPhone && !missingEmail
             ? "Stickers auto-link to your account by phone number — add and verify yours to see everything registered under it."

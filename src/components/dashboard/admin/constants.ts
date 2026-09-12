@@ -1,4 +1,4 @@
-import { LayoutGrid, Plus, PhoneCall, Bell, Users, Palette, Store, ShoppingBag, MessageCircle, Send } from "lucide-react";
+import { LayoutGrid, Plus, PhoneCall, Bell, Users, Palette, Store, ShoppingBag, MessageCircle, Send, Package } from "lucide-react";
 
 export const FONT_OPTIONS = [
   { id: "Plus Jakarta Sans", label: "Jakarta Sans", css: "'Plus Jakarta Sans', ui-sans-serif, system-ui" },
@@ -22,6 +22,7 @@ export const NAV_ITEMS = [
   { id: "messages", label: "Message Manager", icon: Send, section: "Engagement" },
   { id: "alerts", label: "Alerts", icon: Bell, section: "Engagement" },
   { id: "users", label: "Users", icon: Users, section: "Manage" },
+  { id: "products", label: "Shop Products", icon: Package, section: "Manage" },
   { id: "customize", label: "Customization", icon: Palette, section: "Manage" },
 ];
 

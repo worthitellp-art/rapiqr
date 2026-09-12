@@ -14,7 +14,7 @@ export default function SocialAuthButton({
       type="button"
       onClick={onGoogleSignIn}
       disabled={isSubmitting}
-      className="w-full h-12 px-4 rounded-xl border border-zinc-200 hover:border-black bg-white active:scale-[0.99] text-black text-sm md:text-base font-semibold transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+      className="w-full h-11 px-4 rounded-xl border border-slate-200 hover:border-slate-400 bg-white hover:bg-slate-50/80 active:scale-[0.99] text-slate-800 text-sm font-semibold transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-xs"
     >
       <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
         <path
@@ -38,3 +38,4 @@ export default function SocialAuthButton({
     </button>
   );
 }
+

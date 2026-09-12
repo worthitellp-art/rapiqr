@@ -12,6 +12,7 @@ const ScanPage = lazy(() => import('./components/scan/ScanPage'));
 const DistributorDashboard = lazy(() => import('./components/dashboard/DistributorDashboard'));
 const TrackOrderModal = lazy(() => import('./components/landing/TrackOrderModal'));
 const AuthPage = lazy(() => import('./components/auth/AuthPage'));
+const PrivacyPolicyPage = lazy(() => import('./components/legal/PrivacyPolicyPage'));
 
 export type AppPage =
   | 'landing'
@@ -21,7 +22,8 @@ export type AppPage =
   | 'checkout'
   | 'join'
   | 'login'
-  | 'register';
+  | 'register'
+  | 'privacy';
 
 function PageLoader() {
   return (
@@ -51,7 +53,7 @@ function isScanUrl(): boolean {
 
   const isSingleSegmentQrPath =
     /^\/([A-Z0-9_-]{3,})$/i.test(pathName) &&
-    !/^\/(admin|distributor|checkout|auth|callback|login|register|signup)$/i.test(pathName);
+    !/^\/(admin|distributor|checkout|auth|callback|login|register|signup|privacy|terms|join)$/i.test(pathName);
 
   return !!directQrMatch || legacyPathMatch || hashMatch || queryMatch || isSingleSegmentQrPath;
 }
@@ -116,6 +118,7 @@ function MainAppContent() {
     const pathName = window.location.pathname.toLowerCase();
     const hashString = window.location.hash.toLowerCase();
     if (pathName === '/checkout' || hashString === '#/checkout') return 'checkout';
+    if (pathName === '/privacy' || hashString === '#/privacy') return 'privacy';
     try {
       const saved = localStorage.getItem('repiqr-current-page') || localStorage.getItem('namoqr-current-page');
       if (saved === 'dashboard') return 'dashboard';
@@ -141,6 +144,8 @@ function MainAppContent() {
         window.history.pushState({}, '', '/login');
       } else if (next === 'register') {
         window.history.pushState({}, '', '/register');
+      } else if (next === 'privacy') {
+        window.history.pushState({}, '', '/privacy');
       } else if (next === 'checkout') {
         window.history.pushState({}, '', '/checkout');
         localStorage.setItem('repiqr-current-page', 'checkout');
@@ -282,7 +287,9 @@ function MainAppContent() {
         ) : (
           <ClientDashboard
             onBack={() => navigateTo('landing')}
+            onPurchaseSticker={() => navigateTo('checkout')}
           />
+
         )}
       </Suspense>
     );
@@ -302,6 +309,7 @@ function MainAppContent() {
         <AuthPage
           initialMode={page === 'register' ? 'signup' : 'login'}
           prefillEmail={authPrefillEmail}
+          onModeChange={(nextMode) => setPage(nextMode === 'signup' ? 'register' : 'login')}
           onBackHome={() => navigateTo('landing')}
           onSuccess={() => {
             setAuthPrefillEmail('');
@@ -316,6 +324,7 @@ function MainAppContent() {
       </Suspense>
     );
   }
+
 
   if (page === 'checkout') {
     return (
@@ -352,6 +361,14 @@ function MainAppContent() {
     );
   }
 
+  if (page === 'privacy') {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <PrivacyPolicyPage onBack={() => navigateTo('landing')} />
+      </Suspense>
+    );
+  }
+
   return (
     <Suspense fallback={<PageLoader />}>
       <div className="min-h-screen bg-[#FAFAFC] text-[#0A0D14]">
@@ -362,6 +379,7 @@ function MainAppContent() {
           onOpenDistributorDashboard={() => navigateTo('distributor')}
           onOpenCheckout={() => navigateTo('checkout')}
           onOpenTrackOrder={() => handleOpenTrackOrder()}
+          onOpenPrivacy={() => navigateTo('privacy')}
           onOpenJoinUs={(serviceType) => {
             setJoinServiceType(serviceType);
             navigateTo('join');

@@ -983,7 +983,6 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                     <label className="fx-label mb-1.5 block">Delivery</label>
                     <select value={draft.deliveryMethod} onChange={(e) => setDraftField("deliveryMethod", e.target.value)} className="fx-input">
                       <option value="standard">Standard</option>
-                      <option value="express">Express</option>
                     </select>
                   </div>
                 </div>

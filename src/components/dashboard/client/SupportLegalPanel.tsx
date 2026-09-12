@@ -146,6 +146,14 @@ export default function SupportLegalPanel({ showToast }: { showToast: (msg: stri
           <p>RapiQR collects only what's needed to protect you and your belongings: your name, phone/email, the emergency contacts you add, and scan/alert activity tied to your stickers.</p>
           <p>We never display your real phone number to anyone who scans your sticker — all calls are routed anonymously through a masked line. Location shared during an emergency scan is sent only to you, the owner.</p>
           <p>Your data is never sold. It's used solely to operate the RapiQR safety network and is encrypted at rest and in transit.</p>
+          <a
+            href="/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block font-bold text-[var(--fx-accent-ink)] underline hover:text-[var(--fx-accent)]"
+          >
+            Read the full Privacy Policy →
+          </a>
         </LegalModal>
       )}
 

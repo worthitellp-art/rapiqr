@@ -31,18 +31,21 @@ export default function RestoreStickerModal({
   openQuickLook: (q: QrRecord) => void;
   setToast: (msg: string | null) => void;
 }) {
-  // v1 stickers need both the id and its code (independent random values —
-  // see stickerCrypto.js). v2 stickers only need the code: the id is
-  // deterministically derivable from it, so the server looks it up with no
-  // id from the caller at all — see QrModel.recoverByCodeV2.
-  const [mode, setMode] = useState<"id-and-code" | "code-only">("id-and-code");
+  // Every sticker generated since id-scheme v2 (GenerateTagModal / bulk
+  // generation both call saveQrCodeV2 exclusively now) is recoverable from
+  // its code ALONE — the id is deterministically derivable from it server-side,
+  // see QrModel.recoverByCodeV2. That's the default, primary flow here.
+  // "id-and-code" only exists as a fallback for v1 stickers issued before the
+  // switch, where the id and code are independent random values that were
+  // never linked by anything but a database row — see stickerCrypto.js.
+  const [mode, setMode] = useState<"code-only" | "id-and-code">("code-only");
   const [targetId, setTargetId] = useState("");
   const [recoveryCode, setRecoveryCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const handleClose = () => {
-    setTargetId(""); setRecoveryCode(""); setError(null); setMode("id-and-code");
+    setTargetId(""); setRecoveryCode(""); setError(null); setMode("code-only");
     onClose();
   };
 
@@ -98,7 +101,11 @@ export default function RestoreStickerModal({
       iconTone="accent"
       size="md"
     >
-      <p className="text-xs text-[var(--fx-ink-2)] font-medium -mt-2 mb-4">Bring back a deleted sticker with its recovery code</p>
+      <p className="text-xs text-[var(--fx-ink-2)] font-medium -mt-2 mb-4">
+        {mode === "code-only"
+          ? "Enter the recovery code printed on the physical sticker — that's all that's needed."
+          : "Older tag: enter its ID and recovery code together."}
+      </p>
 
       <form onSubmit={handleRestore} className="space-y-3">
         {mode === "id-and-code" && (
@@ -114,10 +121,10 @@ export default function RestoreStickerModal({
 
         <button
           type="button"
-          onClick={() => { setMode((m) => (m === "id-and-code" ? "code-only" : "id-and-code")); setError(null); }}
+          onClick={() => { setMode((m) => (m === "code-only" ? "id-and-code" : "code-only")); setError(null); }}
           className="text-[11px] font-semibold text-[var(--fx-accent-ink)] hover:underline cursor-pointer"
         >
-          {mode === "id-and-code" ? "I only have the recovery code, not the ID" : "I have the sticker ID too"}
+          {mode === "code-only" ? "This is an older tag — I also have its ID" : "I only have the recovery code, not the ID"}
         </button>
 
         {error && <p className="text-xs font-semibold text-[var(--fx-red)]">{error}</p>}
