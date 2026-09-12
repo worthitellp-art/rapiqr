@@ -38,8 +38,21 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const FRONTEND_ORIGIN = process.env.FRONTEND_URL || 'https://rapiqr.worthitellp.workers.dev';
 
-// Enable CORS & Request Parsing — configured frontend plus local dev origins
-const ALLOWED_ORIGINS = [FRONTEND_ORIGIN, 'http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173'];
+// Enable CORS & Request Parsing — configured frontend plus local dev origins.
+// The custom domain is listed explicitly (not just via FRONTEND_URL) so a
+// live custom-domain switch doesn't silently CORS-block every API call —
+// including the Google sign-in verification call — the moment DNS cuts over,
+// before anyone remembers to update the FRONTEND_URL env var to match.
+const ALLOWED_ORIGINS = [
+  FRONTEND_ORIGIN,
+  'https://repiqr.com',
+  'https://www.repiqr.com',
+  'https://rapiqr.onrender.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+];
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || ALLOWED_ORIGINS.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
