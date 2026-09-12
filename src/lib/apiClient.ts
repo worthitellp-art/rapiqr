@@ -346,6 +346,33 @@ export const apiClient = {
       });
     },
 
+    /**
+     * id-scheme v2 — the server generates the recovery code AND derives the
+     * sticker id from it (HMAC-SHA256, see Server/services/stickerCrypto.js);
+     * the caller supplies neither. All admin-generated tags use this going
+     * forward — see QrModel.saveV2.
+     */
+    async saveQrCodeV2(qrData: { category?: string; ownerPhone?: string; fg?: string; bg?: string; template?: string }) {
+      return request<{ success: boolean; data?: any; error?: string }>('/qr/v2', {
+        method: 'POST',
+        body: JSON.stringify(qrData),
+      });
+    },
+
+    /**
+     * Code-only recovery for id-scheme v2 stickers — no sticker id needed,
+     * unlike restoreQrCode. The server re-derives the id from the code alone
+     * and re-renders the QR through its exact pinned parameters, verifying
+     * the result against the hash recorded at issuance before returning it.
+     * See QrModel.recoverByCodeV2.
+     */
+    async recoverByCode(recoveryCode: string) {
+      return request<{ success: boolean; data?: any; image?: string; imageSha256?: string; error?: string }>('/qr/recover-by-code', {
+        method: 'POST',
+        body: JSON.stringify({ recoveryCode }),
+      });
+    },
+
     async activateQrCode(qrId: string, activationData: any) {
       return request<{ success: boolean; data: any }>(`/qr/${qrId}/activate`, {
         method: 'POST',
@@ -480,6 +507,24 @@ export const apiClient = {
     async getAlerts(limit = 50) {
       return request<{ success: boolean; data: any[] }>(`/alerts?limit=${limit}`, {
         method: 'GET',
+      });
+    },
+
+    async deleteAllAlerts() {
+      return request<{ success: boolean; message?: string; data?: { deletedCount: number } }>('/alerts', {
+        method: 'DELETE',
+      });
+    },
+
+    async deleteAlert(id: string) {
+      return request<{ success: boolean; message?: string }>(`/alerts/${id}`, {
+        method: 'DELETE',
+      });
+    },
+
+    async resolveAlert(id: string) {
+      return request<{ success: boolean; message?: string; data?: any }>(`/alerts/${id}/resolve`, {
+        method: 'PATCH',
       });
     },
   },
@@ -724,24 +769,51 @@ export const apiClient = {
     },
   },
 
-  // Razorpay checkout payment flow (test mode) — see docs/razorpayapi.md
+  // Razorpay standard checkout payment gateway flow — see docs/razorpayapi.md
   payments: {
-    async createOrder(orderId: string) {
+    async createOrder(params: string | { orderId?: string; amount?: number; currency?: string; receipt?: string; notes?: Record<string, any> }) {
+      const requestPayload = typeof params === 'string' ? { orderId: params } : params;
       return request<{
         success: boolean;
         error?: string;
+        order_id?: string;
+        amount?: number;
+        currency?: string;
+        keyId?: string;
         data?: {
-          keyId: string; razorpayOrderId: string; amount: number; currency: string;
-          orderId: string; name: string; email: string; phone: string;
+          keyId: string;
+          razorpayOrderId: string;
+          order_id: string;
+          amount: number;
+          currency: string;
+          orderId?: string;
+          name?: string;
+          email?: string;
+          phone?: string;
         };
-      }>('/payments/create-order', {
+      }>('/create-order', {
         method: 'POST',
-        body: JSON.stringify({ orderId }),
+        body: JSON.stringify(requestPayload),
       });
     },
 
-    async verify(payload: { orderId: string; razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) {
-      return request<{ success: boolean; error?: string; data?: any }>('/payments/verify', {
+    async verify(payload: {
+      orderId?: string;
+      order_id?: string;
+      razorpay_order_id?: string;
+      payment_id?: string;
+      razorpay_payment_id?: string;
+      signature?: string;
+      razorpay_signature?: string;
+    }) {
+      return request<{
+        success: boolean;
+        error?: string;
+        message?: string;
+        order_id?: string;
+        payment_id?: string;
+        data?: any;
+      }>('/verify-payment', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
@@ -910,6 +982,28 @@ export const apiClient = {
       const qs = params.toString();
       return request<{ success: boolean; data: any[] }>(`/admin/messages${qs ? `?${qs}` : ''}`, {
         method: 'GET',
+      });
+    },
+
+    async deleteAllMessages() {
+      return request<{ success: boolean; message?: string; data?: { deletedCount: number } }>('/admin/messages', {
+        method: 'DELETE',
+      });
+    },
+
+    // Customize page: the saved default QR placement on the sticker template.
+    // Persisted server-side so it's a real shared default, not just whatever
+    // is in one admin's browser localStorage.
+    async getStickerPosition() {
+      return request<{ success: boolean; data: { x: number; y: number; w: number; h: number } | null }>('/admin/sticker-position', {
+        method: 'GET',
+      });
+    },
+
+    async saveStickerPosition(pos: { x: number; y: number; w: number; h: number }) {
+      return request<{ success: boolean; data?: { x: number; y: number; w: number; h: number }; error?: string }>('/admin/sticker-position', {
+        method: 'PUT',
+        body: JSON.stringify(pos),
       });
     },
   },

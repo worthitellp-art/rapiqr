@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { X, Printer, Download, Loader2, Grid3X3 } from "lucide-react";
 import { QrRecord, StickerPos } from "./types";
 import { usePrintSheetState } from "./print-sheet/usePrintSheetState";
@@ -66,26 +66,26 @@ export default function PrintSheetModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden text-[#17181A] border border-[#E5E5E7] font-body"
+        className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden text-[var(--fx-ink)] border border-[var(--fx-border)] font-body"
         style={{ animation: "modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)" }}
         onClick={(clickEvent) => clickEvent.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5E5E7] bg-[#FAFAFB]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--fx-border)] bg-[var(--fx-canvas)]">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[#E8EDFF] text-[#3E52B8] flex items-center justify-center">
+            <div className="w-9 h-9 rounded-lg bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center">
               <Printer size={18} strokeWidth={2.4} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="font-display text-[17px] font-bold text-[#17181A] leading-tight">
+                <h2 className="font-display text-[17px] font-bold text-[var(--fx-ink)] leading-tight">
                   Print Sheet Generator (18×12″)
                 </h2>
-                <span className="text-[10px] font-bold uppercase tracking-wide bg-[#E8EDFF] text-[#3E52B8] px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-wide bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] px-2 py-0.5 rounded-full flex items-center gap-1">
                   <Grid3X3 size={11} /> 9 Unique Stickers / Sheet
                 </span>
               </div>
-              <p className="text-[12px] text-[#777B80] mt-0.5">
+              <p className="text-[12px] text-[var(--fx-ink-2)] mt-0.5">
                 Every slot is a different unique sticker from your generated fleet · 300 DPI with cut lines
               </p>
             </div>
@@ -93,7 +93,7 @@ export default function PrintSheetModal({
 
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-transparent hover:bg-[#E5E5E7] text-[#777B80] hover:text-[#17181A] flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-lg bg-transparent hover:bg-[var(--fx-border)] text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] flex items-center justify-center transition-colors cursor-pointer"
             aria-label="Close"
           >
             <X size={18} />
@@ -136,8 +136,8 @@ export default function PrintSheetModal({
         </div>
 
         {/* Modal Footer Actions */}
-        <div className="px-6 py-4 border-t border-[#E5E5E7] bg-[#FAFAFB] flex flex-wrap items-center justify-between gap-3">
-          <div className="text-[12px] text-[#777B80]">
+        <div className="px-6 py-4 border-t border-[var(--fx-border)] bg-[var(--fx-canvas)] flex flex-wrap items-center justify-between gap-3">
+          <div className="text-[12px] text-[var(--fx-ink-2)]">
             {!hasStickers ? (
               <span className="text-[#DC2626] font-medium">No stickers available in fleet</span>
             ) : !hasValidSelection ? (
@@ -145,8 +145,8 @@ export default function PrintSheetModal({
             ) : (
               <span>
                 Unique Stickers:{" "}
-                <strong className="text-[#17181A]">{selectedCount} selected</strong>{" "}
-                <span className="text-[#777B80]">
+                <strong className="text-[var(--fx-ink)]">{selectedCount} selected</strong>{" "}
+                <span className="text-[var(--fx-ink-2)]">
                   ({totalSheets} sheet{totalSheets > 1 ? "s" : ""})
                 </span>
               </span>
@@ -157,7 +157,7 @@ export default function PrintSheetModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-[13px] font-semibold text-[#777B80] hover:text-[#17181A] bg-white border border-[#E5E5E7] rounded-lg hover:bg-[#F3F3F4] transition-all cursor-pointer"
+              className="px-4 py-2 text-[13px] font-semibold text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] bg-white border border-[var(--fx-border)] rounded-lg hover:bg-[var(--fx-canvas)] transition-all cursor-pointer"
             >
               Cancel
             </button>
@@ -166,7 +166,7 @@ export default function PrintSheetModal({
               type="button"
               onClick={handleDirectPrint}
               disabled={!hasValidSelection || isExporting}
-              className="inline-flex items-center gap-2 px-4 py-2 text-[13px] font-semibold text-[#17181A] bg-white border border-[#17181A] rounded-lg hover:bg-[#F3F3F4] active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2 text-[13px] font-semibold text-[var(--fx-ink)] bg-white border border-[var(--fx-ink)] rounded-lg hover:bg-[var(--fx-canvas)] active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               {isExporting && exportAction === "print" ? (
                 <Loader2 size={15} className="animate-spin" />
@@ -180,7 +180,7 @@ export default function PrintSheetModal({
               type="button"
               onClick={handleDownloadSheet}
               disabled={!hasValidSelection || isExporting}
-              className="inline-flex items-center gap-2 px-5 py-2 text-[13px] font-semibold text-white bg-[#5C78DF] hover:bg-[#4A63C0] active:scale-95 rounded-lg transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="inline-flex items-center gap-2 px-5 py-2 text-[13px] font-semibold text-white bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] active:scale-95 rounded-lg transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               {isExporting && exportAction === "download" ? (
                 <Loader2 size={15} className="animate-spin" />

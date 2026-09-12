@@ -16,7 +16,7 @@ export default function CustomizePage({
   openPrintSheet?: () => void;
 }) {
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#18181B] font-body" style={{ background: "#F8F8F7" }}>
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[var(--fx-ink)] font-body" style={{ background: "var(--fx-canvas)" }}>
       <StickerEditor
         stickerPos={stickerPos}
         setStickerPos={setStickerPos}

@@ -2,6 +2,7 @@ const UserModel = require('../models/userModel');
 const ProductModel = require('../models/productModel');
 const MessageModel = require('../models/messageModel');
 const LogModel = require('../models/logModel');
+const TemplateModel = require('../models/templateModel');
 const Sticker = require('../models/schemas/Sticker');
 const { logger } = require('../middleware/loggerMiddleware');
 const { sendEmail } = require('../services/emailService');
@@ -222,6 +223,54 @@ class AdminController {
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('ADMIN_MESSAGE_LIST', 'Failed to fetch message log', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Message Manager: delete all tracked messages.
+   * DELETE /api/admin/messages
+   */
+  static async deleteAllMessages(req, res) {
+    try {
+      const result = await MessageModel.deleteAllMessages();
+      logger.info('ADMIN_MESSAGE_DELETE_ALL', `Deleted ${result.deletedCount} message records`);
+      return res.json({ success: true, message: 'All messages deleted successfully', data: result });
+    } catch (err) {
+      logger.error('ADMIN_MESSAGE_DELETE_ALL', 'Failed to delete all messages', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Customize page: the saved default QR placement on the sticker template.
+   * GET /api/admin/sticker-position
+   */
+  static async getStickerPosition(req, res) {
+    try {
+      const data = await TemplateModel.getDefaultStickerPosition();
+      return res.json({ success: true, data });
+    } catch (err) {
+      logger.error('ADMIN_STICKER_POSITION_GET', 'Failed to fetch default sticker position', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * PUT /api/admin/sticker-position
+   */
+  static async saveStickerPosition(req, res) {
+    try {
+      const { x, y, w, h } = req.body || {};
+      const pos = { x: Number(x), y: Number(y), w: Number(w), h: Number(h) };
+      if (Object.values(pos).some((n) => !Number.isFinite(n))) {
+        return res.status(400).json({ success: false, error: 'x, y, w and h must all be numbers' });
+      }
+
+      const data = await TemplateModel.setDefaultStickerPosition(pos);
+      return res.json({ success: true, data });
+    } catch (err) {
+      logger.error('ADMIN_STICKER_POSITION_SAVE', 'Failed to save default sticker position', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

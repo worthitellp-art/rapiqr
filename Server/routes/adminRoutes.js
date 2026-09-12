@@ -16,5 +16,8 @@ router.post('/users/:id/disable-2fa', AdminController.disableUserTwoFactor);
 router.get('/stickers', AdminController.searchStickers);
 router.get('/messages/stats', AdminController.getMessageStats);
 router.get('/messages', AdminController.listMessages);
+router.delete('/messages', AdminController.deleteAllMessages);
+router.get('/sticker-position', AdminController.getStickerPosition);
+router.put('/sticker-position', AdminController.saveStickerPosition);
 
 module.exports = router;

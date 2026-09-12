@@ -1,13 +1,13 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { ShieldCheck, KeyRound, Mail, Smartphone, Loader2, Check, Copy, Bell } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { apiClient, isApiBackendConfigured } from '../../../lib/apiClient';
 import { isPushSupported, getExistingSubscription, subscribeToPush, unsubscribeFromPush } from '../../../lib/push';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
 
-const inputCls = 'w-full px-3.5 py-2.5 text-sm bg-[#F5F6FA] border border-[#E8ECF4] rounded-xl outline-none focus:border-[#111111]';
-const labelCls = 'block text-xs font-bold text-[#64748B] mb-1';
-const cardCls = 'bg-white border border-[#E8ECF4] rounded-2xl p-5 sm:p-6 space-y-4';
+const inputCls = 'w-full px-3.5 py-2.5 text-sm bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-xl outline-none focus:border-[var(--fx-ink)]';
+const labelCls = 'block text-xs font-bold text-[var(--fx-ink-2)] mb-1';
+const cardCls = 'bg-white border border-[var(--fx-border)] rounded-2xl p-5 sm:p-6 space-y-4';
 
 function Banner({ tone, message }: { tone: 'success' | 'error'; message: string }) {
   return (
@@ -24,12 +24,12 @@ export default function AccountSettingsPanel({ showToast, onAccountDeleted, onPr
     return (
       <div className="space-y-6 animate-fade-in">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1D26]">Account Settings</h1>
-          <p className="text-xs sm:text-sm text-[#64748B] mt-1">Manage your name, phone, email, password and security options.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--fx-ink)]">Account Settings</h1>
+          <p className="text-xs sm:text-sm text-[var(--fx-ink-2)] mt-1">Manage your name, phone, email, password and security options.</p>
         </div>
         <div className={cardCls}>
-          <p className="text-sm text-[#64748B]">
-            Account settings (email/password/2FA changes) require the RapiQR backend to be connected. Configure <code className="text-xs bg-[#F5F6FA] px-1.5 py-0.5 rounded">VITE_API_BASE_URL</code> to enable this section.
+          <p className="text-sm text-[var(--fx-ink-2)]">
+            Account settings (email/password/2FA changes) require the RapiQR backend to be connected. Configure <code className="text-xs bg-[var(--fx-canvas)] px-1.5 py-0.5 rounded">VITE_API_BASE_URL</code> to enable this section.
           </p>
         </div>
       </div>
@@ -39,8 +39,8 @@ export default function AccountSettingsPanel({ showToast, onAccountDeleted, onPr
   return (
     <div className="space-y-7 animate-fade-in">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1D26]">Account Settings</h1>
-        <p className="text-sm text-[#64748B] mt-1">Manage your account details, contact info, and security credentials.</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--fx-ink)]">Account Settings</h1>
+        <p className="text-sm text-[var(--fx-ink-2)] mt-1">Manage your account details, contact info, and security credentials.</p>
       </div>
 
       <ProfileForm profile={profile} refreshProfile={refreshProfile} showToast={showToast} onProductsLinked={onProductsLinked} />
@@ -83,7 +83,7 @@ function DangerZoneSection({ onAccountDeleted }: { onAccountDeleted?: () => void
   return (
     <div className={`${cardCls} border-[#FECACA]`}>
       <h3 className="font-bold text-sm text-[#DC2626]">Danger Zone</h3>
-      <p className="text-xs text-[#64748B]">
+      <p className="text-xs text-[var(--fx-ink-2)]">
         Permanently delete your account, profile, and every sticker linked to it. This cannot be undone.
       </p>
       {msg && <Banner tone={msg.tone} message={msg.text} />}
@@ -93,7 +93,7 @@ function DangerZoneSection({ onAccountDeleted }: { onAccountDeleted?: () => void
           <button
             type="button"
             onClick={() => setConfirming(false)}
-            className="text-xs text-[#64748B] hover:text-[#17181A] underline cursor-pointer ml-2"
+            className="text-xs text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] underline cursor-pointer ml-2"
           >
             Cancel
           </button>
@@ -195,7 +195,7 @@ function ProfileForm({ profile, refreshProfile, showToast, onProductsLinked }: a
 
   return (
     <div className={cardCls}>
-      <h3 className="font-bold text-sm text-[#1A1D26] flex items-center gap-2"><Smartphone size={15} /> Profile</h3>
+      <h3 className="font-bold text-sm text-[var(--fx-ink)] flex items-center gap-2"><Smartphone size={15} /> Profile</h3>
 
       <div className="max-w-sm">
         <label className={labelCls}>Full Name</label>
@@ -205,7 +205,7 @@ function ProfileForm({ profile, refreshProfile, showToast, onProductsLinked }: a
       <button
         onClick={handleSaveName}
         disabled={saving}
-        className="px-5 py-2.5 rounded-xl bg-[#111111] hover:bg-black text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
+        className="px-5 py-2.5 rounded-xl bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5 shadow-sm shadow-[var(--fx-accent)]/20 transition-all"
       >
         {saving && <Loader2 size={13} className="animate-spin" />} Save Name
       </button>
@@ -214,39 +214,39 @@ function ProfileForm({ profile, refreshProfile, showToast, onProductsLinked }: a
           sticker, so a number on this account would only compete with the real owner
           for the stickers registered under it — the server rejects it outright. */}
       {profile?.role === 'admin' ? (
-        <div className="pt-4 border-t border-[#E8ECF4]">
-          <p className="text-xs text-[#64748B]">
+        <div className="pt-4 border-t border-[var(--fx-border)]">
+          <p className="text-xs text-[var(--fx-ink-2)]">
             The admin account doesn't use a phone number — the Fleet console lists every sticker regardless of who owns it.
           </p>
         </div>
       ) : (
-      <div className="pt-4 border-t border-[#E8ECF4] space-y-3">
+      <div className="pt-4 border-t border-[var(--fx-border)] space-y-3">
         <div className="flex items-center justify-between">
-          <label className={`${labelCls} mb-0`}>Phone Number <span className="text-[#DC2626]">*</span></label>
+          <label className={`${labelCls} mb-0`}>Phone Number <span className="text-[var(--fx-red)]">*</span></label>
           {profile?.phoneNumber && profile?.isPhoneVerified ? (
-            <span className="text-[10px] font-black uppercase tracking-wider text-[#16A34A] flex items-center gap-1">
+            <span className="text-[10px] font-black uppercase tracking-wider text-[var(--fx-green)] flex items-center gap-1">
               <Check size={11} /> Verified
             </span>
           ) : (
-            <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 font-bold flex items-center gap-1">
+            <span className="text-[10px] font-black uppercase tracking-wider text-[var(--fx-amber)] font-bold flex items-center gap-1">
               ⚠ Unverified (OTP Required)
             </span>
           )}
         </div>
         {profile?.phoneNumber && !otpStep && (
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <p className="text-sm font-mono font-bold text-[#1A1D26]">{profile.phoneNumber}</p>
+            <p className="text-sm font-mono font-bold text-[var(--fx-ink)]">{profile.phoneNumber}</p>
             <button
               onClick={handleLoadStickers}
               disabled={loadingStickers}
-              className="px-3.5 py-2 rounded-xl bg-[#F5F6FA] border border-[#E8ECF4] text-xs font-bold text-[#1A1D26] hover:bg-[#E2E8F0] disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-[var(--fx-canvas)] border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink)] hover:bg-[var(--fx-border)] disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
             >
               {loadingStickers ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />} Load Stickers
             </button>
           </div>
         )}
         {!profile?.phoneNumber && (
-          <p className="text-xs text-[#64748B]">
+          <p className="text-xs text-[var(--fx-ink-2)]">
             A verified phone number is required — it's what your stickers auto-link to the first time they're scanned and activated.
           </p>
         )}
@@ -261,7 +261,7 @@ function ProfileForm({ profile, refreshProfile, showToast, onProductsLinked }: a
             <button
               onClick={handleSendOtp}
               disabled={phoneBusy}
-              className="px-4 py-2.5 rounded-xl bg-[#F5F6FA] border border-[#E8ECF4] text-xs font-bold text-[#1A1D26] hover:bg-[#E2E8F0] disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 flex-shrink-0"
+              className="px-4 py-2.5 rounded-xl bg-[var(--fx-canvas)] border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink)] hover:bg-[var(--fx-border)] disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 flex-shrink-0"
             >
               {phoneBusy ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
               {profile?.phoneNumber ? 'Verify New Number' : 'Verify Number'}
@@ -288,7 +288,7 @@ function ProfileForm({ profile, refreshProfile, showToast, onProductsLinked }: a
             </button>
             <button
               onClick={() => { setOtpStep(false); setPhoneMsg(null); }}
-              className="px-3 py-2.5 rounded-xl border border-[#E8ECF4] text-xs font-bold text-[#64748B] hover:bg-[#F5F6FA] cursor-pointer flex-shrink-0"
+              className="px-3 py-2.5 rounded-xl border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] cursor-pointer flex-shrink-0"
             >
               Cancel
             </button>
@@ -348,8 +348,8 @@ function EmailForm({ profile, refreshProfile, showToast }: any) {
 
   return (
     <div className={cardCls}>
-      <h3 className="font-bold text-sm text-[#1A1D26] flex items-center gap-2"><Mail size={15} /> Email Address</h3>
-      <p className="text-xs text-[#64748B]">Current: <span className="font-semibold text-[#1A1D26]">{profile?.email}</span></p>
+      <h3 className="font-bold text-sm text-[var(--fx-ink)] flex items-center gap-2"><Mail size={15} /> Email Address</h3>
+      <p className="text-xs text-[var(--fx-ink-2)]">Current: <span className="font-semibold text-[var(--fx-ink)]">{profile?.email}</span></p>
       <div className={isAdminAccount ? 'max-w-sm' : 'grid sm:grid-cols-2 gap-3.5'}>
         <div>
           <label className={labelCls}>New Email</label>
@@ -366,7 +366,7 @@ function EmailForm({ profile, refreshProfile, showToast }: any) {
       <button
         onClick={handleSave}
         disabled={saving}
-        className="px-5 py-2.5 rounded-xl bg-[#111111] hover:bg-black text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
+        className="px-5 py-2.5 rounded-xl bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5 shadow-sm shadow-[var(--fx-accent)]/20 transition-all"
       >
         {saving && <Loader2 size={13} className="animate-spin" />} Update Email
       </button>
@@ -408,7 +408,7 @@ function PasswordForm({ showToast }: any) {
 
   return (
     <div className={cardCls}>
-      <h3 className="font-bold text-sm text-[#1A1D26] flex items-center gap-2"><KeyRound size={15} /> Change Password</h3>
+      <h3 className="font-bold text-sm text-[var(--fx-ink)] flex items-center gap-2"><KeyRound size={15} /> Change Password</h3>
       <div className="grid sm:grid-cols-3 gap-3.5">
         <div>
           <label className={labelCls}>Current Password</label>
@@ -427,7 +427,7 @@ function PasswordForm({ showToast }: any) {
       <button
         onClick={handleSave}
         disabled={saving}
-        className="px-5 py-2.5 rounded-xl bg-[#111111] hover:bg-black text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
+        className="px-5 py-2.5 rounded-xl bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5 shadow-sm shadow-[var(--fx-accent)]/20 transition-all"
       >
         {saving && <Loader2 size={13} className="animate-spin" />} Change Password
       </button>
@@ -501,16 +501,16 @@ function TwoFactorSection({ profile, refreshProfile, showToast }: any) {
   return (
     <div className={cardCls}>
       <div className="flex items-center justify-between">
-        <h3 className="font-bold text-sm text-[#1A1D26] flex items-center gap-2"><ShieldCheck size={15} /> Two-Factor Authentication (2FA)</h3>
-        <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full ${enabled ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#F1F5F9] text-[#64748B]'}`}>
+        <h3 className="font-bold text-sm text-[var(--fx-ink)] flex items-center gap-2"><ShieldCheck size={15} /> Two-Factor Authentication (2FA)</h3>
+        <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full ${enabled ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[var(--fx-canvas)] text-[var(--fx-ink-2)]'}`}>
           {enabled ? 'Enabled' : 'Disabled'}
         </span>
       </div>
 
       {!enabled && !setupData && (
         <>
-          <p className="text-xs text-[#64748B]">Add an extra layer of security using an authenticator app (Google Authenticator, Authy, etc).</p>
-          <button onClick={startSetup} disabled={busy} className="px-5 py-2.5 rounded-xl bg-[#111111] hover:bg-black text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5">
+          <p className="text-xs text-[var(--fx-ink-2)]">Add an extra layer of security using an authenticator app (Google Authenticator, Authy, etc).</p>
+          <button onClick={startSetup} disabled={busy} className="px-5 py-2.5 rounded-xl bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5 shadow-sm shadow-[var(--fx-accent)]/20 transition-all">
             {busy && <Loader2 size={13} className="animate-spin" />} Set Up 2FA
           </button>
         </>
@@ -518,10 +518,10 @@ function TwoFactorSection({ profile, refreshProfile, showToast }: any) {
 
       {!enabled && setupData && (
         <div className="space-y-3">
-          <p className="text-xs text-[#64748B]">Scan-free setup: open your authenticator app, choose "Enter a setup key manually", and enter this key:</p>
+          <p className="text-xs text-[var(--fx-ink-2)]">Scan-free setup: open your authenticator app, choose "Enter a setup key manually", and enter this key:</p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 text-sm font-mono font-bold bg-[#F5F6FA] border border-[#E8ECF4] rounded-xl px-3.5 py-2.5 break-all">{setupData.secret}</code>
-            <button onClick={copySecret} className="w-10 h-10 flex-shrink-0 rounded-xl bg-[#F5F6FA] border border-[#E8ECF4] flex items-center justify-center cursor-pointer">
+            <code className="flex-1 text-sm font-mono font-bold bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-xl px-3.5 py-2.5 break-all">{setupData.secret}</code>
+            <button onClick={copySecret} className="w-10 h-10 flex-shrink-0 rounded-xl bg-[var(--fx-canvas)] border border-[var(--fx-border)] flex items-center justify-center cursor-pointer">
               {copied ? <Check size={14} className="text-[#16A34A]" /> : <Copy size={14} />}
             </button>
           </div>
@@ -532,7 +532,7 @@ function TwoFactorSection({ profile, refreshProfile, showToast }: any) {
           {msg && <Banner tone={msg.tone} message={msg.text} />}
           <div className="flex gap-2">
             <button onClick={() => { setSetupData(null); setCode(''); }} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer">Cancel</button>
-            <button onClick={verifyCode} disabled={busy || code.length !== 6} className="flex-1 py-2.5 rounded-xl bg-[#111111] hover:bg-black text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5">
+            <button onClick={verifyCode} disabled={busy || code.length !== 6} className="flex-1 py-2.5 rounded-xl bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm shadow-[var(--fx-accent)]/20 transition-all">
               {busy && <Loader2 size={13} className="animate-spin" />} Verify & Enable
             </button>
           </div>
@@ -608,12 +608,12 @@ function PushNotificationsSection({ showToast }: any) {
   return (
     <div className={cardCls}>
       <div className="flex items-center justify-between">
-        <h3 className="font-bold text-sm text-[#1A1D26] flex items-center gap-2"><Bell size={15} /> Push Notifications</h3>
-        <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full ${enabled ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#F1F5F9] text-[#64748B]'}`}>
+        <h3 className="font-bold text-sm text-[var(--fx-ink)] flex items-center gap-2"><Bell size={15} /> Push Notifications</h3>
+        <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full ${enabled ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[var(--fx-canvas)] text-[var(--fx-ink-2)]'}`}>
           {enabled ? 'Enabled' : 'Disabled'}
         </span>
       </div>
-      <p className="text-xs text-[#64748B]">
+      <p className="text-xs text-[var(--fx-ink-2)]">
         Get notified the moment someone messages you about a scanned sticker — even when RapiQR isn't open in a tab.
       </p>
       {msg && <Banner tone={msg.tone} message={msg.text} />}
@@ -622,7 +622,7 @@ function PushNotificationsSection({ showToast }: any) {
           {busy && <Loader2 size={13} className="animate-spin" />} Turn Off
         </button>
       ) : (
-        <button onClick={handleEnable} disabled={busy} className="px-5 py-2.5 rounded-xl bg-[#111111] hover:bg-black text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5">
+        <button onClick={handleEnable} disabled={busy} className="px-5 py-2.5 rounded-xl bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5 shadow-sm shadow-[var(--fx-accent)]/20 transition-all">
           {busy && <Loader2 size={13} className="animate-spin" />} Turn On
         </button>
       )}

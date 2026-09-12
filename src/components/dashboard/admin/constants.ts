@@ -9,16 +9,20 @@ export const FONT_OPTIONS = [
 // Admin's own nav — deliberately excludes "repichat": the system admin doesn't
 // run per-sticker conversations, they just need to see which owners are
 // online (see the "Online Now" widget on the Overview page).
+//
+// `section` groups the flat list in the sidebar (Sidebar.tsx renders a small
+// uppercase label above each run of items sharing a section); items with no
+// `section` render ungrouped at the top, above every labeled group.
 export const NAV_ITEMS = [
   { id: "overview", label: "Dashboard", icon: LayoutGrid },
-  { id: "orders", label: "Orders", icon: ShoppingBag },
-  { id: "distributors", label: "Distributors", icon: Store },
-  { id: "qr", label: "QR Codes", icon: Plus },
-  { id: "communication", label: "Communication", icon: PhoneCall },
-  { id: "messages", label: "Message Manager", icon: Send },
-  { id: "alerts", label: "Alerts", icon: Bell },
-  { id: "users", label: "Users", icon: Users },
-  { id: "customize", label: "Customization", icon: Palette },
+  { id: "qr", label: "QR Codes", icon: Plus, section: "Fleet" },
+  { id: "orders", label: "Orders", icon: ShoppingBag, section: "Fleet" },
+  { id: "distributors", label: "Distributors", icon: Store, section: "Fleet" },
+  { id: "communication", label: "Communication", icon: PhoneCall, section: "Engagement" },
+  { id: "messages", label: "Message Manager", icon: Send, section: "Engagement" },
+  { id: "alerts", label: "Alerts", icon: Bell, section: "Engagement" },
+  { id: "users", label: "Users", icon: Users, section: "Manage" },
+  { id: "customize", label: "Customization", icon: Palette, section: "Manage" },
 ];
 
 // Client (sticker owner) only nav item — their link into the RepiChat inbox.

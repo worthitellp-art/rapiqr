@@ -3,10 +3,21 @@ const { Schema, model } = require('mongoose');
 // Merged collection: was two Postgres tables (qr_codes + products), 1:1 via
 // products.qr_code_id, always read/written together — see migration plan.
 const stickerSchema = new Schema({
-  // crypto.randomUUID() — cryptographically random, unlike the old 6-character
-  // Math.random()-based code, which had a small enough namespace (~17.6M
-  // combinations) to make enumeration/guessing a real concern.
+  // v1 (id_scheme_version 1, the default): crypto.randomUUID() — cryptographically
+  // random, unlike the old 6-character Math.random()-based code, which had a
+  // small enough namespace (~17.6M combinations) to make enumeration/guessing
+  // a real concern. Independent of recovery_code; the two are linked only by
+  // this row.
+  // v2 (id_scheme_version 2): _id = HMAC-SHA256(recovery_code, ...) — see
+  // Server/services/stickerCrypto.js. The id is a deterministic, one-way
+  // function of the recovery code, so it's recomputable from the code alone
+  // with no dependency on this row surviving. New issuance only; v1 stickers
+  // already printed in the field keep working exactly as before.
   _id: { type: String },
+  // Which derivation scheme produced this sticker's _id/recovery_code
+  // relationship. Never recompute an existing sticker's id under a newer
+  // scheme — a version bump only changes how FUTURE stickers are issued.
+  id_scheme_version: { type: Number, default: 1 },
   status: { type: String, enum: ['active', 'inactive', 'lost', 'replaced'], default: 'inactive' },
   // Plaintext recovery code for admin reference in the dashboard.
   recovery_code: { type: String, default: null },
@@ -14,7 +25,31 @@ const stickerSchema = new Schema({
   // exactly once at creation and never stored/retrievable in plaintext.
   // Proves possession of the physical sticker's printed backup code before
   // a soft-deleted record can be restored — see QrModel.restoreByRecoveryCode.
+  // For v2 stickers this is defense-in-depth only (the id-derivation lookup
+  // already proves possession) — see stickerCrypto.js's hashRecoveryCodeV2.
   recovery_code_hash: { type: String, default: null, select: false },
+  // ── v2-only: pinned QR generation parameters (Server/services/qrPinning.js) ──
+  // Exact literal string encoded into the QR, stored verbatim rather than
+  // rebuilt from the current APP_URL — a later domain/config change must
+  // never alter what an already-printed sticker decodes to.
+  qr_payload: { type: String, default: null },
+  // Explicit per ISO/IEC 18004 so the QR bit matrix is reproducible by ANY
+  // spec-compliant encoder, forever — never re-derive these via "auto" once set.
+  qr_version: { type: Number, default: null },
+  qr_ecc_level: { type: String, enum: ['L', 'M', 'Q', 'H', null], default: null },
+  qr_mask_pattern: { type: Number, min: 0, max: 7, default: null },
+  module_size_px: { type: Number, default: null },
+  margin_modules: { type: Number, default: null },
+  // Exact pinned encoder identity used to render this sticker — a future
+  // library bump renders new stickers with a new encoder_version; old
+  // stickers are never silently re-rendered with it.
+  encoder_name: { type: String, default: null },
+  encoder_version: { type: String, default: null },
+  // SHA-256 of the canonical rendered PNG at issuance — the tripwire every
+  // regeneration re-checks against (see QrModel.recoverByCodeV2). A mismatch
+  // means the pinned encoder produced different bytes than at issuance and
+  // must hard-fail rather than silently serve a "close enough" image.
+  rendered_image_sha256: { type: String, default: null },
   // Soft delete: the admin "delete" action sets this instead of removing the
   // document, so the sticker's identity (and its recovery code hash) survive
   // for a later recovery-code-verified restore. Excluded from public/admin

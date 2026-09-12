@@ -39,6 +39,7 @@ import {
   ShoppingBag,
   Star,
   Truck,
+  LayoutDashboard,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
@@ -105,6 +106,7 @@ const INK = '#0B0B0C';
 export interface LandingPageMasterProps {
   onStart?: () => void;
   onLogin?: () => void;
+  onOpenDashboard?: () => void;
   onOpenDistributorDashboard?: () => void;
   onOpenCheckout?: () => void;
   onOpenJoinUs?: (serviceType?: string) => void;
@@ -918,6 +920,7 @@ function QrGlyph({ size = 96, color = '#FFFFFF' }: { size?: number; color?: stri
 export default function LandingPageMaster({
   onStart,
   onLogin,
+  onOpenDashboard,
   onOpenDistributorDashboard,
   onOpenCheckout,
   onOpenJoinUs,
@@ -1129,13 +1132,33 @@ export default function LandingPageMaster({
       }
       return [...prev, { product, qty }];
     });
-    setCartNotice({ name: product.name, qty });
+    // The cart drawer already shows the update live when it's open — the
+    // toast is only useful when the drawer isn't visible to confirm the add.
+    if (!isCartOpen) setCartNotice({ name: product.name, qty });
   };
 
   const openCheckout = () => {
     setIsCartOpen(false);
     if (onOpenCheckout) onOpenCheckout();
     else onStart?.();
+  };
+
+  const handleBuyNow = (product: ProductItem) => {
+    setCart((prevCart) => {
+      const existingItem = prevCart.find((item) => item.product.id === product.id);
+      if (existingItem) {
+        return prevCart.map((item) =>
+          item.product.id === product.id ? { ...item, qty: Math.max(1, item.qty) } : item
+        );
+      }
+      return [...prevCart, { product, qty: 1 }];
+    });
+    setIsCartOpen(false);
+    if (onOpenCheckout) {
+      onOpenCheckout();
+    } else if (onStart) {
+      onStart();
+    }
   };
 
   const handleDemoTrigger = (actionType: 'parking' | 'gps' | 'emergency') => {
@@ -1253,9 +1276,9 @@ export default function LandingPageMaster({
   const activeStep = HOW_IT_WORKS_STEPS[activeHiwStep] ?? HOW_IT_WORKS_STEPS[0];
 
   const NAV_LINKS = [
-    { id: 'products-section', label: 'Products' },
     { id: 'hiw-section', label: 'How it works' },
-    { id: 'pricing-section', label: 'Pricing' },
+    { id: 'trust-section', label: 'Why RepiQR' },
+    { id: 'products-section', label: 'Products' },
     { id: 'distributor-section', label: 'Franchise' },
     { id: 'faq-section', label: 'FAQ' },
   ];
@@ -1379,7 +1402,15 @@ export default function LandingPageMaster({
               )}
             </button>
 
-            {isEmbeddedInDashboard ? (
+            {isLoggedIn ? (
+              <button
+                onClick={onOpenDashboard || onLogin}
+                className="cursor-pointer flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-[13px] font-semibold text-[#0B0B0C] shadow-sm transition-transform hover:scale-[1.03] active:scale-95"
+              >
+                <LayoutDashboard size={15} />
+                <span>Dashboard</span>
+              </button>
+            ) : isEmbeddedInDashboard ? (
               <button
                 onClick={onOpenCheckout}
                 className="cursor-pointer rounded-full bg-white px-6 py-2.5 text-[13px] font-semibold text-[#0B0B0C] transition-transform hover:scale-[1.03] active:scale-95"
@@ -1395,10 +1426,10 @@ export default function LandingPageMaster({
                   Log in
                 </button>
                 <button
-                  onClick={onStart || onOpenCheckout}
+                  onClick={() => handleSmoothScroll('products-section')}
                   className="cursor-pointer rounded-full bg-white px-6 py-2.5 text-[13px] font-semibold text-[#0B0B0C] transition-transform hover:scale-[1.03] active:scale-95"
                 >
-                  Get started
+                  Choose tag
                 </button>
               </>
             )}
@@ -1477,24 +1508,39 @@ export default function LandingPageMaster({
             </div>
 
             <div className="mt-8 flex flex-col gap-3">
-              <button
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  onLogin?.();
-                }}
-                className="w-full rounded-full border border-white/20 py-3.5 text-sm font-medium text-white"
-              >
-                Log in
-              </button>
-              <button
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  (onStart || onOpenCheckout)?.();
-                }}
-                className="w-full rounded-full bg-white py-3.5 text-sm font-semibold text-[#0B0B0C]"
-              >
-                Get started
-              </button>
+              {isLoggedIn ? (
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    (onOpenDashboard || onLogin)?.();
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-full bg-white py-3.5 text-sm font-semibold text-[#0B0B0C] transition-transform active:scale-95"
+                >
+                  <LayoutDashboard size={16} />
+                  <span>Go to Dashboard</span>
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      onLogin?.();
+                    }}
+                    className="w-full rounded-full border border-white/20 py-3.5 text-sm font-medium text-white"
+                  >
+                    Log in
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      handleSmoothScroll('products-section');
+                    }}
+                    className="w-full rounded-full bg-[#F6C000] py-3.5 text-sm font-bold text-[#0B0B0C]"
+                  >
+                    Choose tag
+                  </button>
+                </>
+              )}
             </div>
           </motion.div>
         )}
@@ -1552,20 +1598,28 @@ export default function LandingPageMaster({
             className="mt-9 flex flex-col items-center gap-4"
           >
             <motion.button
-              onClick={onStart || onOpenCheckout}
+              onClick={() => handleSmoothScroll('products-section')}
               whileHover={reduced ? undefined : { y: -3 }}
               whileTap={reduced ? undefined : { scale: 0.97 }}
               transition={{ duration: 0.25, ease: EASE }}
-              className="group flex cursor-pointer items-center gap-4 rounded-md bg-white px-8 py-4 text-[15px] font-semibold text-[#0B0B0C] shadow-[0_16px_40px_-18px_rgba(0,0,0,0.8)] sm:gap-6 sm:px-10 sm:py-5"
+              className="group flex cursor-pointer items-center gap-4 rounded-md bg-[#F6C000] px-8 py-4 text-[15px] font-bold text-[#0B0B0C] shadow-[0_16px_40px_-18px_rgba(246,192,0,0.6)] sm:gap-6 sm:px-10 sm:py-5"
             >
               Get your tag
               <ArrowRight
                 size={18}
-                className="transition-transform duration-300 group-hover:translate-x-1.5"
-                style={{ color: '#C79E00' }}
+                className="transition-transform duration-300 group-hover:translate-x-1.5 text-[#0B0B0C]"
               />
             </motion.button>
-            <p className="text-[12px] font-light text-white/75">Ships in 2–3 days. No app required.</p>
+            <div className="flex items-center gap-3 text-[12px] font-light text-white/75">
+              <span>Ships in 2–3 days · Zero subscriptions</span>
+              <span className="h-1 w-1 rounded-full bg-white/40" />
+              <button
+                onClick={() => handleSmoothScroll('hiw-section')}
+                className="cursor-pointer text-[#F6C000] hover:underline"
+              >
+                See how it works ↓
+              </button>
+            </div>
           </motion.div>
         </motion.div>
 
@@ -1609,158 +1663,7 @@ export default function LandingPageMaster({
         </div>
       </section>
 
-      {/* ── 5. CATEGORY TICKER ──────────────────────────────────────────── */}
-      <section className="overflow-hidden border-y border-white/10 bg-[#0B0B0C] py-6">
-        <Marquee duration={44}>
-          {BADGE_ITEMS.map((item) => (
-            <span
-              key={`a-${item.label}`}
-              className="flex items-center gap-2.5 whitespace-nowrap rounded-full border border-white/10 px-5 py-2.5 text-[13px] font-light text-white/55"
-            >
-              <item.icon size={15} className="text-white/35" />
-              {item.label}
-            </span>
-          ))}
-        </Marquee>
-      </section>
-
-      {/* ── 6. PRODUCTS — tabs + horizontal rail ────────────────────────── */}
-      <section id="products-section" className="bg-[#F4F1EC] py-16 sm:py-24 lg:py-32">
-        <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
-          <Reveal className="flex flex-col gap-8 border-b border-black/10 pb-10 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-xl">
-              <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.18em] text-black/60">
-                The RepiQR collection
-              </p>
-              <h2 className="text-[clamp(2rem,4.2vw,3.4rem)] font-medium leading-[1.02] tracking-[-0.04em]">
-                <SplitWords text="Protection, made personal" />
-              </h2>
-              <p className="mt-4 max-w-lg text-[15px] font-light leading-relaxed text-black/60">
-                Choose a purpose-built tag for the things that move through your day.
-                Every one includes lifetime validity and private contact routing.
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-5 text-[11px] uppercase tracking-[0.14em] text-black/60">
-              <span><strong className="text-black">{PRODUCTS.length}</strong> tag styles</span>
-              <span className="h-5 w-px bg-black/15" />
-              <span><strong className="text-black">∞</strong> validity</span>
-            </div>
-          </Reveal>
-
-          {/* Tabs */}
-          <Reveal delay={0.12} className="mt-10 flex flex-wrap justify-center gap-2">
-            {(['All', 'Vehicle', 'Home', 'Family', 'Travel'] as const).map((cat) => {
-              const on = activeCategory === cat;
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className={`relative cursor-pointer rounded-full px-5 py-2 text-[13px] font-medium transition-colors ${
-                    on ? 'text-white' : 'text-black/55 hover:text-black'
-                  }`}
-                >
-                  {on && (
-                    <motion.span
-                      layoutId="product-tab"
-                      transition={{ duration: 0.45, ease: EASE }}
-                      className="absolute inset-0 rounded-full bg-[#0B0B0C]"
-                    />
-                  )}
-                  <span className="relative z-10">{cat}</span>
-                </button>
-              );
-            })}
-          </Reveal>
-        </div>
-
-        {/* Product grid */}
-        <div className="relative mt-12 px-6 sm:px-10">
-          <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
-            <AnimatePresence mode="popLayout">
-              {filteredProducts.map((product, i) => (
-                <motion.article
-                  key={product.id}
-                  layout
-                  initial={reduced ? undefined : { opacity: 0, y: 40 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.7, delay: i * 0.07, ease: EASE }}
-                  className="group relative flex h-full flex-col overflow-hidden rounded-[1.75rem] bg-[#0B0B0C] shadow-[0_24px_60px_-28px_rgba(0,0,0,0.65)]"
-                >
-                  <div className="relative aspect-[16/9] overflow-hidden">
-                    <img
-                      src={product.img}
-                      alt={product.name}
-                      className="h-full w-full object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0C] via-[#0B0B0C]/10 to-transparent" />
-                    <span className="absolute left-5 top-5 rounded-full border border-white/15 bg-black/40 px-3 py-1 text-[11px] font-light text-white/80 backdrop-blur-sm">
-                      {product.badge}
-                    </span>
-                    <span className="absolute bottom-5 left-5 text-[11px] font-medium uppercase tracking-[0.14em] text-white/55">
-                      {product.category}
-                    </span>
-                  </div>
-
-                  <div className="p-6 pt-2 text-white sm:p-7 sm:pt-3">
-                    <div className="flex items-start justify-between gap-4">
-                      <h3 className="text-xl font-medium tracking-[-0.02em]">{product.name}</h3>
-                      <div className="shrink-0 text-right">
-                        <div className="text-lg font-medium">₹{product.price}</div>
-                        <div className="text-[11px] font-light text-white/50 line-through">
-                          ₹{product.mrp}
-                        </div>
-                      </div>
-                    </div>
-
-                    <p className="mt-2.5 text-[13px] font-light leading-relaxed text-white/55">
-                      {product.desc}
-                    </p>
-
-                    <ul className="mt-5 space-y-2">
-                      {product.features.map((f) => (
-                        <li key={f} className="flex items-start gap-2 text-[12px] font-light text-white/60">
-                          <Check size={13} className="mt-[3px] shrink-0" style={{ color: '#F6C000' }} />
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-
-                    <div className="mt-6 flex items-center gap-2">
-                      <button
-                        onClick={() => addToCart(product)}
-                        className="flex-1 cursor-pointer rounded-full bg-white py-3 text-[13px] font-semibold text-[#0B0B0C] transition-transform hover:scale-[1.02] active:scale-95"
-                      >
-                        Add to cart
-                      </button>
-                      <button
-                        onClick={() => {
-                          addToCart(product, 1);
-                          openCheckout();
-                        }}
-                        className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/20 text-white transition-colors hover:bg-white/10"
-                        aria-label={`Buy ${product.name} now`}
-                      >
-                        <ArrowUpRight size={17} />
-                      </button>
-                    </div>
-
-                    {product.rating && (
-                      <div className="mt-4 flex items-center gap-1.5 text-[11px] font-light text-white/50">
-                        <Star size={12} style={{ color: '#F6C000' }} fill="#F6C000" />
-                        {product.rating} · {product.reviewsCount?.toLocaleString('en-IN')} owners
-                      </div>
-                    )}
-                  </div>
-                </motion.article>
-              ))}
-            </AnimatePresence>
-          </div>
-
-        </div>
-      </section>
-
-      {/* ── 7. HOW IT WORKS — pinned, scroll-driven on desktop ──────────── */}
+      {/* ── 4. HOW IT WORKS — pinned, scroll-driven on desktop ──────────── */}
       <section id="hiw-section" className="bg-[#F4F1EC]">
         {/* Desktop: a tall track whose progress drives the pinned panel. */}
         <div ref={stepsTrackRef} className="relative hidden h-[420vh] lg:block">
@@ -1851,8 +1754,7 @@ export default function LandingPageMaster({
           </div>
         </div>
 
-        {/* Mobile: the same story, stacked. Pinning on a phone fights the
-            browser's own scroll chrome, so it is not worth the jank. */}
+        {/* Mobile: the same story, stacked */}
         <div className="px-6 py-24 lg:hidden">
           <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-black/60">
             How it works
@@ -1880,9 +1782,89 @@ export default function LandingPageMaster({
         </div>
       </section>
 
-    
+      {/* ── 5. TRUST & PRIVACY PILLARS ──────────────────────────────────── */}
+      <section id="trust-section" className="border-t border-white/10 bg-[#0B0B0C] py-16 text-white sm:py-24 lg:py-32">
+        <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
+          <Reveal className="mx-auto max-w-2xl text-center">
+            <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.18em] text-[#F6C000]">
+              Engineered for absolute trust
+            </p>
+            <h2 className="text-[clamp(2rem,4.2vw,3.4rem)] font-medium leading-[1.04] tracking-[-0.035em]">
+              Security and privacy in every layer
+            </h2>
+            <p className="mt-4 text-[15px] font-light leading-relaxed text-white/60">
+              Your phone number is never exposed to strangers. Built with cloud-grade encryption,
+              instant WhatsApp dispatch, and multi-contact emergency routing.
+            </p>
+          </Reveal>
 
-      {/* ── 10. PHOTO WALL ──────────────────────────────────────────────── */}
+          {/* 4 Feature Trust Cards */}
+          <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {FEATURE_CARDS.map((card, i) => (
+              <Reveal key={card.id} delay={i * 0.08}>
+                <div className="flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-colors hover:border-[#F6C000]/40">
+                  <div>
+                    <div className="mb-5 aspect-16/10 overflow-hidden rounded-xl bg-black/40">
+                      <img src={card.img} alt={card.title} className="h-full w-full object-cover opacity-80" />
+                    </div>
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#F6C000]">
+                      {card.tag}
+                    </span>
+                    <h3 className="mt-2 text-lg font-medium text-white">{card.title}</h3>
+                    <p className="mt-2 text-[13px] font-light leading-relaxed text-white/55">
+                      {card.description}
+                    </p>
+                  </div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+
+          {/* Trust Guarantees Bar */}
+          <Reveal delay={0.2} className="mt-12 rounded-2xl border border-white/10 bg-white/[0.02] p-6 sm:p-8">
+            <div className="grid grid-cols-1 gap-6 text-center sm:grid-cols-2 sm:text-left lg:grid-cols-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#F6C000]/30 bg-[#F6C000]/10 text-[#F6C000]">
+                  <Lock size={18} />
+                </div>
+                <div>
+                  <h4 className="text-[13px] font-semibold text-white">100% Number Masking</h4>
+                  <p className="text-[11px] text-white/50">Callers never see your number</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                  <Zap size={18} />
+                </div>
+                <div>
+                  <h4 className="text-[13px] font-semibold text-white">0.4s Instant Alert</h4>
+                  <p className="text-[11px] text-white/50">WhatsApp &amp; SMS ping within 2s</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400">
+                  <CheckCircle2 size={18} />
+                </div>
+                <div>
+                  <h4 className="text-[13px] font-semibold text-white">No Subscription Fees</h4>
+                  <p className="text-[11px] text-white/50">Pay once, protected for life</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400">
+                  <Truck size={18} />
+                </div>
+                <div>
+                  <h4 className="text-[13px] font-semibold text-white">Free Express Shipping</h4>
+                  <p className="text-[11px] text-white/50">Doorstep delivery across India</p>
+                </div>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── 6. PHOTO WALL — authentic real-world tags ───────────────────── */}
       <section className="relative overflow-hidden bg-[#0B0B0C] py-16 sm:py-24 lg:py-32">
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
           <Reveal>
@@ -1895,8 +1877,6 @@ export default function LandingPageMaster({
         <div className="relative z-10 grid grid-cols-3 gap-3 px-3 opacity-45 sm:gap-4 sm:px-4">
           {MOSAIC_COLUMNS.map((column, ci) => (
             <Parallax key={ci} distance={ci === 1 ? 90 : 45}>
-              {/* Spacing lives inside Parallax: its outer element only carries
-                  the scroll ref, the inner one is what actually moves. */}
               <div className="space-y-3 sm:space-y-4">
                 {column.map((img, ri) => (
                   <div
@@ -1912,6 +1892,160 @@ export default function LandingPageMaster({
         </div>
 
         <div className="pointer-events-none absolute inset-0 z-[15] bg-gradient-to-b from-[#0B0B0C] via-[#0B0B0C]/55 to-[#0B0B0C]" />
+      </section>
+
+      {/* ── 7. CATEGORY TICKER ──────────────────────────────────────────── */}
+      <section className="overflow-hidden border-y border-white/10 bg-[#0B0B0C] py-6">
+        <Marquee duration={44}>
+          {BADGE_ITEMS.map((item) => (
+            <span
+              key={`a-${item.label}`}
+              className="flex items-center gap-2.5 whitespace-nowrap rounded-full border border-white/10 px-5 py-2.5 text-[13px] font-light text-white/55"
+            >
+              <item.icon size={15} className="text-white/35" />
+              {item.label}
+            </span>
+          ))}
+        </Marquee>
+      </section>
+
+      {/* ── 8. PRODUCTS — Choose Product & Buy Now ──────────────────────── */}
+      <section id="products-section" className="bg-[#F4F1EC] py-16 sm:py-24 lg:py-32">
+        <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
+          <Reveal className="flex flex-col gap-8 border-b border-black/10 pb-10 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-xl">
+              <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.18em] text-black/60">
+                The RepiQR collection
+              </p>
+              <h2 className="text-[clamp(2rem,4.2vw,3.4rem)] font-medium leading-[1.02] tracking-[-0.04em]">
+                <SplitWords text="Protection, made personal" />
+              </h2>
+              <p className="mt-4 max-w-lg text-[15px] font-light leading-relaxed text-black/60">
+                Choose a purpose-built tag for the things that move through your day.
+                Every one includes lifetime validity and private contact routing.
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-5 text-[11px] uppercase tracking-[0.14em] text-black/60">
+              <span><strong className="text-black">{PRODUCTS.length}</strong> tag styles</span>
+              <span className="h-5 w-px bg-black/15" />
+              <span><strong className="text-black">∞</strong> validity</span>
+            </div>
+          </Reveal>
+
+          {/* Tabs */}
+          <Reveal delay={0.12} className="mt-10 flex flex-wrap justify-center gap-2">
+            {(['All', 'Vehicle', 'Home', 'Family', 'Travel'] as const).map((cat) => {
+              const on = activeCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={`relative cursor-pointer rounded-full px-5 py-2 text-[13px] font-medium transition-colors ${
+                    on ? 'text-white' : 'text-black/55 hover:text-black'
+                  }`}
+                >
+                  {on && (
+                    <motion.span
+                      layoutId="product-tab"
+                      transition={{ duration: 0.45, ease: EASE }}
+                      className="absolute inset-0 rounded-full bg-[#0B0B0C]"
+                    />
+                  )}
+                  <span className="relative z-10">{cat}</span>
+                </button>
+              );
+            })}
+          </Reveal>
+        </div>
+
+        {/* Product grid */}
+        <div className="relative mt-12 px-6 sm:px-10">
+          <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+            <AnimatePresence mode="popLayout">
+              {filteredProducts.map((product, i) => (
+                <motion.article
+                  key={product.id}
+                  layout
+                  initial={reduced ? undefined : { opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.7, delay: i * 0.07, ease: EASE }}
+                  className="group relative flex h-full flex-col overflow-hidden rounded-[1.75rem] bg-[#0B0B0C] shadow-[0_24px_60px_-28px_rgba(0,0,0,0.65)]"
+                >
+                  <div className="relative aspect-[16/9] overflow-hidden">
+                    <img
+                      src={product.img}
+                      alt={product.name}
+                      className="h-full w-full object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0C] via-[#0B0B0C]/10 to-transparent" />
+                    <span className="absolute left-5 top-5 rounded-full border border-white/15 bg-black/40 px-3 py-1 text-[11px] font-light text-white/80 backdrop-blur-sm">
+                      {product.badge}
+                    </span>
+                    <span className="absolute bottom-5 left-5 text-[11px] font-medium uppercase tracking-[0.14em] text-white/55">
+                      {product.category}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-1 flex-col justify-between p-6 pt-2 text-white sm:p-7 sm:pt-3">
+                    <div>
+                      <div className="flex items-start justify-between gap-4">
+                        <h3 className="text-xl font-medium tracking-[-0.02em]">{product.name}</h3>
+                        <div className="shrink-0 text-right">
+                          <div className="text-lg font-medium">₹{product.price}</div>
+                          <div className="text-[11px] font-light text-white/50 line-through">
+                            ₹{product.mrp}
+                          </div>
+                        </div>
+                      </div>
+
+                      <p className="mt-2.5 text-[13px] font-light leading-relaxed text-white/55">
+                        {product.desc}
+                      </p>
+
+                      <ul className="mt-5 space-y-2">
+                        {product.features.map((f) => (
+                          <li key={f} className="flex items-start gap-2 text-[12px] font-light text-white/60">
+                            <Check size={13} className="mt-[3px] shrink-0" style={{ color: '#F6C000' }} />
+                            {f}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div>
+                      {/* BUY NOW & ADD TO CART */}
+                      <div className="mt-6 flex items-center gap-2.5">
+                        <button
+                          onClick={() => handleBuyNow(product)}
+                          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-[#F6C000] py-3 text-[13px] font-bold text-[#0B0B0C] shadow-md transition-all hover:bg-[#ffcf24] hover:shadow-lg active:scale-95"
+                        >
+                          <span>Buy Now</span>
+                          <ArrowRight size={15} />
+                        </button>
+                        <button
+                          onClick={() => addToCart(product, 1)}
+                          className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/20 text-white/80 transition-all hover:border-white/50 hover:bg-white/10 hover:text-white active:scale-95"
+                          title={`Add ${product.name} to cart`}
+                          aria-label={`Add ${product.name} to cart`}
+                        >
+                          <ShoppingBag size={16} />
+                        </button>
+                      </div>
+
+                      {product.rating && (
+                        <div className="mt-4 flex items-center gap-1.5 text-[11px] font-light text-white/50">
+                          <Star size={12} style={{ color: '#F6C000' }} fill="#F6C000" />
+                          {product.rating} · {product.reviewsCount?.toLocaleString('en-IN')} owners
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.article>
+              ))}
+            </AnimatePresence>
+          </div>
+        </div>
       </section>
 
       {/* ── 11. PRICING ─────────────────────────────────────────────────── */}
@@ -2430,14 +2564,13 @@ export default function LandingPageMaster({
             </p>
 
             <button
-              onClick={onStart || onOpenCheckout}
-              className="group mt-10 inline-flex cursor-pointer items-center gap-2.5 rounded-full bg-white px-9 py-4 text-sm font-semibold text-[#0B0B0C] transition-transform hover:scale-[1.04] active:scale-95"
+              onClick={() => handleSmoothScroll('products-section')}
+              className="group mt-10 inline-flex cursor-pointer items-center gap-2.5 rounded-full bg-[#F6C000] px-9 py-4 text-sm font-bold text-[#0B0B0C] transition-transform hover:scale-[1.04] active:scale-95 shadow-lg"
             >
-              Get started
+              Choose your tag
               <ArrowRight
                 size={15}
-                className="transition-transform group-hover:translate-x-1"
-                style={{ color: '#C79E00' }}
+                className="transition-transform group-hover:translate-x-1 text-[#0B0B0C]"
               />
             </button>
           </Reveal>

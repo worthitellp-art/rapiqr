@@ -1,8 +1,8 @@
-import type React from "react";
+﻿import type React from "react";
 import { useEffect, useState } from "react";
 import { X, Check, Copy, Download, Printer, AlertCircle, Loader2 } from "lucide-react";
 import { QrRecord } from "./types";
-import { uid, generateStickerId, generateClientRecoveryCode, qrFullUrl, generateQrDataUrl } from "./helpers";
+import { qrFullUrl, generateQrDataUrl } from "./helpers";
 import { apiClient } from "../../../lib/apiClient";
 import { STICKER_CATEGORIES, getCategoryLabel } from "../../../stickerModules";
 import QrCodeImage from "./QrCodeImage";
@@ -29,22 +29,22 @@ interface GenerateTagModalProps {
   onPrint?: (target?: QrRecord, batch?: QrRecord[]) => void;
 }
 
-function buildQrRecord(targetCategory: string, ownerPhone?: string): QrRecord {
+/** Maps the id-scheme v2 server response (QrModel.saveV2) into a QrRecord. */
+function recordFromV2Response(data: any, fallbackCategory: string, ownerPhone?: string): QrRecord {
   const rec: QrRecord = {
-    id: generateStickerId(),
-    clientId: uid("CL"),
-    qrUrl: "",
-    createdAt: new Date().toISOString(),
+    id: data.id,
+    clientId: data.client_id,
+    qrUrl: qrFullUrl(data.id),
+    createdAt: data.created_at || new Date().toISOString(),
     scans: 0,
-    status: "inactive",
-    template: "Standard Tag",
-    category: targetCategory,
-    fg: "000000",
-    bg: "FFFFFF",
-    recoveryCode: generateClientRecoveryCode(),
+    status: data.status || "inactive",
+    template: data.template_name || "Standard Tag",
+    category: data.category || fallbackCategory,
+    fg: data.fg_color || "000000",
+    bg: data.bg_color || "FFFFFF",
+    recoveryCode: data.recoveryCode,
   };
   if (ownerPhone && ownerPhone.trim()) rec.ownerPhone = ownerPhone.trim();
-  rec.qrUrl = qrFullUrl(rec.id);
   return rec;
 }
 
@@ -102,35 +102,30 @@ export default function GenerateTagModal({
       return;
     }
 
-    const rec = buildQrRecord(category, phone);
-    setQrList((prev) => [rec, ...prev]);
     setStep("creating");
 
-    // The "success" screen — QR code, ID, recovery code — must only ever show
-    // for a tag the server actually persisted. This used to fall through to
+    // id-scheme v2: the server generates the recovery code AND derives the
+    // sticker id from it (see QrModel.saveV2) — neither is known until the
+    // response comes back, so there's nothing to optimistically prepend
+    // beforehand. The "success" screen only ever shows a tag the server
+    // actually persisted — a prior version of this flow could fall through to
     // success on ANY save failure that wasn't a 409 (network blip, 500,
     // expired session, ...), handing the admin a fully-formed-looking sticker
     // that had never been written to the database: unrecoverable, never
     // syncing to the client dashboard, because there was nothing there to sync.
     try {
-      const res = await apiClient.qr.saveQrCode({
-        id: rec.id,
-        clientId: rec.clientId,
-        status: rec.status,
-        templateName: rec.template,
-        category: rec.category,
-        fgColor: rec.fg,
-        bgColor: rec.bg,
-        recoveryCode: rec.recoveryCode,
+      const res = await apiClient.qr.saveQrCodeV2({
+        category,
         ownerPhone: phone.trim() || undefined,
       });
-      const resolvedCode = res?.data?.recoveryCode || rec.recoveryCode || "";
-      rec.recoveryCode = resolvedCode;
+      if (!res?.success || !res.data) throw new Error(res?.error || "Failed to create tag");
+
+      const rec = recordFromV2Response(res.data, category, phone);
+      setQrList((prev) => [rec, ...prev]);
       setCreated(rec);
-      setRecoveryCode(resolvedCode);
+      setRecoveryCode(rec.recoveryCode || "");
       setStep("success");
     } catch (err: any) {
-      setQrList((prev) => prev.filter((x) => x.id !== rec.id));
       setStep("form");
       if (err?.status === 409) {
         setPhoneError("Phone number already exists in this category.");
@@ -167,9 +162,9 @@ export default function GenerateTagModal({
   };
 
   return (
-    <div className="rq-modal-backdrop" style={{ fontFamily: "'Inter', ui-sans-serif, system-ui" }} onClick={onClose}>
-      <div className="rq-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="rq-modal-close" onClick={onClose} aria-label="Close">
+    <div className="fx-modal-backdrop" style={{ fontFamily: "'Inter', ui-sans-serif, system-ui" }} onClick={onClose}>
+      <div className="fx-modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+        <button className="fx-modal-close" onClick={onClose} aria-label="Close">
           <X size={15} />
         </button>
 
@@ -178,15 +173,15 @@ export default function GenerateTagModal({
             <h3 style={{ fontSize: 17, fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 2 }}>
               Create QR tag
             </h3>
-            <p style={{ fontSize: 13, color: "var(--rq-text-2)", marginBottom: 20 }}>
+            <p style={{ fontSize: 13, color: "var(--fx-ink-2)", marginBottom: 20 }}>
               Stamp a new tag. Recovery codes appear once after creation.
             </p>
 
-            <div className="rq-field">
-              <label className="rq-field-label" htmlFor="gt-category">Sticker category</label>
+            <div className="fx-field">
+              <label className="fx-field-label" htmlFor="gt-category">Sticker category</label>
               <select
                 id="gt-category"
-                className="rq-select"
+                className="fx-select"
                 style={{ width: "100%" }}
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
@@ -197,11 +192,11 @@ export default function GenerateTagModal({
               </select>
             </div>
 
-            <div className="rq-field">
-              <label className="rq-field-label" htmlFor="gt-phone">Phone number <span style={{ fontWeight: 400, color: "var(--rq-muted)" }}>(optional)</span></label>
+            <div className="fx-field">
+              <label className="fx-field-label" htmlFor="gt-phone">Phone number <span style={{ fontWeight: 400, color: "var(--fx-faint)" }}>(optional)</span></label>
               <input
                 id="gt-phone"
-                className="rq-input"
+                className="fx-input"
                 style={{ width: "100%" }}
                 placeholder="+91 98765 43210"
                 inputMode="tel"
@@ -210,7 +205,7 @@ export default function GenerateTagModal({
                 onKeyDown={(e) => { if (e.key === "Enter") handleGenerate(); }}
               />
               {phoneError && (
-                <div className="rq-error">
+                <div className="fx-error">
                   <AlertCircle size={13} />
                   {phoneError}
                 </div>
@@ -218,13 +213,13 @@ export default function GenerateTagModal({
             </div>
 
             <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
-              <button className="rq-btn rq-btn-secondary" style={{ flex: 1 }} onClick={onClose}>
+              <button className="fx-btn fx-btn-secondary" style={{ flex: 1 }} onClick={onClose}>
                 Cancel
               </button>
-              <button className="rq-btn rq-btn-primary" style={{ flex: 1 }} onClick={handleGenerate} disabled={step === "creating"}>
+              <button className="fx-btn fx-btn-primary" style={{ flex: 1 }} onClick={handleGenerate} disabled={step === "creating"}>
                 {step === "creating" ? (
                   <>
-                    <Loader2 size={15} className="rq-spin" style={{ animation: "rq-spin 0.8s linear infinite" }} />
+                    <Loader2 size={15} className="fx-spin" style={{ animation: "fx-spin 0.8s linear infinite" }} />
                     Creating…
                   </>
                 ) : (
@@ -232,50 +227,50 @@ export default function GenerateTagModal({
                 )}
               </button>
             </div>
-            <style>{`@keyframes rq-spin { to { transform: rotate(360deg); } }`}</style>
+            <style>{`@keyframes fx-spin { to { transform: rotate(360deg); } }`}</style>
           </>
         )}
 
         {step === "success" && created && (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-              <span style={{ width: 32, height: 32, borderRadius: 8, background: "var(--rq-success-soft)", color: "var(--rq-success)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ width: 32, height: 32, borderRadius: 8, background: "var(--fx-green-soft)", color: "var(--fx-green)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
                 <Check size={18} />
               </span>
               <div>
                 <h3 style={{ fontSize: 17, fontWeight: 600, letterSpacing: "-0.01em", lineHeight: 1.2 }}>QR created</h3>
-                <p style={{ fontSize: 12.5, color: "var(--rq-text-2)" }}>
+                <p style={{ fontSize: 12.5, color: "var(--fx-ink-2)" }}>
                   {getCategoryLabel(created.category || "car")} · tag ready to print
                 </p>
               </div>
             </div>
 
             <div style={{ display: "flex", justifyContent: "center", margin: "4px 0 16px" }}>
-              <div style={{ border: "1px solid var(--rq-border)", borderRadius: 10, padding: 10, background: "#FFF" }}>
+              <div style={{ border: "1px solid var(--fx-border)", borderRadius: 10, padding: 10, background: "#FFF" }}>
                 <QrCodeImage data={qrFullUrl(created.id)} fg="000000" bg="FFFFFF" size={168} style={{ width: 168, height: 168 }} />
               </div>
             </div>
 
             <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--rq-muted)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>Public URL</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--rq-bg)", border: "1px solid var(--rq-border)", borderRadius: 8, padding: "6px 8px" }}>
-                <span className="rq-mono" style={{ flex: 1, fontSize: 12, color: "var(--rq-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--fx-faint)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>Public URL</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--fx-canvas)", border: "1px solid var(--fx-border)", borderRadius: 8, padding: "6px 8px" }}>
+                <span className="fx-mono" style={{ flex: 1, fontSize: 12, color: "var(--fx-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {qrFullUrl(created.id)}
                 </span>
-                <button className="rq-icon-btn" title="Copy URL" onClick={copyUrl}>
-                  {urlCopied ? <Check size={14} style={{ color: "var(--rq-success)" }} /> : <Copy size={14} />}
+                <button className="fx-icon-btn" title="Copy URL" onClick={copyUrl}>
+                  {urlCopied ? <Check size={14} style={{ color: "var(--fx-green)" }} /> : <Copy size={14} />}
                 </button>
               </div>
             </div>
 
             <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--rq-muted)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>Recovery code</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--rq-bg)", border: "1px solid var(--rq-border)", borderRadius: 8, padding: "6px 8px" }}>
-                <span className="rq-mono" style={{ flex: 1, fontSize: 15, fontWeight: 600, letterSpacing: "0.08em", color: "var(--rq-text)", userSelect: "all" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--fx-faint)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>Recovery code</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--fx-canvas)", border: "1px solid var(--fx-border)", borderRadius: 8, padding: "6px 8px" }}>
+                <span className="fx-mono" style={{ flex: 1, fontSize: 15, fontWeight: 600, letterSpacing: "0.08em", color: "var(--fx-ink)", userSelect: "all" }}>
                   {formatRecovery(recoveryCode)}
                 </span>
-                <button className="rq-icon-btn" title="Copy recovery code" onClick={copyCode}>
-                  {codeCopied ? <Check size={14} style={{ color: "var(--rq-success)" }} /> : <Copy size={14} />}
+                <button className="fx-icon-btn" title="Copy recovery code" onClick={copyCode}>
+                  {codeCopied ? <Check size={14} style={{ color: "var(--fx-green)" }} /> : <Copy size={14} />}
                 </button>
               </div>
             </div>
@@ -288,14 +283,14 @@ export default function GenerateTagModal({
             </div>
 
             <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-              <button className="rq-btn rq-btn-secondary" style={{ flex: 1 }} onClick={handleDownloadQr}>
+              <button className="fx-btn fx-btn-secondary" style={{ flex: 1 }} onClick={handleDownloadQr}>
                 <Download size={14} /> Download QR
               </button>
-              <button className="rq-btn rq-btn-secondary" style={{ flex: 1 }} onClick={() => onPrint?.(created, [created])}>
+              <button className="fx-btn fx-btn-secondary" style={{ flex: 1 }} onClick={() => onPrint?.(created, [created])}>
                 <Printer size={14} /> Print tag
               </button>
             </div>
-            <button className="rq-btn rq-btn-primary" style={{ width: "100%" }} onClick={onClose}>
+            <button className="fx-btn fx-btn-primary" style={{ width: "100%" }} onClick={onClose}>
               Done
             </button>
           </>

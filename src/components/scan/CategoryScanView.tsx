@@ -158,8 +158,7 @@ const TINTS: Record<string, { bg: string; ring: string; icon: string; text: stri
   peach:  { bg: "bg-pink-50",    ring: "border-pink-100",    icon: "text-pink-600",    text: "group-hover:text-pink-700" },
 };
 
-/* Sheet button styles — flat, single-tone boxes (no gradients) per the
-   Pinterest-minimal system: a tinted surface + icon, not a glossy pill. */
+/* Sheet button styles — flat, single-tone surfaces */
 const BUTTON_STYLES: Record<string, string> = {
   primary: "bg-[#FDEAEA] text-[#9E0A0A] hover:bg-[#FBDCDC]",
   wa: "bg-[#E4F7EA] text-[#15803D] hover:bg-[#D5F2DF]",

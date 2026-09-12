@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+﻿import React, { useState, useMemo } from "react";
 import { Search, CheckSquare, Square, CheckCheck, XSquare, AlertCircle, Grid3X3 } from "lucide-react";
 import { QrRecord } from "../types";
 
@@ -50,17 +50,17 @@ export default function BatchStickerPicker({
   const sheetCount = Math.ceil(selectedCount / 9);
 
   return (
-    <div className="bg-[#F7F7F8] p-3.5 rounded-lg border border-[#E5E5E7] space-y-3">
+    <div className="bg-[var(--fx-canvas)] p-3.5 rounded-lg border border-[var(--fx-border)] space-y-3">
       {/* Header with Title and Quick Select Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-[#E5E5E7]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-[var(--fx-border)]">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-[13px] font-bold text-[#17181A]">Select Unique Stickers for 3×3 Sheets:</span>
-            <span className="text-[11px] font-bold bg-[#E8EDFF] text-[#3E52B8] px-2.5 py-0.5 rounded-full">
+            <span className="text-[13px] font-bold text-[var(--fx-ink)]">Select Unique Stickers for 3×3 Sheets:</span>
+            <span className="text-[11px] font-bold bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] px-2.5 py-0.5 rounded-full">
               {selectedCount} of {availableStickers.length} Selected
             </span>
           </div>
-          <p className="text-[11.5px] text-[#777B80] mt-0.5">
+          <p className="text-[11.5px] text-[var(--fx-ink-2)] mt-0.5">
             {selectedCount > 0
               ? `Each sticker slot is unique. Will generate ${sheetCount} sheet${sheetCount > 1 ? "s" : ""} (9 unique tags per 18×12″ page)`
               : "Select stickers below. Each slot in the 3×3 grid receives a different sticker."}
@@ -71,7 +71,7 @@ export default function BatchStickerPicker({
           <button
             type="button"
             onClick={onSelectAll}
-            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[#3E52B8] bg-white border border-[#5C78DF]/30 rounded hover:bg-[#E8EDFF] transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[var(--fx-accent-ink)] bg-white border border-[var(--fx-accent)]/30 rounded hover:bg-[var(--fx-accent-soft)] transition-colors cursor-pointer"
           >
             <CheckCheck size={12} />
             <span>Select All ({availableStickers.length})</span>
@@ -81,7 +81,7 @@ export default function BatchStickerPicker({
             <button
               type="button"
               onClick={onSelectFirstNine}
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[#17181A] bg-white border border-[#E5E5E7] rounded hover:bg-[#F3F3F4] transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[var(--fx-ink)] bg-white border border-[var(--fx-border)] rounded hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
               title="Select first 9 stickers to fill exactly one 18×12″ sheet"
             >
               <Grid3X3 size={12} />
@@ -92,7 +92,7 @@ export default function BatchStickerPicker({
           <button
             type="button"
             onClick={onDeselectAll}
-            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[#777B80] bg-white border border-[#E5E5E7] rounded hover:bg-[#F3F3F4] transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[var(--fx-ink-2)] bg-white border border-[var(--fx-border)] rounded hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
           >
             <XSquare size={12} />
             <span>Clear</span>
@@ -102,20 +102,20 @@ export default function BatchStickerPicker({
 
       {/* Search Bar */}
       <div className="relative">
-        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#777B80]" />
+        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--fx-ink-2)]" />
         <input
           type="text"
           placeholder="Filter stickers by tag ID, category, or phone..."
           value={searchQuery}
           onChange={(searchEvent) => setSearchQuery(searchEvent.target.value)}
-          className="w-full bg-white border border-[#E5E5E7] rounded-md pl-8 pr-3 py-1.5 text-[12px] text-[#17181A] placeholder-[#9CA0A6] outline-none focus:border-[#5C78DF]"
+          className="w-full bg-white border border-[var(--fx-border)] rounded-md pl-8 pr-3 py-1.5 text-[12px] text-[var(--fx-ink)] placeholder-[var(--fx-faint)] outline-none focus:border-[var(--fx-accent)]"
         />
       </div>
 
       {/* Stickers Checkbox Grid */}
-      <div className="max-h-44 overflow-y-auto bg-white border border-[#E5E5E7] rounded-md p-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5">
+      <div className="max-h-44 overflow-y-auto bg-white border border-[var(--fx-border)] rounded-md p-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5">
         {filteredStickers.length === 0 ? (
-          <div className="col-span-full py-4 text-center text-[12px] text-[#777B80]">
+          <div className="col-span-full py-4 text-center text-[12px] text-[var(--fx-ink-2)]">
             No stickers match "{searchQuery}"
           </div>
         ) : (
@@ -131,25 +131,25 @@ export default function BatchStickerPicker({
                 onClick={() => onToggleSticker(sticker.id)}
                 className={`flex items-center gap-2 p-2 rounded border transition-colors cursor-pointer text-[12px] ${
                   isSelected
-                    ? "border-[#5C78DF] bg-[#F4F7FF] text-[#17181A] font-medium"
-                    : "border-[#E5E5E7] hover:bg-[#FAFAFB] text-[#777B80]"
+                    ? "border-[var(--fx-accent)] bg-[var(--fx-accent-soft)] text-[var(--fx-ink)] font-medium"
+                    : "border-[var(--fx-border)] hover:bg-[var(--fx-canvas)] text-[var(--fx-ink-2)]"
                 }`}
               >
                 {isSelected ? (
-                  <CheckSquare size={15} className="text-[#5C78DF] flex-shrink-0" />
+                  <CheckSquare size={15} className="text-[var(--fx-accent)] flex-shrink-0" />
                 ) : (
-                  <Square size={15} className="text-[#9CA0A6] flex-shrink-0" />
+                  <Square size={15} className="text-[var(--fx-faint)] flex-shrink-0" />
                 )}
 
                 <div className="truncate flex-1">
-                  <span className="font-mono font-bold text-[#17181A]">{sticker.id}</span>
-                  <span className="text-[10px] text-[#777B80] ml-1.5 uppercase">
+                  <span className="font-mono font-bold text-[var(--fx-ink)]">{sticker.id}</span>
+                  <span className="text-[10px] text-[var(--fx-ink-2)] ml-1.5 uppercase">
                     {sticker.category || "Car"}
                   </span>
                 </div>
 
                 {isSelected && slotNumber && (
-                  <span className="text-[10px] font-bold font-mono bg-[#E8EDFF] text-[#3E52B8] px-1.5 py-0.5 rounded flex-shrink-0">
+                  <span className="text-[10px] font-bold font-mono bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] px-1.5 py-0.5 rounded flex-shrink-0">
                     S{sheetNumber}:#{slotInSheet}
                   </span>
                 )}

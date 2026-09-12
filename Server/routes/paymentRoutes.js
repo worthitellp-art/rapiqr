@@ -7,5 +7,6 @@ const { optionalAuth } = require('../middleware/authMiddleware');
 // the order's own userId (attached at creation) is what links a payment to an account.
 router.post('/create-order', optionalAuth, PaymentController.createOrder);
 router.post('/verify', optionalAuth, PaymentController.verify);
+router.post('/verify-payment', optionalAuth, PaymentController.verify);
 
 module.exports = router;

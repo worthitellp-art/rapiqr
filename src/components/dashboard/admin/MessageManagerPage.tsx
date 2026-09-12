@@ -1,6 +1,6 @@
 import type React from "react";
 import { useEffect, useState, useCallback } from "react";
-import { Send, CheckCircle2, XCircle, FlaskConical, MessageSquareText, RefreshCcw } from "lucide-react";
+import { Send, CheckCircle2, XCircle, FlaskConical, MessageSquareText, RefreshCcw, Trash2, AlertTriangle } from "lucide-react";
 import { apiClient } from "../../../lib/apiClient";
 
 type MessageStats = { total: number; sent: number; failed: number; simulated: number; sms: number; whatsapp: number; last24h: number };
@@ -25,9 +25,9 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string; ic
 
 function StatTile({ label, value, accent }: { label: string; value: number | string; accent?: string }) {
   return (
-    <div className="bg-white border border-[#E5E7EB] p-4 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
-      <p className="text-[10px] font-extrabold text-[#71717A] uppercase tracking-wider mb-1.5">{label}</p>
-      <p className="text-2xl font-display font-bold" style={{ color: accent || "#18181B" }}>{value}</p>
+    <div className="bg-white border border-[var(--fx-border)] p-4 rounded-xl shadow-xs">
+      <p className="text-[10px] font-extrabold text-[var(--fx-ink-2)] uppercase tracking-wider mb-1.5">{label}</p>
+      <p className="text-2xl font-display font-bold text-[var(--fx-ink)]" style={{ color: accent }}>{value}</p>
     </div>
   );
 }
@@ -46,8 +46,12 @@ export default function MessageManagerPage() {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [channelFilter, setChannelFilter] = useState<string>("ALL");
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const load = useCallback(() => {
+    setLoading(true);
     apiClient.admin.getMessageStats().then((res) => {
       if (res.success) setStats(res.data);
     }).catch(() => { /* table may not be provisioned yet */ });
@@ -68,23 +72,95 @@ export default function MessageManagerPage() {
     return () => clearInterval(interval);
   }, [load]);
 
+  const handleDeleteAll = async () => {
+    setDeleting(true);
+    try {
+      const res = await apiClient.admin.deleteAllMessages();
+      if (res.success) {
+        setMessages([]);
+        setStats({ total: 0, sent: 0, failed: 0, simulated: 0, sms: 0, whatsapp: 0, last24h: 0 });
+        setShowConfirmModal(false);
+        setToastMessage("All messages have been successfully deleted.");
+        setTimeout(() => setToastMessage(null), 4000);
+      }
+    } catch (err: any) {
+      alert(err?.message || "Failed to delete messages");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const successRate = stats && stats.total > 0 ? Math.round((stats.sent / stats.total) * 100) : null;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#18181B] font-body" style={{ background: "#F8F8F7" }}>
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[var(--fx-ink)] font-body bg-[var(--fx-canvas)]/50 min-h-screen">
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div className="fixed top-5 right-5 z-50 flex items-center gap-2 bg-[var(--fx-accent)] text-white px-4 py-3 rounded-xl shadow-xl text-xs font-bold animate-fade-in">
+          <CheckCircle2 size={16} className="text-emerald-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-[var(--fx-border)] p-6 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+              <Trash2 size={24} />
+            </div>
+            <div className="text-center space-y-1.5">
+              <h3 className="text-lg font-black text-[var(--fx-ink)] font-display">Delete All Messages?</h3>
+              <p className="text-xs text-[var(--fx-ink-2)] leading-relaxed max-w-xs mx-auto">
+                This will permanently delete all SMS and WhatsApp delivery records from the system. This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                disabled={deleting}
+                className="w-1/2 py-2.5 rounded-xl border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAll}
+                disabled={deleting}
+                className="w-1/2 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                {deleting ? "Deleting..." : "Yes, Delete All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h3 className="font-display font-semibold text-[#18181B] text-[14px] flex items-center gap-2">
-            <Send size={15} className="text-[#EAB308]" /> Message Manager
+          <h3 className="font-display font-bold text-[var(--fx-ink)] text-base sm:text-lg flex items-center gap-2">
+            <Send size={18} className="text-[var(--fx-ink-2)]" /> Message Manager
           </h3>
-          <p className="text-[11px] text-[#71717A] mt-1">Every SMS &amp; WhatsApp send attempted via Twilio — alerts, phone verification, and sticker activation OTPs.</p>
+          <p className="text-xs text-[var(--fx-ink-2)] mt-1">Every SMS &amp; WhatsApp send attempted via Twilio — alerts, phone verification, and sticker activation OTPs.</p>
         </div>
-        <button
-          onClick={load}
-          className="self-start inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-[#E5E7EB] text-[12px] font-semibold text-[#18181B] hover:bg-[#F4F4F5] transition-all cursor-pointer flex-shrink-0"
-        >
-          <RefreshCcw size={13} /> Refresh
-        </button>
+        <div className="flex items-center gap-2 self-start flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowConfirmModal(true)}
+            disabled={messages.length === 0 || deleting}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Trash2 size={13} /> Delete All Messages
+          </button>
+          <button
+            type="button"
+            onClick={load}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] transition-all cursor-pointer shadow-xs flex-shrink-0"
+          >
+            <RefreshCcw size={13} className={loading ? "animate-spin" : ""} /> Refresh
+          </button>
+        </div>
       </div>
 
       {/* ── Stat Tiles ── */}
@@ -95,7 +171,7 @@ export default function MessageManagerPage() {
         <StatTile label="Simulated" value={stats?.simulated ?? "—"} accent="#B54708" />
         <StatTile label="SMS" value={stats?.sms ?? "—"} />
         <StatTile label="WhatsApp" value={stats?.whatsapp ?? "—"} />
-        <StatTile label="Success Rate" value={successRate !== null ? `${successRate}%` : "—"} accent="#F5C518" />
+        <StatTile label="Success Rate" value={successRate !== null ? `${successRate}%` : "—"} accent="var(--fx-accent)" />
       </div>
 
       {/* ── Filters ── */}
@@ -104,20 +180,20 @@ export default function MessageManagerPage() {
           <button
             key={s}
             onClick={() => setStatusFilter(s)}
-            className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
-              statusFilter === s ? "bg-[#F5C518] text-[#18181B]" : "bg-white border border-[#E5E7EB] text-[#71717A] hover:text-[#18181B]"
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+              statusFilter === s ? "bg-[var(--fx-accent)] text-white shadow-xs" : "bg-white border border-[var(--fx-border)] text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:border-[var(--fx-border-strong)]"
             }`}
           >
             {s === "ALL" ? "All Statuses" : STATUS_META[s]?.label || s}
           </button>
         ))}
-        <span className="w-px h-4 bg-[#E5E7EB] mx-1" />
+        <span className="w-px h-4 bg-[var(--fx-border-strong)] mx-1" />
         {["ALL", "sms", "whatsapp"].map((c) => (
           <button
             key={c}
             onClick={() => setChannelFilter(c)}
-            className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
-              channelFilter === c ? "bg-[#F5C518] text-[#18181B]" : "bg-white border border-[#E5E7EB] text-[#71717A] hover:text-[#18181B]"
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+              channelFilter === c ? "bg-[var(--fx-accent)] text-white shadow-xs" : "bg-white border border-[var(--fx-border)] text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:border-[var(--fx-border-strong)]"
             }`}
           >
             {c === "ALL" ? "All Channels" : c.toUpperCase()}
@@ -126,39 +202,43 @@ export default function MessageManagerPage() {
       </div>
 
       {/* ── Message Log Table ── */}
-      <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] overflow-hidden">
+      <div className="bg-white border border-[var(--fx-border)] rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[680px] text-sm">
             <thead>
-              <tr className="border-b border-[#E5E7EB] text-[10px] font-extrabold text-[#71717A] uppercase tracking-wider">
-                <th className="text-left px-4 py-3">Status</th>
-                <th className="text-left px-4 py-3">Channel</th>
-                <th className="text-left px-4 py-3">To</th>
-                <th className="text-left px-4 py-3">Event</th>
-                <th className="text-left px-4 py-3">Message</th>
-                <th className="text-left px-4 py-3">When</th>
+              <tr className="border-b border-[var(--fx-border)] bg-[var(--fx-canvas)]/80 text-[11px] font-extrabold text-[var(--fx-ink-2)] uppercase tracking-wider">
+                <th className="text-left px-4 py-3.5">Status</th>
+                <th className="text-left px-4 py-3.5">Channel</th>
+                <th className="text-left px-4 py-3.5">To</th>
+                <th className="text-left px-4 py-3.5">Event</th>
+                <th className="text-left px-4 py-3.5">Message</th>
+                <th className="text-left px-4 py-3.5">When</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-[var(--fx-border)]">
               {messages.map((m) => {
                 const meta = STATUS_META[m.status] || STATUS_META.failed;
                 return (
-                  <tr key={m.id} className="border-b border-[#F0F0F1] last:border-0 hover:bg-[#FCFCFD] align-top">
-                    <td className="px-4 py-3">
+                  <tr key={m.id} className="hover:bg-[var(--fx-canvas)]/80 transition-colors align-top">
+                    <td className="px-4 py-3.5">
                       <span
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold"
                         style={{ color: meta.color, background: meta.bg }}
                       >
                         {meta.icon} {meta.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-[12px] font-semibold text-[#18181B] uppercase">{m.channel}</td>
-                    <td className="px-4 py-3 text-[12px] font-mono text-[#18181B]">{m.to_number || "—"}</td>
-                    <td className="px-4 py-3 text-[11px] text-[#71717A]">{m.event || "—"}</td>
-                    <td className="px-4 py-3 text-[11px] text-[#71717A] max-w-xs truncate" title={m.error || m.body_preview || ""}>
-                      {m.status === "failed" ? (m.error || "Unknown error") : (m.body_preview || "—")}
+                    <td className="px-4 py-3.5 text-xs font-bold text-[var(--fx-ink)] uppercase">{m.channel}</td>
+                    <td className="px-4 py-3.5 text-xs font-mono font-medium text-[var(--fx-ink)]">{m.to_number || "—"}</td>
+                    <td className="px-4 py-3.5 text-xs font-medium text-[var(--fx-ink-2)]">{m.event || "—"}</td>
+                    <td className="px-4 py-3.5 text-xs text-[var(--fx-ink-2)] max-w-xs break-words" title={m.error || m.body_preview || ""}>
+                      {m.status === "failed" ? (
+                        <span className="text-red-600 font-semibold">{m.error || "Unknown error"}</span>
+                      ) : (
+                        <span>{m.body_preview || "—"}</span>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-[11px] text-[#71717A] whitespace-nowrap">{formatWhen(m.created_at)}</td>
+                    <td className="px-4 py-3.5 text-xs text-[var(--fx-ink-2)] font-medium whitespace-nowrap">{formatWhen(m.created_at)}</td>
                   </tr>
                 );
               })}
@@ -168,9 +248,11 @@ export default function MessageManagerPage() {
 
         {!loading && messages.length === 0 && (
           <div className="py-16 flex flex-col items-center justify-center text-center px-6">
-            <MessageSquareText size={28} className="text-[#C9CACC] mb-3" />
-            <p className="text-[13px] font-semibold text-[#18181B]">No messages logged yet</p>
-            <p className="text-[11px] text-[#71717A] mt-1 max-w-sm">
+            <div className="w-12 h-12 rounded-2xl bg-[var(--fx-canvas)] flex items-center justify-center text-[var(--fx-faint)] mb-3">
+              <MessageSquareText size={24} />
+            </div>
+            <p className="text-sm font-bold text-[var(--fx-ink)]">No messages logged yet</p>
+            <p className="text-xs text-[var(--fx-ink-2)] mt-1 max-w-sm leading-relaxed">
               Sends will appear here once an alert, phone verification, or sticker activation OTP goes out.
             </p>
           </div>

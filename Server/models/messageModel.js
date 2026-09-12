@@ -81,6 +81,18 @@ class MessageModel {
       return { total: 0, sent: 0, failed: 0, simulated: 0, sms: 0, whatsapp: 0, last24h: 0 };
     }
   }
+
+  /**
+   * Delete all tracked messages from the collection
+   */
+  static async deleteAllMessages() {
+    try {
+      const result = await SmsMessage.deleteMany({});
+      return { deletedCount: result.deletedCount || 0 };
+    } catch (err) {
+      throw err;
+    }
+  }
 }
 
 module.exports = MessageModel;

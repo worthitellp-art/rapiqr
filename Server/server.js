@@ -1,3 +1,4 @@
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -60,6 +61,13 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Attach Live Console Logger Middleware
 app.use(requestLogger);
 
+// Static uploads serving for attachments and media (fallback when cloud S3 is not configured)
+const uploadsDirectory = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDirectory)) {
+  fs.mkdirSync(uploadsDirectory, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDirectory));
+
 // API Health Check Endpoint
 app.get('/api/health', (req, res) => {
   res.json({
@@ -86,6 +94,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/distributors', distributorRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api', paymentRoutes); // Provides direct /api/create-order and /api/verify-payment
 app.use('/api/shop-products', shopProductRoutes);
 app.use('/api/shiprocket', shiprocketRoutes);
 app.use('/api/chat', chatRoutes);
@@ -132,4 +141,4 @@ connectDB()
     logger.error('SERVER', 'Failed to connect to MongoDB — refusing to start', err);
     process.exit(1);
   });
-// Nodemon reload trigger
+// Nodemon reload trigger: live razorpay credentials loaded

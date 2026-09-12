@@ -1,6 +1,5 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import AuthModal from './components/auth/AuthModal';
 import AdminAuthModal from './components/auth/AdminAuthModal';
 import AuthCallback from './pages/AuthCallback';
 
@@ -12,12 +11,23 @@ const ClientDashboard = lazy(() => import('./components/ClientDashboard'));
 const ScanPage = lazy(() => import('./components/scan/ScanPage'));
 const DistributorDashboard = lazy(() => import('./components/dashboard/DistributorDashboard'));
 const TrackOrderModal = lazy(() => import('./components/landing/TrackOrderModal'));
+const AuthPage = lazy(() => import('./components/auth/AuthPage'));
+
+export type AppPage =
+  | 'landing'
+  | 'dashboard'
+  | 'scan'
+  | 'distributor'
+  | 'checkout'
+  | 'join'
+  | 'login'
+  | 'register';
 
 function PageLoader() {
   return (
     <div className="min-h-screen bg-[#FAFAFC] flex items-center justify-center">
       <div className="flex flex-col items-center gap-3">
-        <div className="w-8 h-8 border-2 border-[#FF6500] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#446FF2] border-t-transparent rounded-full animate-spin" />
         <span className="text-sm font-semibold text-[#64748B]">Loading...</span>
       </div>
     </div>
@@ -41,7 +51,7 @@ function isScanUrl(): boolean {
 
   const isSingleSegmentQrPath =
     /^\/([A-Z0-9_-]{3,})$/i.test(pathName) &&
-    !/^\/(admin|distributor|checkout|auth|callback)$/i.test(pathName);
+    !/^\/(admin|distributor|checkout|auth|callback|login|register|signup)$/i.test(pathName);
 
   return !!directQrMatch || legacyPathMatch || hashMatch || queryMatch || isSingleSegmentQrPath;
 }
@@ -56,13 +66,28 @@ function isAdminUrl(): boolean {
   return /\/admin(\/|$)/i.test(window.location.pathname) || /#\/admin(\/|$)/i.test(window.location.hash);
 }
 
+function getAuthUrlMode(): 'login' | 'register' | null {
+  if (typeof window === 'undefined') return null;
+  const pathName = window.location.pathname.toLowerCase();
+  const hashString = window.location.hash.toLowerCase();
+  if (pathName === '/login' || hashString === '#/login') return 'login';
+  if (
+    pathName === '/register' ||
+    pathName === '/signup' ||
+    hashString === '#/register' ||
+    hashString === '#/signup'
+  ) {
+    return 'register';
+  }
+  return null;
+}
+
 function MainAppContent() {
   const { isLoggedIn, isAdmin, loading } = useAuth();
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login');
   const [dashboardMode, setDashboardMode] = useState<'admin' | null>(null);
   const [adminModalOpen, setAdminModalOpen] = useState(() => isAdminUrl());
   const [joinServiceType, setJoinServiceType] = useState<string | undefined>();
+  const [authPrefillEmail, setAuthPrefillEmail] = useState('');
 
   // Track order modal state
   const [trackModalOpen, setTrackModalOpen] = useState(() => {
@@ -83,25 +108,36 @@ function MainAppContent() {
     setTrackModalOpen(true);
   };
 
-  // Restore page from localStorage, but only non-scan pages
-  const [page, setPage] = useState<'landing' | 'dashboard' | 'scan' | 'distributor' | 'checkout' | 'join'>(() => {
+  // Restore page from localStorage or URL
+  const [page, setPage] = useState<AppPage>(() => {
     if (isScanUrl()) return 'scan';
+    const authUrlMode = getAuthUrlMode();
+    if (authUrlMode) return authUrlMode;
     try {
       const saved = localStorage.getItem('repiqr-current-page') || localStorage.getItem('namoqr-current-page');
       if (saved === 'dashboard') return 'dashboard';
       if (saved === 'distributor') return 'distributor';
       if (saved === 'checkout') return 'checkout';
       if (saved === 'join') return 'join';
+      if (saved === 'login') return 'login';
+      if (saved === 'register') return 'register';
     } catch { /* ignore */ }
     return 'landing';
   });
 
   // Persist page to localStorage whenever it changes
-  const navigateTo = (next: 'landing' | 'dashboard' | 'scan' | 'distributor' | 'checkout' | 'join') => {
+  const navigateTo = (next: AppPage) => {
     try {
       if (next === 'landing') {
         localStorage.removeItem('repiqr-current-page');
         localStorage.removeItem('namoqr-current-page');
+        if (window.location.pathname !== '/' && !window.location.pathname.startsWith('/QR')) {
+          window.history.pushState({}, '', '/');
+        }
+      } else if (next === 'login') {
+        window.history.pushState({}, '', '/login');
+      } else if (next === 'register') {
+        window.history.pushState({}, '', '/register');
       } else {
         localStorage.setItem('repiqr-current-page', next);
         localStorage.setItem('namoqr-current-page', next);
@@ -116,6 +152,9 @@ function MainAppContent() {
     if ((page === 'dashboard' || page === 'distributor') && !isLoggedIn) {
       setDashboardMode(null);
       navigateTo('landing');
+    }
+    if ((page === 'login' || page === 'register') && isLoggedIn) {
+      navigateTo('dashboard');
     }
   }, [loading, isLoggedIn, page]);
 
@@ -133,6 +172,10 @@ function MainAppContent() {
         } else {
           setAdminModalOpen(true);
         }
+      }
+      const authUrlMode = getAuthUrlMode();
+      if (authUrlMode && page !== authUrlMode) {
+        setPage(authUrlMode);
       }
       const search = new URLSearchParams(window.location.search);
       if (search.has('track')) {
@@ -152,16 +195,14 @@ function MainAppContent() {
     if (isLoggedIn) {
       navigateTo('dashboard');
     } else {
-      setAuthModalMode(mode);
-      setAuthModalOpen(true);
+      navigateTo(mode === 'login' ? 'login' : 'register');
     }
   };
 
-  // Post-purchase one-click signup: open the signup modal pre-filled with the order email
-  const [authPrefillEmail, setAuthPrefillEmail] = useState('');
+  // Post-purchase one-click signup: open the signup page pre-filled with the order email
   const handleOpenSignupWithEmail = (email: string) => {
     setAuthPrefillEmail(email);
-    handleOpenAuth('signup');
+    navigateTo('register');
   };
 
   // While the session is resolving, show loader — prevents flash of landing page
@@ -240,6 +281,27 @@ function MainAppContent() {
     );
   }
 
+  if (page === 'login' || page === 'register') {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <AuthPage
+          initialMode={page === 'register' ? 'signup' : 'login'}
+          prefillEmail={authPrefillEmail}
+          onBackHome={() => navigateTo('landing')}
+          onSuccess={() => {
+            setAuthPrefillEmail('');
+            const pendingIntent = localStorage.getItem('namoqr-pending-distributor-intent');
+            if (pendingIntent) {
+              navigateTo('landing');
+            } else {
+              navigateTo('dashboard');
+            }
+          }}
+        />
+      </Suspense>
+    );
+  }
+
   if (page === 'checkout') {
     return (
       <Suspense fallback={<PageLoader />}>
@@ -252,13 +314,6 @@ function MainAppContent() {
           onOrderComplete={() => {
             try { localStorage.removeItem('namoqr-cart'); } catch { /* ignore */ }
           }}
-        />
-        <AuthModal
-          isOpen={authModalOpen}
-          onClose={() => { setAuthModalOpen(false); setAuthPrefillEmail(''); }}
-          onSuccess={() => navigateTo('dashboard')}
-          initialMode={authModalMode}
-          prefillEmail={authPrefillEmail}
         />
         <TrackOrderModal
           isOpen={trackModalOpen}
@@ -286,8 +341,9 @@ function MainAppContent() {
     <Suspense fallback={<PageLoader />}>
       <div className="min-h-screen bg-[#FAFAFC] text-[#0A0D14]">
         <LandingPageMaster
-          onStart={() => handleOpenAuth('signup')}
+          onStart={() => navigateTo('checkout')}
           onLogin={() => handleOpenAuth('login')}
+          onOpenDashboard={() => navigateTo('dashboard')}
           onOpenDistributorDashboard={() => navigateTo('distributor')}
           onOpenCheckout={() => navigateTo('checkout')}
           onOpenTrackOrder={() => handleOpenTrackOrder()}
@@ -295,22 +351,6 @@ function MainAppContent() {
             setJoinServiceType(serviceType);
             navigateTo('join');
           }}
-        />
-        <AuthModal
-          isOpen={authModalOpen}
-          onClose={() => { setAuthModalOpen(false); setAuthPrefillEmail(''); }}
-          onSuccess={() => {
-            // Check if there was a pending distributor application attempt before login
-            const pendingIntent = localStorage.getItem('namoqr-pending-distributor-intent');
-            if (pendingIntent) {
-              // Stay on landing page, LandingPageMaster will auto-open the distributor modal
-              setAuthModalOpen(false);
-            } else {
-              navigateTo('dashboard');
-            }
-          }}
-          initialMode={authModalMode}
-          prefillEmail={authPrefillEmail}
         />
         <TrackOrderModal
           isOpen={trackModalOpen}

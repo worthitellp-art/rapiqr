@@ -64,6 +64,75 @@ class QrController {
   }
 
   /**
+   * Create a QR code under id-scheme v2 — the server generates the recovery
+   * code and derives the sticker id from it; the client supplies neither.
+   * See QrModel.saveV2 / Server/services/stickerCrypto.js.
+   */
+  static async saveQrCodeV2(req, res) {
+    try {
+      const qrData = req.body || {};
+      const saved = await QrModel.saveV2(qrData);
+      if (!saved) {
+        logger.warn('QR_SAVE_V2', 'Failed to save id-scheme v2 QR Code row in database');
+        return res.status(500).json({ success: false, error: 'Failed to save QR Code record' });
+      }
+      logger.rowInserted('qr_codes', saved.id, { category: saved.category, template: saved.template_name, status: saved.status, idSchemeVersion: saved.idSchemeVersion });
+      return res.json({ success: true, data: saved });
+    } catch (err) {
+      if (err.code === 'DUPLICATE_PHONE') {
+        return res.status(409).json({ success: false, error: err.message });
+      }
+      logger.error('QR_SAVE_V2', 'Error saving id-scheme v2 QR Code record', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Code-only recovery for id-scheme v2 stickers — see QrModel.recoverByCodeV2.
+   * Public: the recovery code itself is the proof of possession, same as the
+   * existing v1 restore route.
+   */
+  static async recoverByCode(req, res) {
+    try {
+      const { recoveryCode } = req.body || {};
+      if (!recoveryCode) {
+        return res.status(400).json({ success: false, error: 'recoveryCode is required' });
+      }
+
+      const result = await QrModel.recoverByCodeV2(recoveryCode);
+      if (!result.ok) {
+        const messages = {
+          invalid_format: 'That recovery code looks malformed — check for typos.',
+          not_found: 'No sticker found with that recovery code.',
+          hash_mismatch: 'That recovery code could not be verified.',
+          integrity_failure: 'This sticker could not be regenerated — please contact support.',
+          duplicate_phone: 'Another live tag already uses this phone number in the same category. Change or remove that tag first, then recover.',
+        };
+        if (result.reason === 'hash_mismatch' || result.reason === 'integrity_failure') {
+          logger.error('QR_RECOVER_V2_INTEGRITY', `Recovery integrity failure (${result.reason})`);
+        } else {
+          logger.security('QR_RECOVER_V2_DENIED', `Recovery-by-code attempt failed (${result.reason})`);
+        }
+        const status = result.reason === 'duplicate_phone' ? 409
+          : (result.reason === 'integrity_failure' || result.reason === 'hash_mismatch') ? 500
+          : (result.reason === 'invalid_format' ? 400 : 404);
+        return res.status(status).json({ success: false, error: messages[result.reason] || 'Recovery failed.' });
+      }
+
+      logger.security('QR_RECOVERED_V2', `Sticker ${result.data.id} regenerated via code-only recovery`);
+      return res.json({
+        success: true,
+        data: result.data,
+        image: `data:image/png;base64,${result.imageBase64}`,
+        imageSha256: result.imageSha256,
+      });
+    } catch (err) {
+      logger.error('QR_RECOVER_V2', 'Failed to recover QR by code', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
    * Activate QR Code
    */
   static async activateQrCode(req, res) {

@@ -18,5 +18,8 @@ const alertLimiter = rateLimit({
 router.post('/', alertLimiter, AlertController.createAlert);
 // Admin-only: alert log contains reporter phone numbers + GPS locations
 router.get('/', verifyToken, verifyAdmin, AlertController.getAlerts);
+router.delete('/', verifyToken, verifyAdmin, AlertController.deleteAllAlerts);
+router.delete('/:id', verifyToken, verifyAdmin, AlertController.deleteAlert);
+router.patch('/:id/resolve', verifyToken, verifyAdmin, AlertController.resolveAlert);
 
 module.exports = router;

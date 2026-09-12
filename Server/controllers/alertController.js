@@ -155,6 +155,53 @@ class AlertController {
       return res.status(500).json({ success: false, error: err.message });
     }
   }
+
+  /**
+   * Delete all alerts (Admin only)
+   * DELETE /api/alerts
+   */
+  static async deleteAllAlerts(req, res) {
+    try {
+      logger.info('ALERT_DELETE_ALL', 'Deleting all emergency alerts');
+      const result = await AlertModel.deleteAllAlerts();
+      return res.json({ success: true, message: 'All alerts deleted successfully', data: result });
+    } catch (err) {
+      logger.error('ALERT_DELETE_ALL', 'Failed to delete all alerts', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Delete single alert by ID (Admin only)
+   * DELETE /api/alerts/:id
+   */
+  static async deleteAlert(req, res) {
+    try {
+      const { id } = req.params;
+      logger.info('ALERT_DELETE_ONE', `Deleting alert ${id}`);
+      const result = await AlertModel.deleteAlert(id);
+      return res.json({ success: true, message: 'Alert deleted successfully', data: result });
+    } catch (err) {
+      logger.error('ALERT_DELETE_ONE', 'Failed to delete alert', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Resolve an alert (Admin only)
+   * PATCH /api/alerts/:id/resolve
+   */
+  static async resolveAlert(req, res) {
+    try {
+      const { id } = req.params;
+      logger.info('ALERT_RESOLVE', `Resolving alert ${id}`);
+      const result = await AlertModel.resolveAlert(id);
+      return res.json({ success: true, message: 'Alert marked as resolved', data: result });
+    } catch (err) {
+      logger.error('ALERT_RESOLVE', 'Failed to resolve alert', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
 }
 
 module.exports = AlertController;

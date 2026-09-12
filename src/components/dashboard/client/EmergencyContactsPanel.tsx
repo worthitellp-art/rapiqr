@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Loader2, Save, Users } from 'lucide-react';
 import { getCategoryIcon, getCategoryLabel } from '../../../stickerModules';
 import type { DashboardSticker, EmergencyContact } from './types';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
 
-const inputCls = 'w-full px-3 py-2.5 text-xs bg-[#F5F6FA] border border-[#E8ECF4] rounded-xl outline-none focus:border-[#111111] font-semibold';
+const inputCls = 'w-full px-3 py-2.5 text-xs bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-xl outline-none focus:border-[var(--fx-ink)] font-semibold';
 
 function StickerContactsCard({
   sticker,
@@ -45,20 +45,20 @@ function StickerContactsCard({
   };
 
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 space-y-3.5 shadow-xs">
+    <div className="bg-white border border-[var(--fx-border)] rounded-2xl p-5 space-y-3.5 shadow-xs">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center text-lg flex-shrink-0">
+        <div className="w-10 h-10 rounded-xl bg-[var(--fx-canvas)] border border-[var(--fx-border)] flex items-center justify-center text-lg flex-shrink-0">
           {getCategoryIcon(sticker.category as any) || '🏷️'}
         </div>
         <div>
-          <h3 className="font-bold text-sm text-[#0F172A] leading-tight">{sticker.nickname}</h3>
-          <p className="text-[11px] font-semibold text-[#94A3B8]">{getCategoryLabel(sticker.category as any) || sticker.code}</p>
+          <h3 className="font-bold text-sm text-[var(--fx-ink)] leading-tight">{sticker.nickname}</h3>
+          <p className="text-[11px] font-semibold text-[var(--fx-faint)]">{getCategoryLabel(sticker.category as any) || sticker.code}</p>
         </div>
       </div>
 
       <div className="space-y-3">
         {contacts.length === 0 && (
-          <p className="text-xs text-[#94A3B8] italic">No emergency contacts added yet.</p>
+          <p className="text-xs text-[var(--fx-faint)] italic">No emergency contacts added yet.</p>
         )}
         {contacts.map((c, idx) => (
           <div key={idx} className="flex gap-2 items-start">
@@ -80,11 +80,11 @@ function StickerContactsCard({
       </div>
 
       <div className="flex items-center gap-2 pt-1">
-        <button onClick={addContact} className="flex-1 py-2.5 rounded-xl border border-dashed border-[#CBD5E1] text-[11px] font-bold text-[#64748B] hover:bg-[#F8FAFC] flex items-center justify-center gap-1.5 cursor-pointer">
+        <button onClick={addContact} className="flex-1 py-2.5 rounded-xl border border-dashed border-[var(--fx-border)] text-[11px] font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] flex items-center justify-center gap-1.5 cursor-pointer">
           <Plus size={12} /> Add Contact
         </button>
         {dirty && (
-          <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-white text-[11px] font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5">
+          <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-[11px] font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm shadow-[var(--fx-accent)]/20 transition-all">
             {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Save Contacts
           </button>
         )}
@@ -103,15 +103,15 @@ export default function EmergencyContactsPanel({
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1D26]">Emergency Contacts</h1>
-        <p className="text-xs sm:text-sm text-[#64748B] mt-1">Add, edit or remove emergency contacts for each of your stickers, any time.</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--fx-ink)]">Emergency Contacts</h1>
+        <p className="text-xs sm:text-sm text-[var(--fx-ink-2)] mt-1">Add, edit or remove emergency contacts for each of your stickers, any time.</p>
       </div>
 
       {products.length === 0 ? (
-        <div className="bg-white border border-[#E8ECF4] rounded-3xl p-12 text-center space-y-3 shadow-sm">
-          <Users size={32} className="mx-auto text-[#94A3B8]" />
-          <h3 className="text-lg font-bold text-[#1A1D26]">No stickers yet</h3>
-          <p className="text-xs text-[#64748B] max-w-sm mx-auto">Activate a sticker first — emergency contacts are attached per sticker.</p>
+        <div className="bg-white border border-[var(--fx-border)] rounded-3xl p-12 text-center space-y-3 shadow-sm">
+          <Users size={32} className="mx-auto text-[var(--fx-faint)]" />
+          <h3 className="text-lg font-bold text-[var(--fx-ink)]">No stickers yet</h3>
+          <p className="text-xs text-[var(--fx-ink-2)] max-w-sm mx-auto">Activate a sticker first — emergency contacts are attached per sticker.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

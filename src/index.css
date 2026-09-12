@@ -1,7 +1,10 @@
 @import "tailwindcss";
 
+/* ── Marketing / public-site theme (LandingPageMaster, ScanPage) ─────────────
+   Out of scope for the dashboard redesign — untouched. */
 @theme {
-  --font-sans: "Plus Jakarta Sans", "Inter", Helvetica, Arial, sans-serif;
+  --font-sans: "Inter Display", "InterVariable", "Inter", "Plus Jakarta Sans", Helvetica, Arial, sans-serif;
+  --font-inter: "Inter Display", "InterVariable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-serif: "Fraunces", Georgia, serif;
 
   --color-cream: #F6F1E7;
@@ -22,306 +25,14 @@
   --color-line-dark: rgba(255,254,251,0.12);
 }
 
-:root {
-  --yellow: #F6C000;
-  --yellow-line: #E0AE00;
-  --yellow-soft: #FFF7DC;
-  --yellow-ink: #4A3900;
-  --ink: #17181C;
-  --ink-dim: #6B6D76;
-  --ink-faint: #9EA0AA;
-  --bg: #FFFFFF;
-  --surface-2: #FAFAF9;
-  --border: #EAEAEC;
-  --border-2: #DEDFE3;
-  --green: #16A34A;
-  --green-soft: #E8F7EC;
-  --red: #DC2626;
-  --red-soft: #FDEAEA;
-}
-
-.font-display { font-family: 'Plus Jakarta Sans', 'Outfit', sans-serif; font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11'; }
-.font-title { font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif; }
-.font-mono { font-family: 'JetBrains Mono', 'IBM Plex Mono', monospace; }
-.font-body { font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-
-/* ── Admin Console design tokens ───────────────────────────────────────────
-   Pinterest-style system (see DESIGN-pinterest.md), yellow standing in for
-   Pinterest's brand red as the single accent color: warm-cream canvas, true-
-   white cards, ink/body/mute/ash text scale, a two-radius shape vocabulary
-   (16px standard, pill for circular/chip elements), and flat cards with no
-   drop shadow — shadow is reserved for the modal layer only, per the
-   reference system's "Elevation & Depth" table. Consumers sit under
-   `#root .ac-console` (the admin dashboard root) so nothing leaks into the
-   public site — also mirrored at `:root` below so ac-* classes never render
-   with undefined variables outside that wrapper. */
-.ac-console {
-  --ac-bg: #FBFBF9;          /* page canvas — Pinterest surface-soft */
-  --ac-surface: #FFFFFF;     /* card surface — Pinterest canvas      */
-  --ac-border: #DADAD3;      /* hairline — Pinterest hairline        */
-  --ac-border-strong: #C8C8C1; /* Pinterest stone */
-  --ac-ink: #211922;         /* Pinterest ink-soft */
-  --ac-ink-2: #33332E;       /* Pinterest body */
-  --ac-muted: #62625B;       /* Pinterest mute */
-  --ac-faint: #91918C;       /* Pinterest ash */
-  --ac-accent: #F5C518;      /* brand yellow standing in for Pinterest red */
-  --ac-accent-strong: #EAB308;
-  --ac-accent-soft: #FDF4DB;
-  --ac-accent-soft-strong: #F8E9B0;
-  --ac-accent-ink: #A16207;  /* readable amber text on soft  */
-  --ac-on-accent: #211922;   /* text placed on yellow        */
-  --ac-green: #22C55E;
-  --ac-green-ink: #16A34A;
-  --ac-green-soft: #F0FDF4;
-  --ac-red: #EF4444;
-  --ac-red-ink: #DC2626;
-  --ac-red-soft: #FEF2F2;
-  --ac-amber: #B54708;
-  --ac-amber-soft: #FEF6E7;
-  --ac-radius-card: 16px;     /* Pinterest rounded.md */
-  --ac-radius-control: 16px;  /* Pinterest rounded.md — buttons & inputs */
-  --ac-radius-pill: 9999px;   /* Pinterest rounded.full */
-  --ac-shadow-card: none;     /* Pinterest cards are flat — no drop shadow */
-  --ac-shadow-pop: 0 8px 24px rgba(24, 24, 27, 0.10), 0 2px 8px rgba(24, 24, 27, 0.06);
-
-  /* Base type size for the admin console — all Tailwind px text classes below
-     are scaled up by the "admin type scale" block further down, so 12px machine
-     output renders as a comfortable ~13.5px here. */
-  font-size: 15px;
-}
-
-/* ── Admin type scale ────────────────────────────────────────────────────────
-   The dashboard was built with compact 10–13px utility classes; this scoped
-   pass scales them all up by ~1–1.5px (plus the big display sizes) so the whole
-   console reads larger and more comfortable without touching layout spacing.
-   `.ac-console .text-...` beats Tailwind's `.text-...` on specificity. */
-.ac-console .text-\[8px\] { font-size: 9.5px; }
-.ac-console .text-\[9px\] { font-size: 10.5px; }
-.ac-console .text-\[10px\] { font-size: 11.5px; }
-.ac-console .text-\[10\.5px\] { font-size: 12px; }
-.ac-console .text-\[11px\] { font-size: 12.5px; }
-.ac-console .text-\[11\.5px\] { font-size: 13px; }
-.ac-console .text-\[12px\] { font-size: 13.5px; }
-.ac-console .text-\[12\.5px\] { font-size: 14px; }
-.ac-console .text-\[13px\] { font-size: 14.5px; }
-.ac-console .text-\[13\.5px\] { font-size: 15px; }
-.ac-console .text-\[14px\] { font-size: 15.5px; }
-.ac-console .text-\[15px\] { font-size: 16.5px; }
-.ac-console .text-\[15\.5px\] { font-size: 17px; }
-.ac-console .text-\[16px\] { font-size: 17.5px; }
-.ac-console .text-\[17px\] { font-size: 18.5px; }
-.ac-console .text-\[18px\] { font-size: 19.5px; }
-.ac-console .text-\[20px\] { font-size: 21.5px; }
-.ac-console .text-\[21px\] { font-size: 22.5px; }
-.ac-console .text-\[24px\] { font-size: 26px; }
-.ac-console .text-\[26px\] { font-size: 28px; }
-.ac-console .text-\[28px\] { font-size: 30px; }
-.ac-console .text-\[30px\] { font-size: 32px; }
-
-/* Card — the atomic surface unit. */
-.ac-card {
-  background: var(--ac-surface);
-  border: 1px solid var(--ac-border);
-  border-radius: var(--ac-radius-card);
-  box-shadow: var(--ac-shadow-card);
-}
-
-/* Card header band — title + optional actions, with a hairline divider. */
-.ac-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--ac-border);
-}
-
-/* Card body padding */
-.ac-card-body { padding: 20px; }
-
-/* Compact, scannable section headings. */
-.ac-section-title {
-  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--ac-ink);
-}
-.ac-card-title {
-  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--ac-ink);
-}
-.ac-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ac-muted);
-}
-
-/* Buttons — one primary-action system, 40–44px tall, 10px radius, bold text. */
-.ac-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 42px;
-  padding: 0 18px;
-  border-radius: var(--ac-radius-control);
-  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1;
-  border: 1px solid transparent;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease, transform .05s ease;
-}
-.ac-btn:active { transform: scale(0.98); }
-.ac-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.ac-btn-primary { background: var(--ac-ink); color: #FFFFFF; }
-.ac-btn-primary:hover:not(:disabled) { background: #27272A; }
-
-.ac-btn-accent { background: var(--ac-accent); color: var(--ac-on-accent); }
-.ac-btn-accent:hover:not(:disabled) { background: var(--ac-accent-strong); }
-
-.ac-btn-secondary {
-  background: var(--ac-surface);
-  border-color: var(--ac-border-strong);
-  color: var(--ac-ink);
-}
-.ac-btn-secondary:hover:not(:disabled) { background: #F4F4F5; }
-
-.ac-btn-ghost { background: transparent; color: var(--ac-muted); }
-.ac-btn-ghost:hover:not(:disabled) { background: #F4F4F5; color: var(--ac-ink); }
-
-.ac-btn-danger { background: var(--ac-red); color: #FFFFFF; }
-.ac-btn-danger:hover:not(:disabled) { background: var(--ac-red-ink); }
-
-/* Inputs / selects / textareas — 40–44px tall, 10px radius. */
-.ac-input, .ac-select {
-  width: 100%;
-  height: 42px;
-  padding: 0 14px;
-  border-radius: var(--ac-radius-control);
-  border: 1px solid var(--ac-border-strong);
-  background: var(--ac-surface);
-  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-  font-size: 15px;
-  color: var(--ac-ink);
-  outline: none;
-  transition: border-color .15s ease, box-shadow .15s ease;
-}
-.ac-input::placeholder { color: var(--ac-faint); }
-.ac-input:focus, .ac-select:focus {
-  border-color: var(--ac-accent-strong);
-  box-shadow: 0 0 0 3px rgba(245, 197, 24, 0.30);
-}
-.ac-textarea {
-  width: 100%;
-  padding: 12px 14px;
-  border-radius: var(--ac-radius-control);
-  border: 1px solid var(--ac-border-strong);
-  background: var(--ac-surface);
-  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-  font-size: 15px;
-  color: var(--ac-ink);
-  outline: none;
-  resize: vertical;
-  transition: border-color .15s ease, box-shadow .15s ease;
-}
-.ac-textarea::placeholder { color: var(--ac-faint); }
-.ac-textarea:focus {
-  border-color: var(--ac-accent-strong);
-  box-shadow: 0 0 0 3px rgba(245, 197, 24, 0.30);
-}
-
-/* Pills / badges / status chips. */
-.ac-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 11px;
-  border-radius: var(--ac-radius-pill);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  line-height: 1.3;
-  white-space: nowrap;
-}
-.ac-pill-dot { width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0; }
-
-/* Small square icon tile. */
-.ac-icon-tile {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  flex-shrink: 0;
-}
-
-/* Data tables. */
-.ac-table { width: 100%; border-collapse: collapse; }
-.ac-th {
-  padding: 12px 16px;
-  text-align: left;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ac-muted);
-  background: var(--ac-bg);
-  border-bottom: 1px solid var(--ac-border);
-  white-space: nowrap;
-}
-.ac-td {
-  padding: 16px;
-  font-size: 14.5px;
-  color: var(--ac-ink);
-  border-bottom: 1px solid var(--ac-border);
-  vertical-align: middle;
-}
-.ac-tr-row { transition: background-color .12s ease; }
-.ac-tr-row:hover { background: var(--ac-bg); }
-tbody .ac-tr-row:last-child .ac-td { border-bottom: none; }
-
-/* Filters / tab chips. */
-.ac-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 13px;
-  border-radius: 999px;
-  font-size: 12.5px;
-  font-weight: 600;
-  border: 1px solid var(--ac-border-strong);
-  background: var(--ac-surface);
-  color: var(--ac-muted);
-  cursor: pointer;
-  transition: background-color .15s ease, color .15s ease, border-color .15s ease;
-}
-.ac-chip:hover { color: var(--ac-ink); border-color: var(--ac-border-strong); }
-.ac-chip-active {
-  background: var(--ac-accent);
-  border-color: var(--ac-accent);
-  color: var(--ac-on-accent);
-}
-
-/* Docked modal surface — Pinterest rounded.lg (32px), the system's only
-   surface that gets a real shadow. */
-.ac-modal {
-  background: var(--ac-surface);
-  border: 1px solid var(--ac-border);
-  border-radius: 32px;
-  box-shadow: var(--ac-shadow-pop);
-  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-  color: var(--ac-ink);
-}
+/* Dashboard chrome font utilities — used by both the admin and client
+   dashboards (inside `.fx-shell`) and repointed to the single Inter +
+   JetBrains Mono pairing. Class NAMES are kept as-is since many components
+   already reference them; only the family values changed. */
+.font-display { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; font-weight: 700; letter-spacing: -0.01em; }
+.font-title { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; font-weight: 600; }
+.font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+.font-body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
 
 * { box-sizing: border-box; }
 html { height: 100%; }
@@ -451,7 +162,8 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
   animation: pulse-glow 2.5s ease-in-out infinite;
 }
 
-/* ── Design Buttons from docs/buttonsanddesign.txt ── */
+/* ── Design Buttons from docs/buttonsanddesign.txt — public marketing site,
+   out of scope for the dashboard redesign. ── */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -552,117 +264,274 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
   display: none;
 }
 
-/* ── ac-* fallback tokens ────────────────────────────────────────────────────
-   The ac-* token block lives under `.ac-console`, which isn't mounted anywhere
-   in the current tree — so ac-btn/ac-modal/ac-input classes render with
-   undefined CSS variables and look broken. Mirror the block at `:root` so the
-   legacy classes get their intended values everywhere, not just under a
-   wrapper that was never applied. */
-:root {
-  --ac-bg: #FBFBF9;
-  --ac-surface: #FFFFFF;
-  --ac-border: #DADAD3;
-  --ac-border-strong: #C8C8C1;
-  --ac-ink: #211922;
-  --ac-ink-2: #33332E;
-  --ac-muted: #62625B;
-  --ac-faint: #91918C;
-  --ac-accent: #F5C518;
-  --ac-accent-strong: #EAB308;
-  --ac-accent-soft: #FDF4DB;
-  --ac-accent-soft-strong: #F8E9B0;
-  --ac-accent-ink: #A16207;
-  --ac-on-accent: #211922;
-  --ac-green: #22C55E;
-  --ac-green-ink: #16A34A;
-  --ac-green-soft: #F0FDF4;
-  --ac-red: #EF4444;
-  --ac-red-ink: #DC2626;
-  --ac-red-soft: #FEF2F2;
-  --ac-amber: #B54708;
-  --ac-amber-soft: #FEF6E7;
-  --ac-radius-card: 16px;
-  --ac-radius-control: 16px;
-  --ac-radius-pill: 9999px;
-  --ac-shadow-card: none;
-  --ac-shadow-pop: 0 8px 24px rgba(24, 24, 27, 0.10), 0 2px 8px rgba(24, 24, 27, 0.06);
+/* ── Fx design system — neutral SaaS dashboard reset ─────────────────────────
+   Single token system shared by the Admin panel and the Client dashboard.
+   White/near-white canvas, flat 1px-bordered cards (no drop shadow — shadow
+   is reserved for modals/popovers only), a light sidebar with a hairline
+   right border, near-black (#111111) as the one primary/"accent" color — no
+   yellow, no decorative color anywhere — and status color (green/orange/red/
+   blue) used only where it's semantically meaningful. Scoped under
+   `.fx-shell` (mounted once on each dashboard's root), mirrored at `:root`
+   below so nothing renders with an undefined variable before mount. */
+.fx-shell {
+  --fx-canvas: #FAFAFA;
+  --fx-surface: #FFFFFF;
+  --fx-sidebar-bg: #FFFFFF;
+  --fx-sidebar-hover: #F5F5F5;
+  --fx-sidebar-ink: #6B7280;
+  --fx-border: #E5E7EB;
+  --fx-border-strong: #D1D5DB;
+  --fx-ink: #111111;
+  --fx-ink-2: #6B7280;
+  --fx-faint: #9CA3AF;
+  --fx-accent: #111111;
+  --fx-accent-ink: #000000;
+  --fx-accent-soft: #F3F4F6;
+  --fx-green: #16A34A;
+  --fx-green-soft: #ECFDF3;
+  --fx-red: #DC2626;
+  --fx-red-soft: #FEF2F2;
+  --fx-amber: #EA580C;
+  --fx-amber-soft: #FFF7ED;
+  --fx-blue: #2563EB;
+  --fx-blue-soft: #EFF6FF;
+  --fx-radius-card: 10px;
+  --fx-radius-tile: 8px;
+  --fx-radius-control: 8px;
+  --fx-radius-pill: 999px;
+  --fx-shadow-pop: 0 12px 28px rgba(31,27,22,0.12), 0 2px 6px rgba(31,27,22,0.06);
+
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--fx-canvas);
+  color: var(--fx-ink);
 }
 
-/* ── RapiQR Tag Generator 2.0 — design tokens & primitives ──────────────────
-   Premium minimal SaaS language (Linear / Stripe / Vercel). Scoped under
-   `.rq-2` so the redesign only touches the newly built surfaces and never
-   leaks into the rest of the admin console or the public site.
-
-   Tokens (single source of truth for every color/radius/shadow below):
-     bg        #F7F7F5         surface   #FFFFFF
-     text      #171717         text-2    #6B7280
-     muted     #9CA3AF         border    #E5E7EB
-     border-s  #D1D5DB         brand     #FACC15
-     brand-hv  #EAB308         success   #16A34A
-     danger    #DC2626         info      #2563EB
-   Typography: Inter, 14px base, 28px display, 13px body, 11px table heads. */
-.rq-2 {
-  --rq-bg: #F7F7F5;
-  --rq-surface: #FFFFFF;
-  --rq-text: #171717;
-  --rq-text-2: #6B7280;
-  --rq-muted: #9CA3AF;
-  --rq-border: #E5E7EB;
-  --rq-border-strong: #D1D5DB;
-  --rq-brand: #FACC15;
-  --rq-brand-hover: #EAB308;
-  --rq-success: #16A34A;
-  --rq-success-soft: #F0FDF4;
-  --rq-danger: #DC2626;
-  --rq-danger-soft: #FEF2F2;
-  --rq-info: #2563EB;
-  --rq-info-soft: #EFF6FF;
-  --rq-hover: #F9FAFB;
-  --rq-focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.12);
-
-  color: var(--rq-text);
-  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 14px;
-  line-height: 1.45;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+.fx-shell .font-mono,
+.fx-shell code,
+.fx-shell kbd,
+.fx-shell pre {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
 }
-.rq-2 *,
-.rq-2 *::before,
-.rq-2 *::after { box-sizing: border-box; }
-.rq-2 button { font-family: inherit; }
 
-/* ── Buttons ──────────────────────────────────────────────────────────────── */
-.rq-btn {
+/* Neutral text-selection highlight inside the dashboards — the page-wide
+   default further down is yellow (marketing site only); this overrides it
+   here so no yellow ever shows up in the admin/client dashboards. */
+.fx-shell ::selection { background: rgba(17,17,17,0.12); color: var(--fx-ink); }
+.fx-shell ::-moz-selection { background: rgba(17,17,17,0.12); color: var(--fx-ink); }
+
+.fx-display {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Card — flat surface, hairline border, no drop shadow. */
+.fx-card {
+  background: var(--fx-surface);
+  border: 1px solid var(--fx-border);
+  border-radius: var(--fx-radius-card);
+}
+
+/* Buttons — one system, 42px tall, 8px radius. Primary is dark-ink
+   (monochrome), not the accent — the accent is reserved for sparing emphasis. */
+.fx-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 34px;
-  padding: 0 14px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  font-size: 13px;
+  gap: 8px;
+  height: 42px;
+  padding: 0 18px;
+  border-radius: var(--fx-radius-control);
+  font-family: inherit;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1;
-  white-space: nowrap;
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, opacity .15s ease;
+  white-space: nowrap;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .05s ease;
 }
-.rq-btn:disabled { opacity: .48; cursor: not-allowed; }
-.rq-btn-primary { background: var(--rq-brand); color: var(--rq-text); }
-.rq-btn-primary:hover:not(:disabled) { background: var(--rq-brand-hover); }
-.rq-btn-primary:active:not(:disabled) { transform: translateY(1px); }
-.rq-btn-secondary { background: var(--rq-surface); border-color: var(--rq-border); color: var(--rq-text-2); }
-.rq-btn-secondary:hover:not(:disabled) { background: var(--rq-hover); border-color: var(--rq-border-strong); color: var(--rq-text); }
-.rq-btn-ghost { background: transparent; color: var(--rq-text-2); }
-.rq-btn-ghost:hover:not(:disabled) { background: var(--rq-hover); color: var(--rq-text); }
-.rq-btn-danger { background: var(--rq-surface); border-color: var(--rq-border); color: var(--rq-danger); }
-.rq-btn-danger:hover:not(:disabled) { background: var(--rq-danger-soft); border-color: rgba(220, 38, 38, 0.35); }
-.rq-btn-lg { height: 38px; padding: 0 18px; font-size: 13.5px; }
-.rq-btn-sm { height: 30px; padding: 0 11px; font-size: 12.5px; border-radius: 6px; }
+.fx-btn:active:not(:disabled) { transform: scale(0.98); }
+.fx-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.rq-icon-btn {
+.fx-btn-primary { background: var(--fx-ink); color: #FFFFFF; }
+.fx-btn-primary:hover:not(:disabled) { background: #34302A; }
+
+.fx-btn-secondary {
+  background: var(--fx-surface);
+  border-color: var(--fx-border-strong);
+  color: var(--fx-ink);
+}
+.fx-btn-secondary:hover:not(:disabled) { background: var(--fx-canvas); }
+
+.fx-btn-ghost { background: transparent; color: var(--fx-ink-2); }
+.fx-btn-ghost:hover:not(:disabled) { background: var(--fx-canvas); color: var(--fx-ink); }
+
+.fx-btn-danger { background: var(--fx-red); color: #FFFFFF; }
+.fx-btn-danger:hover:not(:disabled) { background: #A32C24; }
+
+.fx-btn-soft { background: var(--fx-accent-soft); color: var(--fx-accent-ink); }
+.fx-btn-soft:hover:not(:disabled) { background: #F6DACB; }
+
+/* Inputs / selects / textareas — 42px tall, 8px radius. */
+.fx-input, .fx-select {
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: var(--fx-radius-control);
+  border: 1px solid var(--fx-border-strong);
+  background: var(--fx-surface);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--fx-ink);
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.fx-input::placeholder { color: var(--fx-faint); }
+.fx-input:focus, .fx-select:focus {
+  border-color: var(--fx-accent);
+  box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.12);
+}
+.fx-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--fx-radius-control);
+  border: 1px solid var(--fx-border-strong);
+  background: var(--fx-surface);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--fx-ink);
+  outline: none;
+  resize: vertical;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.fx-textarea::placeholder { color: var(--fx-faint); }
+.fx-textarea:focus {
+  border-color: var(--fx-accent);
+  box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.12);
+}
+
+/* Pills / badges / status chips / filter chips. */
+.fx-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: var(--fx-radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.fx-pill-dot { width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0; }
+
+.fx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid var(--fx-border-strong);
+  background: var(--fx-surface);
+  color: var(--fx-ink-2);
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+}
+.fx-chip:hover { color: var(--fx-ink); }
+.fx-chip-active {
+  background: var(--fx-ink);
+  border-color: var(--fx-ink);
+  color: #FFFFFF;
+}
+
+.fx-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fx-ink-2);
+}
+
+/* Small square icon tile. */
+.fx-icon-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--fx-radius-tile);
+  flex-shrink: 0;
+}
+
+/* Data tables — add `fx-table-dense` for a tighter row (bulk lists). */
+.fx-table { width: 100%; border-collapse: collapse; }
+.fx-th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fx-ink-2);
+  background: var(--fx-canvas);
+  border-bottom: 1px solid var(--fx-border);
+  white-space: nowrap;
+}
+.fx-th-right { text-align: right; }
+.fx-td {
+  padding: 16px;
+  font-size: 14px;
+  color: var(--fx-ink);
+  border-bottom: 1px solid var(--fx-border);
+  vertical-align: middle;
+}
+.fx-tr { transition: background-color .12s ease; }
+.fx-tr:hover { background: var(--fx-canvas); }
+tbody .fx-tr:last-child .fx-td { border-bottom: none; }
+
+.fx-table-dense .fx-th { padding: 0 14px; height: 38px; font-size: 11px; }
+.fx-table-dense .fx-td { padding: 11px 14px; font-size: 13px; }
+
+/* Modal surface. */
+.fx-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 115;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(31, 27, 22, 0.4);
+  backdrop-filter: blur(4px);
+}
+.fx-modal {
+  position: relative;
+  width: 100%;
+  background: var(--fx-surface);
+  border: 1px solid var(--fx-border);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: var(--fx-shadow-pop);
+  color: var(--fx-ink);
+}
+
+.fx-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+.fx-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.fx-scrollbar::-webkit-scrollbar-thumb { background: rgba(31,27,22,0.16); border-radius: 3px; }
+.fx-scrollbar-light::-webkit-scrollbar { width: 5px; height: 5px; }
+.fx-scrollbar-light::-webkit-scrollbar-track { background: transparent; }
+.fx-scrollbar-light::-webkit-scrollbar-thumb { background: var(--fx-border-strong); border-radius: 3px; }
+
+/* ── Dense controls — compact 34px buttons/inputs/table for bulk-list
+   surfaces (the QR Codes fleet table, its toolbar, row-action menu). Same
+   tokens as everything else above, just a tighter component scale. */
+.fx-btn-lg { height: 38px; padding: 0 18px; font-size: 14.5px; }
+.fx-btn-sm { height: 30px; padding: 0 11px; font-size: 12.5px; border-radius: 6px; }
+.fx-input-sm { height: 30px; font-size: 12.5px; }
+
+.fx-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -671,36 +540,15 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
   border-radius: 6px;
   border: none;
   background: transparent;
-  color: var(--rq-muted);
+  color: var(--fx-faint);
   cursor: pointer;
   transition: background-color .12s ease, color .12s ease, opacity .12s ease;
 }
-.rq-icon-btn:hover:not(:disabled) { background: var(--rq-hover); color: var(--rq-text); }
-.rq-icon-btn:disabled { opacity: .4; cursor: not-allowed; }
-.rq-icon-btn-danger:hover:not(:disabled) { background: var(--rq-danger-soft); color: var(--rq-danger); }
+.fx-icon-btn:hover:not(:disabled) { background: var(--fx-canvas); color: var(--fx-ink); }
+.fx-icon-btn:disabled { opacity: .4; cursor: not-allowed; }
+.fx-icon-btn-danger:hover:not(:disabled) { background: var(--fx-red-soft); color: var(--fx-red); }
 
-/* ── Inputs / selects ─────────────────────────────────────────────────────── */
-.rq-input,
-.rq-select {
-  height: 34px;
-  padding: 0 12px;
-  border-radius: 8px;
-  border: 1px solid var(--rq-border);
-  background: var(--rq-surface);
-  font-family: inherit;
-  font-size: 13px;
-  color: var(--rq-text);
-  outline: none;
-  transition: border-color .15s ease, box-shadow .15s ease;
-}
-.rq-input::placeholder { color: var(--rq-muted); }
-.rq-input:focus,
-.rq-select:focus { border-color: var(--rq-border-strong); box-shadow: var(--rq-focus-ring); }
-.rq-select { padding-right: 28px; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; cursor: pointer; }
-.rq-input-sm { height: 30px; font-size: 12.5px; }
-
-/* ── Badge ────────────────────────────────────────────────────────────────── */
-.rq-badge {
+.fx-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -710,23 +558,20 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
   font-weight: 600;
   line-height: 18px;
   white-space: nowrap;
-  background: var(--rq-hover);
-  color: #4B5563;
+  background: var(--fx-canvas);
+  color: var(--fx-ink-2);
 }
-.rq-badge-info { background: var(--rq-info-soft); color: var(--rq-info); }
+.fx-badge-info { background: var(--fx-accent-soft); color: var(--fx-accent-ink); }
 
-/* ── Status ───────────────────────────────────────────────────────────────── */
-.rq-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--rq-text-2); }
-.rq-dot { width: 7px; height: 7px; border-radius: 999px; background: #D1D5DB; flex-shrink: 0; }
-.rq-dot-green { background: var(--rq-success); }
-.rq-dot-amber { background: #D97706; }
+.fx-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--fx-ink-2); }
+.fx-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--fx-border-strong); flex-shrink: 0; }
+.fx-dot-green { background: var(--fx-green); }
+.fx-dot-amber { background: var(--fx-amber); }
 
-/* ── Monospace ────────────────────────────────────────────────────────────── */
-.rq-mono { font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 12.5px; letter-spacing: .01em; }
+.fx-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px; letter-spacing: .01em; }
 
-/* ── Segmented control ────────────────────────────────────────────────────── */
-.rq-seg { display: inline-flex; align-items: center; gap: 2px; background: var(--rq-bg); border: 1px solid var(--rq-border); border-radius: 8px; padding: 2px; }
-.rq-seg button {
+.fx-seg { display: inline-flex; align-items: center; gap: 2px; background: var(--fx-canvas); border: 1px solid var(--fx-border); border-radius: 8px; padding: 2px; }
+.fx-seg button {
   height: 28px;
   padding: 0 12px;
   border: none;
@@ -734,61 +579,39 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
   background: transparent;
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--rq-text-2);
+  color: var(--fx-ink-2);
   cursor: pointer;
   white-space: nowrap;
   transition: background-color .12s ease, color .12s ease, box-shadow .12s ease;
 }
-.rq-seg button:hover { color: var(--rq-text); }
-.rq-seg button.rq-seg-active { background: var(--rq-surface); color: var(--rq-text); box-shadow: 0 1px 2px rgba(23, 23, 23, 0.06); }
+.fx-seg button:hover { color: var(--fx-ink); }
+.fx-seg button.fx-seg-active { background: var(--fx-surface); color: var(--fx-ink); box-shadow: 0 1px 2px rgba(31,27,22,.08); }
 
-/* ── Generator toolbar ────────────────────────────────────────────────────── */
-.rq-toolbar { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; background: var(--rq-surface); border: 1px solid var(--rq-border); border-radius: 10px; padding: 12px; }
-.rq-toolbar-field { display: flex; flex-direction: column; gap: 5px; }
-.rq-toolbar-label { font-size: 11px; font-weight: 600; color: var(--rq-muted); text-transform: uppercase; letter-spacing: .04em; }
+.fx-toolbar { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; background: var(--fx-surface); border: 1px solid var(--fx-border); border-radius: 10px; padding: 12px; }
+.fx-toolbar-field { display: flex; flex-direction: column; gap: 5px; }
+.fx-toolbar-label { font-size: 11px; font-weight: 600; color: var(--fx-faint); text-transform: uppercase; letter-spacing: .04em; }
 
-/* ── Table ────────────────────────────────────────────────────────────────── */
-.rq-table-wrap { background: var(--rq-surface); border: 1px solid var(--rq-border); border-radius: 10px; overflow: hidden; }
-.rq-table { width: 100%; border-collapse: collapse; }
-.rq-th {
-  padding: 0 14px;
-  height: 40px;
-  text-align: left;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: .03em;
-  text-transform: uppercase;
-  color: var(--rq-muted);
-  background: var(--rq-surface);
-  border-bottom: 1px solid var(--rq-border);
-  white-space: nowrap;
-}
-.rq-th-right { text-align: right; }
-.rq-td { padding: 13px 14px; font-size: 13px; color: var(--rq-text); border-bottom: 1px solid var(--rq-border); vertical-align: middle; }
-.rq-tr { transition: background-color .12s ease; }
-.rq-tr:hover .rq-td { background: var(--rq-hover); }
-.rq-tr.rq-selected .rq-td { background: rgba(250, 204, 21, 0.08); }
-.rq-tr.rq-selected:hover .rq-td { background: rgba(250, 204, 21, 0.12); }
-.rq-tr:last-child .rq-td { border-bottom: none; }
+.fx-table-wrap { background: var(--fx-surface); border: 1px solid var(--fx-border); border-radius: 10px; overflow: hidden; }
+.fx-tr.fx-selected .fx-td { background: var(--fx-accent-soft); }
+.fx-tr.fx-selected:hover .fx-td { background: #F6DACB; }
 
-.rq-check { width: 15px; height: 15px; margin: 0; accent-color: var(--rq-brand); cursor: pointer; }
+.fx-check { width: 15px; height: 15px; margin: 0; accent-color: var(--fx-accent); cursor: pointer; }
 
-/* ── Popover menu ─────────────────────────────────────────────────────────── */
-.rq-menu-wrap { position: relative; }
-.rq-menu {
+.fx-menu-wrap { position: relative; }
+.fx-menu {
   position: absolute;
   right: 0;
   top: calc(100% + 4px);
   z-index: 60;
   min-width: 176px;
-  background: var(--rq-surface);
-  border: 1px solid var(--rq-border);
+  background: var(--fx-surface);
+  border: 1px solid var(--fx-border);
   border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(23, 23, 23, 0.10), 0 1px 3px rgba(23, 23, 23, 0.06);
+  box-shadow: var(--fx-shadow-pop);
   padding: 4px;
-  animation: rq-fade-in .12s ease;
+  animation: fade-in .12s ease;
 }
-.rq-menu-item {
+.fx-menu-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -799,40 +622,17 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
   background: transparent;
   font-size: 13px;
   font-weight: 500;
-  color: var(--rq-text-2);
+  color: var(--fx-ink-2);
   cursor: pointer;
   text-align: left;
   transition: background-color .12s ease, color .12s ease;
 }
-.rq-menu-item:hover { background: var(--rq-hover); color: var(--rq-text); }
-.rq-menu-item-danger { color: var(--rq-danger); }
-.rq-menu-item-danger:hover { background: var(--rq-danger-soft); color: var(--rq-danger); }
-.rq-menu-sep { height: 1px; margin: 4px 6px; background: var(--rq-border); }
+.fx-menu-item:hover { background: var(--fx-canvas); color: var(--fx-ink); }
+.fx-menu-item-danger { color: var(--fx-red); }
+.fx-menu-item-danger:hover { background: var(--fx-red-soft); color: var(--fx-red); }
+.fx-menu-sep { height: 1px; margin: 4px 6px; background: var(--fx-border); }
 
-/* ── Modal ────────────────────────────────────────────────────────────────── */
-.rq-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 115;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: rgba(23, 23, 23, 0.42);
-  backdrop-filter: blur(4px);
-}
-.rq-modal {
-  position: relative;
-  width: 100%;
-  max-width: 420px;
-  background: var(--rq-surface);
-  border: 1px solid var(--rq-border);
-  border-radius: 12px;
-  box-shadow: 0 20px 48px rgba(23, 23, 23, 0.16), 0 2px 8px rgba(23, 23, 23, 0.08);
-  padding: 24px;
-  animation: rq-modal-in .18s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.rq-modal-close {
+.fx-modal-close {
   position: absolute;
   top: 14px;
   right: 14px;
@@ -844,32 +644,60 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: var(--rq-muted);
+  color: var(--fx-faint);
   cursor: pointer;
   transition: background-color .12s ease, color .12s ease;
 }
-.rq-modal-close:hover { background: var(--rq-hover); color: var(--rq-text); }
+.fx-modal-close:hover { background: var(--fx-canvas); color: var(--fx-ink); }
 
-/* ── Field group ──────────────────────────────────────────────────────────── */
-.rq-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
-.rq-field-label { font-size: 13px; font-weight: 600; color: var(--rq-text); }
-.rq-field-hint { font-size: 12px; color: var(--rq-muted); }
-.rq-error { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--rq-danger); }
+.fx-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.fx-field-label { font-size: 13px; font-weight: 600; color: var(--fx-ink); }
+.fx-field-hint { font-size: 12px; color: var(--fx-faint); }
+.fx-error { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--fx-red); }
 
-/* ── Empty state ──────────────────────────────────────────────────────────── */
-.rq-empty {
+.fx-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   padding: 64px 24px;
-  background: var(--rq-surface);
-  border: 1px dashed var(--rq-border);
+  background: var(--fx-surface);
+  border: 1px dashed var(--fx-border);
   border-radius: 12px;
 }
 
-/* ── Animations ───────────────────────────────────────────────────────────── */
-@keyframes rq-modal-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
-@keyframes rq-fade-in { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
+.fx-spin { animation: fx-spin .8s linear infinite; }
+.fx-spin-inline { display: inline-block; animation: fx-spin .8s linear infinite; }
+@keyframes fx-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
+/* ── fx-* fallback mirror — same values, at :root, so anything rendering
+   outside `.fx-shell` (e.g. before mount) never hits an undefined variable. */
+:root {
+  --fx-canvas: #FAFAFA;
+  --fx-surface: #FFFFFF;
+  --fx-sidebar-bg: #FFFFFF;
+  --fx-sidebar-hover: #F5F5F5;
+  --fx-sidebar-ink: #6B7280;
+  --fx-border: #E5E7EB;
+  --fx-border-strong: #D1D5DB;
+  --fx-ink: #111111;
+  --fx-ink-2: #6B7280;
+  --fx-faint: #9CA3AF;
+  --fx-accent: #111111;
+  --fx-accent-ink: #000000;
+  --fx-accent-soft: #F3F4F6;
+  --fx-green: #16A34A;
+  --fx-green-soft: #ECFDF3;
+  --fx-red: #DC2626;
+  --fx-red-soft: #FEF2F2;
+  --fx-amber: #EA580C;
+  --fx-amber-soft: #FFF7ED;
+  --fx-blue: #2563EB;
+  --fx-blue-soft: #EFF6FF;
+  --fx-radius-card: 10px;
+  --fx-radius-tile: 8px;
+  --fx-radius-control: 8px;
+  --fx-radius-pill: 999px;
+  --fx-shadow-pop: 0 12px 28px rgba(31,27,22,0.12), 0 2px 6px rgba(31,27,22,0.06);
+}

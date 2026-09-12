@@ -5,6 +5,22 @@ const ChatMessage = require('./schemas/ChatMessage');
 const Alert = require('./schemas/Alert');
 const User = require('./schemas/User');
 const { normalizePhone, isSamePhone } = require('../utils/phone');
+const {
+  ID_SCHEME_VERSION: ID_SCHEME_VERSION_V2,
+  generateRecoveryCodeV2,
+  deriveStickerIdV2,
+  hashRecoveryCodeV2,
+  isValidCodeFormat: isValidCodeFormatV2,
+} = require('../services/stickerCrypto');
+const { computePinnedQrParams, renderPinnedQrPng, ENCODER_NAME, ENCODER_VERSION, DEFAULT_MODULE_SIZE_PX, DEFAULT_MARGIN_MODULES } = require('../services/qrPinning');
+
+// v2 stickers resolve to https://<host>/<id> — same public URL shape v1 uses
+// (see helpers.ts qrFullUrl) — kept identical so scanning behaves the same
+// regardless of scheme. Matches the APP_URL convention used everywhere else
+// server-side (alertController, chatController, notificationController, ...).
+// Read once at issuance and stored verbatim on the row (qr_payload) — a later
+// change to APP_URL must never alter what an already-issued sticker encodes.
+const QR_HOST = (process.env.APP_URL || 'https://rapiqr.worthitellp.workers.dev').replace(/\/+$/, '');
 
 const DUPLICATE_ERROR_CODES = ['E11000', '11000'];
 
@@ -241,6 +257,152 @@ class QrModel {
       console.error('QrModel.save Error:', err);
       return null;
     }
+  }
+
+  /**
+   * Create/Mint QR code — id-scheme v2: the server generates the recovery
+   * code AND derives the sticker id from it (never the reverse, and never a
+   * client-supplied id/code — see Server/services/stickerCrypto.js for why
+   * the derivation must be server-authoritative to mean anything). QR
+   * generation parameters are computed once here and pinned onto the row
+   * forever — see Server/services/qrPinning.js.
+   */
+  static async saveV2(qrData = {}) {
+    const category = qrData.category || 'car';
+    try {
+      const recoveryCode = generateRecoveryCodeV2();
+      const id = deriveStickerIdV2(recoveryCode);
+      const codeHash = hashRecoveryCodeV2(recoveryCode);
+      const ownerPhone = qrData.ownerPhone || null;
+      const normalizedPhone = ownerPhone ? normalizePhone(ownerPhone) : null;
+      const fgColor = qrData.fg || '000000';
+      const bgColor = qrData.bg || 'FFFFFF';
+
+      const qrPayload = `${QR_HOST}/${id}`;
+      const { qrVersion, qrEccLevel, qrMaskPattern } = computePinnedQrParams(qrPayload);
+      const pinned = {
+        qrVersion,
+        qrEccLevel,
+        qrMaskPattern,
+        moduleSizePx: DEFAULT_MODULE_SIZE_PX,
+        marginModules: DEFAULT_MARGIN_MODULES,
+        fgColorHex: `#${fgColor}`,
+        bgColorHex: `#${bgColor}`,
+      };
+      const { sha256 } = await renderPinnedQrPng(qrPayload, pinned);
+
+      const doc = await Sticker.create({
+        _id: id,
+        id_scheme_version: ID_SCHEME_VERSION_V2,
+        client_id: qrData.clientId || `CL${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
+        status: qrData.status || 'inactive',
+        template_name: qrData.template || 'Standard Tag',
+        fg_color: fgColor,
+        bg_color: bgColor,
+        category,
+        phone_number: ownerPhone,
+        normalized_phone_number: normalizedPhone,
+        recovery_code: recoveryCode,
+        recovery_code_hash: codeHash,
+        qr_payload: qrPayload,
+        qr_version: qrVersion,
+        qr_ecc_level: qrEccLevel,
+        qr_mask_pattern: qrMaskPattern,
+        module_size_px: pinned.moduleSizePx,
+        margin_modules: pinned.marginModules,
+        encoder_name: ENCODER_NAME,
+        encoder_version: ENCODER_VERSION,
+        rendered_image_sha256: sha256,
+        created_at: qrData.createdAt || new Date(),
+      });
+
+      return {
+        ...toPublicQr(doc),
+        recoveryCode,
+        idSchemeVersion: ID_SCHEME_VERSION_V2,
+        qrPayload,
+        qrVersion,
+        qrEccLevel,
+        qrMaskPattern,
+        moduleSizePx: pinned.moduleSizePx,
+        marginModules: pinned.marginModules,
+      };
+    } catch (err) {
+      if (isDuplicateError(err)) {
+        const dup = getDuplicateDetails(err);
+        const errObj = new Error(`A tag with phone number ${dup?.phone || 'unknown'} already exists in category ${dup?.category || category}`);
+        errObj.code = 'DUPLICATE_PHONE';
+        throw errObj;
+      }
+      console.error('QrModel.saveV2 Error:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Code-only recovery for id-scheme v2 stickers — no sticker id needed from
+   * the caller at all, unlike v1's restoreByRecoveryCode. The recovery code
+   * alone derives the id, and the QR is re-rendered through the EXACT pinned
+   * parameters recorded at issuance, then hash-checked against the image
+   * recorded at issuance before anything is served — see qrPinning.js.
+   *
+   * `not_found` deliberately covers "no such code" so the response can't be
+   * used to enumerate valid codes.
+   */
+  static async recoverByCodeV2(rawRecoveryCode) {
+    if (!rawRecoveryCode || !isValidCodeFormatV2(rawRecoveryCode)) {
+      return { ok: false, reason: 'invalid_format' };
+    }
+
+    const id = deriveStickerIdV2(rawRecoveryCode);
+    const doc = await Sticker.findById(id)
+      .select('+recovery_code_hash id_scheme_version deleted_at category normalized_phone_number '
+        + 'qr_payload qr_version qr_ecc_level qr_mask_pattern module_size_px margin_modules '
+        + 'fg_color bg_color encoder_name encoder_version rendered_image_sha256 '
+        + 'status client_id template_name scans_count last_scanned_at created_at')
+      .lean();
+
+    if (!doc || doc.id_scheme_version !== ID_SCHEME_VERSION_V2) return { ok: false, reason: 'not_found' };
+
+    // Should be unreachable if derivation is correct — the id lookup above
+    // already matched. Treated as an integrity failure, not a normal
+    // "wrong code" outcome, since it means the derivation path itself is broken.
+    const expectedHash = hashRecoveryCodeV2(rawRecoveryCode);
+    if (!doc.recovery_code_hash || expectedHash !== doc.recovery_code_hash) {
+      return { ok: false, reason: 'hash_mismatch' };
+    }
+
+    // Recompute the canonical image through the EXACT parameters pinned at
+    // issuance and verify it against the hash recorded then. A mismatch means
+    // the pinned encoder produced different bytes than at issuance — abort
+    // rather than silently serve a "close enough" image.
+    const { buffer, sha256 } = await renderPinnedQrPng(doc.qr_payload, {
+      qrVersion: doc.qr_version,
+      qrEccLevel: doc.qr_ecc_level,
+      qrMaskPattern: doc.qr_mask_pattern,
+      moduleSizePx: doc.module_size_px,
+      marginModules: doc.margin_modules,
+      fgColorHex: `#${doc.fg_color}`,
+      bgColorHex: `#${doc.bg_color}`,
+    });
+
+    if (sha256 !== doc.rendered_image_sha256) {
+      return { ok: false, reason: 'integrity_failure' };
+    }
+
+    let restoredData = null;
+    if (doc.deleted_at) {
+      const restoreResult = await QrModel._restoreDeletedSticker(id, doc);
+      if (!restoreResult.ok) return restoreResult;
+      restoredData = restoreResult.data;
+    }
+
+    return {
+      ok: true,
+      data: restoredData || toPublicQr(doc),
+      imageBase64: buffer.toString('base64'),
+      imageSha256: sha256,
+    };
   }
 
   /**

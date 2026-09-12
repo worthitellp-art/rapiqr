@@ -1,17 +1,20 @@
-import type React from "react";
+﻿import type React from "react";
 import { useState } from "react";
-import {
-  Tag, Plus, Users, ArrowUpRight, ChevronRight, Activity,
-  HardDriveDownload, Sparkles, Phone, Info, BarChart3, PieChart
-} from "lucide-react";
+import { Tag, Plus, Info, Layers, ScanLine, Boxes } from "lucide-react";
 import StatusPill from "./StatusPill";
-import StickerThumb from "./StickerThumb";
 import { QrRecord, Template } from "./types";
 import { fmtDate } from "./helpers";
 import QrRowActions from "./QrRowActions";
 import ConfirmModal from "./ConfirmModal";
 import { apiClient } from "../../../lib/apiClient";
-import { MaskedCodeDisplay, CodeVisibilityToggleButton } from "./StickerCodeComponents";
+import FxAssetCard, { FxAssetTile } from "../shared/FxAssetCard";
+import FxTodoList, { FxTodoItem } from "../shared/FxTodoList";
+import FxStatTile from "../shared/FxStatTile";
+import FxCalendarWidget from "../shared/FxCalendarWidget";
+import FxActivityLog, { FxActivityItem } from "../shared/FxActivityLog";
+import FxTransactionsTable, { FxTableColumn } from "../shared/FxTransactionsTable";
+import { FxAvatarTrigger, FxIconButton } from "../shared/FxTopBar";
+import { Bell } from "lucide-react";
 
 interface OverviewPageProps {
   qrList: QrRecord[];
@@ -22,6 +25,26 @@ interface OverviewPageProps {
   openRestore: () => void;
   setToast: (msg: string | null) => void;
   openPrintSheet?: (qr: QrRecord) => void;
+  admin?: { name: string; role?: string };
+}
+
+const TILE_STYLES = [
+  { bg: "var(--fx-accent)", fg: "#FFFFFF" },
+  { bg: "var(--fx-canvas)", fg: "var(--fx-ink-2)" },
+  { bg: "var(--fx-green-soft)", fg: "var(--fx-green)" },
+  { bg: "var(--fx-amber-soft)", fg: "var(--fx-amber)" },
+];
+
+function timeAgo(dateStr?: string): string {
+  if (!dateStr) return "";
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}hrs ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
 }
 
 export default function OverviewPage({
@@ -30,415 +53,230 @@ export default function OverviewPage({
   templates,
   setPage,
   openQuickLook,
-  openRestore,
+  openRestore: _openRestore,
   setToast,
   openPrintSheet,
+  admin,
 }: OverviewPageProps) {
   const [deleteTarget, setDeleteTarget] = useState<QrRecord | null>(null);
-  const [revealedRowIds, setRevealedRowIds] = useState<Set<string>>(new Set());
+  const [tableSearch, setTableSearch] = useState("");
 
-  function toggleRowCodeVisibility(targetId: string) {
-    setRevealedRowIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(targetId)) next.delete(targetId);
-      else next.add(targetId);
-      return next;
-    });
-  }
+  const firstName = (admin?.name || "Admin").trim().split(/\s+/)[0];
+  const todayStr = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
 
   // Exact Real Data Calculations (No Mock Data / Fallbacks)
   const activeTags = qrList.filter((q) => q.status === "active" || Boolean((q.ownerPhone || (q as any).phone)?.trim()));
   const totalScans = qrList.reduce((sum, q) => sum + (q.scans || 0), 0);
   const inactiveCount = qrList.length - activeTags.length;
-  const todayStr = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const totalTagsCount = qrList.length || 1;
 
-  // Category Breakdown from Real Data
   const categoriesMap = qrList.reduce((acc, q) => {
     const cat = (q.category || "car").toLowerCase();
     acc[cat] = (acc[cat] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
-
   const categoryList = Object.entries(categoriesMap).sort((a, b) => b[1] - a[1]);
-  const totalTagsCount = qrList.length || 1;
 
-  // Real Scan Velocity Points for Area Graph
-  // Plot scan counts across the fleet tags dynamically
-  const maxScans = Math.max(...qrList.map(q => q.scans || 0), 10);
-  const svgPoints = qrList.slice(0, 12).map((q, idx, arr) => {
-    const x = (idx / Math.max(arr.length - 1, 1)) * 560 + 20;
-    const y = 140 - ((q.scans || 0) / maxScans) * 110;
-    return `${x},${y}`;
-  }).join(" ");
+  const categoryBreakdown = categoryList.map(([cat, count]) => {
+    const activeInCat = qrList.filter((q) => {
+      const phone = q.ownerPhone || q.phoneNumber || (q as any).phone;
+      return (q.category || "car").toLowerCase() === cat && Boolean(phone && String(phone).trim());
+    }).length;
+    return { cat, count, activePct: count ? Math.round((activeInCat / count) * 100) : 0 };
+  });
+
+  const assetTiles: FxAssetTile[] = categoryBreakdown.slice(0, 4).map(({ cat, count }, i) => ({
+    icon: <Tag size={15} />,
+    count: `${count} Tags`,
+    name: cat.charAt(0).toUpperCase() + cat.slice(1),
+    bg: TILE_STYLES[i % TILE_STYLES.length].bg,
+    fg: TILE_STYLES[i % TILE_STYLES.length].fg,
+    onClick: () => setPage("qr"),
+  }));
+
+  const todoItems: FxTodoItem[] = categoryBreakdown.slice(0, 4).map(({ cat, count, activePct }, i) => ({
+    id: cat,
+    icon: <Tag size={14} />,
+    iconBg: TILE_STYLES[i % TILE_STYLES.length].bg,
+    title: cat.charAt(0).toUpperCase() + cat.slice(1),
+    subtitle: `${count} tag${count === 1 ? "" : "s"} in fleet`,
+    percent: activePct,
+  }));
+
+  const activityItems: FxActivityItem[] = [...qrList]
+    .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+    .slice(0, 5)
+    .map((q, i) => {
+      const phone = q.ownerPhone || q.phoneNumber || (q as any).phone;
+      const isActivated = Boolean(phone && String(phone).trim());
+      const colors = ["var(--fx-accent)", "var(--fx-ink-2)", "var(--fx-amber)", "var(--fx-green)", "var(--fx-accent-ink)"];
+      return {
+        id: q.id,
+        avatar: q.id.slice(0, 2).toUpperCase(),
+        avatarBg: colors[i % colors.length],
+        title: `${q.id} tag ${isActivated ? "activated" : "created"}`,
+        subtitle: isActivated ? `Assigned to ${phone}` : `${q.category || "car"} · Unassigned`,
+        time: timeAgo(q.createdAt),
+      };
+    });
+
+  const tableRows = qrList
+    .filter((q) => !tableSearch || q.id.toLowerCase().includes(tableSearch.toLowerCase()))
+    .slice(0, 8);
+
+  const tableColumns: FxTableColumn<QrRecord>[] = [
+    {
+      key: "id",
+      label: "Tag ID",
+      render: (q) => (
+        <div className="flex items-center gap-2.5">
+          <span className="w-8 h-8 rounded-full bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center text-[10.5px] font-bold flex-shrink-0">
+            {q.id.slice(0, 2).toUpperCase()}
+          </span>
+          <span className="fx-display text-[13.5px] text-[var(--fx-ink)]">{q.id}</span>
+        </div>
+      ),
+    },
+    {
+      key: "phone",
+      label: "Owner Phone",
+      render: (q) => {
+        const phone = q.ownerPhone || q.phoneNumber || (q as any).phone;
+        return phone ? (
+          <span className="font-semibold text-[var(--fx-ink)] text-xs">{phone}</span>
+        ) : (
+          <span className="text-[var(--fx-faint)] text-xs">—</span>
+        );
+      },
+    },
+    { key: "category", label: "Type", render: (q) => <span className="capitalize text-xs font-medium text-[var(--fx-ink-2)]">{q.category || "car"}</span> },
+    { key: "date", label: "Date", render: (q) => <span className="text-[11px] text-[var(--fx-faint)]">{fmtDate(q.createdAt)}</span> },
+    {
+      key: "status",
+      label: "Status",
+      render: (q) => {
+        const phone = q.ownerPhone || q.phoneNumber || (q as any).phone;
+        const computedStatus = Boolean(phone && String(phone).trim()) ? "active" : q.status;
+        return <StatusPill status={computedStatus} />;
+      },
+    },
+    {
+      key: "actions",
+      label: "",
+      align: "right",
+      render: (q) => (
+        <QrRowActions qr={q} openQuickLook={openQuickLook} setDeleteTarget={setDeleteTarget} openPrintSheet={openPrintSheet} />
+      ),
+    },
+  ];
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#18181B] font-body" style={{ background: "#F8F8F7" }}>
-      {/* ── Top Greeting & Action Header ─────────── */}
+    <div className="px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-16 space-y-6">
+      {/* ── Greeting header ─────────────────────────── */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <div className="text-[12px] font-medium text-[#71717A] mb-1">
-            {todayStr}
-          </div>
-          <h1 className="font-display text-[28px] font-bold text-[#18181B] leading-tight tracking-[-0.8px]">
-            Fleet Overview
+          <p className="text-[12px] font-medium text-[var(--fx-faint)] mb-1">{todayStr}</p>
+          <h1 className="fx-display text-[28px] text-[var(--fx-ink)] leading-tight">
+            Hello {firstName}, {greeting}
           </h1>
-          <p className="text-[13px] text-[#71717A] mt-0.5">
-            Real-time fleet operations, scan analytics, and inventory distribution.
-          </p>
+          <p className="text-[13px] text-[var(--fx-ink-2)] mt-0.5">Let's check your fleet.</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <FxIconButton icon={<Bell size={15} />} onClick={() => setPage("alerts")} title="Alerts" badge={inactiveCount > 0} />
+          <FxAvatarTrigger name={admin?.name || "Admin"} role={admin?.role} />
           <button
             onClick={() => setPage("qr")}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#F5C518] text-[#18181B] font-bold text-[13px] hover:bg-[#EAB308] transition-all cursor-pointer shadow-sm"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[var(--fx-accent)] text-white font-bold text-[13px] hover:bg-[var(--fx-accent-ink)] transition-all cursor-pointer shadow-sm"
           >
             <Plus size={15} /> Generate Tags
           </button>
         </div>
       </div>
 
-      {/* ── Top 4-Column True Data Stat Strip (No Mock Values) ───────── */}
-      <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 divide-y sm:divide-y-0 sm:divide-x divide-[#E5E7EB]">
-        {/* Metric 1 */}
-        <div className="sm:pr-4 pt-2 sm:pt-0">
-          <div className="flex items-center justify-between text-[12px] font-semibold text-[#71717A] mb-1">
+      {/* ── Top 3-column stat strip ─────────────────── */}
+      <div className="fx-card p-6 grid grid-cols-1 sm:grid-cols-3 gap-6 divide-y sm:divide-y-0 sm:divide-x divide-[var(--fx-border)]">
+        <div className="sm:pr-6 pt-2 sm:pt-0">
+          <div className="flex items-center justify-between text-[12px] font-semibold text-[var(--fx-ink-2)] mb-1">
+            <span>Total Registered Tags</span>
+            <Info size={13} className="text-[var(--fx-faint)]" />
+          </div>
+          <div className="fx-display text-[30px] text-[var(--fx-ink)]">{qrList.length}</div>
+          <p className="text-[11px] text-[var(--fx-faint)] font-medium mt-1">Total plates generated</p>
+        </div>
+
+        <div className="sm:px-6 pt-4 sm:pt-0">
+          <div className="flex items-center justify-between text-[12px] font-semibold text-[var(--fx-ink-2)] mb-1">
             <span>Active Fleet Tags</span>
-            <Info size={13} className="text-[#A1A1AA]" />
+            <Info size={13} className="text-[var(--fx-faint)]" />
           </div>
-          <div className="text-[30px] font-semibold text-[#18181B] tracking-[-1px]">
-            {activeTags.length}
-          </div>
-          <p className="text-[11px] text-[#16A34A] font-medium mt-1">
+          <div className="fx-display text-[30px] text-[var(--fx-ink)]">{activeTags.length}</div>
+          <p className="text-[11px] text-[var(--fx-green)] font-medium mt-1">
             {((activeTags.length / totalTagsCount) * 100).toFixed(1)}% of total fleet
           </p>
         </div>
 
-        {/* Metric 2 */}
-        <div className="sm:px-4 pt-4 sm:pt-0">
-          <div className="flex items-center justify-between text-[12px] font-semibold text-[#71717A] mb-1">
-            <span>Inactive Inventory</span>
-            <Info size={13} className="text-[#A1A1AA]" />
-          </div>
-          <div className="text-[30px] font-semibold text-[#18181B] tracking-[-1px]">
-            {inactiveCount}
-          </div>
-          <p className="text-[11px] text-[#71717A] font-medium mt-1">Ready to activate</p>
-        </div>
-
-        {/* Metric 3 */}
-        <div className="sm:px-4 pt-4 sm:pt-0">
-          <div className="flex items-center justify-between text-[12px] font-semibold text-[#71717A] mb-1">
-            <span>Total Registered Tags</span>
-            <Info size={13} className="text-[#A1A1AA]" />
-          </div>
-          <div className="text-[30px] font-semibold text-[#18181B] tracking-[-1px]">
-            {qrList.length}
-          </div>
-          <p className="text-[11px] text-[#71717A] font-medium mt-1">Total plates generated</p>
-        </div>
-
-        {/* Metric 4 */}
-        <div className="sm:pl-4 pt-4 sm:pt-0">
-          <div className="flex items-center justify-between text-[12px] font-semibold text-[#71717A] mb-1">
+        <div className="sm:pl-6 pt-4 sm:pt-0">
+          <div className="flex items-center justify-between text-[12px] font-semibold text-[var(--fx-ink-2)] mb-1">
             <span>Total Fleet Scans</span>
-            <Info size={13} className="text-[#A1A1AA]" />
+            <Info size={13} className="text-[var(--fx-faint)]" />
           </div>
-          <div className="text-[30px] font-semibold text-[#18181B] tracking-[-1px]">
-            {totalScans}
-          </div>
-          <p className="text-[11px] text-[#A16207] font-medium mt-1">Masked scan connections</p>
+          <div className="fx-display text-[30px] text-[var(--fx-ink)]">{totalScans}</div>
+          <p className="text-[11px] text-[var(--fx-amber)] font-medium mt-1">Masked scan connections</p>
         </div>
       </div>
 
-      {/* ── REAL DATA CHARTS & GRAPH SECTION ────────────── */}
+      {/* ── Main split: content + right rail ─────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Chart 1: Scan Velocity Area Graph (Real Data) */}
-        <div className="lg:col-span-7 bg-white border border-[#E5E7EB] rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-display text-[15px] font-semibold text-[#18181B] flex items-center gap-2">
-                <BarChart3 size={17} className="text-[#A16207]" /> Scan Volume &amp; Activity Graph
-              </h3>
-              <p className="text-[12px] text-[#71717A] mt-0.5">Real scan counts mapped across active tags</p>
-            </div>
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded bg-[#FDF4DB] text-[#A16207] uppercase tracking-wide">
-              Live Fleet Data
-            </span>
+        {/* Content column */}
+        <div className="lg:col-span-8 space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <FxAssetCard
+              title="My Asset"
+              total={qrList.length}
+              totalDelta={`+${activeTags.length} active`}
+              tiles={assetTiles}
+            />
+            <FxTodoList title="To-do List" items={todoItems} onViewAll={() => setPage("qr")} />
           </div>
 
-          <div className="h-[200px] w-full pt-2">
-            <svg width="100%" height="100%" viewBox="0 0 600 160" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="scanGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#F5C518" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="#F5C518" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              {/* Grid Lines */}
-              <line x1="0" y1="20" x2="600" y2="20" stroke="#F1F1F3" strokeWidth="1" />
-              <line x1="0" y1="70" x2="600" y2="70" stroke="#F1F1F3" strokeWidth="1" />
-              <line x1="0" y1="120" x2="600" y2="120" stroke="#F1F1F3" strokeWidth="1" />
-
-              {/* Dynamic Path */}
-              {qrList.length > 0 && svgPoints ? (
-                <>
-                  <polygon points={`20,150 ${svgPoints} 580,150`} fill="url(#scanGrad)" />
-                  <polyline points={svgPoints} fill="none" stroke="#F5C518" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                </>
-              ) : (
-                <text x="300" y="80" textAnchor="middle" fill="#A1A1AA" fontSize="12">
-                  No scan data available yet
-                </text>
-              )}
-            </svg>
-          </div>
+          <FxTransactionsTable
+            title="Transactions"
+            columns={tableColumns}
+            rows={tableRows}
+            searchValue={tableSearch}
+            onSearchChange={setTableSearch}
+            onViewAll={() => setPage("qr")}
+            emptyLabel="No fleet tags generated yet."
+          />
         </div>
 
-        {/* Chart 2: Category Distribution Breakdown (Real Data) */}
-        <div className="lg:col-span-5 bg-white border border-[#E5E7EB] rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display text-[15px] font-semibold text-[#18181B] flex items-center gap-2">
-              <PieChart size={17} className="text-[#16A34A]" /> Category Distribution
-            </h3>
-            <span className="text-[11px] text-[#71717A] font-mono">{qrList.length} total</span>
+        {/* Right rail */}
+        <div className="lg:col-span-4 space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <FxStatTile icon={<Boxes size={14} />} label="Total Tags" value={qrList.length} color="blue" progress={100} />
+            <FxStatTile icon={<ScanLine size={14} />} label="Total Scans" value={totalScans} color="orange" progress={Math.min(100, totalScans)} />
+            <FxStatTile
+              icon={<Layers size={14} />}
+              label="Categories"
+              value={categoryList.length}
+              color="purple"
+              progress={Math.min(100, categoryList.length * 20)}
+            />
+            <FxStatTile
+              icon={<Tag size={14} />}
+              label="Templates"
+              value={templates.length}
+              color="cream"
+              progress={Math.min(100, templates.length * 20)}
+            />
           </div>
 
-          <div className="space-y-3.5 pt-1">
-            {categoryList.length === 0 ? (
-              <p className="text-[12.5px] text-[#A1A1AA] py-8 text-center">No categories registered.</p>
-            ) : (
-              categoryList.map(([cat, count]) => {
-                const pct = ((count / totalTagsCount) * 100).toFixed(1);
-                return (
-                  <div key={cat} className="space-y-1.5">
-                    <div className="flex justify-between text-[12.5px]">
-                      <span className="font-semibold text-[#18181B] capitalize">{cat}</span>
-                      <span className="font-mono text-[#71717A]">{count} ({pct}%)</span>
-                    </div>
-                    <div className="w-full bg-[#F4F4F5] h-2 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#A16207] rounded-full transition-all duration-300"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
+          <FxCalendarWidget />
 
-      {/* ── Mid-Section 3-Column Grid ─────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Column 1: Create New / Quick Actions */}
-        <div className="lg:col-span-4 bg-white border border-[#E5E7EB] rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] p-6 space-y-4">
-          <h3 className="font-display text-[13px] font-semibold text-[#18181B]">
-            Quick Actions
-          </h3>
-
-          <div className="space-y-2">
-            <button
-              onClick={() => setPage("qr")}
-              className="w-full flex items-center justify-between p-3.5 rounded-lg border border-[#E5E7EB] hover:border-[#F5C518] hover:bg-[#F8F8F7] transition-all cursor-pointer group text-left"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#FDF4DB] text-[#A16207] flex items-center justify-center font-bold">
-                  <Tag size={16} />
-                </div>
-                <span className="text-[13px] font-semibold text-[#18181B]">Generate QR Tag</span>
-              </div>
-              <ChevronRight size={16} className="text-[#A1A1AA] group-hover:text-[#EAB308] transition-colors" />
-            </button>
-
-            <button
-              onClick={() => setPage("users")}
-              className="w-full flex items-center justify-between p-3.5 rounded-lg border border-[#E5E7EB] hover:border-[#22C55E] hover:bg-[#F8F8F7] transition-all cursor-pointer group text-left"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#F0FDF4] text-[#16A34A] flex items-center justify-center font-bold">
-                  <Users size={16} />
-                </div>
-                <span className="text-[13px] font-semibold text-[#18181B]">User Accounts</span>
-              </div>
-              <ChevronRight size={16} className="text-[#A1A1AA] group-hover:text-[#22C55E] transition-colors" />
-            </button>
-
-            <button
-              onClick={() => setPage("backup")}
-              className="w-full flex items-center justify-between p-3.5 rounded-lg border border-[#E5E7EB] hover:border-[#F5C518] hover:bg-[#F8F8F7] transition-all cursor-pointer group text-left"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#FDF4DB] text-[#A16207] flex items-center justify-center font-bold">
-                  <HardDriveDownload size={16} />
-                </div>
-                <span className="text-[13px] font-semibold text-[#18181B]">Google Drive Sync</span>
-              </div>
-              <ChevronRight size={16} className="text-[#A1A1AA] group-hover:text-[#EAB308] transition-colors" />
-            </button>
-
-            <button
-              onClick={() => setPage("customize")}
-              className="w-full flex items-center justify-between p-3.5 rounded-lg border border-[#E5E7EB] hover:border-[#6B72B8] hover:bg-[#F8F8F7] transition-all cursor-pointer group text-left"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#ECEEFA] text-[#6B72B8] flex items-center justify-center font-bold">
-                  <Sparkles size={16} />
-                </div>
-                <span className="text-[13px] font-semibold text-[#18181B]">Sticker Placement</span>
-              </div>
-              <ChevronRight size={16} className="text-[#A1A1AA] group-hover:text-[#6B72B8] transition-colors" />
-            </button>
-          </div>
-        </div>
-
-        {/* Column 2: System Health & Status */}
-        <div className="lg:col-span-4 bg-white border border-[#E5E7EB] rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] p-6 flex flex-col justify-between space-y-4">
-          <div>
-            <h3 className="font-display text-[13px] font-semibold text-[#18181B] mb-3">
-              Fleet Status
-            </h3>
-            <div className="space-y-3 pt-1">
-              <div className="flex justify-between items-center text-[12.5px] p-2.5 rounded bg-[#F8F8F7] border border-[#E5E7EB]">
-                <span className="text-[#71717A]">Database Connection</span>
-                <span className="font-bold text-[#16A34A] flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#16A34A]" /> Connected
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-[12.5px] p-2.5 rounded bg-[#F8F8F7] border border-[#E5E7EB]">
-                <span className="text-[#71717A]">Cloudshope Gateway</span>
-                <span className="font-bold text-[#16A34A] flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#16A34A]" /> Active
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-[12.5px] p-2.5 rounded bg-[#F8F8F7] border border-[#E5E7EB]">
-                <span className="text-[#71717A]">WhatsApp Notification</span>
-                <span className="font-bold text-[#16A34A] flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#16A34A]" /> Ready
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setPage("backup")}
-            className="w-full pt-4 border-t border-[#E5E7EB] flex items-center justify-between text-[13px] font-semibold text-[#A16207] hover:underline cursor-pointer"
-          >
-            <span>Run full system diagnostic</span>
-            <ChevronRight size={14} />
-          </button>
-        </div>
-
-        {/* Column 3: Recent Tags */}
-        <div className="lg:col-span-4 bg-white border border-[#E5E7EB] rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] p-6 flex flex-col justify-between space-y-4">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-display text-[13px] font-semibold text-[#18181B]">
-                Recent Tags ({qrList.length})
-              </h3>
-              <button
-                onClick={() => setPage("qr")}
-                className="text-[12px] font-semibold text-[#A16207] hover:underline"
-              >
-                + Generate
-              </button>
-            </div>
-
-            {qrList.length === 0 ? (
-              <p className="text-[13px] text-[#A1A1AA] italic py-6 text-center">No tags generated yet.</p>
-            ) : (
-              <div className="space-y-3 divide-y divide-[#F4F4F5]">
-                {qrList.slice(0, 3).map((q) => {
-                  const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || "";
-                  const isActivated = Boolean(phoneNum && phoneNum.trim());
-                  return (
-                    <div key={q.id} className="pt-3 first:pt-0 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="font-display font-semibold text-[14px] text-[#18181B]">{q.id}</p>
-                        <p className="text-[11px] text-[#71717A]">
-                          {isActivated ? phoneNum : "Unassigned"}
-                        </p>
-                      </div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase ${isActivated ? "bg-[#F0FDF4] text-[#16A34A]" : "bg-[#F4F4F5] text-[#71717A]"}`}>
-                        {isActivated ? "Active" : "Inactive"}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={() => setPage("qr")}
-            className="w-full pt-4 border-t border-[#E5E7EB] flex items-center justify-between text-[13px] font-semibold text-[#A16207] hover:underline cursor-pointer"
-          >
-            <span>Go to all tags list</span>
-            <ChevronRight size={14} />
-          </button>
-        </div>
-      </div>
-
-      {/* ── Recent Fleet Tags Table ─────────────────────────────────── */}
-      <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-display text-[14px] font-semibold text-[#18181B]">
-            Active Fleet Tags Table
-          </h3>
-          <button
-            onClick={() => setPage("qr")}
-            className="text-[12px] font-bold text-[#A16207] hover:underline flex items-center gap-1"
-          >
-            View Full List <ArrowUpRight size={14} />
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm text-[#18181B]">
-            <thead>
-              <tr className="text-left font-display text-[11px] font-bold text-[#71717A] uppercase tracking-wider bg-[#F8F8F7] border-b border-[#E5E7EB]">
-                <th className="px-4 py-3">QR Plate</th>
-                <th className="px-3 py-3">Owner Phone</th>
-                <th className="px-3 py-3">Category</th>
-                <th className="px-3 py-3">Created</th>
-                <th className="px-3 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E5E7EB]">
-              {qrList.slice(0, 8).map((q) => {
-                const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || "";
-                const isActivated = Boolean(phoneNum && phoneNum.trim());
-                const computedStatus = isActivated ? "active" : q.status;
-
-                return (
-                  <tr key={q.id} className="hover:bg-[#F4F4F5] transition-colors">
-                    <td className="px-4 py-3 font-display font-semibold text-[15px] text-[#18181B]">
-                      {q.id}
-                    </td>
-                    <td className="px-3 py-3 text-xs">
-                      {isActivated ? (
-                        <span className="font-bold text-[#18181B]">{phoneNum}</span>
-                      ) : (
-                        <span className="text-[#A1A1AA]">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 font-medium text-xs capitalize">{q.category || "car"}</td>
-                    <td className="px-3 py-3 text-[11px] text-[#71717A]">{fmtDate(q.createdAt)}</td>
-                    <td className="px-3 py-3"><StatusPill status={computedStatus} /></td>
-                    <td className="px-4 py-3 text-right">
-                      <QrRowActions
-                        qr={q}
-                        openQuickLook={openQuickLook}
-                        setDeleteTarget={setDeleteTarget}
-                        openPrintSheet={openPrintSheet}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <FxActivityLog title="Activity Log" items={activityItems} onViewAll={() => setPage("qr")} />
         </div>
       </div>
 
@@ -448,7 +286,7 @@ export default function OverviewPage({
         title="Delete QR Sticker?"
         message={
           <>
-            Are you sure you want to delete <span className="font-bold text-[#18181B]">{deleteTarget?.id}</span>?
+            Are you sure you want to delete <span className="font-bold text-[var(--fx-ink)]">{deleteTarget?.id}</span>?
             This cannot be undone.
           </>
         }

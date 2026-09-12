@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { ShieldCheck, Loader2, Check, X, Mail, Smartphone } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
 
-const inputCls = 'w-full px-3.5 py-2.5 text-sm bg-[#F5F6FA] border border-[#E8ECF4] rounded-xl outline-none focus:border-[#111111]';
+const inputCls = 'w-full px-3.5 py-2.5 text-sm bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-xl outline-none focus:border-[var(--fx-ink)]';
 
 /**
  * Signing in with only an email or only a phone number leaves the other half
@@ -76,24 +76,24 @@ export default function CompleteProfilePopup({
 
   return (
     <div
-      className="fixed inset-0 z-[130] flex items-center justify-center p-4"
+      className="fx-shell fixed inset-0 z-[130] flex items-center justify-center p-4 text-[var(--fx-ink)]"
       style={{ background: 'rgba(10,10,20,0.6)', backdropFilter: 'blur(4px)' }}
     >
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 border border-gray-100 relative">
         <button
           onClick={onDismiss}
-          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-[#F5F6FA] flex items-center justify-center text-gray-500 hover:text-gray-900 cursor-pointer"
+          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-[var(--fx-canvas)] flex items-center justify-center text-gray-500 hover:text-gray-900 cursor-pointer"
         >
           <X size={16} />
         </button>
 
-        <div className="w-12 h-12 rounded-2xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mb-4">
+        <div className="w-12 h-12 rounded-2xl bg-[var(--fx-amber-soft)] text-[var(--fx-amber)] flex items-center justify-center mb-4">
           <ShieldCheck size={22} />
         </div>
-        <h3 className="font-bold text-lg text-[#1A1D26]">
+        <h3 className="font-bold text-lg text-[var(--fx-ink)]">
           {missingPhone && !missingEmail ? 'Enter your phone number to get your stickers' : 'Finish setting up your account'}
         </h3>
-        <p className="text-xs text-[#64748B] mt-1 mb-5">
+        <p className="text-xs text-[var(--fx-ink-2)] mt-1 mb-5">
           {missingPhone && !missingEmail
             ? "Stickers auto-link to your account by phone number — add and verify yours to see everything registered under it."
             : `You signed in with just ${missingPhone && !missingEmail ? 'an email' : missingEmail && !missingPhone ? 'a phone number' : 'one contact method'} — add${missingPhone && missingEmail ? ' both a phone number and an email' : missingPhone ? ' a phone number' : ' an email'} so stickers can auto-link and emergency contacts can reach you.`}
@@ -107,7 +107,7 @@ export default function CompleteProfilePopup({
           <div className="space-y-4">
             {missingPhone && (
               <div className="space-y-2.5">
-                <label className="text-xs font-bold text-[#64748B] flex items-center gap-1.5">
+                <label className="text-xs font-bold text-[var(--fx-ink-2)] flex items-center gap-1.5">
                   <Smartphone size={13} /> Phone Number
                 </label>
                 {!otpStep ? (
@@ -120,7 +120,7 @@ export default function CompleteProfilePopup({
                     <button
                       onClick={handleSendOtp}
                       disabled={busy}
-                      className="px-4 py-2.5 rounded-xl bg-[#111111] hover:bg-black text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 flex-shrink-0"
+                      className="px-4 py-2.5 rounded-xl bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 flex-shrink-0 shadow-sm shadow-[var(--fx-accent)]/20 transition-all"
                     >
                       {busy ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />} Verify
                     </button>
@@ -151,10 +151,10 @@ export default function CompleteProfilePopup({
 
             {missingEmail && (
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#64748B] flex items-center gap-1.5">
+                <label className="text-xs font-bold text-[var(--fx-ink-2)] flex items-center gap-1.5">
                   <Mail size={13} /> Email Address
                 </label>
-                <p className="text-xs text-[#64748B]">
+                <p className="text-xs text-[var(--fx-ink-2)]">
                   {profile?.email ? `Current: ${profile.email}` : 'No email on file yet.'} Add or update it from Account Settings.
                 </p>
               </div>
@@ -169,11 +169,11 @@ export default function CompleteProfilePopup({
             <div className="flex items-center gap-2.5 pt-1">
               <button
                 onClick={onGoToSettings}
-                className="flex-1 py-2.5 rounded-xl bg-[#F5F6FA] border border-[#E8ECF4] text-xs font-bold text-[#1A1D26] hover:bg-[#E2E8F0] cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl bg-[var(--fx-canvas)] border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink)] hover:bg-[var(--fx-border)] cursor-pointer"
               >
                 Go to Account Settings
               </button>
-              <button onClick={onDismiss} className="px-4 py-2.5 text-xs font-bold text-[#94A3B8] hover:text-[#64748B] cursor-pointer">
+              <button onClick={onDismiss} className="px-4 py-2.5 text-xs font-bold text-[var(--fx-faint)] hover:text-[var(--fx-ink-2)] cursor-pointer">
                 Later
               </button>
             </div>

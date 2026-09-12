@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+﻿import { useState, useEffect, useMemo } from "react";
 import {
   ShoppingBag, Search, Truck, CheckCircle2, XCircle, Clock,
   Phone, Mail, MapPin, IndianRupee, Trash2, AlertTriangle, Loader2,
@@ -44,7 +44,7 @@ const PAYMENT_META: Record<OrderPayment["status"], { label: string; color: strin
 
 const STATUS_META: Record<Order["status"], { label: string; icon: any; color: string; bg: string }> = {
   placed: { label: "Placed", icon: Clock, color: "text-[#B54708]", bg: "bg-[#FEF6E7]" },
-  shipped: { label: "Shipped", icon: Truck, color: "text-[#A16207]", bg: "bg-[#FDF4DB]" },
+  shipped: { label: "Shipped", icon: Truck, color: "text-[var(--fx-accent-ink)]", bg: "bg-[var(--fx-accent-soft)]" },
   delivered: { label: "Delivered", icon: CheckCircle2, color: "text-[#16A34A]", bg: "bg-[#F0FDF4]" },
   cancelled: { label: "Cancelled", icon: XCircle, color: "text-[#EF4444]", bg: "bg-[#FEF2F2]" },
 };
@@ -376,16 +376,16 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
   // ── Render helpers ────────────────────────────────────────────────────────
   const SortIcon = ({ k }: { k: SortKey }) =>
     sort.key !== k ? (
-      <ArrowUpDown size={12} className="text-[#A1A1AA]" />
+      <ArrowUpDown size={12} className="text-[var(--fx-faint)]" />
     ) : sort.dir === "asc" ? (
-      <ArrowUp size={12} className="text-[#A16207]" />
+      <ArrowUp size={12} className="text-[var(--fx-accent-ink)]" />
     ) : (
-      <ArrowDown size={12} className="text-[#A16207]" />
+      <ArrowDown size={12} className="text-[var(--fx-accent-ink)]" />
     );
 
   const sortTh = (k: SortKey, label: string, align = "text-left") => (
     <th className="px-4 py-3 cursor-pointer select-none whitespace-nowrap" onClick={() => { setSort((s) => s.key === k ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" } : { key: k, dir: k === "name" ? "asc" : "desc" }); }}>
-      <span className={`inline-flex items-center gap-1 ${align} ${sort.key === k ? "text-[#18181B]" : ""}`}>{label}<SortIcon k={k} /></span>
+      <span className={`inline-flex items-center gap-1 ${align} ${sort.key === k ? "text-[var(--fx-ink)]" : ""}`}>{label}<SortIcon k={k} /></span>
     </th>
   );
 
@@ -400,21 +400,21 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#18181B] font-body relative" style={{ background: "#F8F8F7" }}>
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[var(--fx-ink)] font-body relative" style={{ background: "var(--fx-canvas)" }}>
       {/* ── Page header ─────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-11 h-11 rounded-xl bg-[#FDF4DB] text-[#A16207] flex items-center justify-center shrink-0">
+          <div className="w-11 h-11 rounded-xl bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center shrink-0">
             <ShoppingBag size={21} />
           </div>
           <div className="min-w-0">
-            <h1 className="font-display text-[24px] font-bold text-[#18181B] leading-tight tracking-[-0.5px] flex items-center gap-2.5">
+            <h1 className="font-display text-[24px] font-bold text-[var(--fx-ink)] leading-tight tracking-[-0.5px] flex items-center gap-2.5">
               Orders
-              <span className="inline-flex items-center px-2.5 h-6 rounded-full bg-[#F4F4F5] text-[#71717A] text-[11px] font-bold">
+              <span className="inline-flex items-center px-2.5 h-6 rounded-full bg-[var(--fx-canvas)] text-[var(--fx-ink-2)] text-[11px] font-bold">
                 {totalCount} record{totalCount === 1 ? "" : "s"}
               </span>
             </h1>
-            <p className="text-[13px] text-[#71717A] mt-0.5">
+            <p className="text-[13px] text-[var(--fx-ink-2)] mt-0.5">
               Track fulfillment, manage records, and contact customers right from this list.
             </p>
           </div>
@@ -429,7 +429,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
             <IndianRupee size={14} />
             <span className="font-mono font-bold">₹{revenue.toLocaleString("en-IN")}</span> Revenue
           </div>
-          <button onClick={openNewOrder} className="ac-btn ac-btn-accent">
+          <button onClick={openNewOrder} className="fx-btn fx-btn-primary">
             <Plus size={15} strokeWidth={2.5} />
             New Order
           </button>
@@ -437,7 +437,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
       </div>
 
       {/* ── Toolbar: tabs + search ──────────────────────────────────── */}
-      <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-[0_1px_2px_rgba(24,24,27,0.05)] p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="bg-white border border-[var(--fx-border)] rounded-xl shadow-[0_1px_2px_rgba(24,24,27,0.05)] p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 overflow-x-auto -mx-1 px-1">
           {STATUS_TABS.map((tab) => {
             const count = tab.key === "all" ? totalCount : orders.filter((o) => o.status === tab.key).length;
@@ -447,39 +447,39 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                 key={tab.key}
                 onClick={() => setFilter(tab.key)}
                 className={`flex items-center gap-1.5 h-10 px-4 rounded-[10px] text-[12px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  active ? "bg-[#F5C518] text-[#18181B]" : "text-[#71717A] hover:bg-[#F4F4F5] hover:text-[#18181B]"
+                  active ? "bg-[var(--fx-accent)] text-white shadow-sm shadow-[var(--fx-accent)]/25" : "text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] hover:text-[var(--fx-ink)]"
                 }`}
               >
                 {tab.label}
-                <span className={`text-[10px] font-bold font-mono ${active ? "text-[#18181B]/70" : "text-[#A1A1AA]"}`}>{count}</span>
+                <span className={`text-[10px] font-bold font-mono ${active ? "text-white/80" : "text-[var(--fx-faint)]"}`}>{count}</span>
               </button>
             );
           })}
         </div>
 
         <div className="relative w-full lg:w-80 shrink-0">
-          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#A1A1AA]" />
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--fx-faint)]" />
           <input
             type="text"
             placeholder="Search by order ID, name, email, phone..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 h-10 text-[12.5px] rounded-[10px] border border-[#E5E7EB] bg-[#F8F8F7] text-[#18181B] placeholder-[#A1A1AA] outline-none transition-all focus:border-[#EAB308] focus:bg-white focus:ring-[3px] focus:ring-[#F5C518]/[0.30]"
+            className="w-full pl-10 pr-4 h-10 text-[12.5px] rounded-[10px] border border-[var(--fx-border)] bg-[var(--fx-canvas)] text-[var(--fx-ink)] placeholder-[var(--fx-faint)] outline-none transition-all focus:border-[var(--fx-accent-ink)] focus:bg-white focus:ring-[3px] focus:ring-[var(--fx-accent)]/[0.30]"
           />
         </div>
       </div>
 
       {/* ── Bulk selection bar ──────────────────────────────────────── */}
       {selected.size > 0 && (
-        <div className="bg-[#FDF4DB] border border-[#EAB308]/50 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 animate-fade-in">
-          <span className="text-[12.5px] font-bold text-[#18181B]">
+        <div className="bg-[var(--fx-accent-soft)] border border-[var(--fx-accent-ink)]/50 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 animate-fade-in">
+          <span className="text-[12.5px] font-bold text-[var(--fx-ink)]">
             {selected.size} order{selected.size === 1 ? "" : "s"} selected
           </span>
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => bulkStatus("shipped")}
               disabled={bulkBusy || !hasShippable}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[10px] text-[12px] font-bold bg-[#18181B] text-white hover:bg-[#27272A] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[10px] text-[12px] font-bold bg-[var(--fx-ink)] text-white hover:bg-[var(--fx-ink)] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               title={hasShippable ? "Mark all selected placed orders as shipped" : "No selected order can be shipped next"}
             >
               <Truck size={13} /> Mark as Shipped
@@ -487,7 +487,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
             <button
               onClick={() => bulkStatus("delivered")}
               disabled={bulkBusy}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[10px] text-[12px] font-bold bg-white border border-[#E5E7EB] text-[#18181B] hover:bg-[#F8F8F7] transition-all cursor-pointer disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[10px] text-[12px] font-bold bg-white border border-[var(--fx-border)] text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] transition-all cursor-pointer disabled:opacity-40"
             >
               <CheckCircle2 size={13} /> Mark as Delivered
             </button>
@@ -500,7 +500,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
             </button>
             <button
               onClick={() => setSelected(new Set())}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-[10px] text-[12px] font-semibold text-[#71717A] hover:bg-white/60 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-[10px] text-[12px] font-semibold text-[var(--fx-ink-2)] hover:bg-white/60 transition-colors cursor-pointer"
             >
               <X size={13} /> Clear
             </button>
@@ -512,40 +512,40 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         <div className="xl:col-span-8 space-y-4 min-w-0">
           {/* Table */}
-          <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-[0_1px_2px_rgba(24,24,27,0.05)] overflow-hidden">
+          <div className="bg-white border border-[var(--fx-border)] rounded-xl shadow-[0_1px_2px_rgba(24,24,27,0.05)] overflow-hidden">
             {loading ? (
               <div className="p-16 text-center space-y-3">
-                <div className="w-12 h-12 rounded-xl bg-[#FDF4DB] text-[#A16207] flex items-center justify-center mx-auto">
+                <div className="w-12 h-12 rounded-xl bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center mx-auto">
                   <Loader2 size={22} className="animate-spin" />
                 </div>
-                <p className="font-semibold text-[13px] text-[#18181B]">Loading orders…</p>
+                <p className="font-semibold text-[13px] text-[var(--fx-ink)]">Loading orders…</p>
               </div>
             ) : loadError ? (
               <div className="p-16 text-center space-y-3">
                 <div className="w-12 h-12 rounded-xl bg-[#FEF2F2] text-[#EF4444] flex items-center justify-center mx-auto">
                   <XCircle size={22} />
                 </div>
-                <p className="font-bold text-[13px] text-[#18181B]">Couldn't load orders.</p>
-                <p className="text-[12px] text-[#71717A] font-mono max-w-[420px] mx-auto">{loadError}</p>
-                <button onClick={loadOrders} className="ac-btn ac-btn-danger h-10">
+                <p className="font-bold text-[13px] text-[var(--fx-ink)]">Couldn't load orders.</p>
+                <p className="text-[12px] text-[var(--fx-ink-2)] font-mono max-w-[420px] mx-auto">{loadError}</p>
+                <button onClick={loadOrders} className="fx-btn fx-btn-danger h-10">
                   <RefreshCw size={14} /> Retry
                 </button>
               </div>
             ) : filteredOrders.length === 0 ? (
               <div className="p-16 text-center space-y-3">
-                <div className="w-12 h-12 rounded-xl bg-[#FDF4DB] text-[#A16207] flex items-center justify-center mx-auto">
+                <div className="w-12 h-12 rounded-xl bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center mx-auto">
                   <ShoppingBag size={22} />
                 </div>
-                <p className="font-bold text-[13px] text-[#18181B]">
+                <p className="font-bold text-[13px] text-[var(--fx-ink)]">
                   {searchQuery || filter !== "all" ? "No orders match your filters." : "No orders yet."}
                 </p>
-                <p className="text-[12.5px] text-[#71717A] max-w-[420px] mx-auto">
+                <p className="text-[12.5px] text-[var(--fx-ink-2)] max-w-[420px] mx-auto">
                   {searchQuery || filter !== "all"
                     ? "Try a different search term or status tab."
                     : "Orders placed by customers on the Checkout page will appear here. You can also add one manually."}
                 </p>
                 {(searchQuery || filter !== "all") && (
-                  <button onClick={() => { setSearchQuery(""); setFilter("all"); }} className="ac-btn ac-btn-secondary h-10">
+                  <button onClick={() => { setSearchQuery(""); setFilter("all"); }} className="fx-btn fx-btn-secondary h-10">
                     <X size={14} /> Clear filters
                   </button>
                 )}
@@ -554,14 +554,14 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
               <>
                 <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-[#F8F8F7] border-b border-[#E5E7EB] text-[10px] font-bold uppercase tracking-wide text-[#71717A]">
+                      <tr className="bg-[var(--fx-canvas)] border-b border-[var(--fx-border)] text-[10px] font-bold uppercase tracking-wide text-[var(--fx-ink-2)]">
                         <th className="px-4 py-3 w-10">
                           <input
                             type="checkbox"
                             checked={pageAllSelected}
                             onChange={togglePageAll}
                             title="Select all orders on this page"
-                            className="w-4 h-4 rounded border-[#D0D5DD] text-[#EAB308] cursor-pointer"
+                            className="w-4 h-4 rounded border-[#D0D5DD] text-[var(--fx-accent-ink)] cursor-pointer"
                           />
                         </th>
                         {sortTh("name", "Customer")}
@@ -573,7 +573,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                         <th className="px-4 py-3 text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#E5E7EB]">
+                    <tbody className="divide-y divide-[var(--fx-border)]">
                       {pageRows.map((order) => {
                         const meta = STATUS_META[order.status] || STATUS_META.placed;
                         const payMeta = PAYMENT_META[order.payment?.status || "created"];
@@ -584,7 +584,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                             key={order.id}
                             onClick={() => { setSelectedOrder(order); setShipError(null); }}
                             className={`group cursor-pointer transition-colors ${
-                              isInspecting ? "bg-[#FDF4DB]/50" : isBulkSelected ? "bg-[#F5C518]/[0.07]" : "hover:bg-[#F8F8F7]"
+                              isInspecting ? "bg-[var(--fx-accent-soft)]/50" : isBulkSelected ? "bg-[var(--fx-accent)]/[0.07]" : "hover:bg-[var(--fx-canvas)]"
                             }`}
                           >
                             <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
@@ -593,7 +593,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                                 checked={isBulkSelected}
                                 onChange={() => toggleRow(order.id)}
                                 title="Select this order"
-                                className="w-4 h-4 rounded border-[#D0D5DD] text-[#EAB308] cursor-pointer"
+                                className="w-4 h-4 rounded border-[#D0D5DD] text-[var(--fx-accent-ink)] cursor-pointer"
                               />
                             </td>
                             <td className="px-4 py-3.5">
@@ -602,22 +602,22 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                                   {(order.name || "?").charAt(0).toUpperCase()}
                                 </div>
                                 <div className="min-w-0">
-                                  <div className="font-semibold text-[13px] text-[#18181B] truncate">
+                                  <div className="font-semibold text-[13px] text-[var(--fx-ink)] truncate">
                                     {order.name}
                                     {order.userId && (
-                                      <span className="ml-2 text-[9px] font-bold text-[#A16207] bg-[#FDF4DB] px-1.5 py-0.5 rounded-md align-middle">Registered</span>
+                                      <span className="ml-2 text-[9px] font-bold text-[var(--fx-accent-ink)] bg-[var(--fx-accent-soft)] px-1.5 py-0.5 rounded-md align-middle">Registered</span>
                                     )}
                                   </div>
-                                  <div className="text-[11px] text-[#A1A1AA] truncate">{order.email || "—"}</div>
+                                  <div className="text-[11px] text-[var(--fx-faint)] truncate">{order.email || "—"}</div>
                                 </div>
                               </div>
                             </td>
                             <td className="px-4 py-3.5">
-                              <div className="text-[12px] font-semibold text-[#18181B]">{order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? "s" : ""}</div>
-                              <div className="text-[11px] text-[#A1A1AA] max-w-[140px] truncate">{order.items?.[0]?.name || "—"}</div>
+                              <div className="text-[12px] font-semibold text-[var(--fx-ink)]">{order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? "s" : ""}</div>
+                              <div className="text-[11px] text-[var(--fx-faint)] max-w-[140px] truncate">{order.items?.[0]?.name || "—"}</div>
                             </td>
                             <td className="px-4 py-3.5">
-                              <span className="font-bold font-mono text-[13px] text-[#18181B]">₹{(order.total || 0).toLocaleString("en-IN")}</span>
+                              <span className="font-bold font-mono text-[13px] text-[var(--fx-ink)]">₹{(order.total || 0).toLocaleString("en-IN")}</span>
                             </td>
                             <td className="px-4 py-3.5">
                               <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold whitespace-nowrap ${payMeta.bg} ${payMeta.color}`}>
@@ -626,8 +626,8 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                             </td>
                             <td className="px-4 py-3.5"><Badge meta={meta} /></td>
                             <td className="px-4 py-3.5 whitespace-nowrap">
-                              <div className="text-[11px] font-semibold text-[#18181B]">{fmtDateTime(order.createdAt)}</div>
-                              <div className="text-[10px] font-mono text-[#A1A1AA]">{order.id}</div>
+                              <div className="text-[11px] font-semibold text-[var(--fx-ink)]">{fmtDateTime(order.createdAt)}</div>
+                              <div className="text-[10px] font-mono text-[var(--fx-faint)]">{order.id}</div>
                             </td>
                             <td className="px-4 py-3.5">
                               <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
@@ -635,7 +635,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                                   <button
                                     onClick={() => handleStatusChange(order.id, NEXT_STATUS[order.status]!)}
                                     disabled={updatingStatus}
-                                    className="flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[11px] font-bold bg-[#F5C518] text-[#18181B] hover:bg-[#EAB308] transition-all cursor-pointer disabled:opacity-50"
+                                    className="flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[11px] font-bold bg-[var(--fx-accent)] text-white hover:bg-[var(--fx-accent-ink)] transition-all cursor-pointer disabled:opacity-50 shadow-xs"
                                   >
                                     <Truck size={12} />
                                     Mark {STATUS_META[NEXT_STATUS[order.status]!].label}
@@ -643,7 +643,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                                 )}
                                 <button
                                   onClick={() => setDeleteConfirm({ type: "single", order })}
-                                  className="flex items-center justify-center w-8 h-8 rounded-[8px] text-[#A1A1AA] hover:text-[#EF4444] hover:bg-[#FEF2F2] transition-colors cursor-pointer"
+                                  className="flex items-center justify-center w-8 h-8 rounded-[8px] text-[var(--fx-faint)] hover:text-[#EF4444] hover:bg-[#FEF2F2] transition-colors cursor-pointer"
                                   title="Delete this order"
                                 >
                                   <Trash2 size={14} />
@@ -657,30 +657,30 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                  </table>
 
                  {/* Pagination footer */}
-                <div className="px-4 py-3 border-t border-[#E5E7EB] bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <span className="text-[11.5px] text-[#71717A]">
-                    Showing <span className="font-bold text-[#18181B]">{filteredOrders.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}</span>–
-                    <span className="font-bold text-[#18181B]">{Math.min(page * PAGE_SIZE, filteredOrders.length)}</span> of{" "}
-                    <span className="font-bold text-[#18181B]">{filteredOrders.length}</span> orders
+                <div className="px-4 py-3 border-t border-[var(--fx-border)] bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <span className="text-[11.5px] text-[var(--fx-ink-2)]">
+                    Showing <span className="font-bold text-[var(--fx-ink)]">{filteredOrders.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}</span>–
+                    <span className="font-bold text-[var(--fx-ink)]">{Math.min(page * PAGE_SIZE, filteredOrders.length)}</span> of{" "}
+                    <span className="font-bold text-[var(--fx-ink)]">{filteredOrders.length}</span> orders
                   </span>
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={page === 1}
-                      className="flex items-center justify-center w-9 h-9 rounded-[10px] border border-[#E5E7EB] bg-white text-[#18181B] hover:bg-[#F8F8F7] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="flex items-center justify-center w-9 h-9 rounded-[10px] border border-[var(--fx-border)] bg-white text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                       aria-label="Previous page"
                     >
                       <ChevronLeft size={15} />
                     </button>
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => {
                       const show = totalPages <= 7 || Math.abs(n - page) <= 1 || n === 1 || n === totalPages;
-                      if (!show) return n === totalPages - 1 || n === 2 ? <span key={n} className="px-1 text-[12px] text-[#A1A1AA]">…</span> : null;
+                      if (!show) return n === totalPages - 1 || n === 2 ? <span key={n} className="px-1 text-[12px] text-[var(--fx-faint)]">…</span> : null;
                       return (
                         <button
                           key={n}
                           onClick={() => setPage(n)}
                           className={`flex items-center justify-center min-w-9 h-9 px-2.5 rounded-[10px] text-[12px] font-semibold transition-all cursor-pointer ${
-                            page === n ? "bg-[#F5C518] text-[#18181B]" : "text-[#71717A] hover:bg-[#F4F4F5]"
+                            page === n ? "bg-[var(--fx-accent)] text-white shadow-xs" : "text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]"
                           }`}
                         >
                           {n}
@@ -690,7 +690,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                     <button
                       onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                       disabled={page === totalPages}
-                      className="flex items-center justify-center w-9 h-9 rounded-[10px] border border-[#E5E7EB] bg-white text-[#18181B] hover:bg-[#F8F8F7] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="flex items-center justify-center w-9 h-9 rounded-[10px] border border-[var(--fx-border)] bg-white text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                       aria-label="Next page"
                     >
                       <ChevronRight size={15} />
@@ -703,57 +703,57 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
         </div>
 
         {/* ── Details Inspector ─────────────────────────────────────── */}
-        <div className="xl:col-span-4 bg-white border border-[#E5E7EB] rounded-xl shadow-[0_1px_2px_rgba(24,24,27,0.05)] sticky top-6 min-w-0">
-          <div className="px-6 py-4 border-b border-[#E5E7EB] flex items-center justify-between gap-3">
-            <h3 className="font-display font-semibold text-[14.5px] text-[#18181B]">Order Inspector</h3>
-            {selectedOrder && <span className="text-[11px] font-mono font-bold text-[#A16207] bg-[#FDF4DB] px-2 py-0.5 rounded-md">{selectedOrder.id}</span>}
+        <div className="xl:col-span-4 bg-white border border-[var(--fx-border)] rounded-xl shadow-[0_1px_2px_rgba(24,24,27,0.05)] sticky top-6 min-w-0">
+          <div className="px-6 py-4 border-b border-[var(--fx-border)] flex items-center justify-between gap-3">
+            <h3 className="font-display font-semibold text-[14.5px] text-[var(--fx-ink)]">Order Inspector</h3>
+            {selectedOrder && <span className="text-[11px] font-mono font-bold text-[var(--fx-accent-ink)] bg-[var(--fx-accent-soft)] px-2 py-0.5 rounded-md">{selectedOrder.id}</span>}
           </div>
 
           {selectedOrder ? (
             <div className="p-6 space-y-5 text-[12px]">
               <div>
-                <label className="text-[10px] font-bold text-[#71717A] uppercase tracking-wide block mb-1.5">Customer</label>
-                <div className="font-bold text-[14px] text-[#18181B] bg-[#F8F8F7] border border-[#E5E7EB] p-3 rounded-[10px] flex items-center justify-between gap-2">
+                <label className="text-[10px] font-bold text-[var(--fx-ink-2)] uppercase tracking-wide block mb-1.5">Customer</label>
+                <div className="font-bold text-[14px] text-[var(--fx-ink)] bg-[var(--fx-canvas)] border border-[var(--fx-border)] p-3 rounded-[10px] flex items-center justify-between gap-2">
                   <span className="truncate">{selectedOrder.name}</span>
                   {selectedOrder.userId ? (
-                    <span className="text-[10px] font-bold text-[#A16207] bg-[#FDF4DB] px-2 py-0.5 rounded-md whitespace-nowrap">Registered</span>
+                    <span className="text-[10px] font-bold text-[var(--fx-accent-ink)] bg-[var(--fx-accent-soft)] px-2 py-0.5 rounded-md whitespace-nowrap">Registered</span>
                   ) : (
-                    <span className="text-[10px] font-bold text-[#71717A] bg-[#F4F4F5] px-2 py-0.5 rounded-md whitespace-nowrap">Guest</span>
+                    <span className="text-[10px] font-bold text-[var(--fx-ink-2)] bg-[var(--fx-canvas)] px-2 py-0.5 rounded-md whitespace-nowrap">Guest</span>
                   )}
                 </div>
                 {selectedOrder.userId && (
-                  <div className="text-[10.5px] font-mono text-[#A1A1AA] mt-1 truncate">User ID: {selectedOrder.userId}</div>
+                  <div className="text-[10.5px] font-mono text-[var(--fx-faint)] mt-1 truncate">User ID: {selectedOrder.userId}</div>
                 )}
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-[#71717A] uppercase tracking-wide block mb-1.5">Payment (Razorpay)</label>
-                <div className="bg-[#F8F8F7] border border-[#E5E7EB] rounded-[10px] p-3 space-y-1.5">
+                <label className="text-[10px] font-bold text-[var(--fx-ink-2)] uppercase tracking-wide block mb-1.5">Payment (Razorpay)</label>
+                <div className="bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-[10px] p-3 space-y-1.5">
                   {(() => {
                     const p = selectedOrder.payment;
                     const pMeta = PAYMENT_META[p?.status || "created"];
                     return (
                       <>
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-[#71717A]">Status</span>
+                          <span className="text-[var(--fx-ink-2)]">Status</span>
                           <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${pMeta.bg} ${pMeta.color}`}>{pMeta.label}</span>
                         </div>
                         {p?.razorpayPaymentId && (
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-[#71717A] shrink-0">Payment ID</span>
-                            <span className="font-mono text-[11px] text-[#18181B] truncate">{p.razorpayPaymentId}</span>
+                            <span className="text-[var(--fx-ink-2)] shrink-0">Payment ID</span>
+                            <span className="font-mono text-[11px] text-[var(--fx-ink)] truncate">{p.razorpayPaymentId}</span>
                           </div>
                         )}
                         {p?.razorpayOrderId && (
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-[#71717A] shrink-0">Razorpay Order</span>
-                            <span className="font-mono text-[11px] text-[#18181B] truncate">{p.razorpayOrderId}</span>
+                            <span className="text-[var(--fx-ink-2)] shrink-0">Razorpay Order</span>
+                            <span className="font-mono text-[11px] text-[var(--fx-ink)] truncate">{p.razorpayOrderId}</span>
                           </div>
                         )}
                         {p?.paidAt && (
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-[#71717A]">Paid At</span>
-                            <span className="text-[#18181B]">{fmtDateTime(p.paidAt)}</span>
+                            <span className="text-[var(--fx-ink-2)]">Paid At</span>
+                            <span className="text-[var(--fx-ink)]">{fmtDateTime(p.paidAt)}</span>
                           </div>
                         )}
                       </>
@@ -764,16 +764,16 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] font-bold text-[#71717A] uppercase tracking-wide block mb-1.5">Phone</label>
-                  <div className="font-bold text-[#18181B] bg-[#F8F8F7] border border-[#E5E7EB] p-3 rounded-[10px] flex items-center gap-1.5 font-mono">
-                    <Phone size={14} className="text-[#A16207]" />
+                  <label className="text-[10px] font-bold text-[var(--fx-ink-2)] uppercase tracking-wide block mb-1.5">Phone</label>
+                  <div className="font-bold text-[var(--fx-ink)] bg-[var(--fx-canvas)] border border-[var(--fx-border)] p-3 rounded-[10px] flex items-center gap-1.5 font-mono">
+                    <Phone size={14} className="text-[var(--fx-accent-ink)]" />
                     {selectedOrder.phone}
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-[#71717A] uppercase tracking-wide block mb-1.5">Email</label>
-                  <div className="font-medium text-[#18181B] bg-[#F8F8F7] border border-[#E5E7EB] p-3 rounded-[10px] flex items-center gap-1.5 truncate">
-                    <Mail size={14} className="text-[#A1A1AA] flex-shrink-0" />
+                  <label className="text-[10px] font-bold text-[var(--fx-ink-2)] uppercase tracking-wide block mb-1.5">Email</label>
+                  <div className="font-medium text-[var(--fx-ink)] bg-[var(--fx-canvas)] border border-[var(--fx-border)] p-3 rounded-[10px] flex items-center gap-1.5 truncate">
+                    <Mail size={14} className="text-[var(--fx-faint)] flex-shrink-0" />
                     <span className="truncate">{selectedOrder.email}</span>
                   </div>
                 </div>
@@ -781,9 +781,9 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
 
               {selectedOrder.shippingAddress && (
                 <div>
-                  <label className="text-[10px] font-bold text-[#71717A] uppercase tracking-wide block mb-1.5">Shipping Address</label>
-                  <div className="font-medium text-[#18181B] bg-[#F8F8F7] border border-[#E5E7EB] p-3 rounded-[10px] flex items-start gap-1.5">
-                    <MapPin size={14} className="text-[#A16207] flex-shrink-0 mt-0.5" />
+                  <label className="text-[10px] font-bold text-[var(--fx-ink-2)] uppercase tracking-wide block mb-1.5">Shipping Address</label>
+                  <div className="font-medium text-[var(--fx-ink)] bg-[var(--fx-canvas)] border border-[var(--fx-border)] p-3 rounded-[10px] flex items-start gap-1.5">
+                    <MapPin size={14} className="text-[var(--fx-accent-ink)] flex-shrink-0 mt-0.5" />
                     <span>
                       {[selectedOrder.shippingAddress.address, selectedOrder.shippingAddress.city, selectedOrder.shippingAddress.state, selectedOrder.shippingAddress.pincode]
                         .filter(Boolean)
@@ -794,60 +794,60 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
               )}
 
               <div>
-                <label className="text-[10px] font-bold text-[#71717A] uppercase tracking-wide block mb-1.5">Items</label>
-                <div className="bg-[#F8F8F7] border border-[#E5E7EB] rounded-[10px] divide-y divide-[#E5E7EB] overflow-hidden">
+                <label className="text-[10px] font-bold text-[var(--fx-ink-2)] uppercase tracking-wide block mb-1.5">Items</label>
+                <div className="bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-[10px] divide-y divide-[var(--fx-border)] overflow-hidden">
                   {(selectedOrder.items || []).map((it, i) => (
                     <div key={i} className="flex items-center justify-between gap-2 p-3">
-                      <span className="font-semibold text-[#18181B]">{it.name} × {it.qty}</span>
-                      <span className="font-bold text-[#18181B] font-mono">₹{(it.price * it.qty).toLocaleString("en-IN")}</span>
+                      <span className="font-semibold text-[var(--fx-ink)]">{it.name} × {it.qty}</span>
+                      <span className="font-bold text-[var(--fx-ink)] font-mono">₹{(it.price * it.qty).toLocaleString("en-IN")}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="bg-[#F8F8F7] border border-[#E5E7EB] rounded-[10px] p-3.5 space-y-1.5">
-                <div className="flex justify-between text-[#71717A]"><span>Subtotal</span><span className="font-mono">₹{selectedOrder.subtotal.toLocaleString("en-IN")}</span></div>
-                <div className="flex justify-between text-[#71717A]"><span>Delivery</span><span className="font-mono">{selectedOrder.deliveryFee ? `₹${selectedOrder.deliveryFee}` : "Free"}</span></div>
-                <div className="flex justify-between font-black text-[#18181B] text-[14.5px] pt-2 border-t border-[#E5E7EB]"><span>Total</span><span className="font-mono">₹{selectedOrder.total.toLocaleString("en-IN")}</span></div>
+              <div className="bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-[10px] p-3.5 space-y-1.5">
+                <div className="flex justify-between text-[var(--fx-ink-2)]"><span>Subtotal</span><span className="font-mono">₹{selectedOrder.subtotal.toLocaleString("en-IN")}</span></div>
+                <div className="flex justify-between text-[var(--fx-ink-2)]"><span>Delivery</span><span className="font-mono">{selectedOrder.deliveryFee ? `₹${selectedOrder.deliveryFee}` : "Free"}</span></div>
+                <div className="flex justify-between font-black text-[var(--fx-ink)] text-[14.5px] pt-2 border-t border-[var(--fx-border)]"><span>Total</span><span className="font-mono">₹{selectedOrder.total.toLocaleString("en-IN")}</span></div>
               </div>
 
               {/* ── Shiprocket ── */}
-              <div className="pt-2 border-t border-[#E5E7EB] space-y-2">
-                <label className="text-[10px] font-bold text-[#71717A] uppercase tracking-wide block">Delivery (Shiprocket)</label>
+              <div className="pt-2 border-t border-[var(--fx-border)] space-y-2">
+                <label className="text-[10px] font-bold text-[var(--fx-ink-2)] uppercase tracking-wide block">Delivery (Shiprocket)</label>
 
                 {selectedOrder.shiprocket?.shipmentId ? (
-                  <div className="bg-[#F8F8F7] border border-[#E5E7EB] rounded-[10px] p-3 space-y-1.5">
+                  <div className="bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-[10px] p-3 space-y-1.5">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[#71717A]">Courier</span>
-                      <span className="font-semibold text-[#18181B] truncate">{selectedOrder.shiprocket.courierName || "Assigning…"}</span>
+                      <span className="text-[var(--fx-ink-2)]">Courier</span>
+                      <span className="font-semibold text-[var(--fx-ink)] truncate">{selectedOrder.shiprocket.courierName || "Assigning…"}</span>
                     </div>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[#71717A]">AWB</span>
-                      <span className="font-mono text-[11px] text-[#18181B] truncate">{selectedOrder.shiprocket.awbCode || "Pending"}</span>
+                      <span className="text-[var(--fx-ink-2)]">AWB</span>
+                      <span className="font-mono text-[11px] text-[var(--fx-ink)] truncate">{selectedOrder.shiprocket.awbCode || "Pending"}</span>
                     </div>
                     {selectedOrder.shiprocket.currentStatus && (
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[#71717A]">Courier Status</span>
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-[#FDF4DB] text-[#A16207]">
+                        <span className="text-[var(--fx-ink-2)]">Courier Status</span>
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)]">
                           {selectedOrder.shiprocket.currentStatus}
                         </span>
                       </div>
                     )}
                     {selectedOrder.shiprocket.etd && (
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[#71717A]">Expected</span>
-                        <span className="text-[#18181B]">{selectedOrder.shiprocket.etd}</span>
+                        <span className="text-[var(--fx-ink-2)]">Expected</span>
+                        <span className="text-[var(--fx-ink)]">{selectedOrder.shiprocket.etd}</span>
                       </div>
                     )}
 
                     {!!selectedOrder.shiprocket.timeline?.length && (
-                       <div className="pt-2.5 mt-1 border-t border-[#E5E7EB] space-y-2.5">
+                       <div className="pt-2.5 mt-1 border-t border-[var(--fx-border)] space-y-2.5">
                         {[...selectedOrder.shiprocket.timeline].reverse().map((ev, i) => (
                           <div key={`${ev.status}-${ev.at}-${i}`} className="flex gap-2.5">
-                            <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${i === 0 ? "bg-[#A16207]" : "bg-[#D5D6D9]"}`} />
+                            <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${i === 0 ? "bg-[var(--fx-accent-ink)]" : "bg-[#D5D6D9]"}`} />
                             <div className="min-w-0">
-                              <div className="text-[12px] font-semibold text-[#18181B]">{ev.status}</div>
-                              <div className="text-[11px] text-[#A1A1AA] font-mono truncate">
+                              <div className="text-[12px] font-semibold text-[var(--fx-ink)]">{ev.status}</div>
+                              <div className="text-[11px] text-[var(--fx-faint)] font-mono truncate">
                                 {[ev.at ? fmtDateTime(ev.at) : null, ev.location].filter(Boolean).join(" · ")}
                               </div>
                             </div>
@@ -860,7 +860,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                       <button
                         onClick={() => handleRefreshTracking(selectedOrder)}
                         disabled={refreshingTrack}
-                        className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-[10px] text-[12px] font-bold bg-[#18181B] text-white hover:bg-[#27272A] transition-colors cursor-pointer disabled:opacity-50"
+                        className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-[10px] text-[12px] font-bold bg-[var(--fx-ink)] text-white hover:bg-[var(--fx-ink)] transition-colors cursor-pointer disabled:opacity-50"
                       >
                         <RefreshCw size={13} className={refreshingTrack ? "animate-spin" : ""} />
                         {refreshingTrack ? "Refreshing…" : "Refresh Tracking"}
@@ -870,7 +870,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                           href={selectedOrder.shiprocket.trackingUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex items-center justify-center gap-1.5 h-10 px-4 rounded-[10px] text-[12px] font-bold bg-white text-[#18181B] border border-[#E5E7EB] hover:bg-[#F8F8F7] transition-colors"
+                          className="flex items-center justify-center gap-1.5 h-10 px-4 rounded-[10px] text-[12px] font-bold bg-white text-[var(--fx-ink)] border border-[var(--fx-border)] hover:bg-[var(--fx-canvas)] transition-colors"
                         >
                           <ExternalLink size={13} />
                           Open
@@ -879,7 +879,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                     </div>
                   </div>
                 ) : selectedOrder.status === "cancelled" ? (
-                  <p className="text-[12px] text-[#A1A1AA]">This order was cancelled — no shipment to book.</p>
+                  <p className="text-[12px] text-[var(--fx-faint)]">This order was cancelled — no shipment to book.</p>
                 ) : selectedOrder.payment?.status !== "paid" && selectedOrder.paymentMethod !== "cod" ? (
                   <p className="text-[12px] text-[#B54708] bg-[#FEF6E7] rounded-[10px] p-3">
                     Payment hasn't been confirmed yet. Book the shipment once this order shows as Paid (or switch it to COD).
@@ -888,7 +888,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                   <button
                     onClick={() => handleCreateShipment(selectedOrder)}
                     disabled={shipping}
-                    className="w-full flex items-center justify-center gap-1.5 h-11 rounded-[10px] text-[12.5px] font-bold bg-[#F5C518] text-[#18181B] hover:bg-[#EAB308] transition-colors cursor-pointer disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-1.5 h-11 rounded-[10px] text-[12.5px] font-bold bg-[var(--fx-accent)] text-white hover:bg-[var(--fx-accent-ink)] transition-colors cursor-pointer disabled:opacity-50 shadow-sm shadow-[var(--fx-accent)]/20"
                   >
                     {shipping ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
                     {shipping ? "Booking courier…" : "Book Shipment via Shiprocket"}
@@ -901,8 +901,8 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
               </div>
 
               {/* ── Fulfillment status ── */}
-              <div className="pt-2 border-t border-[#E5E7EB] space-y-2">
-                <label className="text-[10px] font-bold text-[#71717A] uppercase tracking-wide block">Fulfillment Status</label>
+              <div className="pt-2 border-t border-[var(--fx-border)] space-y-2">
+                <label className="text-[10px] font-bold text-[var(--fx-ink-2)] uppercase tracking-wide block">Fulfillment Status</label>
                 <div className="flex flex-wrap gap-2">
                   {(["placed", "shipped", "delivered", "cancelled"] as const).map((s) => {
                     const meta = STATUS_META[s];
@@ -913,7 +913,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                         onClick={() => handleStatusChange(selectedOrder.id, s)}
                         disabled={updatingStatus || isActive}
                         className={`h-9 px-4 rounded-[10px] text-[12px] font-bold capitalize transition-all cursor-pointer disabled:cursor-default ${
-                          isActive ? `${meta.bg} ${meta.color}` : "bg-[#F8F8F7] text-[#71717A] border border-[#E5E7EB] hover:bg-[#F4F4F5]"
+                          isActive ? `${meta.bg} ${meta.color}` : "bg-[var(--fx-canvas)] text-[var(--fx-ink-2)] border border-[var(--fx-border)] hover:bg-[var(--fx-canvas)]"
                         }`}
                       >
                         {meta.label}
@@ -923,7 +923,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-[#E5E7EB]">
+              <div className="pt-3 border-t border-[var(--fx-border)]">
                 <button
                   type="button"
                   onClick={() => setDeleteConfirm({ type: "single", order: selectedOrder })}
@@ -935,7 +935,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
               </div>
             </div>
           ) : (
-            <div className="py-20 px-6 text-center text-[#A1A1AA] text-[12.5px]">
+            <div className="py-20 px-6 text-center text-[var(--fx-faint)] text-[12.5px]">
               Select any order row to inspect items, shipping details, and update fulfillment status.
             </div>
           )}
@@ -944,14 +944,14 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
 
       {/* ── New Order Modal ─────────────────────────────────────────── */}
       {newOrderOpen && (
-        <div className="fixed inset-0 bg-[#18181B]/50 backdrop-blur-[2px] flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => !savingOrder && setNewOrderOpen(false)}>
-           <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-[#E5E7EB] p-6 space-y-5 animate-scale-up" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-[var(--fx-ink)]/50 backdrop-blur-[2px] flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => !savingOrder && setNewOrderOpen(false)}>
+           <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-[var(--fx-border)] p-6 space-y-5 animate-modal-pop" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="font-display text-[17px] font-bold text-[#18181B] tracking-[-0.3px]">Create new order</h2>
-                <p className="text-[12.5px] text-[#71717A] mt-0.5">Manually record an order placed outside the checkout flow.</p>
+                <h2 className="font-display text-[17px] font-bold text-[var(--fx-ink)] tracking-[-0.3px]">Create new order</h2>
+                <p className="text-[12.5px] text-[var(--fx-ink-2)] mt-0.5">Manually record an order placed outside the checkout flow.</p>
               </div>
-              <button onClick={() => setNewOrderOpen(false)} className="flex items-center justify-center w-8 h-8 rounded-[8px] text-[#71717A] hover:bg-[#F4F4F5] cursor-pointer" aria-label="Close">
+              <button onClick={() => setNewOrderOpen(false)} className="flex items-center justify-center w-8 h-8 rounded-[8px] text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] cursor-pointer" aria-label="Close">
                 <X size={16} />
               </button>
             </div>
@@ -959,29 +959,29 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-3">
-                  <label className="ac-label mb-1.5 block">Customer name</label>
-                  <input type="text" value={draft.name} onChange={(e) => setDraftField("name", e.target.value)} placeholder="e.g. Aarav Sharma" className="ac-input" />
+                  <label className="fx-label mb-1.5 block">Customer name</label>
+                  <input type="text" value={draft.name} onChange={(e) => setDraftField("name", e.target.value)} placeholder="e.g. Aarav Sharma" className="fx-input" />
                 </div>
                 <div>
-                  <label className="ac-label mb-1.5 block">Email</label>
-                  <input type="email" value={draft.email} onChange={(e) => setDraftField("email", e.target.value)} placeholder="name@example.com" className="ac-input" />
+                  <label className="fx-label mb-1.5 block">Email</label>
+                  <input type="email" value={draft.email} onChange={(e) => setDraftField("email", e.target.value)} placeholder="name@example.com" className="fx-input" />
                 </div>
                 <div>
-                  <label className="ac-label mb-1.5 block">Phone</label>
-                  <input type="tel" value={draft.phone} onChange={(e) => setDraftField("phone", e.target.value)} placeholder="90XXXXXXXX" className="ac-input font-mono" />
+                  <label className="fx-label mb-1.5 block">Phone</label>
+                  <input type="tel" value={draft.phone} onChange={(e) => setDraftField("phone", e.target.value)} placeholder="90XXXXXXXX" className="fx-input font-mono" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="ac-label mb-1.5 block">Payment</label>
-                    <select value={draft.paymentMethod} onChange={(e) => setDraftField("paymentMethod", e.target.value)} className="ac-input">
+                    <label className="fx-label mb-1.5 block">Payment</label>
+                    <select value={draft.paymentMethod} onChange={(e) => setDraftField("paymentMethod", e.target.value)} className="fx-input">
                       <option value="upi">UPI</option>
                       <option value="cod">COD</option>
                       <option value="card">Card</option>
                     </select>
                   </div>
                   <div>
-                    <label className="ac-label mb-1.5 block">Delivery</label>
-                    <select value={draft.deliveryMethod} onChange={(e) => setDraftField("deliveryMethod", e.target.value)} className="ac-input">
+                    <label className="fx-label mb-1.5 block">Delivery</label>
+                    <select value={draft.deliveryMethod} onChange={(e) => setDraftField("deliveryMethod", e.target.value)} className="fx-input">
                       <option value="standard">Standard</option>
                       <option value="express">Express</option>
                     </select>
@@ -991,10 +991,10 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="ac-label block">Line items</label>
+                  <label className="fx-label block">Line items</label>
                   <button
                     onClick={() => setDraft((d) => ({ ...d, items: [...d.items, { name: "", qty: 1, price: 0 }] }))}
-                    className="flex items-center gap-1 h-8 px-2.5 rounded-[8px] text-[11.5px] font-bold text-[#A16207] bg-[#FDF4DB] hover:bg-[#F8E9B0] transition-colors cursor-pointer"
+                    className="flex items-center gap-1 h-8 px-2.5 rounded-[8px] text-[11.5px] font-bold text-[var(--fx-accent-ink)] bg-[var(--fx-accent-soft)] hover:bg-[var(--fx-accent-soft)] transition-colors cursor-pointer"
                   >
                     <Plus size={12} /> Add item
                   </button>
@@ -1002,10 +1002,10 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                 <div className="space-y-2">
                   {draft.items.map((it, i) => (
                     <div key={i} className="flex items-center gap-2">
-                      <input type="text" value={it.name} onChange={(e) => updateItem(i, "name", e.target.value)} placeholder="Item name" className="ac-input flex-1 min-w-0" />
-                      <input type="number" min={1} value={it.qty} onChange={(e) => updateItem(i, "qty", Math.max(1, Number(e.target.value) || 1))} title="Quantity" className="ac-input w-16 text-center" />
-                      <input type="number" min={0} step="1" value={it.price} onChange={(e) => updateItem(i, "price", Number(e.target.value) || 0)} placeholder="₹" title="Unit price" className="ac-input w-24 font-mono" />
-                      <button onClick={() => setDraft((d) => ({ ...d, items: d.items.filter((_, idx) => idx !== i) }))} disabled={draft.items.length === 1} className="flex items-center justify-center w-9 h-9 rounded-[8px] text-[#A1A1AA] hover:text-[#EF4444] hover:bg-[#FEF2F2] transition-colors cursor-pointer disabled:opacity-40" aria-label="Remove item">
+                      <input type="text" value={it.name} onChange={(e) => updateItem(i, "name", e.target.value)} placeholder="Item name" className="fx-input flex-1 min-w-0" />
+                      <input type="number" min={1} value={it.qty} onChange={(e) => updateItem(i, "qty", Math.max(1, Number(e.target.value) || 1))} title="Quantity" className="fx-input w-16 text-center" />
+                      <input type="number" min={0} step="1" value={it.price} onChange={(e) => updateItem(i, "price", Number(e.target.value) || 0)} placeholder="₹" title="Unit price" className="fx-input w-24 font-mono" />
+                      <button onClick={() => setDraft((d) => ({ ...d, items: d.items.filter((_, idx) => idx !== i) }))} disabled={draft.items.length === 1} className="flex items-center justify-center w-9 h-9 rounded-[8px] text-[var(--fx-faint)] hover:text-[#EF4444] hover:bg-[#FEF2F2] transition-colors cursor-pointer disabled:opacity-40" aria-label="Remove item">
                         <X size={14} />
                       </button>
                     </div>
@@ -1015,35 +1015,35 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="ac-label mb-1.5 block">Address</label>
-                  <input type="text" value={draft.address} onChange={(e) => setDraftField("address", e.target.value)} placeholder="Street, area" className="ac-input" />
+                  <label className="fx-label mb-1.5 block">Address</label>
+                  <input type="text" value={draft.address} onChange={(e) => setDraftField("address", e.target.value)} placeholder="Street, area" className="fx-input" />
                 </div>
                 <div>
-                  <label className="ac-label mb-1.5 block">City</label>
-                  <input type="text" value={draft.city} onChange={(e) => setDraftField("city", e.target.value)} placeholder="City" className="ac-input" />
+                  <label className="fx-label mb-1.5 block">City</label>
+                  <input type="text" value={draft.city} onChange={(e) => setDraftField("city", e.target.value)} placeholder="City" className="fx-input" />
                 </div>
                 <div>
-                  <label className="ac-label mb-1.5 block">State</label>
-                  <input type="text" value={draft.state} onChange={(e) => setDraftField("state", e.target.value)} placeholder="State" className="ac-input" />
+                  <label className="fx-label mb-1.5 block">State</label>
+                  <input type="text" value={draft.state} onChange={(e) => setDraftField("state", e.target.value)} placeholder="State" className="fx-input" />
                 </div>
                 <div>
-                  <label className="ac-label mb-1.5 block">Pincode</label>
-                  <input type="text" value={draft.pincode} onChange={(e) => setDraftField("pincode", e.target.value)} placeholder="Pincode" className="ac-input font-mono" />
+                  <label className="fx-label mb-1.5 block">Pincode</label>
+                  <input type="text" value={draft.pincode} onChange={(e) => setDraftField("pincode", e.target.value)} placeholder="Pincode" className="fx-input font-mono" />
                 </div>
               </div>
 
-              <div className="bg-[#F8F8F7] border border-[#E5E7EB] rounded-[10px] px-4 py-3 space-y-1">
-                <div className="flex justify-between text-[12.5px] text-[#71717A]"><span>Subtotal</span><span className="font-mono">₹{draftSubtotal.toLocaleString("en-IN")}</span></div>
-                <div className="flex justify-between text-[12.5px] text-[#71717A]"><span>Delivery</span><span className="font-mono">{draftDelivery ? `₹${draftDelivery}` : "Free"}</span></div>
-                <div className="flex justify-between font-bold text-[14.5px] text-[#18181B] pt-1 border-t border-[#E5E7EB]"><span>Total</span><span className="font-mono">₹{draftTotal.toLocaleString("en-IN")}</span></div>
+              <div className="bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-[10px] px-4 py-3 space-y-1">
+                <div className="flex justify-between text-[12.5px] text-[var(--fx-ink-2)]"><span>Subtotal</span><span className="font-mono">₹{draftSubtotal.toLocaleString("en-IN")}</span></div>
+                <div className="flex justify-between text-[12.5px] text-[var(--fx-ink-2)]"><span>Delivery</span><span className="font-mono">{draftDelivery ? `₹${draftDelivery}` : "Free"}</span></div>
+                <div className="flex justify-between font-bold text-[14.5px] text-[var(--fx-ink)] pt-1 border-t border-[var(--fx-border)]"><span>Total</span><span className="font-mono">₹{draftTotal.toLocaleString("en-IN")}</span></div>
               </div>
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-1">
-              <button onClick={() => setNewOrderOpen(false)} disabled={savingOrder} className="ac-btn ac-btn-secondary">
+              <button onClick={() => setNewOrderOpen(false)} disabled={savingOrder} className="fx-btn fx-btn-secondary">
                 Cancel
               </button>
-              <button onClick={saveNewOrder} disabled={savingOrder} className="ac-btn ac-btn-accent">
+              <button onClick={saveNewOrder} disabled={savingOrder} className="fx-btn fx-btn-primary">
                 {savingOrder ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
                 {savingOrder ? "Creating…" : "Create Order"}
               </button>
@@ -1054,17 +1054,17 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
 
       {/* ── Delete Confirmation Modal ────────────────────────────────── */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-[#18181B]/50 backdrop-blur-[2px] flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#E5E7EB] space-y-4 animate-scale-up">
+        <div className="fixed inset-0 bg-[var(--fx-ink)]/50 backdrop-blur-[2px] flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[var(--fx-border)] space-y-4 animate-modal-pop">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#FEF2F2] text-[#EF4444] flex items-center justify-center shrink-0 mt-0.5">
+              <div className="w-10 h-10 rounded-xl bg-[var(--fx-red-soft)] text-[var(--fx-red)] flex items-center justify-center shrink-0 mt-0.5">
                 <AlertTriangle size={20} />
               </div>
               <div>
-                <h3 className="font-display text-[15px] font-bold text-[#18181B] leading-snug">
+                <h3 className="font-display text-[15px] font-bold text-[var(--fx-ink)] leading-snug">
                   {deleteConfirm.type === "all" ? "Delete All Orders?" : `Delete Order ${deleteConfirm.order.id}?`}
                 </h3>
-                <p className="text-[12.5px] text-[#71717A] mt-1 leading-relaxed">
+                <p className="text-[12.5px] text-[var(--fx-ink-2)] mt-1 leading-relaxed">
                   {deleteConfirm.type === "all"
                     ? "This will permanently delete all order records from the database. This action cannot be undone."
                     : `Are you sure you want to delete the order record for "${deleteConfirm.order.name}" (₹${deleteConfirm.order.total.toLocaleString("en-IN")})?`}
@@ -1072,12 +1072,12 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E5E7EB]">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--fx-border)]">
               <button
                 type="button"
                 onClick={() => setDeleteConfirm(null)}
                 disabled={deleting}
-                className="px-4 h-10 rounded-[10px] text-[12.5px] font-semibold text-[#71717A] bg-[#F4F4F5] hover:bg-[#E8E8EA] transition-colors cursor-pointer disabled:opacity-50"
+                className="px-4 h-10 rounded-[10px] text-[12.5px] font-semibold text-[var(--fx-ink-2)] bg-[var(--fx-canvas)] hover:bg-[var(--fx-border)] transition-colors cursor-pointer disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -1088,7 +1088,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                   else handleDeleteSingle(deleteConfirm.order.id);
                 }}
                 disabled={deleting}
-                className="px-4 h-10 rounded-[10px] text-[12.5px] font-bold text-white bg-[#EF4444] hover:bg-[#DC2626] transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                className="px-4 h-10 rounded-[10px] text-[12.5px] font-bold text-white bg-[var(--fx-red)] hover:bg-[#A32C24] transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
               >
                 {deleting && <Loader2 size={13} className="animate-spin" />}
                 <span>{deleting ? "Deleting..." : deleteConfirm.type === "all" ? "Yes, Delete All" : "Yes, Delete"}</span>

@@ -137,6 +137,18 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
     return () => clearInterval(interval);
   }, [isAdmin]);
 
+  // Default sticker QR placement was localStorage-only, so "Save Default
+  // Position" never actually became a shared default — it only stuck in the
+  // admin's own browser and reverted to the hardcoded fallback on another
+  // device, a fresh login, or cleared site data. Fetch the real saved value
+  // from the backend once on mount and let it win over the local cache.
+  useEffect(() => {
+    if (!isAdmin) return;
+    apiClient.admin.getStickerPosition().then((res) => {
+      if (res?.data) setStickerPos(res.data);
+    }).catch(() => { /* fall back to the local cache */ });
+  }, [isAdmin]);
+
   const admin = {
     name: profile?.fullName || (isAdmin ? "System Admin" : "Client User"),
     email: profile?.email || "",
@@ -172,8 +184,8 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
 
   return (
     <div
-      className="h-screen w-full flex overflow-hidden text-[#211922]"
-      style={{ "--accent": "#F6C000", fontFamily: "'Inter', sans-serif", background: "#FBFBF9" } as React.CSSProperties}
+      className="fx-shell h-screen w-full flex overflow-hidden text-[var(--fx-ink)]"
+      style={{ background: "var(--fx-canvas)" } as React.CSSProperties}
     >
       {/* Mobile drawer backdrop — md+ docks the sidebar so it never renders there */}
       {sidebarOpen && (
@@ -190,7 +202,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
         isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)}
       />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: "#FBFBF9" }}>
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: "var(--fx-canvas)" }}>
         <TopBar
           admin={admin} searchQuery={searchQuery} setSearchQuery={setSearchQuery}
           page={page} setPage={setPage}
@@ -204,7 +216,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
               qrList={qrList} setQrList={setQrList} templates={templates}
               setPage={setPage} openQuickLook={setQuickLookQr}
               openRestore={() => setRestoreModalOpen(true)} setToast={setToast}
-              openPrintSheet={handleOpenPrintSheet}
+              openPrintSheet={handleOpenPrintSheet} admin={admin}
             />
           )}
           {page === "orders" && <OrdersPage setToast={setToast} />}

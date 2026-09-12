@@ -16,9 +16,17 @@ const restoreLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: '
 // template placement) — nothing to upload or persist here.
 router.get('/', verifyToken, verifyAdmin, QrController.getQrCodes);
 router.post('/', verifyToken, verifyAdmin, QrController.saveQrCode);
+// id-scheme v2: server-generated recovery code + HMAC-derived id (see
+// QrModel.saveV2). New issuance only — existing v1 stickers are untouched.
+router.post('/v2', verifyToken, verifyAdmin, QrController.saveQrCodeV2);
 router.delete('/', verifyToken, verifyAdmin, QrController.deleteAllQrCodes);
 router.delete('/:id', verifyToken, verifyAdmin, QrController.deleteQrCode);
 router.post('/:id/restore', verifyToken, verifyAdmin, restoreLimiter, QrController.restoreQrCode);
+// Public, code-only recovery for id-scheme v2 stickers — no sticker id
+// needed from the caller at all (see QrModel.recoverByCodeV2). Declared
+// before the generic '/:id' GET route only for readability; the two never
+// collide since this is a POST on a static path.
+router.post('/recover-by-code', restoreLimiter, QrController.recoverByCode);
 // Public: anonymous visitors scan/activate a single sticker by ID
 router.get('/:id', QrController.getQrCodeById);
 // Public self-service recovery: a client (or anyone holding the sticker's

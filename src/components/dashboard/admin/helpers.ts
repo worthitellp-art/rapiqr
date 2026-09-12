@@ -41,34 +41,11 @@ export function fmtDateTime(d: string) {
   }
 }
 
-/**
- * A sticker's own id — cryptographically random (Web Crypto's CSPRNG).
- */
-export function generateStickerId(): string {
-  return crypto.randomUUID();
-}
-
-/**
- * 12-character hex recovery code generated client-side with CSPRNG.
- */
-export function generateClientRecoveryCode(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
-    const randomBytes = new Uint8Array(6);
-    crypto.getRandomValues(randomBytes);
-    return Array.from(randomBytes, (byte) => byte.toString(16).padStart(2, "0")).join("").toUpperCase();
-  }
-  return Math.random().toString(36).substring(2, 14).toUpperCase();
-}
-
-export function uid(prefix = "QR") {
-  const digits = "0123456789";
-  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-  let numPart = "";
-  for (let i = 0; i < 3; i++) numPart += digits.charAt(Math.floor(Math.random() * digits.length));
-  let letterPart = "";
-  for (let i = 0; i < 3; i++) letterPart += letters.charAt(Math.floor(Math.random() * letters.length));
-  return `${prefix}${numPart}${letterPart}`;
-}
+// Sticker ids and recovery codes are no longer generated client-side — the
+// server derives the id FROM a server-generated recovery code (id-scheme v2,
+// HMAC-SHA256; see Server/services/stickerCrypto.js) so the two can never
+// drift apart the way independently-generated client values could. See
+// QrModel.saveV2 / apiClient.qr.saveQrCodeV2.
 
 export function dispatchActivationToUserDashboard(qrItem: QrRecord) {
   if (typeof window === "undefined") return;

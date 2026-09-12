@@ -1,4 +1,4 @@
-import type React from "react";
+﻿import type React from "react";
 import { useState, useEffect } from "react";
 import { Plus, Trash2, Phone, AlertTriangle, Check, Mail, MapPin } from "lucide-react";
 import { useLocalStorage } from "./useLocalStorage";
@@ -136,20 +136,20 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
   const orphans = providers.filter((p: any) => !known.has(providerSlug(p)));
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[#18181B] font-body" style={{ background: "#F8F8F7" }}>
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[var(--fx-ink)] font-body" style={{ background: "var(--fx-canvas)" }}>
       {/* Add Provider Form */}
-      <div className="bg-white border border-[#E5E7EB] p-6 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
-        <h3 className="font-display font-semibold text-[#18181B] text-[14px] mb-5 flex items-center gap-2">
+      <div className="bg-white border border-[var(--fx-border)] p-6 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+        <h3 className="font-display font-semibold text-[var(--fx-ink)] text-[14px] mb-5 flex items-center gap-2">
           <Phone size={15} className="text-[#B54708]" /> Add Service Provider
         </h3>
         <form onSubmit={handleAdd} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
-              <label className="block text-[10px] font-extrabold text-[#71717A] mb-1.5 uppercase tracking-wider">Service Type</label>
+              <label className="block text-[10px] font-extrabold text-[var(--fx-ink-2)] mb-1.5 uppercase tracking-wider">Service Type</label>
               <select
                 value={serviceType}
                 onChange={(e) => setServiceType(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-[#E5E7EB] bg-white outline-none focus:border-[#F5C518] transition-all font-semibold text-[#18181B]"
+                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-[var(--fx-border)] bg-white outline-none focus:border-[var(--fx-accent)] transition-all font-semibold text-[var(--fx-ink)]"
               >
                 {SERVICE_TYPES.map((s) => (
                   <option key={s.slug} value={s.slug}>{s.label}</option>
@@ -157,23 +157,23 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-extrabold text-[#71717A] mb-1.5 uppercase tracking-wider">Provider Name</label>
+              <label className="block text-[10px] font-extrabold text-[var(--fx-ink-2)] mb-1.5 uppercase tracking-wider">Provider Name</label>
               <input
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder={meta.placeholder}
-                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-[#E5E7EB] bg-white outline-none focus:border-[#F5C518] transition-all font-semibold text-[#18181B]"
+                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-[var(--fx-border)] bg-white outline-none focus:border-[var(--fx-accent)] transition-all font-semibold text-[var(--fx-ink)]"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-extrabold text-[#71717A] mb-1.5 uppercase tracking-wider">Phone Number</label>
+              <label className="block text-[10px] font-extrabold text-[var(--fx-ink-2)] mb-1.5 uppercase tracking-wider">Phone Number</label>
               <PhoneInputWithCountry value={phone} onChange={(full) => setPhone(full)} />
             </div>
             <div className="flex items-end">
               <button
                 type="submit"
                 disabled={!label.trim() || !phone.trim() || saving}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#F5C518] hover:bg-[#EAB308] text-[#18181B] text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm shadow-[var(--fx-accent)]/20"
               >
                 <Plus size={14} /> {saving ? "Saving…" : "Add"}
               </button>
@@ -182,9 +182,9 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
 
           {/* Category scope */}
           <div>
-            <label className="block text-[10px] font-extrabold text-[#71717A] mb-2 uppercase tracking-wider">
+            <label className="block text-[10px] font-extrabold text-[var(--fx-ink-2)] mb-2 uppercase tracking-wider">
               Applicable Categories
-              <span className="ml-2 font-semibold normal-case tracking-normal text-[#A1A1AA]">
+              <span className="ml-2 font-semibold normal-case tracking-normal text-[var(--fx-faint)]">
                 — leave all unselected to make this provider available to every category
               </span>
             </label>
@@ -198,8 +198,8 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
                     onClick={() => toggleCategory(c.value)}
                     className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
                       on
-                        ? "bg-[#F5C518] border-[#F5C518] text-[#18181B]"
-                        : "bg-white border-[#E5E7EB] text-[#71717A] hover:border-[#A1A1AA]"
+                        ? "bg-[var(--fx-accent)] border-[var(--fx-accent)] text-white shadow-xs"
+                        : "bg-white border-[var(--fx-border)] text-[var(--fx-ink-2)] hover:border-[var(--fx-faint)]"
                     }`}
                   >
                     {on && <Check size={11} />} {c.label}
@@ -217,14 +217,14 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
           {grouped.map(({ type, items }) => {
             const m = getServiceMeta(type.slug);
             return (
-              <div key={type.slug} className="bg-white border border-[#E5E7EB] overflow-hidden rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
-                <div className="px-5 py-3 border-b border-[#E5E7EB] bg-[#F8F8F7] flex items-center gap-2.5">
+              <div key={type.slug} className="bg-white border border-[var(--fx-border)] overflow-hidden rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+                <div className="px-5 py-3 border-b border-[var(--fx-border)] bg-[var(--fx-canvas)] flex items-center gap-2.5">
                   <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: m.bg, color: m.color }}>
                     <m.Icon size={14} />
                   </div>
-                  <span className="text-xs font-extrabold text-[#18181B] uppercase tracking-wider">{type.label}</span>
-                  <span className="text-[10px] text-[#71717A] font-semibold bg-[#F4F4F5] px-1.5 py-0.5 rounded-lg">{items.length}</span>
-                  <span className="text-[10px] text-[#A1A1AA] font-mono ml-auto">{type.slug}</span>
+                  <span className="text-xs font-extrabold text-[var(--fx-ink)] uppercase tracking-wider">{type.label}</span>
+                  <span className="text-[10px] text-[var(--fx-ink-2)] font-semibold bg-[var(--fx-canvas)] px-1.5 py-0.5 rounded-lg">{items.length}</span>
+                  <span className="text-[10px] text-[var(--fx-faint)] font-mono ml-auto">{type.slug}</span>
                 </div>
 
                 {items.map((p: any) => {
@@ -236,14 +236,14 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
                   return (
                     <div
                       key={p.id}
-                      className={`flex items-center justify-between px-5 py-3.5 border-b border-[#E5E7EB] last:border-0 hover:bg-[#F4F4F5] transition-colors ${inactive ? "opacity-55" : ""}`}
+                      className={`flex items-center justify-between px-5 py-3.5 border-b border-[var(--fx-border)] last:border-0 hover:bg-[var(--fx-canvas)] transition-colors ${inactive ? "opacity-55" : ""}`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.bg, color: m.color }}>
                           <m.Icon size={14} />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-[#18181B] truncate flex items-center gap-1.5">
+                          <p className="text-xs font-bold text-[var(--fx-ink)] truncate flex items-center gap-1.5">
                             {p.label}
                             {isApplication && (
                               <span className="px-1.5 py-0.5 rounded-md bg-[#FEF6E7] text-[#B54708] text-[9px] font-extrabold uppercase tracking-wider flex-shrink-0">
@@ -251,15 +251,15 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
                               </span>
                             )}
                           </p>
-                          <p className="text-[11px] text-[#71717A] font-mono font-semibold mt-0.5">{p.phone}</p>
+                          <p className="text-[11px] text-[var(--fx-ink-2)] font-mono font-semibold mt-0.5">{p.phone}</p>
                           {(p.city || p.email) && (
-                            <p className="text-[10px] text-[#71717A] font-semibold mt-1 flex items-center gap-2.5 flex-wrap">
+                            <p className="text-[10px] text-[var(--fx-ink-2)] font-semibold mt-1 flex items-center gap-2.5 flex-wrap">
                               {p.city && <span className="flex items-center gap-1"><MapPin size={10} /> {p.city}</span>}
                               {p.email && <span className="flex items-center gap-1"><Mail size={10} /> {p.email}</span>}
                             </p>
                           )}
-                          {p.notes && <p className="text-[10px] text-[#71717A] mt-1 line-clamp-2">{p.notes}</p>}
-                          <p className="text-[10px] text-[#A1A1AA] font-semibold mt-1">
+                          {p.notes && <p className="text-[10px] text-[var(--fx-ink-2)] mt-1 line-clamp-2">{p.notes}</p>}
+                          <p className="text-[10px] text-[var(--fx-faint)] font-semibold mt-1">
                             {scope.length === 0
                               ? "All categories"
                               : scope.map((s) => STICKER_CATEGORIES.find((c) => c.value === s)?.label || s).join(" · ")}
@@ -272,7 +272,7 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
                           onClick={() => handleToggleActive(p)}
                           className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider border transition-all cursor-pointer ${
                             inactive
-                              ? "bg-white border-[#E5E7EB] text-[#A1A1AA] hover:border-[#16A34A] hover:text-[#16A34A]"
+                              ? "bg-white border-[var(--fx-border)] text-[var(--fx-faint)] hover:border-[#16A34A] hover:text-[#16A34A]"
                               : "bg-[#F0FDF4] border-[#16A34A]/30 text-[#16A34A] hover:bg-[#D7F2E2]"
                           }`}
                         >
@@ -280,7 +280,7 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
                         </button>
                         <button
                           onClick={() => handleRemove(p.id)}
-                          className="w-7 h-7 rounded-lg hover:bg-[#FEF2F2] hover:text-[#EF4444] flex items-center justify-center text-[#A1A1AA] transition-all cursor-pointer"
+                          className="w-7 h-7 rounded-lg hover:bg-[#FEF2F2] hover:text-[#EF4444] flex items-center justify-center text-[var(--fx-faint)] transition-all cursor-pointer"
                         >
                           <Trash2 size={13} />
                         </button>
@@ -293,24 +293,24 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
           })}
 
           {orphans.length > 0 && (
-            <div className="bg-white border border-[#E5E7EB] overflow-hidden rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
-              <div className="px-5 py-3 border-b border-[#E5E7EB] bg-[#FEF6E7] flex items-center gap-2.5">
+            <div className="bg-white border border-[var(--fx-border)] overflow-hidden rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+              <div className="px-5 py-3 border-b border-[var(--fx-border)] bg-[#FEF6E7] flex items-center gap-2.5">
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: "#FEF2F2", color: "#B54708" }}>
                   <AlertTriangle size={14} />
                 </div>
-                <span className="text-xs font-extrabold text-[#18181B] uppercase tracking-wider">Unrecognised service type</span>
-                <span className="text-[10px] text-[#71717A] font-semibold">These won't be matched by any scan-page button</span>
+                <span className="text-xs font-extrabold text-[var(--fx-ink)] uppercase tracking-wider">Unrecognised service type</span>
+                <span className="text-[10px] text-[var(--fx-ink-2)] font-semibold">These won't be matched by any scan-page button</span>
               </div>
               {orphans.map((p: any) => (
-                <div key={p.id} className="flex items-center justify-between px-5 py-3.5 border-b border-[#E5E7EB] last:border-0">
+                <div key={p.id} className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--fx-border)] last:border-0">
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-[#18181B] truncate">{p.label}</p>
-                    <p className="text-[11px] text-[#71717A] font-mono font-semibold mt-0.5">{p.phone}</p>
-                    <p className="text-[10px] text-[#A1A1AA] font-mono mt-1">{p.category || "—"} → {providerSlug(p) || "—"}</p>
+                    <p className="text-xs font-bold text-[var(--fx-ink)] truncate">{p.label}</p>
+                    <p className="text-[11px] text-[var(--fx-ink-2)] font-mono font-semibold mt-0.5">{p.phone}</p>
+                    <p className="text-[10px] text-[var(--fx-faint)] font-mono mt-1">{p.category || "—"} → {providerSlug(p) || "—"}</p>
                   </div>
                   <button
                     onClick={() => handleRemove(p.id)}
-                    className="w-7 h-7 rounded-lg hover:bg-[#FEF2F2] hover:text-[#EF4444] flex items-center justify-center text-[#A1A1AA] transition-all cursor-pointer flex-shrink-0"
+                    className="w-7 h-7 rounded-lg hover:bg-[#FEF2F2] hover:text-[#EF4444] flex items-center justify-center text-[var(--fx-faint)] transition-all cursor-pointer flex-shrink-0"
                   >
                     <Trash2 size={13} />
                   </button>
@@ -320,12 +320,12 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
           )}
         </div>
       ) : (
-        <div className="bg-white border border-[#E5E7EB] p-12 text-center rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
-          <div className="w-12 h-12 rounded-lg bg-[#F4F4F5] flex items-center justify-center mx-auto mb-3">
-            <Phone size={20} className="text-[#A1A1AA]" />
+        <div className="bg-white border border-[var(--fx-border)] p-12 text-center rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+          <div className="w-12 h-12 rounded-lg bg-[var(--fx-canvas)] flex items-center justify-center mx-auto mb-3">
+            <Phone size={20} className="text-[var(--fx-faint)]" />
           </div>
-          <p className="text-sm font-semibold text-[#18181B]">No providers added yet</p>
-          <p className="text-xs text-[#71717A] mt-1">Add your first service provider above</p>
+          <p className="text-sm font-semibold text-[var(--fx-ink)]">No providers added yet</p>
+          <p className="text-xs text-[var(--fx-ink-2)] mt-1">Add your first service provider above</p>
         </div>
       )}
     </div>

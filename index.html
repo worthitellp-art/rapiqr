@@ -17,7 +17,17 @@
     <link rel="icon" type="image/png" href="/src/assets/REPIQR ICON .png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Inter is loaded as its full variable font (opsz 14..32, wght 100..900)
+         rather than fixed static weights — Inter's opsz axis is what the
+         reference designs call "Inter Display": browsers apply
+         font-optical-sizing:auto by default, so the same family
+         automatically renders the Display cut at heading/stat sizes and the
+         Text cut at body sizes, with no separate family name needed. -->
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+    <!-- Plus Jakarta Sans is kept only for the sticker-artwork font picker on
+         the Customization page (constants.ts FONT_OPTIONS) — dashboard chrome
+         itself uses Inter (above) + JetBrains Mono (mono/code) exclusively. -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Google Identity Services is loaded lazily, only when Google sign-in is
          actually attempted (see loadGoogleIdentityScript in AuthContext.tsx) —
          it was previously loaded eagerly here and shipped ~84% unused bytes to
@@ -25,6 +35,7 @@
   </head>
   <body>
     <div id="root"></div>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

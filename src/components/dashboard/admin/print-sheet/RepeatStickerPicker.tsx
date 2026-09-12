@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+﻿import React, { useState, useMemo } from "react";
 import { Search, Check, Sparkles } from "lucide-react";
 import { QrRecord } from "../types";
 
@@ -28,13 +28,13 @@ export default function RepeatStickerPicker({
   }, [stickers, searchQuery]);
 
   return (
-    <div className="bg-[#F8F8F7] p-3.5 rounded-lg border border-[#E5E7EB] space-y-2.5">
+    <div className="bg-[var(--fx-canvas)] p-3.5 rounded-lg border border-[var(--fx-border)] space-y-2.5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <label className="text-[12px] font-bold text-[#18181B] flex items-center gap-1.5">
-          <Sparkles size={14} className="text-[#EAB308]" />
+        <label className="text-[12px] font-bold text-[var(--fx-ink)] flex items-center gap-1.5">
+          <Sparkles size={14} className="text-[var(--fx-accent-ink)]" />
           <span>Choose Sticker to Repeat:</span>
         </label>
-        <span className="text-[11px] text-[#71717A]">
+        <span className="text-[11px] text-[var(--fx-ink-2)]">
           {stickers.length} {stickers.length === 1 ? "sticker" : "stickers"} available
         </span>
       </div>
@@ -43,13 +43,13 @@ export default function RepeatStickerPicker({
         {/* Search filter for large fleets */}
         {stickers.length > 5 && (
           <div className="relative sm:w-60">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#71717A]" />
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--fx-ink-2)]" />
             <input
               type="text"
               placeholder="Search tag ID or phone..."
               value={searchQuery}
               onChange={(searchEvent) => setSearchQuery(searchEvent.target.value)}
-              className="w-full bg-white border border-[#E5E7EB] rounded-md pl-8 pr-3 py-1.5 text-[12.5px] text-[#18181B] placeholder-[#A1A1AA] outline-none focus:border-[#F5C518]"
+              className="w-full bg-white border border-[var(--fx-border)] rounded-md pl-8 pr-3 py-1.5 text-[12.5px] text-[var(--fx-ink)] placeholder-[var(--fx-faint)] outline-none focus:border-[var(--fx-accent)]"
             />
           </div>
         )}
@@ -58,7 +58,7 @@ export default function RepeatStickerPicker({
         <select
           value={selectedStickerId}
           onChange={(changeEvent) => onSelectSticker(changeEvent.target.value)}
-          className="flex-1 bg-white border border-[#E5E7EB] rounded-md px-3 py-1.5 text-[13px] font-semibold text-[#18181B] outline-none focus:border-[#F5C518] cursor-pointer"
+          className="flex-1 bg-white border border-[var(--fx-border)] rounded-md px-3 py-1.5 text-[13px] font-semibold text-[var(--fx-ink)] outline-none focus:border-[var(--fx-accent)] cursor-pointer"
         >
           {filteredStickers.length === 0 ? (
             <option value="" disabled>
@@ -75,9 +75,9 @@ export default function RepeatStickerPicker({
       </div>
 
       {selectedStickerId && (
-        <div className="flex items-center gap-2 text-[11.5px] text-[#A16207] font-medium bg-[#FDF4DB]/60 px-2.5 py-1 rounded">
+        <div className="flex items-center gap-2 text-[11.5px] text-[var(--fx-accent-ink)] font-medium bg-[var(--fx-accent-soft)]/60 px-2.5 py-1 rounded">
           <Check size={13} strokeWidth={2.5} />
-          <span>Currently selected for 3×3 tiling: <strong className="font-mono font-bold text-[#18181B]">{selectedStickerId}</strong></span>
+          <span>Currently selected for 3×3 tiling: <strong className="font-mono font-bold text-[var(--fx-ink)]">{selectedStickerId}</strong></span>
         </div>
       )}
     </div>

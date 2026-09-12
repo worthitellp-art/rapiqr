@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { X, AlertTriangle, Plus, Trash2, ArrowRightLeft, History, Loader2, ExternalLink, Download, Copy, Check, QrCode, Printer, RefreshCw } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { DashboardSticker, EmergencyContact } from './types';
@@ -18,7 +18,7 @@ function ModalShell({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center p-4"
+      className="fx-shell fixed inset-0 z-[120] flex items-center justify-center p-4 text-[var(--fx-ink)]"
       style={{ background: 'rgba(10,10,20,0.6)', backdropFilter: 'blur(4px)' }}
       onClick={onClose}
     >
@@ -37,16 +37,16 @@ function ModalShell({
 function ModalHeader({ title, onClose }: { title: string; onClose: () => void }) {
   return (
     <div className="flex items-center justify-between mb-5">
-      <h3 className="font-bold text-lg text-[#1A1D26]">{title}</h3>
-      <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#F5F6FA] flex items-center justify-center text-gray-500 hover:text-gray-900 cursor-pointer">
+      <h3 className="font-bold text-lg text-[var(--fx-ink)]">{title}</h3>
+      <button onClick={onClose} className="w-8 h-8 rounded-full bg-[var(--fx-canvas)] flex items-center justify-center text-gray-500 hover:text-gray-900 cursor-pointer">
         <X size={16} />
       </button>
     </div>
   );
 }
 
-const inputCls = 'w-full px-3.5 py-2.5 text-sm bg-[#F5F6FA] border border-[#E8ECF4] rounded-xl outline-none focus:border-[#111111]';
-const labelCls = 'block text-xs font-bold text-[#64748B] mb-1';
+const inputCls = 'w-full px-3.5 py-2.5 text-sm bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-xl outline-none focus:border-[var(--fx-ink)]';
+const labelCls = 'block text-xs font-bold text-[var(--fx-ink-2)] mb-1';
 
 /* ─── EDIT DETAILS MODAL ─── */
 export function EditDetailsModal({
@@ -105,7 +105,7 @@ export function EditDetailsModal({
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white bg-[#111111] hover:bg-black disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5"
+          className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm shadow-[var(--fx-accent)]/20 transition-all"
         >
           {saving && <Loader2 size={13} className="animate-spin" />} Save Changes
         </button>
@@ -174,7 +174,7 @@ export function EditContactsModal({
         ))}
         <button
           onClick={addContact}
-          className="w-full py-2.5 rounded-xl border border-dashed border-[#E8ECF4] text-xs font-bold text-[#64748B] hover:bg-[#F5F6FA] flex items-center justify-center gap-1.5 cursor-pointer"
+          className="w-full py-2.5 rounded-xl border border-dashed border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] flex items-center justify-center gap-1.5 cursor-pointer"
         >
           <Plus size={14} /> Add Contact
         </button>
@@ -186,7 +186,7 @@ export function EditContactsModal({
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white bg-[#111111] hover:bg-black disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5"
+          className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm shadow-[var(--fx-accent)]/20 transition-all"
         >
           {saving && <Loader2 size={13} className="animate-spin" />} Save Contacts
         </button>
@@ -229,7 +229,7 @@ export function TransferModal({
   return (
     <ModalShell onClose={onClose}>
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(37,99,235,0.12)', color: '#2563EB' }}>
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(37,99,235,0.12)', color: 'var(--fx-accent)' }}>
           <ArrowRightLeft size={18} />
         </div>
         <h3 className="font-bold text-gray-900 text-base leading-snug">Transfer Sticker Ownership</h3>
@@ -256,7 +256,7 @@ export function TransferModal({
           onClick={handleSubmit}
           disabled={busy}
           className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90 cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60"
-          style={{ background: '#2563EB' }}
+          style={{ background: 'var(--fx-accent)' }}
         >
           {busy && <Loader2 size={13} className="animate-spin" />} {confirming ? 'Confirm Transfer' : 'Transfer'}
         </button>
@@ -281,27 +281,27 @@ export function ScanHistoryModal({
     <ModalShell onClose={onClose} maxWidth="max-w-lg">
       <ModalHeader title={`Scan & Alert History — ${sticker.nickname}`} onClose={onClose} />
       {loading ? (
-        <div className="py-10 flex items-center justify-center text-[#64748B] text-xs gap-2">
+        <div className="py-10 flex items-center justify-center text-[var(--fx-ink-2)] text-xs gap-2">
           <Loader2 size={16} className="animate-spin" /> Loading history…
         </div>
       ) : history.length === 0 ? (
         <div className="text-center py-10 space-y-2">
-          <History size={28} className="mx-auto text-[#94A3B8]" />
-          <p className="text-xs text-[#64748B]">No scans or alerts recorded yet for this sticker.</p>
+          <History size={28} className="mx-auto text-[var(--fx-faint)]" />
+          <p className="text-xs text-[var(--fx-ink-2)]">No scans or alerts recorded yet for this sticker.</p>
         </div>
       ) : (
         <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
           {history.map((h, idx) => (
-            <div key={h.id || idx} className="bg-[#F5F6FA] rounded-xl p-3.5 border border-[#E8ECF4]">
+            <div key={h.id || idx} className="bg-[var(--fx-canvas)] rounded-xl p-3.5 border border-[var(--fx-border)]">
               <div className="flex justify-between items-center mb-1">
-                <span className="font-bold text-xs text-[#1A1D26] capitalize">{String(h.type || 'event').replace(/_/g, ' ')}</span>
-                <span className="text-[10px] text-[#94A3B8]">{h.created_at ? new Date(h.created_at).toLocaleString() : ''}</span>
+                <span className="font-bold text-xs text-[var(--fx-ink)] capitalize">{String(h.type || 'event').replace(/_/g, ' ')}</span>
+                <span className="text-[10px] text-[var(--fx-faint)]">{h.created_at ? new Date(h.created_at).toLocaleString() : ''}</span>
               </div>
-              {h.message && <p className="text-xs text-[#64748B]">{h.message}</p>}
+              {h.message && <p className="text-xs text-[var(--fx-ink-2)]">{h.message}</p>}
               <span className={`inline-block mt-1.5 text-[9.5px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                h.status === 'unread' ? 'bg-[#FEE2E2] text-[#DC2626]' :
-                h.status === 'acknowledged' ? 'bg-[#FEF3C7] text-[#B45309]' :
-                'bg-[#DCFCE7] text-[#16A34A]'
+                h.status === 'unread' ? 'bg-[var(--fx-red-soft)] text-[var(--fx-red)]' :
+                h.status === 'acknowledged' ? 'bg-[var(--fx-amber-soft)] text-[var(--fx-amber)]' :
+                'bg-[var(--fx-green-soft)] text-[var(--fx-green)]'
               }`}>
                 {h.status || 'logged'}
               </span>
@@ -334,7 +334,7 @@ export function ConfirmActionModal({
   const colors = {
     danger: { bg: 'rgba(239,68,68,0.12)', fg: '#EF4444', btn: '#EF4444' },
     warning: { bg: 'rgba(180,83,9,0.12)', fg: '#B45309', btn: '#B45309' },
-    info: { bg: 'rgba(37,99,235,0.12)', fg: '#2563EB', btn: '#2563EB' },
+    info: { bg: 'rgba(37,99,235,0.12)', fg: 'var(--fx-accent)', btn: 'var(--fx-accent)' },
   }[tone];
 
   return (
@@ -400,14 +400,14 @@ export function RecoverStickerModal({
   return (
     <ModalShell onClose={onClose}>
       <div className="flex items-center gap-3 mb-5">
-        <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(82,117,217,0.12)', color: '#5275D9' }}>
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(82,117,217,0.12)', color: 'var(--fx-accent)' }}>
           <RefreshCw size={18} />
         </div>
         <div>
           <h3 className="font-bold text-gray-900 text-base leading-snug">Recover a Sticker</h3>
           <p className="text-xs text-gray-500 font-medium">Deleted it by mistake, or it's missing? Enter its ID to bring it back — no code needed if it's linked to your account.</p>
         </div>
-        <button onClick={onClose} className="ml-auto w-8 h-8 rounded-full bg-[#F5F6FA] flex items-center justify-center text-gray-500 hover:text-gray-900 cursor-pointer shrink-0">
+        <button onClick={onClose} className="ml-auto w-8 h-8 rounded-full bg-[var(--fx-canvas)] flex items-center justify-center text-gray-500 hover:text-gray-900 cursor-pointer shrink-0">
           <X size={16} />
         </button>
       </div>
@@ -433,7 +433,7 @@ export function RecoverStickerModal({
             type="submit"
             disabled={submitting}
             className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90 cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60"
-            style={{ background: '#5275D9' }}
+            style={{ background: 'var(--fx-accent)' }}
           >
             {submitting ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} {submitting ? 'Recovering…' : 'Recover Sticker'}
           </button>
@@ -498,16 +498,16 @@ export function QrCodeModal({
 
       <div className="flex flex-col items-center text-center space-y-4">
         {/* Category & Nickname Badge */}
-        <div className="flex items-center gap-2 bg-[#F8FAFC] border border-[#E2E8F0] px-3.5 py-1.5 rounded-full">
+        <div className="flex items-center gap-2 bg-[var(--fx-canvas)] border border-[var(--fx-border)] px-3.5 py-1.5 rounded-full">
           <span className="text-sm">{getCategoryIcon(sticker.category as any) || '🏷️'}</span>
-          <span className="font-bold text-xs text-[#0F172A]">{sticker.nickname}</span>
-          <span className="text-[10px] font-bold text-[#D97706] bg-[#FEF3C7] px-2 py-0.5 rounded-full">
+          <span className="font-bold text-xs text-[var(--fx-ink)]">{sticker.nickname}</span>
+          <span className="text-[10px] font-bold text-[var(--fx-ink-2)] bg-[var(--fx-canvas)] px-2 py-0.5 rounded-full">
             {sticker.code || sticker.qrCodeId}
           </span>
         </div>
 
         {/* QR Code Container */}
-        <div className="p-5 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm flex flex-col items-center justify-center">
+        <div className="p-5 bg-white rounded-2xl border border-[var(--fx-border)] shadow-sm flex flex-col items-center justify-center">
           <QRCodeSVG
             id={`qr-code-svg-${sticker.id}`}
             value={scanUrl}
@@ -515,10 +515,10 @@ export function QrCodeModal({
             level="H"
             includeMargin={true}
           />
-          <p className="text-[10px] font-extrabold text-[#64748B] mt-2 tracking-widest uppercase">RepiQR Safety Tag</p>
+          <p className="text-[10px] font-extrabold text-[var(--fx-ink-2)] mt-2 tracking-widest uppercase">RepiQR Safety Tag</p>
         </div>
 
-        <p className="text-xs text-[#64748B] max-w-xs font-medium leading-relaxed">
+        <p className="text-xs text-[var(--fx-ink-2)] max-w-xs font-medium leading-relaxed">
           Scan this QR code with any smartphone camera to launch the emergency contact alert interface.
         </p>
 
@@ -528,7 +528,7 @@ export function QrCodeModal({
             href={scanUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full py-2.5 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-xs font-bold text-white flex items-center justify-center gap-2 transition-all shadow-sm"
+            className="w-full py-2.5 rounded-xl bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-xs font-bold text-white flex items-center justify-center gap-2 transition-all shadow-sm shadow-[var(--fx-accent)]/20"
           >
             <ExternalLink size={14} /> Open &amp; Test Scan Page
           </a>
@@ -536,7 +536,7 @@ export function QrCodeModal({
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={handleCopyScanLink}
-              className="py-2.5 px-3 rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#1E293B] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              className="py-2.5 px-3 rounded-xl border border-[var(--fx-border)] bg-white hover:bg-[var(--fx-canvas)] text-xs font-bold text-[var(--fx-ink-2)] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
               {copied ? 'Copied!' : 'Copy Link'}
@@ -544,7 +544,7 @@ export function QrCodeModal({
 
             <button
               onClick={handleDownloadQrCode}
-              className="py-2.5 px-3 rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#1E293B] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              className="py-2.5 px-3 rounded-xl border border-[var(--fx-border)] bg-white hover:bg-[var(--fx-canvas)] text-xs font-bold text-[var(--fx-ink-2)] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <Download size={14} /> Download PNG
             </button>
@@ -575,7 +575,7 @@ export function QrCodeModal({
                 onShowToast('Failed to generate print sheet');
               }
             }}
-            className="w-full py-2.5 px-3 rounded-xl border border-[#5C78DF]/30 bg-[#E8EDFF] hover:bg-[#DCE3FF] text-xs font-bold text-[#3E52B8] flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-2xs"
+            className="w-full py-2.5 px-3 rounded-xl border border-[var(--fx-accent)]/30 bg-[var(--fx-accent-soft)] hover:bg-[var(--fx-accent-soft)] text-xs font-bold text-[var(--fx-accent-ink)] flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-2xs"
           >
             <Printer size={14} />
             <span>Print 18×12″ Sheet (9 Stickers)</span>

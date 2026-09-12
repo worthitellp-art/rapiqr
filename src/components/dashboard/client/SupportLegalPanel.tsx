@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { ShieldCheck, Phone, Mail, FileText, Scale, AlertOctagon, Loader2, X } from 'lucide-react';
 import { apiClient } from '../../../lib/apiClient';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
@@ -9,7 +9,7 @@ const SUPPORT_EMAIL = 'support@rapiqr.com';
 function LegalModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center p-4"
+      className="fx-shell fixed inset-0 z-[120] flex items-center justify-center p-4 text-[var(--fx-ink)]"
       style={{ background: 'rgba(10,10,20,0.6)', backdropFilter: 'blur(4px)' }}
       onClick={onClose}
     >
@@ -18,12 +18,12 @@ function LegalModal({ title, onClose, children }: { title: string; onClose: () =
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-lg text-[#1A1D26]">{title}</h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#F5F6FA] flex items-center justify-center text-gray-500 hover:text-gray-900 cursor-pointer">
+          <h3 className="font-bold text-lg text-[var(--fx-ink)]">{title}</h3>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-[var(--fx-canvas)] flex items-center justify-center text-gray-500 hover:text-gray-900 cursor-pointer">
             <X size={16} />
           </button>
         </div>
-        <div className="text-xs text-[#475569] leading-relaxed space-y-3">{children}</div>
+        <div className="text-xs text-[var(--fx-ink-2)] leading-relaxed space-y-3">{children}</div>
       </div>
     </div>
   );
@@ -70,13 +70,13 @@ function ReportModal({
     <LegalModal title={type === 'lost' ? 'Report a Lost Sticker' : 'Report Suspected Fraud'} onClose={onClose}>
       <p>Tell us what happened — our team will follow up by phone or email.</p>
       <div>
-        <label className="block text-xs font-bold text-[#64748B] mb-1">Your Phone (optional)</label>
+        <label className="block text-xs font-bold text-[var(--fx-ink-2)] mb-1">Your Phone (optional)</label>
         <PhoneInputWithCountry value={phone} onChange={(full) => setPhone(full)} />
       </div>
       <div>
-        <label className="block text-xs font-bold text-[#64748B] mb-1">Details</label>
+        <label className="block text-xs font-bold text-[var(--fx-ink-2)] mb-1">Details</label>
         <textarea
-          className="w-full px-3.5 py-2.5 text-sm bg-[#F5F6FA] border border-[#E8ECF4] rounded-xl outline-none focus:border-[#111111] min-h-[100px]"
+          className="w-full px-3.5 py-2.5 text-sm bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-xl outline-none focus:border-[var(--fx-ink)] min-h-[100px]"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder={type === 'lost' ? 'Which sticker, when/where you noticed it missing…' : 'What looked suspicious or fraudulent…'}
@@ -85,7 +85,7 @@ function ReportModal({
       {error && <p className="text-xs font-bold text-[#DC2626]">{error}</p>}
       <div className="flex gap-3 pt-2">
         <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer">Cancel</button>
-        <button onClick={submit} disabled={sending} className="flex-1 py-2.5 rounded-xl bg-[#111111] hover:bg-black text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5">
+        <button onClick={submit} disabled={sending} className="flex-1 py-2.5 rounded-xl bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm shadow-[var(--fx-accent)]/20 transition-all">
           {sending && <Loader2 size={13} className="animate-spin" />} Submit Report
         </button>
       </div>
@@ -99,23 +99,23 @@ export default function SupportLegalPanel({ showToast }: { showToast: (msg: stri
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1D26]">Support &amp; Legal</h1>
-        <p className="text-xs sm:text-sm text-[#64748B] mt-1">Get help, report an issue, or review our policies.</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--fx-ink)]">Support &amp; Legal</h1>
+        <p className="text-xs sm:text-sm text-[var(--fx-ink-2)] mt-1">Get help, report an issue, or review our policies.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div className="bg-white border border-[#E8ECF4] rounded-2xl p-6 space-y-4">
-          <h3 className="font-bold text-sm text-[#1A1D26]">Customer Support</h3>
-          <a href={`tel:${SUPPORT_PHONE.replace(/\s/g, '')}`} className="flex items-center gap-3 text-sm font-semibold text-[#1A1D26] hover:text-[#111111]">
-            <span className="w-9 h-9 rounded-xl bg-[#F1F5F9] flex items-center justify-center flex-shrink-0"><Phone size={15} /></span>
+        <div className="bg-white border border-[var(--fx-border)] rounded-2xl p-6 space-y-4">
+          <h3 className="font-bold text-sm text-[var(--fx-ink)]">Customer Support</h3>
+          <a href={`tel:${SUPPORT_PHONE.replace(/\s/g, '')}`} className="flex items-center gap-3 text-sm font-semibold text-[var(--fx-ink)] hover:text-[var(--fx-ink)]">
+            <span className="w-9 h-9 rounded-xl bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><Phone size={15} /></span>
             {SUPPORT_PHONE}
           </a>
-          <a href={`mailto:${SUPPORT_EMAIL}`} className="flex items-center gap-3 text-sm font-semibold text-[#1A1D26] hover:text-[#111111]">
-            <span className="w-9 h-9 rounded-xl bg-[#F1F5F9] flex items-center justify-center flex-shrink-0"><Mail size={15} /></span>
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="flex items-center gap-3 text-sm font-semibold text-[var(--fx-ink)] hover:text-[var(--fx-ink)]">
+            <span className="w-9 h-9 rounded-xl bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><Mail size={15} /></span>
             {SUPPORT_EMAIL}
           </a>
           <div className="flex gap-2 pt-2">
-            <button onClick={() => setOpenModal('lost')} className="flex-1 py-2.5 rounded-xl bg-[#FEF3C7] hover:bg-[#FDE68A] text-[#B45309] text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5">
+            <button onClick={() => setOpenModal('lost')} className="flex-1 py-2.5 rounded-xl bg-[var(--fx-amber-soft)] hover:bg-[var(--fx-amber-soft)] text-[var(--fx-amber)] text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5">
               <AlertOctagon size={13} /> Report Lost Sticker
             </button>
             <button onClick={() => setOpenModal('fraud')} className="flex-1 py-2.5 rounded-xl bg-[#FEE2E2] hover:bg-[#FECACA] text-[#DC2626] text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5">
@@ -124,14 +124,14 @@ export default function SupportLegalPanel({ showToast }: { showToast: (msg: stri
           </div>
         </div>
 
-        <div className="bg-white border border-[#E8ECF4] rounded-2xl p-6 space-y-4">
-          <h3 className="font-bold text-sm text-[#1A1D26]">Legal</h3>
-          <button onClick={() => setOpenModal('privacy')} className="w-full flex items-center gap-3 text-sm font-semibold text-[#1A1D26] hover:text-[#111111] cursor-pointer">
-            <span className="w-9 h-9 rounded-xl bg-[#F1F5F9] flex items-center justify-center flex-shrink-0"><FileText size={15} /></span>
+        <div className="bg-white border border-[var(--fx-border)] rounded-2xl p-6 space-y-4">
+          <h3 className="font-bold text-sm text-[var(--fx-ink)]">Legal</h3>
+          <button onClick={() => setOpenModal('privacy')} className="w-full flex items-center gap-3 text-sm font-semibold text-[var(--fx-ink)] hover:text-[var(--fx-ink)] cursor-pointer">
+            <span className="w-9 h-9 rounded-xl bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><FileText size={15} /></span>
             Privacy Policy
           </button>
-          <button onClick={() => setOpenModal('terms')} className="w-full flex items-center gap-3 text-sm font-semibold text-[#1A1D26] hover:text-[#111111] cursor-pointer">
-            <span className="w-9 h-9 rounded-xl bg-[#F1F5F9] flex items-center justify-center flex-shrink-0"><Scale size={15} /></span>
+          <button onClick={() => setOpenModal('terms')} className="w-full flex items-center gap-3 text-sm font-semibold text-[var(--fx-ink)] hover:text-[var(--fx-ink)] cursor-pointer">
+            <span className="w-9 h-9 rounded-xl bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><Scale size={15} /></span>
             Terms of Service
           </button>
           <div className="bg-[#DCFCE7] rounded-xl p-3.5 border border-emerald-200 flex items-center gap-2.5 mt-2">

@@ -73,6 +73,45 @@ class AlertModel {
       return [];
     }
   }
+
+  /**
+   * Delete all alerts from the database
+   */
+  static async deleteAllAlerts() {
+    try {
+      const result = await Alert.deleteMany({});
+      return { deletedCount: result.deletedCount || 0 };
+    } catch (err) {
+      console.error('AlertModel.deleteAllAlerts Error:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Delete single alert by ID
+   */
+  static async deleteAlert(id) {
+    try {
+      const result = await Alert.findByIdAndDelete(id);
+      return { success: Boolean(result) };
+    } catch (err) {
+      console.error('AlertModel.deleteAlert Error:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Mark alert as resolved
+   */
+  static async resolveAlert(id) {
+    try {
+      const result = await Alert.findByIdAndUpdate(id, { $set: { status: 'resolved' } }, { new: true });
+      return { success: Boolean(result), data: result };
+    } catch (err) {
+      console.error('AlertModel.resolveAlert Error:', err);
+      throw err;
+    }
+  }
 }
 
 module.exports = AlertModel;
