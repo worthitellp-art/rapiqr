@@ -820,11 +820,6 @@ export default function CheckoutPage({
             <span className="text-gray-300 font-medium text-sm">| Checkout</span>
           </div>
 
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-            <Lock size={12} className="text-emerald-600" />
-            <span className="hidden sm:inline">256-BIT SSL SECURE</span>
-            <span className="sm:hidden">SECURE</span>
-          </div>
         </div>
       </header>
 
@@ -893,14 +888,12 @@ export default function CheckoutPage({
                     <h2 className="font-bold text-sm text-gray-950">Contact Information</h2>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-end">
                     <div>
-                      <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                        Full Name *
-                      </label>
                       <input
                         type="text"
-                        placeholder="Rahul Sharma"
+                        placeholder="Full Name *"
+                        aria-label="Full Name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/15 text-sm font-medium text-gray-900 outline-hidden transition-all"
@@ -1174,19 +1167,8 @@ export default function CheckoutPage({
                   </div>
                 </div>
 
-                {/* Payment gateway trust line — Razorpay's own modal presents the methods */}
-                <div className="pt-3 border-t border-gray-100">
-                  <div className="flex items-center justify-center gap-1.5 text-[11px] text-gray-500 font-medium">
-                    <ShieldCheck size={13} className="text-emerald-600" />
-                    <span>PCI-DSS Compliant Razorpay Gateway — UPI, cards, netbanking &amp; wallets</span>
-                  </div>
-                </div>
-
-                {/* Trust Guarantee */}
-                <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 text-amber-950 text-[11px] font-semibold flex items-center gap-2">
-                  <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
-                  <span>3-Year 3M Weatherproof tag warranty included</span>
-                </div>
+              
+               
 
               </div>
             </div>
