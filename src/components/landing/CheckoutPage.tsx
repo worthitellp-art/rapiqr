@@ -232,13 +232,45 @@ export default function CheckoutPage({
   // Cart is persisted in localStorage
   const [cart, setCart] = useState<CheckoutCartItem[]>(() => {
     try {
-      const saved =
-        localStorage.getItem('repiqr-cart') || localStorage.getItem('namoqr-cart');
-      return saved ? (JSON.parse(saved) as CheckoutCartItem[]) : [];
+      const primary = localStorage.getItem('repiqr-cart');
+      if (primary) {
+        const parsed = JSON.parse(primary);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      const fallback = localStorage.getItem('namoqr-cart');
+      if (fallback) {
+        const parsed = JSON.parse(fallback);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      return [];
     } catch {
       return [];
     }
   });
+
+  // Scroll to top on mount and re-sync cart from localStorage
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    try {
+      const primary = localStorage.getItem('repiqr-cart');
+      if (primary) {
+        const parsed = JSON.parse(primary);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCart(parsed);
+          return;
+        }
+      }
+      const fallback = localStorage.getItem('namoqr-cart');
+      if (fallback) {
+        const parsed = JSON.parse(fallback);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCart(parsed);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // Guest checkout form
   const [name, setName] = useState('');

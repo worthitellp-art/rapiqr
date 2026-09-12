@@ -113,6 +113,9 @@ function MainAppContent() {
     if (isScanUrl()) return 'scan';
     const authUrlMode = getAuthUrlMode();
     if (authUrlMode) return authUrlMode;
+    const pathName = window.location.pathname.toLowerCase();
+    const hashString = window.location.hash.toLowerCase();
+    if (pathName === '/checkout' || hashString === '#/checkout') return 'checkout';
     try {
       const saved = localStorage.getItem('repiqr-current-page') || localStorage.getItem('namoqr-current-page');
       if (saved === 'dashboard') return 'dashboard';
@@ -138,12 +141,17 @@ function MainAppContent() {
         window.history.pushState({}, '', '/login');
       } else if (next === 'register') {
         window.history.pushState({}, '', '/register');
+      } else if (next === 'checkout') {
+        window.history.pushState({}, '', '/checkout');
+        localStorage.setItem('repiqr-current-page', 'checkout');
+        localStorage.setItem('namoqr-current-page', 'checkout');
       } else {
         localStorage.setItem('repiqr-current-page', next);
         localStorage.setItem('namoqr-current-page', next);
       }
     } catch { /* ignore */ }
     setPage(next);
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   };
 
   // After auth loads or on signout: if on dashboard/distributor but not logged in → send to landing & reset dashboardMode
@@ -176,6 +184,13 @@ function MainAppContent() {
       const authUrlMode = getAuthUrlMode();
       if (authUrlMode && page !== authUrlMode) {
         setPage(authUrlMode);
+      }
+      const pathName = window.location.pathname.toLowerCase();
+      const hashString = window.location.hash.toLowerCase();
+      if ((pathName === '/checkout' || hashString === '#/checkout') && page !== 'checkout') {
+        setPage('checkout');
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        return;
       }
       const search = new URLSearchParams(window.location.search);
       if (search.has('track')) {

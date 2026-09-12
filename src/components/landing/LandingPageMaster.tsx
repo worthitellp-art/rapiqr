@@ -937,6 +937,11 @@ export default function LandingPageMaster({
   // Cart state persisted
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
+      const primary = localStorage.getItem('repiqr-cart');
+      if (primary) {
+        const parsed = JSON.parse(primary) as CartItem[];
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
       const saved = localStorage.getItem('namoqr-cart');
       return saved ? (JSON.parse(saved) as CartItem[]) : [];
     } catch {
@@ -948,6 +953,7 @@ export default function LandingPageMaster({
 
   useEffect(() => {
     try {
+      localStorage.setItem('repiqr-cart', JSON.stringify(cart));
       localStorage.setItem('namoqr-cart', JSON.stringify(cart));
     } catch {
       /* ignore */
@@ -1123,37 +1129,58 @@ export default function LandingPageMaster({
   };
 
   const addToCart = (product: ProductItem, qty = 1) => {
-    setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.product.id === product.id ? { ...item, qty: item.qty + qty } : item
-        );
-      }
-      return [...prev, { product, qty }];
-    });
-    // The cart drawer already shows the update live when it's open — the
-    // toast is only useful when the drawer isn't visible to confirm the add.
+    let updatedCart: CartItem[];
+    const existing = cart.find((item) => item.product.id === product.id);
+    if (existing) {
+      updatedCart = cart.map((item) =>
+        item.product.id === product.id ? { ...item, qty: item.qty + qty } : item
+      );
+    } else {
+      updatedCart = [...cart, { product, qty }];
+    }
+    try {
+      localStorage.setItem('repiqr-cart', JSON.stringify(updatedCart));
+      localStorage.setItem('namoqr-cart', JSON.stringify(updatedCart));
+    } catch {
+      /* ignore */
+    }
+    setCart(updatedCart);
     if (!isCartOpen) setCartNotice({ name: product.name, qty });
   };
 
   const openCheckout = () => {
     setIsCartOpen(false);
-    if (onOpenCheckout) onOpenCheckout();
-    else onStart?.();
+    try {
+      localStorage.setItem('repiqr-cart', JSON.stringify(cart));
+      localStorage.setItem('namoqr-cart', JSON.stringify(cart));
+    } catch {
+      /* ignore */
+    }
+    if (onOpenCheckout) {
+      onOpenCheckout();
+    } else if (onStart) {
+      onStart();
+    }
   };
 
   const handleBuyNow = (product: ProductItem) => {
-    setCart((prevCart) => {
-      const existingItem = prevCart.find((item) => item.product.id === product.id);
-      if (existingItem) {
-        return prevCart.map((item) =>
+    const existingItem = cart.find((item) => item.product.id === product.id);
+    const updatedCart: CartItem[] = existingItem
+      ? cart.map((item) =>
           item.product.id === product.id ? { ...item, qty: Math.max(1, item.qty) } : item
-        );
-      }
-      return [...prevCart, { product, qty: 1 }];
-    });
+        )
+      : [...cart, { product, qty: 1 }];
+
+    try {
+      localStorage.setItem('repiqr-cart', JSON.stringify(updatedCart));
+      localStorage.setItem('namoqr-cart', JSON.stringify(updatedCart));
+    } catch {
+      /* ignore */
+    }
+
+    setCart(updatedCart);
     setIsCartOpen(false);
+
     if (onOpenCheckout) {
       onOpenCheckout();
     } else if (onStart) {
