@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, ChevronRight } from 'lucide-react';
+import { Mail, ChevronRight, KeyRound } from 'lucide-react';
 import { AuthMode, AuthStep } from './hooks/useAuthForm';
 
 interface AuthMethodListProps {
@@ -19,6 +19,10 @@ export default function AuthMethodList({
 }: AuthMethodListProps) {
   const handleSelectEmailStep = () => {
     onSelectStep('email');
+  };
+
+  const handleSelectOtpStep = () => {
+    onSelectStep('otp');
   };
 
   const handleLoginTabClick = () => {
@@ -71,6 +75,22 @@ export default function AuthMethodList({
           </div>
           <div className="text-sm font-bold text-slate-900 text-left flex-1">
             Continue with Email
+          </div>
+          <ChevronRight size={18} className="text-slate-400 group-hover:text-[#A16207] transition-colors" />
+        </button>
+
+        {/* Passwordless Email OTP Option */}
+        <button
+          type="button"
+          onClick={handleSelectOtpStep}
+          className="w-full p-4 rounded-2xl border border-slate-200/90 bg-white hover:bg-[#FFFBF0] hover:border-[#F6C000] transition-all duration-200 flex items-center gap-3.5 group cursor-pointer active:scale-[0.99]"
+        >
+          <div className="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center group-hover:bg-[#F6C000] group-hover:text-[#4A3900] transition-colors shrink-0">
+            <KeyRound size={20} />
+          </div>
+          <div className="text-sm font-bold text-slate-900 text-left flex-1">
+            Sign In with a Code
+            <span className="block text-[11px] font-medium text-slate-400 group-hover:text-[#A16207]">No password needed</span>
           </div>
           <ChevronRight size={18} className="text-slate-400 group-hover:text-[#A16207] transition-colors" />
         </button>

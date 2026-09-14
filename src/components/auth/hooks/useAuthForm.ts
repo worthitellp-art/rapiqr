@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 
 export type AuthMode = 'login' | 'signup';
-export type AuthStep = 'list' | 'email' | 'forgot';
+export type AuthStep = 'list' | 'email' | 'forgot' | 'otp';
 
 interface UseAuthFormOptions {
   isOpen: boolean;
@@ -19,7 +19,7 @@ export function useAuthForm({
   onClose,
   onSuccess,
 }: UseAuthFormOptions) {
-  const { signIn, signUp, resetPassword, signInWithGoogle } = useAuth();
+  const { signIn, signUp, resetPassword, signInWithGoogle, sendEmailOtp, verifyEmailOtp } = useAuth();
 
   const [authMode, setAuthMode] = useState<AuthMode>(initialMode);
   const [authStep, setAuthStep] = useState<AuthStep>('list');
@@ -28,6 +28,8 @@ export function useAuthForm({
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -44,6 +46,8 @@ export function useAuthForm({
       }
       setErrorMessage(null);
       setSuccessMessage(null);
+      setOtpSent(false);
+      setOtpCode('');
     }
   }, [isOpen, prefillEmail]);
 
@@ -60,6 +64,10 @@ export function useAuthForm({
   const selectAuthStep = (step: AuthStep) => {
     setAuthStep(step);
     clearFeedbackMessages();
+    if (step !== 'otp') {
+      setOtpSent(false);
+      setOtpCode('');
+    }
   };
 
   const handleAuthenticationSuccess = (message: string) => {
@@ -136,6 +144,57 @@ export function useAuthForm({
     }
   };
 
+  // Passwordless email login — step 1 (send code). Re-sending (otpSent already
+  // true) is also routed here so "Resend code" reuses the same handler.
+  const handleSendEmailOtp = async (event: React.FormEvent) => {
+    event.preventDefault();
+    clearFeedbackMessages();
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setErrorMessage('Please enter your email address.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const result = await sendEmailOtp(trimmedEmail);
+      if (!result.success) {
+        setErrorMessage(result.error || 'Failed to send sign-in code.');
+        return;
+      }
+      setOtpSent(true);
+      setOtpCode('');
+      setSuccessMessage('Code sent — check your inbox.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Passwordless email login — step 2 (verify code). Success here IS the login.
+  const handleVerifyEmailOtp = async (event: React.FormEvent) => {
+    event.preventDefault();
+    clearFeedbackMessages();
+
+    const trimmedCode = otpCode.trim();
+    if (!trimmedCode) {
+      setErrorMessage('Enter the code sent to your email.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const result = await verifyEmailOtp(email.trim(), trimmedCode);
+      if (!result.success) {
+        setErrorMessage(result.error || 'Verification failed.');
+      } else {
+        handleAuthenticationSuccess('Signed in successfully!');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleGoogleAuthentication = async () => {
     setIsSubmitting(true);
     setErrorMessage(null);
@@ -172,14 +231,19 @@ export function useAuthForm({
     isSubmitting,
     errorMessage,
     successMessage,
+    otpCode,
+    otpSent,
     setEmail,
     setPassword,
     setFullName,
     setIsPasswordVisible,
+    setOtpCode,
     switchAuthMode,
     selectAuthStep,
     handleEmailSubmit,
     handlePasswordResetSubmit,
     handleGoogleAuthentication,
+    handleSendEmailOtp,
+    handleVerifyEmailOtp,
   };
 }

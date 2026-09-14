@@ -99,6 +99,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
           '/auth/forgot-password',
           '/auth/reset-password',
           '/auth/google',
+          '/auth/email-otp/send',
+          '/auth/email-otp/verify',
         ].some(path => endpoint.includes(path));
 
         if (!isAuthLifecycleEndpoint) {
@@ -223,6 +225,22 @@ export const apiClient = {
       return request<{ success: boolean; token?: string; user?: any }>('/auth/google', {
         method: 'POST',
         body: JSON.stringify(credentialOrUser),
+      });
+    },
+
+    // Passwordless email login: sends a 6-digit code (no password involved at all).
+    async sendEmailOtp(email: string) {
+      return request<{ success: boolean; simulated?: boolean; error?: string }>('/auth/email-otp/send', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      });
+    },
+
+    // Verifying the code IS the login — signs into (or creates) the account for that email.
+    async verifyEmailOtp(email: string, code: string) {
+      return request<{ success: boolean; token?: string; user?: any; error?: string }>('/auth/email-otp/verify', {
+        method: 'POST',
+        body: JSON.stringify({ email, code }),
       });
     },
 

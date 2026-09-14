@@ -4,6 +4,7 @@ import AppLogo from '../common/AppLogo';
 import AuthAlertMessage from './AuthAlertMessage';
 import AuthMethodList from './AuthMethodList';
 import EmailAuthStep from './EmailAuthStep';
+import EmailOtpStep from './EmailOtpStep';
 import ForgotPasswordForm from './ForgotPasswordForm';
 import { useAuthForm } from './hooks/useAuthForm';
 
@@ -32,15 +33,20 @@ export default function AuthModal({
     isSubmitting,
     errorMessage,
     successMessage,
+    otpCode,
+    otpSent,
     setEmail,
     setPassword,
     setFullName,
     setIsPasswordVisible,
+    setOtpCode,
     switchAuthMode,
     selectAuthStep,
     handleEmailSubmit,
     handlePasswordResetSubmit,
     handleGoogleAuthentication,
+    handleSendEmailOtp,
+    handleVerifyEmailOtp,
   } = useAuthForm({
     isOpen,
     initialMode,
@@ -133,6 +139,21 @@ export default function AuthModal({
             onForgotPasswordClick={handleSwitchToForgotStep}
             onBackToList={handleReturnToListStep}
             onSubmit={handleEmailSubmit}
+          />
+        )}
+
+        {/* Step 2C: Passwordless Email OTP Screen */}
+        {authStep === 'otp' && (
+          <EmailOtpStep
+            email={email}
+            otpCode={otpCode}
+            otpSent={otpSent}
+            isSubmitting={isSubmitting}
+            onEmailChange={setEmail}
+            onOtpCodeChange={setOtpCode}
+            onBackToList={handleReturnToListStep}
+            onSendCode={handleSendEmailOtp}
+            onVerifyCode={handleVerifyEmailOtp}
           />
         )}
 

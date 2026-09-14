@@ -8,6 +8,7 @@ const { logger } = require('../middleware/loggerMiddleware');
 const { generateSecret, verifyTOTP, buildOtpauthUrl } = require('../utils/totp');
 const { sendSms, sendWhatsAppOtp } = require('../services/smsService');
 const { createOtp, verifyOtp } = require('../services/phoneVerificationService');
+const { createEmailOtp, verifyEmailOtp } = require('../services/emailOtpService');
 const { normalizePhone } = require('../utils/phone');
 const { hashPassword, verifyPassword } = require('../utils/passwords');
 const { createResetToken, createResetLink, findUserByResetToken } = require('../services/passwordResetService');
@@ -485,6 +486,116 @@ class AuthController {
     } catch (err) {
       logger.error('AUTH_GOOGLE', 'Google auth failure', err);
       return res.status(500).json({ success: false, error: err.message || 'Google authentication failed' });
+    }
+  }
+
+  /**
+   * Passwordless email login — step 1. Sends a 6-digit one-time code to the
+   * given address via Resend/SMTP (see emailService). No password is ever
+   * involved: proving control of the inbox is the entire credential. Always
+   * answers the same way whether or not the address has an account (same
+   * enumeration reasoning as forgotPassword) — verifyEmailOtp below auto-creates
+   * the account on first successful verification, same as googleAuth does.
+   */
+  static async sendEmailOtp(req, res) {
+    try {
+      const { email } = req.body || {};
+      const normalizedEmail = String(email || '').trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+        return res.status(400).json({ success: false, error: 'Enter a valid email address.' });
+      }
+
+      const code = createEmailOtp(normalizedEmail);
+      const result = await sendEmail({
+        to: normalizedEmail,
+        subject: 'Your RapiQR sign-in code',
+        html: `<p>Your RapiQR sign-in code is <strong>${code}</strong>. It expires in 5 minutes.</p><p>If you didn't request this, you can safely ignore this email.</p>`,
+        text: `Your RapiQR sign-in code is ${code}. It expires in 5 minutes.`,
+        event: 'EMAIL_OTP_LOGIN',
+      });
+
+      logger.user('EMAIL_OTP_SENT', `Email sign-in code sent to ${normalizedEmail}`, { simulated: result.simulated });
+      return res.json({ success: true, simulated: result.simulated });
+    } catch (err) {
+      logger.error('EMAIL_OTP_SEND', 'Failed to send email sign-in code', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Passwordless email login — step 2. Verifying the code IS the login: on a
+   * match this signs into the existing account for that email, or creates one
+   * (mirroring googleAuth's auto-provision), and returns a normal JWT session.
+   * No password check is layered on top — code possession already proves the
+   * strongest thing this app can prove, control of the inbox.
+   */
+  static async verifyEmailOtp(req, res) {
+    try {
+      const { email, code } = req.body || {};
+      const normalizedEmail = String(email || '').trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) || !code) {
+        return res.status(400).json({ success: false, error: 'Email and code are required.' });
+      }
+
+      const result = verifyEmailOtp(normalizedEmail, code);
+      if (!result.ok) {
+        const messages = {
+          no_pending_otp: 'No sign-in code in progress — request a new one.',
+          expired: 'This code has expired — request a new one.',
+          too_many_attempts: 'Too many incorrect attempts — request a new code.',
+          invalid_code: `Incorrect code.${result.attemptsLeft ? ` ${result.attemptsLeft} attempt(s) left.` : ''}`,
+        };
+        return res.status(400).json({ success: false, error: messages[result.reason] || 'Verification failed.' });
+      }
+
+      const isDesignatedAdmin = normalizedEmail === ADMIN_EMAIL.toLowerCase();
+
+      let profile = await UserModel.findByEmail(normalizedEmail);
+      if (!profile) {
+        profile = await UserModel.createUser({
+          email: normalizedEmail,
+          fullName: normalizedEmail.split('@')[0],
+          role: isDesignatedAdmin ? 'admin' : 'user',
+          emailVerified: true,
+        });
+      } else if (isDesignatedAdmin && profile.role !== 'admin') {
+        profile = await UserModel.reconcileAdminRole(profile);
+      }
+
+      const ip = getClientIp(req);
+      const userAgent = getUserAgent(req);
+      const securityMeta = await UserModel.getSecurityMeta(profile.id);
+      if (securityMeta?.last_login_ip && securityMeta.last_login_ip !== ip) {
+        logger.security('NEW_DEVICE_LOGIN', `Email OTP sign-in for ${normalizedEmail} from a new IP (previously ${securityMeta.last_login_ip})`, { userId: profile.id, previousIp: securityMeta.last_login_ip, ip, userAgent }, { userId: profile.id });
+      }
+      await UserModel.recordLogin(profile.id, { ip, userAgent });
+
+      await OrderModel.linkGuestOrdersToUser(profile.id, profile.email, profile.phoneNumber).catch((linkErr) => {
+        logger.warn('AUTH_EMAIL_OTP', `Non-blocking error linking guest orders: ${linkErr.message}`);
+      });
+
+      const token = jwt.sign(
+        { id: profile.id, email: profile.email, role: profile.role },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      logger.success('AUTH_EMAIL_OTP', `Email OTP sign-in succeeded for: ${normalizedEmail}`, { ip, userAgent }, { userId: profile.id });
+
+      await logAuditEvent({
+        eventType: SecurityEventTypes.AUTH_LOGIN_SUCCESS,
+        actorType: profile.role === 'admin' ? 'ADMIN' : 'USER',
+        req,
+        userId: profile.id,
+        userEmail: profile.email,
+        statusCode: 200,
+        metadata: { role: profile.role, method: 'email_otp' },
+      });
+
+      return res.json({ success: true, token, user: profile });
+    } catch (err) {
+      logger.error('EMAIL_OTP_VERIFY', 'Failed to verify email sign-in code', err);
+      return res.status(500).json({ success: false, error: err.message });
     }
   }
 

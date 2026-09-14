@@ -10,6 +10,11 @@ const signInLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: 'T
 const adminSignInLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, message: 'Too many admin sign-in attempts, please try again later.' });
 const signUpLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, message: 'Too many accounts created from this network, please try again later.' });
 const passwordResetLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 5, message: 'Too many password reset requests, please try again later.' });
+// Email OTP IS the login credential (no password behind it) — sending is capped
+// tighter than signIn to keep it from being usable as an email bomb, and
+// verifying is capped like any other unauthenticated code-guessing surface.
+const emailOtpSendLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, message: 'Too many code requests, please try again later.' });
+const emailOtpVerifyLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many attempts, please try again later.' });
 // TOTP is a 6-digit code re-used for 30s at a time — with no throttle here it
 // was brute-forceable in well under a million tries at typical request rates.
 const twoFactorVerifyLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many 2FA attempts, please try again later.' });
@@ -18,6 +23,8 @@ router.post('/signup', signUpLimiter, AuthController.signUp);
 router.post('/signin', signInLimiter, AuthController.signIn);
 router.post('/admin-signin', adminSignInLimiter, AuthController.adminSignIn);
 router.post('/google', AuthController.googleAuth);
+router.post('/email-otp/send', emailOtpSendLimiter, AuthController.sendEmailOtp);
+router.post('/email-otp/verify', emailOtpVerifyLimiter, AuthController.verifyEmailOtp);
 router.post('/forgot-password', passwordResetLimiter, AuthController.forgotPassword);
 router.post('/reset-password', passwordResetLimiter, AuthController.resetPassword);
 router.post('/forgot-password/whatsapp/send', passwordResetLimiter, AuthController.forgotPasswordWhatsApp);

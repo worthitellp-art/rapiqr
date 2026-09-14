@@ -39,6 +39,10 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   adminSignIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  // Passwordless email login: request a 6-digit code, then verify it — verifying
+  // IS the login, no password anywhere in this path.
+  sendEmailOtp: (email: string) => Promise<{ success: boolean; simulated?: boolean; error?: string }>;
+  verifyEmailOtp: (email: string, code: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<{ success: boolean; error?: string }>;
   resetPassword: (email: string) => Promise<{ success: boolean; message?: string; error?: string }>;
@@ -463,6 +467,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Passwordless email login — step 1. Backend-only for a real send; without a
+  // configured backend there's nothing to email through, so this reports
+  // simulated:true (matching sendPhoneOtp's no-backend fallback) rather than
+  // pretending a code went out.
+  const sendEmailOtp = async (email: string) => {
+    if (!isApiBackendConfigured) {
+      return { success: true, simulated: true };
+    }
+    try {
+      const res = await apiClient.auth.sendEmailOtp(email);
+      return { success: true, simulated: res.simulated };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to send sign-in code.' };
+    }
+  };
+
+  // Passwordless email login — step 2. Verifying the code IS the login: the
+  // backend signs into (or creates) the account for that email and returns a
+  // normal JWT session, same shape as signIn/signUp.
+  const verifyEmailOtp = async (email: string, code: string) => {
+    if (!isApiBackendConfigured) {
+      const cleanEmail = email.trim().toLowerCase();
+      const demoUser: UserProfileData = {
+        id: 'demo-' + Date.now(),
+        email: cleanEmail,
+        fullName: cleanEmail.split('@')[0],
+        role: cleanEmail === ADMIN_EMAIL.toLowerCase() ? 'admin' : 'user',
+        subscriptionPlan: 'free',
+      };
+      setProfile(demoUser);
+      localStorage.setItem('repiqr-auth-user', JSON.stringify(demoUser));
+      localStorage.setItem('namoqr-auth-user', JSON.stringify(demoUser));
+      return { success: true };
+    }
+    try {
+      const res = await apiClient.auth.verifyEmailOtp(email, code);
+      if (res?.token) {
+        localStorage.setItem('repiqr-token', res.token);
+        localStorage.setItem('namoqr-token', res.token);
+      }
+      if (res?.user) {
+        const userProfile = backendUserToProfile(res.user);
+        setProfile(userProfile);
+        localStorage.setItem('repiqr-auth-user', JSON.stringify(userProfile));
+        localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Verification failed.' };
+    }
+  };
+
   // Used only as demo fallback when explicitly triggered — ALWAYS a regular user.
   const demoLogin = () => {
     const demoUser: UserProfileData = {
@@ -610,6 +666,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signIn,
         adminSignIn,
         signInWithGoogle,
+        sendEmailOtp,
+        verifyEmailOtp,
         updatePhoneNumber,
         sendPhoneOtp,
         verifyPhoneOtp,
