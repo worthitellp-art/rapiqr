@@ -6,7 +6,8 @@ const OrderModel = require('../models/orderModel');
 const { JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD } = require('../middleware/authMiddleware');
 const { logger } = require('../middleware/loggerMiddleware');
 const { generateSecret, verifyTOTP, buildOtpauthUrl } = require('../utils/totp');
-const { sendSms, sendWhatsAppOtp } = require('../services/smsService');
+const { sendWhatsAppOtp } = require('../services/smsService');
+const { verifyMsg91WidgetAccessToken } = require('../services/msg91Client');
 const { createOtp, verifyOtp } = require('../services/phoneVerificationService');
 const { createEmailOtp, verifyEmailOtp } = require('../services/emailOtpService');
 const { normalizePhone } = require('../utils/phone');
@@ -686,11 +687,11 @@ class AuthController {
   }
 
   /**
-   * Phone verification step 1 — send a 6-digit code to the candidate number via
-   * SMS + WhatsApp (real Twilio send, honestly reports back if unconfigured).
-   * The number is NOT attached to the account until verifyPhoneOtp succeeds —
-   * this is what closes the "type any phone and silently claim its stickers"
-   * gap, since autoClaimByPhone only ever runs after a real code match.
+   * Phone verification step 1 — validate the candidate number and confirm it
+   * isn't already claimed. The actual OTP send now happens entirely in the
+   * browser via the MSG91 OTP Widget (see src/lib/msg91Widget.ts) — this
+   * endpoint is only the pre-flight "is this worth showing the OTP screen for"
+   * check, so a doomed attempt fails before the widget spends a send on it.
    */
   static async sendPhoneOtp(req, res) {
     try {
@@ -720,48 +721,50 @@ class AuthController {
         });
       }
 
-      const code = createOtp(req.user.id, phoneNumber);
-      const body = `Your RapiQR phone verification code is ${code}. It expires in 5 minutes.`;
-      const [smsResult, whatsappResult] = await Promise.all([
-        sendSms({ to: phoneNumber, body, event: 'PHONE_VERIFY_SMS' }),
-        sendWhatsAppOtp({ to: phoneNumber, code, event: 'PHONE_VERIFY_WHATSAPP' }),
-      ]);
-
-      const simulated = Boolean(smsResult.simulated && whatsappResult.simulated);
-      logger.user('PHONE_OTP_SENT', `Phone verification code sent for ${req.user.email}`, { simulated });
-      return res.json({ success: true, simulated });
+      logger.user('PHONE_OTP_SEND_CHECKED', `Phone verification pre-check passed for ${req.user.email} — widget will send the OTP`);
+      return res.json({ success: true });
     } catch (err) {
-      logger.error('PHONE_OTP_SEND', 'Failed to send phone verification code', err);
+      logger.error('PHONE_OTP_SEND', 'Failed to run phone verification pre-check', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }
 
   /**
-   * Phone verification step 2 — check the code, and only on a match does this
-   * actually write the account's phone number and run the phone-based auto-claim
-   * (Server/models/productModel.js autoClaimByPhone), so a sticker only ever
-   * lands in a dashboard once ownership of the phone number is proven.
+   * Phone verification step 2 — the browser already ran the OTP exchange with
+   * MSG91's widget and got back an access token; this verifies that token with
+   * MSG91 server-to-server (never trusting the frontend's own "success" claim)
+   * and confirms it verified the SAME number the client says it did, then only
+   * on a match does this write the account's phone number and run the
+   * phone-based auto-claim (Server/models/productModel.js autoClaimByPhone), so
+   * a sticker only ever lands in a dashboard once ownership of the phone number
+   * is proven.
    */
   static async verifyPhoneOtp(req, res) {
     try {
-      const { code } = req.body || {};
-      if (!code) return res.status(400).json({ success: false, error: 'Enter the code sent to your phone.' });
-
-      const result = verifyOtp(req.user.id, code);
-      if (!result.ok) {
-        const messages = {
-          no_pending_otp: 'No verification in progress — request a new code.',
-          expired: 'This code has expired — request a new one.',
-          too_many_attempts: 'Too many incorrect attempts — request a new code.',
-          invalid_code: `Incorrect code.${result.attemptsLeft ? ` ${result.attemptsLeft} attempt(s) left.` : ''}`,
-        };
-        return res.status(400).json({ success: false, error: messages[result.reason] || 'Verification failed.' });
+      const { accessToken, phoneNumber } = req.body || {};
+      if (!accessToken) return res.status(400).json({ success: false, error: 'Missing verification token — please retry.' });
+      if (!normalizePhone(phoneNumber)) {
+        return res.status(400).json({ success: false, error: 'Enter a valid 10-digit mobile number.' });
       }
 
-      // Re-check ownership at the moment we commit: the code was issued minutes ago
-      // and another account could have verified the same number in between. Without
-      // this, two accounts end up holding one number and both compete for its stickers.
-      const taken = await UserModel.findByPhone(result.phone, { excludeUserId: req.user.id });
+      const verification = await verifyMsg91WidgetAccessToken({ accessToken });
+      if (!verification.success) {
+        logger.security('PHONE_OTP_VERIFY_FAILED', `MSG91 widget token rejected for ${req.user.email}: ${verification.error || verification.reason}`);
+        return res.status(400).json({ success: false, error: verification.error || 'Invalid or expired verification code.' });
+      }
+
+      // MSG91 confirms a number was verified — but not necessarily the one this
+      // request claims. Without this check a token minted for one number could be
+      // replayed to claim a different one.
+      if (normalizePhone(verification.verifiedIdentifier) !== normalizePhone(phoneNumber)) {
+        logger.security('PHONE_OTP_MISMATCH', `Verified identifier didn't match claimed number for ${req.user.email}`);
+        return res.status(400).json({ success: false, error: 'Verified number does not match — please retry.' });
+      }
+
+      // Re-check ownership at the moment we commit: another account could have
+      // verified the same number in between. Without this, two accounts end up
+      // holding one number and both compete for its stickers.
+      const taken = await UserModel.findByPhone(phoneNumber, { excludeUserId: req.user.id });
       if (taken) {
         logger.security('PHONE_ALREADY_LINKED', `Phone claimed by another account mid-verification for ${req.user.email}`);
         return res.status(409).json({
@@ -775,21 +778,21 @@ class AuthController {
         phone_verified_at: new Date().toISOString()
       });
 
-      const updated = await UserModel.updateProfile(req.user.id, { phoneNumber: result.phone });
+      const updated = await UserModel.updateProfile(req.user.id, { phoneNumber });
       if (!updated) return res.status(500).json({ success: false, error: 'Failed to save verified phone number.' });
 
       const finalProfile = (await UserModel.findById(req.user.id)) || updated;
 
       let claimedCount = 0;
       try {
-        const claimed = await ProductModel.autoClaimByPhone(req.user.id, finalProfile.full_name, result.phone);
+        const claimed = await ProductModel.autoClaimByPhone(req.user.id, finalProfile.full_name, phoneNumber);
         claimedCount = claimed.length;
       } catch (err) {
         logger.error('PRODUCT_AUTO_CLAIM', 'Failed to auto-claim products after verified phone update', err);
       }
 
       // Link any prior guest orders placed with this verified phone or email
-      await OrderModel.linkGuestOrdersToUser(req.user.id, finalProfile.email, result.phone).catch((linkErr) => {
+      await OrderModel.linkGuestOrdersToUser(req.user.id, finalProfile.email, phoneNumber).catch((linkErr) => {
         logger.warn('PHONE_OTP_VERIFY', `Non-blocking error linking guest orders: ${linkErr.message}`);
       });
 

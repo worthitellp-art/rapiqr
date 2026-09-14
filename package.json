@@ -12,6 +12,7 @@
     "lint": "tsc --noEmit",
     "msg91:whatsapp-test": "node Server/scripts/testMsg91WhatsApp.js",
     "msg91:whatsapp-dry": "node Server/scripts/testMsg91WhatsApp.js --dry-run",
+    "msg91:otp-test": "node Server/scripts/testMsg91Otp.js",
     "lighthouse": "lighthouse http://localhost:4173/ --output=html --output=json --output-path=./lighthouse-report --chrome-flags=\"--headless=new\" --view"
   },
   "dependencies": {

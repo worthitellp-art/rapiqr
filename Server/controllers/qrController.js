@@ -1,7 +1,6 @@
 const QrModel = require('../models/qrModel');
 const { logger } = require('../middleware/loggerMiddleware');
-const { sendSms } = require('../services/smsService');
-const { createOtp, verifyOtp } = require('../services/phoneVerificationService');
+const { verifyMsg91WidgetAccessToken } = require('../services/msg91Client');
 
 class QrController {
   /**
@@ -155,66 +154,64 @@ class QrController {
   }
 
   /**
-   * Activation identity check — step 1: send a real Twilio SMS OTP to the
-   * phone the visitor is registering with. Public (no verifyToken) because
+   * Activation identity check — step 1: validate the phone the visitor is
+   * registering with. The actual OTP send now happens entirely in the browser
+   * via the MSG91 OTP Widget (see src/lib/msg91Widget.ts) — this endpoint is
+   * just the pre-flight format check. Public (no verifyToken) because
    * activation happens before any account exists — anonymous like /activate
-   * itself. Keyed by qrId rather than a userId since there's no session yet;
-   * one in-progress activation per sticker is an acceptable trade-off.
-   *
-   * Twilio trial accounts only deliver to Caller-ID-verified numbers — send
-   * failures (e.g. code 21608 "unverified number") are returned as-is so the
-   * frontend can surface them instead of silently pretending to succeed.
+   * itself.
    */
   static async sendActivationOtp(req, res) {
     try {
-      const { id } = req.params;
       const { phoneNumber } = req.body || {};
       const digits = String(phoneNumber || '').replace(/\D/g, '');
       if (!digits || digits.length < 7) {
         return res.status(400).json({ success: false, error: 'Enter a valid phone number.' });
       }
 
-      const fullPhone = String(phoneNumber).trim().startsWith('+') ? String(phoneNumber).trim() : `+${digits}`;
-      const code = createOtp(id, fullPhone);
-      const body = `Your RapiQR activation code is ${code}. It expires in 5 minutes.`;
-      const smsResult = await sendSms({ to: fullPhone, body, event: 'ACTIVATION_OTP_SMS' });
-
-      logger.event('QR_ACTIVATION_OTP', '📲', `Activation OTP ${smsResult.sent ? 'sent' : smsResult.simulated ? 'simulated' : 'FAILED'} for QR ${id}`);
-
-      if (!smsResult.sent && !smsResult.simulated) {
-        return res.status(502).json({ success: false, simulated: false, error: smsResult.error || 'Could not send the verification SMS.' });
-      }
-
-      return res.json({ success: true, simulated: smsResult.simulated });
+      return res.json({ success: true });
     } catch (err) {
-      logger.error('QR_ACTIVATION_OTP', `Failed to send activation OTP for QR: ${req.params.id}`, err);
+      logger.error('QR_ACTIVATION_OTP', `Failed to run activation OTP pre-check for QR: ${req.params.id}`, err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }
 
   /**
-   * Activation identity check — step 2: verify the code. `000000` is the
-   * shared master bypass baked into phoneVerificationService, for testing
-   * when Twilio isn't sending (simulated mode / unverified test numbers).
+   * Activation identity check — step 2: the browser already ran the OTP
+   * exchange with MSG91's widget and got back an access token; this verifies
+   * that token with MSG91 server-to-server and confirms it verified the SAME
+   * number the client claims (never trusting the frontend's own "success").
    */
   static async verifyActivationOtp(req, res) {
     try {
       const { id } = req.params;
-      const { code } = req.body || {};
-      if (!code) return res.status(400).json({ success: false, error: 'Enter the code sent to your phone.' });
-
-      const result = verifyOtp(id, code);
-      if (!result.ok) {
-        const messages = {
-          no_pending_otp: 'No verification in progress — request a new code.',
-          expired: 'This code has expired — request a new one.',
-          too_many_attempts: 'Too many incorrect attempts — request a new code.',
-          invalid_code: `Incorrect code.${result.attemptsLeft ? ` ${result.attemptsLeft} attempt(s) left.` : ''}`,
-        };
-        return res.status(400).json({ success: false, error: messages[result.reason] || 'Verification failed.' });
+      const { accessToken, phoneNumber } = req.body || {};
+      if (!accessToken) return res.status(400).json({ success: false, error: 'Missing verification token — please retry.' });
+      const digits = String(phoneNumber || '').replace(/\D/g, '');
+      if (!digits || digits.length < 7) {
+        return res.status(400).json({ success: false, error: 'Enter a valid phone number.' });
       }
 
-      return res.json({ success: true, phone: result.phone });
+      const verification = await verifyMsg91WidgetAccessToken({ accessToken });
+      if (!verification.success) {
+        logger.security('QR_ACTIVATION_OTP_VERIFY_FAILED', `MSG91 widget token rejected for QR ${id}: ${verification.error || verification.reason}`);
+        return res.status(400).json({ success: false, error: verification.error || 'Invalid or expired verification code.' });
+      }
+
+      // Compare on the last 10 digits when there are that many (India's national
+      // significant number, same convention as Server/utils/phone.js), otherwise
+      // fall back to the full digit string — this endpoint accepts numbers as
+      // short as 7 digits, so a hard "must have 10" check would reject every
+      // legitimately-verified short number.
+      const verifiedDigits = String(verification.verifiedIdentifier || '').replace(/\D/g, '');
+      const significantDigits = digits.length >= 10 ? digits.slice(-10) : digits;
+      if (!verifiedDigits || !verifiedDigits.endsWith(significantDigits)) {
+        logger.security('QR_ACTIVATION_OTP_MISMATCH', `Verified identifier didn't match claimed number for QR ${id}`);
+        return res.status(400).json({ success: false, error: 'Verified number does not match — please retry.' });
+      }
+
+      const fullPhone = String(phoneNumber).trim().startsWith('+') ? String(phoneNumber).trim() : `+${digits}`;
+      return res.json({ success: true, phone: fullPhone });
     } catch (err) {
       logger.error('QR_ACTIVATION_OTP_VERIFY', `Failed to verify activation OTP for QR: ${req.params.id}`, err);
       return res.status(500).json({ success: false, error: err.message });

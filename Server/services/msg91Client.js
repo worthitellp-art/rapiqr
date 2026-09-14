@@ -476,6 +476,40 @@ async function sendMsg91SessionWhatsApp({ to, text, integratedNumber }) {
   };
 }
 
+/**
+ * Verifies the access token handed back by the MSG91 OTP Widget's client-side
+ * success callback (window.verifyOtp in the browser). The widget runs the
+ * actual send+verify with MSG91's servers itself — this call is what stops a
+ * forged/replayed frontend claim of "verified" from being trusted: only a
+ * token MSG91 itself recognizes as belonging to a completed verification
+ * comes back with type: 'success'.
+ *
+ * @param {{ accessToken: string }} params
+ * @returns {Promise<{ success: boolean, simulated: boolean, response?: any, verifiedIdentifier?: string|null, error?: string|null, reason?: string }>}
+ */
+async function verifyMsg91WidgetAccessToken({ accessToken }) {
+  const config = getMsg91Config();
+
+  if (!config.authKey) {
+    return { success: false, simulated: true, reason: 'MSG91_AUTH_KEY not set in Server/.env' };
+  }
+  if (!accessToken) {
+    return { success: false, simulated: false, error: 'Access token is required' };
+  }
+
+  const payload = { authkey: config.authKey, 'access-token': String(accessToken) };
+  const response = await callMsg91Api('POST', '/api/v5/widget/verifyAccessToken', payload);
+  const isOk = response.status >= 200 && response.status < 300 && response.body?.type === 'success';
+
+  return {
+    success: isOk,
+    simulated: false,
+    response: response.body,
+    verifiedIdentifier: isOk ? response.body?.message || null : null,
+    error: isOk ? null : (response.body?.message || 'Widget access token verification failed'),
+  };
+}
+
 module.exports = {
   getMsg91Config,
   formatRecipientMobile,
@@ -483,6 +517,7 @@ module.exports = {
   sendMsg91FlowSms,
   sendMsg91Otp,
   verifyMsg91Otp,
+  verifyMsg91WidgetAccessToken,
   buildMsg91WhatsAppComponents,
   sendMsg91WhatsApp,
   sendMsg91SessionWhatsApp,

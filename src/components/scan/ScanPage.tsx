@@ -70,6 +70,7 @@ import {
 import RepiChat, { customerTokenKey } from "../chat/RepiChat";
 import { isChatOpen as recallChatOpen, setChatOpen as rememberChatOpen } from "../../lib/chatStorage";
 import ScanPaymentModal from "./payment/ScanPaymentModal";
+import { sendMsg91Otp, verifyMsg91Otp, toMsg91Identifier } from "../../lib/msg91Widget";
 
 /* WhatsApp logo SVG — matches the CategoryScanView WhatsAppIcon */
 function WhatsAppSvg({ size = 16, className = "" }: { size?: number; className?: string }) {
@@ -704,12 +705,11 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   const [buyerPhone, setBuyerPhone] = useState("");
   const [phoneMatchesBuyer, setPhoneMatchesBuyer] = useState(false);
 
-  // OTP verification step state (two-step activation flow) — sends a real
-  // Twilio SMS via the backend (POST /api/qr/:id/send-activation-otp) instead
-  // of the old hardcoded "0000". On a Twilio trial account, delivery only
-  // succeeds to Caller-ID-verified numbers; "000000" is the master bypass
-  // code (Server/services/phoneVerificationService.js) for testing when a
-  // number isn't verified or Twilio credentials aren't configured.
+  // OTP verification step state (two-step activation flow) — the MSG91 OTP
+  // Widget (src/lib/msg91Widget.ts) sends and verifies the code in-browser;
+  // POST /api/qr/:id/send-activation-otp is only a pre-flight phone-format
+  // check now, and /verify-activation-otp checks the widget's resulting
+  // access token with MSG91 server-to-server.
   const [otpStep, setOtpStep] = useState(false);
   const [otpInput, setOtpInput] = useState("");
   const [otpSending, setOtpSending] = useState(false);
@@ -798,11 +798,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         return;
       }
 
-      // 3. Attempt OTP sending (if configured, offers extra verification)
+      // 3. Attempt OTP sending (if configured, offers extra verification). The
+      // pre-check just validates the number; the MSG91 widget does the actual send.
       try {
         const res = await apiClient.qr.sendActivationOtp(qrData.id, fullPhone);
         if (res?.success) {
-          setOtpSimulated(Boolean(res.simulated));
+          await sendMsg91Otp(toMsg91Identifier(fullPhone));
+          setOtpSimulated(false);
           setOtpInput("");
           setActivationError(null);
           setOtpStep(true);
@@ -827,7 +829,9 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
     setActivatingQr(true);
     try {
-      const res = await apiClient.qr.verifyActivationOtp(qrData.id, otpInput.trim());
+      const fullPhone = `${regCountry}${regPhone.trim().replace(/\s+/g, "")}`;
+      const accessToken = await verifyMsg91Otp(otpInput.trim());
+      const res = await apiClient.qr.verifyActivationOtp(qrData.id, accessToken, fullPhone);
       if (!res.success) {
         setActivationError(res.error || "Invalid code. Please try again.");
         return;

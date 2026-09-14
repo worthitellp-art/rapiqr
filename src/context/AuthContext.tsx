@@ -54,7 +54,10 @@ interface AuthContextType {
   // Sticker" card or Account Settings can attach/change the account's phone number,
   // so a sticker only auto-claims once ownership of the phone is actually proven.
   sendPhoneOtp: (phoneNumber: string) => Promise<{ success: boolean; simulated?: boolean; error?: string }>;
-  verifyPhoneOtp: (code: string) => Promise<{ success: boolean; claimedCount?: number; error?: string }>;
+  // `accessToken` comes from the MSG91 OTP Widget's verifyOtp() (src/lib/msg91Widget.ts) —
+  // the widget runs the actual code exchange with MSG91; this hands the resulting
+  // token to the backend to confirm and finalize.
+  verifyPhoneOtp: (accessToken: string) => Promise<{ success: boolean; claimedCount?: number; error?: string }>;
   // Re-pulls the profile from the backend (Account Settings uses this after saving
   // name/phone/email changes so the header/avatar/email stay in sync immediately).
   refreshProfile: () => Promise<void>;
@@ -584,14 +587,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Phone verification step 2 — verifies via backend (the backend itself already
-  // accepts 000000 as a master bypass code, and only a real backend call actually
-  // persists the phone number and runs the phone-based sticker auto-claim; faking
-  // success here locally would mark the phone "verified" in the UI while never
-  // linking any sticker in the database).
-  const verifyPhoneOtp = async (code: string) => {
+  // Phone verification step 2 — the MSG91 OTP Widget already ran the actual
+  // code exchange in the browser (src/lib/msg91Widget.ts verifyMsg91Otp); this
+  // hands the resulting access token to the backend, which re-verifies it with
+  // MSG91 server-to-server and only then persists the phone number and runs
+  // the phone-based sticker auto-claim. Faking success here locally would mark
+  // the phone "verified" in the UI while never linking any sticker in the database.
+  const verifyPhoneOtp = async (accessToken: string) => {
     if (!profile) return { success: false, error: 'Not signed in.' };
-    const cleanCode = code.trim();
+    const cleanToken = accessToken.trim();
     const pendingPhone = localStorage.getItem('repiqr-pending-otp-phone') || profile.phoneNumber || '+1 555-0199';
 
     if (!isApiBackendConfigured) {
@@ -606,7 +610,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const res = await apiClient.auth.verifyPhoneOtp(cleanCode);
+      const res = await apiClient.auth.verifyPhoneOtp(cleanToken, pendingPhone);
       if (res?.success) {
         const updated = res.user ? backendUserToProfile(res.user) : { ...profile, phoneNumber: pendingPhone, isPhoneVerified: true };
         if (profile.role === 'admin') updated.role = 'admin';

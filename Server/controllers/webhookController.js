@@ -113,6 +113,36 @@ class WebhookController {
     return crypto.timingSafeEqual(Buffer.from(header), Buffer.from(expected));
   }
 
+  /**
+   * POST /api/webhooks/msg91-otp — MSG91 OTP Widget "Events and Actions"
+   * callback (the widget's deprecated webhook, set on the widget's config
+   * screen in the MSG91 dashboard). MSG91 doesn't sign this payload, so it's
+   * protected by a shared secret sent as a custom header — set that header on
+   * the widget's webhook config (see MSG91_WEBHOOK_SECRET in Server/.env).
+   * Fails closed when the secret is unset, same reasoning as the WhatsApp
+   * verify handshake above.
+   */
+  static msg91OtpWidget(req, res) {
+    const expected = (process.env.MSG91_WEBHOOK_SECRET || '').trim();
+    if (!expected) {
+      logger.warn('MSG91_OTP_WEBHOOK', 'Received a call but MSG91_WEBHOOK_SECRET is not set — refusing.');
+      return res.sendStatus(503);
+    }
+
+    const provided = String(req.get('x-webhook-secret') || '');
+    const ok =
+      provided.length === expected.length &&
+      crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+
+    if (!ok) {
+      logger.warn('MSG91_OTP_WEBHOOK', 'Rejected a call with a missing/incorrect webhook secret.');
+      return res.sendStatus(403);
+    }
+
+    logger.event('MSG91_OTP_WEBHOOK', '📩', 'Received MSG91 OTP widget event', req.body);
+    return res.sendStatus(200);
+  }
+
   /** Pull delivery receipts out of a Meta-shaped payload. */
   static extractStatuses(body) {
     const out = [];

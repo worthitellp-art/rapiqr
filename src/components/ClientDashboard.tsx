@@ -53,6 +53,7 @@ import { apiClient, ChatSession } from '../lib/apiClient';
 import { connectAsOwner } from '../lib/socketClient';
 import { recallOwnerThread, rememberOwnerThread } from '../lib/chatStorage';
 import { soundNotification } from '../utils/soundNotification';
+import { sendMsg91Otp, verifyMsg91Otp, toMsg91Identifier } from '../lib/msg91Widget';
 
 async function getProductsFromDb(): Promise<any[]> {
   try {
@@ -251,14 +252,18 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     setLinkingMessage(null);
     try {
       const res = await sendPhoneOtp(linkingPhone);
-      setLinkingLoading(false);
-      if (res.success) {
-        setOtpStep('otp');
-        showToast(`Verification code sent to ${linkingPhone}`);
-        setLinkingMessage({ type: 'success', text: `Verification code sent to ${linkingPhone}. Enter OTP to claim your stickers.` });
-      } else {
+      if (!res.success) {
+        setLinkingLoading(false);
         setLinkingMessage({ type: 'error', text: res.error || 'Failed to send OTP.' });
+        return;
       }
+
+      // Pre-check passed — the MSG91 widget actually sends the OTP.
+      await sendMsg91Otp(toMsg91Identifier(linkingPhone));
+      setLinkingLoading(false);
+      setOtpStep('otp');
+      showToast(`Verification code sent to ${linkingPhone}`);
+      setLinkingMessage({ type: 'success', text: `Verification code sent to ${linkingPhone}. Enter OTP to claim your stickers.` });
     } catch (err: any) {
       setLinkingLoading(false);
       setLinkingMessage({ type: 'error', text: err.message || 'Failed to send verification code.' });
@@ -274,7 +279,8 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     setLinkingLoading(true);
     setLinkingMessage(null);
     try {
-      const res = await verifyPhoneOtp(otpCode.trim());
+      const accessToken = await verifyMsg91Otp(otpCode.trim());
+      const res = await verifyPhoneOtp(accessToken);
       setLinkingLoading(false);
       if (res.success) {
         setIsPreparing(true);

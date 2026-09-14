@@ -17,4 +17,8 @@ router.post('/razorpay', PaymentController.webhook);
 // Shiprocket courier delivery updates (SHIPROCKET_WEBHOOK_TOKEN, sent as x-api-key).
 router.post('/shiprocket', ShiprocketController.webhook);
 
+// MSG91 OTP Widget events/actions (MSG91_WEBHOOK_SECRET, sent as the
+// x-webhook-secret header — set that header in the widget's webhook config).
+router.post('/msg91-otp', WebhookController.msg91OtpWidget);
+
 module.exports = router;

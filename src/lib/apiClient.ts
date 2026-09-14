@@ -266,9 +266,12 @@ export const apiClient = {
       });
     },
 
-    // Phone verification (two-step): send a code, then verify it before the
-    // number is attached to the account — required before any sticker can be
-    // auto-claimed by phone. See ClientDashboard.tsx / AccountSettingsPanel.tsx.
+    // Phone verification: this only pre-checks the number (format + not
+    // already claimed) before the MSG91 OTP Widget takes over the actual
+    // send/verify in-browser (see src/lib/msg91Widget.ts). The number isn't
+    // attached to the account until verifyPhoneOtp's access token checks out —
+    // required before any sticker can be auto-claimed by phone.
+    // See ClientDashboard.tsx / AccountSettingsPanel.tsx.
     async sendPhoneOtp(phoneNumber: string) {
       return request<{ success: boolean; simulated?: boolean; error?: string }>('/auth/phone/send-otp', {
         method: 'POST',
@@ -276,10 +279,10 @@ export const apiClient = {
       });
     },
 
-    async verifyPhoneOtp(code: string) {
+    async verifyPhoneOtp(accessToken: string, phoneNumber: string) {
       return request<{ success: boolean; user?: any; claimedCount?: number; error?: string }>('/auth/phone/verify-otp', {
         method: 'POST',
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ accessToken, phoneNumber }),
       });
     },
 
@@ -430,10 +433,10 @@ export const apiClient = {
       });
     },
 
-    async verifyActivationOtp(qrId: string, code: string) {
+    async verifyActivationOtp(qrId: string, accessToken: string, phoneNumber: string) {
       return request<{ success: boolean; phone?: string; error?: string }>(`/qr/${qrId}/verify-activation-otp`, {
         method: 'POST',
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ accessToken, phoneNumber }),
       });
     },
   },

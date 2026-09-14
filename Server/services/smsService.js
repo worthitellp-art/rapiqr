@@ -167,6 +167,61 @@ async function sendSms({ to, body, event = 'SMS_SEND', flowId, variables }) {
 }
 
 /**
+ * Dispatches a one-time-passcode SMS using the active provider. Unlike sendSms
+ * (which posts free-form body text through the MSG91 Flow/DLT template API —
+ * broken here since no MSG91_SMS_FLOW_ID is configured), this goes through
+ * MSG91's dedicated OTP API (Authentication-category template, no DLT flow ID
+ * needed) so the same code already generated locally by phoneVerificationService
+ * is what actually gets delivered. Twilio has no separate OTP endpoint, so it
+ * still sends the plain body text.
+ *
+ * @param {{ to: string, code: string|number, body: string, event?: string }} opts
+ * @returns {Promise<{ sent: boolean, simulated: boolean, sid?: string, error?: string, reason?: string }>}
+ */
+async function sendSmsOtp({ to, code, body, event = 'SMS_OTP' }) {
+  if (!to) return { sent: false, simulated: false, reason: 'no_recipient' };
+
+  const isLiveEligible = LIVE_SMS_EVENTS.has(event);
+  const provider = resolveSmsProvider();
+
+  if (!isLiveEligible || provider === 'simulated') {
+    const reason = !isLiveEligible
+      ? ` ("${event}" isn't in SMS_LIVE_EVENTS)`
+      : ' (configure MSG91_AUTH_KEY or TWILIO credentials in Server/.env to send for real)';
+    logger.external(event, `[SIMULATED] Would send OTP SMS to ${to}: "${body}"${reason}`, { to, body });
+    MessageModel.record({ channel: 'sms', to, event, status: 'simulated', body });
+    return { sent: false, simulated: true };
+  }
+
+  const testNumber = (process.env.TEST_SMS_NUMBER || '').trim();
+  const recipient = testNumber || to;
+
+  if (provider === 'msg91') {
+    try {
+      const msg91Result = await sendMsg91Otp({ mobile: recipient, otp: code });
+
+      if (msg91Result.success) {
+        logger.external(event, `MSG91 OTP SMS sent to ${recipient}`, { to: recipient, messageId: msg91Result.messageId });
+        MessageModel.record({ channel: 'sms', to: recipient, event, status: 'sent', sid: msg91Result.messageId, body });
+        return { sent: true, simulated: false, sid: msg91Result.messageId };
+      }
+
+      logger.error(event, `MSG91 OTP SMS to ${recipient} failed`, msg91Result.error);
+      MessageModel.record({ channel: 'sms', to: recipient, event, status: 'failed', error: msg91Result.error, body });
+      return { sent: false, simulated: false, error: msg91Result.error };
+    } catch (err) {
+      logger.error(event, `Exception while sending MSG91 OTP SMS to ${recipient}`, err);
+      MessageModel.record({ channel: 'sms', to: recipient, event, status: 'failed', error: err.message, body });
+      return { sent: false, simulated: false, error: err.message };
+    }
+  }
+
+  // Twilio (and anything else): no dedicated OTP endpoint, fall back to plain body text.
+  // Pass the original `to` — sendSms applies its own TEST_SMS_NUMBER redirect.
+  return sendSms({ to, body, event });
+}
+
+/**
  * Dispatches a WhatsApp notification using MSG91 WhatsApp Outbound API or Twilio WhatsApp.
  * Supports template outbound messages with components, session messages, test redirects, and database logging.
  *
@@ -296,6 +351,7 @@ async function sendWhatsAppOtp({ to, code, event }) {
 
 module.exports = {
   sendSms,
+  sendSmsOtp,
   sendWhatsApp,
   sendWhatsAppOtp,
   sendMsg91Otp,
