@@ -33,7 +33,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
     return isAdmin ? "overview" : "qr";
   });
   const accent = "FFB020";
-  const fontCss = "'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui";
+  const fontCss = "'Pinterest Sans', 'Pin Sans', ui-sans-serif, system-ui";
   const [templates, setTemplates] = useLocalStorage<Template[]>("repiqr-templates", []);
   const [qrList, setQrList] = useLocalStorage<QrRecord[]>("repiqr-qrlist", []);
   const [stickerPos, setStickerPos] = useLocalStorage<StickerPos>("repiqr-sticker-pos", { x: 110, y: 40, w: 100, h: 100 });

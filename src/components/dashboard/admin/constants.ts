@@ -1,6 +1,7 @@
 import { LayoutGrid, Plus, PhoneCall, Bell, Users, Palette, Store, ShoppingBag, MessageCircle, Send, Package } from "lucide-react";
 
 export const FONT_OPTIONS = [
+  { id: "Pinterest Sans", label: "Pinterest Sans", css: "'Pinterest Sans', 'Pin Sans', ui-sans-serif, system-ui" },
   { id: "Plus Jakarta Sans", label: "Jakarta Sans", css: "'Plus Jakarta Sans', ui-sans-serif, system-ui" },
   { id: "Inter", label: "Inter", css: "'Inter', ui-sans-serif, system-ui" },
   { id: "JetBrains Mono", label: "JetBrains Mono", css: "'JetBrains Mono', ui-monospace, monospace" },

@@ -57,7 +57,7 @@ const MSG91_TEMPLATES = {
   },
 
   EMERGENCY_CONTACT_ALERT: {
-    name: 'emergency_contact_alert',
+    name: process.env.MSG91_WHATSAPP_EMERGENCY_CONTACT_TEMPLATE || 'emergency_contact_alert_v2',
     audience: 'emergency_contact',
     variables: ['label', 'message'],
     defaults: { label: 'a registered tag' },
@@ -67,9 +67,12 @@ const MSG91_TEMPLATES = {
   LOCATION_SHARED: {
     name: 'location_shared',
     audience: 'owner',
-    variables: ['label', 'mapsUrl', 'link'],
+    // MSG91/Meta named parameters must be lowercase letters, digits and
+    // underscores only — mapsUrl (camelCase) is rejected at template-create
+    // time, hence maps_url here and in the body below.
+    variables: ['label', 'maps_url', 'link'],
     defaults: { label: 'your tag' },
-    body: 'RepiQR location alert: someone shared their live GPS location for your tag "{{label}}". View the exact location on the map here: {{mapsUrl}}. Open your dashboard here: {{link}} to view full details and respond.',
+    body: 'RepiQR location alert: someone shared their live GPS location for your tag "{{label}}". View the exact location on the map here: {{maps_url}}. Open your dashboard here: {{link}} to view full details and respond.',
   },
 
   CHAT_STARTED: {

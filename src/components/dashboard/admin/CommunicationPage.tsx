@@ -232,7 +232,7 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
                   const inactive = p.active === false;
                   // A row that came in through the landing page "Join us" form: still
                   // inactive and carrying the contact details the applicant typed.
-                  const isApplication = inactive && Boolean(p.email || p.city || p.notes);
+                  const isApplication = inactive && Boolean(p.email || p.city || p.country || p.notes);
                   return (
                     <div
                       key={p.id}
@@ -252,9 +252,13 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
                             )}
                           </p>
                           <p className="text-[11px] text-[var(--fx-ink-2)] font-mono font-semibold mt-0.5">{p.phone}</p>
-                          {(p.city || p.email) && (
+                          {(p.city || p.country || p.email) && (
                             <p className="text-[10px] text-[var(--fx-ink-2)] font-semibold mt-1 flex items-center gap-2.5 flex-wrap">
-                              {p.city && <span className="flex items-center gap-1"><MapPin size={10} /> {p.city}</span>}
+                              {(p.city || p.country) && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin size={10} /> {[p.city, p.country].filter(Boolean).join(', ')}
+                                </span>
+                              )}
                               {p.email && <span className="flex items-center gap-1"><Mail size={10} /> {p.email}</span>}
                             </p>
                           )}

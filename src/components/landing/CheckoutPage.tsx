@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Lock,
   ShieldCheck,
@@ -18,7 +18,9 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { apiClient } from '../../lib/apiClient';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
+import AutocompleteField from '../common/AutocompleteField';
 import AppLogo from '../common/AppLogo';
+import { INDIAN_STATES, INDIAN_CITIES, INDIAN_CITY_NAMES } from '../../data/locations';
 import { OrderInvoice } from '../../types/invoice';
 import { buildOrderInvoice, printOrderInvoice } from '../../services/invoiceService';
 import OrderInvoiceModal from './OrderInvoiceModal';
@@ -45,129 +47,6 @@ function createLocalOrderFallback(order: {
     /* ignore storage errors — the in-memory id is still returned below */
   }
   return { success: true, data: localOrder };
-}
-
-/* ── India state/city suggestion data (static, no external dependency) ──── */
-
-const INDIAN_STATES = [
-  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa',
-  'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala',
-  'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland',
-  'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
-  'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
-  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
-  'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
-];
-
-const INDIAN_CITIES: { name: string; state: string }[] = [
-  { name: 'Visakhapatnam', state: 'Andhra Pradesh' }, { name: 'Vijayawada', state: 'Andhra Pradesh' },
-  { name: 'Guntur', state: 'Andhra Pradesh' }, { name: 'Tirupati', state: 'Andhra Pradesh' },
-  { name: 'Itanagar', state: 'Arunachal Pradesh' },
-  { name: 'Guwahati', state: 'Assam' }, { name: 'Dibrugarh', state: 'Assam' },
-  { name: 'Patna', state: 'Bihar' }, { name: 'Gaya', state: 'Bihar' }, { name: 'Muzaffarpur', state: 'Bihar' },
-  { name: 'Raipur', state: 'Chhattisgarh' }, { name: 'Bhilai', state: 'Chhattisgarh' },
-  { name: 'Panaji', state: 'Goa' }, { name: 'Margao', state: 'Goa' },
-  { name: 'Ahmedabad', state: 'Gujarat' }, { name: 'Surat', state: 'Gujarat' }, { name: 'Vadodara', state: 'Gujarat' },
-  { name: 'Rajkot', state: 'Gujarat' }, { name: 'Gandhinagar', state: 'Gujarat' },
-  { name: 'Gurugram', state: 'Haryana' }, { name: 'Faridabad', state: 'Haryana' }, { name: 'Panipat', state: 'Haryana' },
-  { name: 'Shimla', state: 'Himachal Pradesh' },
-  { name: 'Ranchi', state: 'Jharkhand' }, { name: 'Jamshedpur', state: 'Jharkhand' }, { name: 'Dhanbad', state: 'Jharkhand' },
-  { name: 'Bengaluru', state: 'Karnataka' }, { name: 'Mysuru', state: 'Karnataka' }, { name: 'Mangaluru', state: 'Karnataka' },
-  { name: 'Hubballi', state: 'Karnataka' },
-  { name: 'Kochi', state: 'Kerala' }, { name: 'Thiruvananthapuram', state: 'Kerala' }, { name: 'Kozhikode', state: 'Kerala' },
-  { name: 'Bhopal', state: 'Madhya Pradesh' }, { name: 'Indore', state: 'Madhya Pradesh' }, { name: 'Gwalior', state: 'Madhya Pradesh' },
-  { name: 'Jabalpur', state: 'Madhya Pradesh' },
-  { name: 'Mumbai', state: 'Maharashtra' }, { name: 'Pune', state: 'Maharashtra' }, { name: 'Nagpur', state: 'Maharashtra' },
-  { name: 'Nashik', state: 'Maharashtra' }, { name: 'Thane', state: 'Maharashtra' }, { name: 'Aurangabad', state: 'Maharashtra' },
-  { name: 'Imphal', state: 'Manipur' },
-  { name: 'Shillong', state: 'Meghalaya' },
-  { name: 'Aizawl', state: 'Mizoram' },
-  { name: 'Kohima', state: 'Nagaland' },
-  { name: 'Bhubaneswar', state: 'Odisha' }, { name: 'Cuttack', state: 'Odisha' },
-  { name: 'Ludhiana', state: 'Punjab' }, { name: 'Amritsar', state: 'Punjab' }, { name: 'Chandigarh', state: 'Punjab' },
-  { name: 'Jaipur', state: 'Rajasthan' }, { name: 'Jodhpur', state: 'Rajasthan' }, { name: 'Udaipur', state: 'Rajasthan' },
-  { name: 'Kota', state: 'Rajasthan' },
-  { name: 'Gangtok', state: 'Sikkim' },
-  { name: 'Chennai', state: 'Tamil Nadu' }, { name: 'Coimbatore', state: 'Tamil Nadu' }, { name: 'Madurai', state: 'Tamil Nadu' },
-  { name: 'Tiruchirappalli', state: 'Tamil Nadu' }, { name: 'Salem', state: 'Tamil Nadu' },
-  { name: 'Hyderabad', state: 'Telangana' }, { name: 'Warangal', state: 'Telangana' },
-  { name: 'Agartala', state: 'Tripura' },
-  { name: 'Lucknow', state: 'Uttar Pradesh' }, { name: 'Kanpur', state: 'Uttar Pradesh' }, { name: 'Noida', state: 'Uttar Pradesh' },
-  { name: 'Ghaziabad', state: 'Uttar Pradesh' }, { name: 'Agra', state: 'Uttar Pradesh' }, { name: 'Varanasi', state: 'Uttar Pradesh' },
-  { name: 'Meerut', state: 'Uttar Pradesh' }, { name: 'Prayagraj', state: 'Uttar Pradesh' },
-  { name: 'Dehradun', state: 'Uttarakhand' }, { name: 'Haridwar', state: 'Uttarakhand' },
-  { name: 'Kolkata', state: 'West Bengal' }, { name: 'Howrah', state: 'West Bengal' }, { name: 'Siliguri', state: 'West Bengal' },
-  { name: 'Port Blair', state: 'Andaman and Nicobar Islands' },
-  { name: 'Silvassa', state: 'Dadra and Nagar Haveli and Daman and Diu' },
-  { name: 'New Delhi', state: 'Delhi' }, { name: 'Delhi', state: 'Delhi' },
-  { name: 'Srinagar', state: 'Jammu and Kashmir' }, { name: 'Jammu', state: 'Jammu and Kashmir' },
-  { name: 'Leh', state: 'Ladakh' },
-  { name: 'Kavaratti', state: 'Lakshadweep' },
-  { name: 'Puducherry', state: 'Puducherry' },
-];
-
-/* ── Small reusable "type to filter" suggestion field ─────────────────────── */
-
-function AutocompleteField({
-  value,
-  onChange,
-  onSelect,
-  suggestions,
-  placeholder,
-  label,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onSelect?: (v: string) => void;
-  suggestions: string[];
-  placeholder: string;
-  label: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const onClickOutside = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
-  }, []);
-
-  const matches = useMemo(() => {
-    const q = value.trim().toLowerCase();
-    if (!q) return [];
-    return suggestions.filter((s) => s.toLowerCase().startsWith(q) || s.toLowerCase().includes(q)).slice(0, 6);
-  }, [value, suggestions]);
-
-  return (
-    <div ref={wrapRef} className="relative">
-      <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">{label}</label>
-      <input
-        type="text"
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        autoComplete="off"
-        className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/15 text-sm font-medium text-gray-900 outline-hidden transition-all"
-      />
-      {open && matches.length > 0 && (
-        <div className="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
-          {matches.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => { onChange(s); onSelect?.(s); setOpen(false); }}
-              className="block w-full px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-amber-50 hover:text-gray-950 cursor-pointer"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
@@ -797,8 +676,6 @@ export default function CheckoutPage({
     runCheckout(isRecognized);
   };
 
-  const cityNames = useMemo(() => INDIAN_CITIES.map((c) => c.name), []);
-
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900 pb-16">
 
@@ -1010,7 +887,7 @@ export default function CheckoutPage({
                         const match = INDIAN_CITIES.find((c) => c.name === selected);
                         if (match && !state.trim()) setState(match.state);
                       }}
-                      suggestions={cityNames}
+                      suggestions={INDIAN_CITY_NAMES}
                     />
 
                     <AutocompleteField

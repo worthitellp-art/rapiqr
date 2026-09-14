@@ -1,10 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Loader2, Mail } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Loader2, Mail, AlertCircle } from 'lucide-react';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
+import AutocompleteField from '../common/AutocompleteField';
 import { SERVICE_TYPES } from '../scan/tileActions';
 import { getServiceMeta } from '../scan/serviceMeta';
 import { STICKER_CATEGORIES } from '../../stickerModules';
 import { apiClient } from '../../lib/apiClient';
+import { INDIAN_CITY_NAMES, COUNTRIES } from '../../data/locations';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface JoinUsPageProps {
   onBack: () => void;
@@ -26,15 +30,20 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [city, setCity] = useState('');
+  const [country, setCountry] = useState('');
   const [notes, setNotes] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const [touchedEmail, setTouchedEmail] = useState(false);
 
   const service = useMemo(() => SERVICE_TYPES.find((type) => type.slug === serviceType) || SERVICE_TYPES[0], [serviceType]);
   const serviceMeta = getServiceMeta(serviceType);
-  const valid = Boolean(label.trim() && phone.trim() && city.trim());
+  const phoneDigits = phone.replace(/\D/g, '').slice(-10);
+  const phoneValid = phoneDigits.length === 10;
+  const emailValid = !email.trim() || EMAIL_PATTERN.test(email.trim());
+  const valid = Boolean(label.trim() && phoneValid && city.trim() && emailValid);
 
   const toggleCategory = (value: string) => {
     setCategories((current) => current.includes(value)
@@ -57,6 +66,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
         phone: phone.trim(),
         email: email.trim(),
         city: city.trim(),
+        country: country.trim(),
         notes: notes.trim(),
       });
       saved = res.data || null;
@@ -140,16 +150,47 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                 </div>
                 <div>
                   <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">City / service area *</label>
-                  <input value={city} onChange={(event) => setCity(event.target.value)} placeholder="e.g. Pune" className="w-full rounded-xl border border-black/12 px-4 py-3.5 text-[14px] outline-hidden focus:border-black" />
+                  <AutocompleteField
+                    label=""
+                    value={city}
+                    onChange={setCity}
+                    suggestions={INDIAN_CITY_NAMES}
+                    placeholder="e.g. Pune"
+                    inputClassName="w-full rounded-xl border border-black/12 px-4 py-3.5 text-[14px] outline-hidden focus:border-black"
+                  />
                 </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">Country <span className="normal-case tracking-normal text-black/40">(optional)</span></label>
+                <AutocompleteField
+                  label=""
+                  value={country}
+                  onChange={setCountry}
+                  suggestions={COUNTRIES}
+                  placeholder="e.g. India"
+                  inputClassName="w-full rounded-xl border border-black/12 px-4 py-3.5 text-[14px] outline-hidden focus:border-black"
+                />
               </div>
 
               <div>
                 <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">Email</label>
                 <div className="relative">
                   <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-black/30" />
-                  <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" className="w-full rounded-xl border border-black/12 py-3.5 pl-11 pr-4 text-[14px] outline-hidden focus:border-black" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    onBlur={() => setTouchedEmail(true)}
+                    placeholder="you@company.com"
+                    className={`w-full rounded-xl border py-3.5 pl-11 pr-4 text-[14px] outline-hidden ${touchedEmail && !emailValid ? 'border-red-400 focus:border-red-500' : 'border-black/12 focus:border-black'}`}
+                  />
                 </div>
+                {touchedEmail && !emailValid && (
+                  <p className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-red-600">
+                    <AlertCircle size={11} /> Enter a valid email address.
+                  </p>
+                )}
               </div>
 
               <div>

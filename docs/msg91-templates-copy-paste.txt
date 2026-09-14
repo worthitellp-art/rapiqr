@@ -1,0 +1,191 @@
+BEFORE YOU START EACH TEMPLATE:
+Set the "Variable Type" dropdown to "Name" FIRST, before typing anything into
+Body. If it's left on "Number" (MSG91's default for a new template), typing
+{{label}} into Body will fail with: "Variables parameters must be whole
+numbers with two sets of curly brackets, i.e., {{1}} or {{2}}." That error
+means the dropdown is wrong, not that the body text is wrong - do not rewrite
+{{label}} as {{1}} to fix it, switch the dropdown back to Name instead. Every
+template below (except otp_verification, which has no Body field at all) uses
+Name.
+
+NOTE ON META DELETION LOCK ERROR:
+If MSG91 says: "New english content can't be added while the existing english
+content is being deleted. try again in less than 1 minute or consider creating
+a new message template":
+Meta locks a template name for a few minutes after it is deleted. Simply append
+"_v2" to the Template Name (e.g. "emergency_contact_alert_v2") to bypass the
+lock instantly without waiting. The backend code already supports this name.
+
+
+====================================
+TEMPLATE: qr_scan_alert
+====================================
+STATUS: ALREADY APPROVED - DO NOT RESUBMIT
+
+Category: Utility
+Language: en
+Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{label}} with "Variables parameters must be whole numbers..."
+Header: None
+
+Body:
+RepiQR alert: someone just scanned your registered tag "{{label}}" and reported the following: "{{message}}". Open your RepiQR dashboard here: {{link}} to view details and respond securely.
+
+Sample values:
+label = Demo Tag 1234
+message = A visitor sent a test alert.
+link = https://repiqr.com/dashboard?tab=chat
+
+Footer: None
+Buttons: None
+
+
+====================================
+TEMPLATE: emergency_alert
+====================================
+Category: Utility
+Language: en
+Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{label}} with "Variables parameters must be whole numbers..."
+Header: None
+
+Body:
+RepiQR EMERGENCY: an urgent alert has been raised for "{{label}}". The person who scanned your tag reports: "{{message}}". Open your dashboard here: {{link}} to view visitor details and take action.
+
+Sample values:
+label = Car GJ 01 XX 0000
+message = Found your car unlocked with lights on
+link = https://repiqr.com/dashboard?tab=chat
+
+Footer: None
+Buttons: None
+
+
+====================================
+TEMPLATE: emergency_contact_alert_v2
+====================================
+NOTE: Named "emergency_contact_alert_v2" to bypass Meta's temporary deletion lock.
+Enter "emergency_contact_alert_v2" in the "Enter Template Name" field in MSG91.
+
+Category: Utility
+Language: en
+Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{label}} with "Variables parameters must be whole numbers..."
+Header: None
+
+Body:
+RepiQR EMERGENCY NOTIFICATION: an urgent alert was raised on the registered tag "{{label}}". The reporter states: "{{message}}". Please check on this situation immediately.
+
+Sample values:
+label = Car GJ 01 XX 0000
+message = Vehicle is blocking my driveway, please move it
+
+Footer: None
+Buttons: None
+
+
+====================================
+TEMPLATE: location_shared
+====================================
+Category: Utility
+Language: en
+Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{label}} with "Variables parameters must be whole numbers..."
+Header: None
+
+Body:
+RepiQR location alert: someone shared their live GPS location for your tag "{{label}}". View the exact location on the map here: {{maps_url}}. Open your dashboard here: {{link}} to view full details and respond.
+
+Sample values:
+label = Car GJ 01 XX 0000
+maps_url = https://maps.google.com/?q=23.0225,72.5714
+link = https://repiqr.com/dashboard?tab=chat
+
+Footer: None
+Buttons: None
+
+
+====================================
+TEMPLATE: chat_started
+====================================
+Category: Utility
+Language: en
+Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{label}} with "Variables parameters must be whole numbers..."
+Header: None
+
+Body:
+RepiQR chat alert: a visitor has started a conversation about your tag "{{label}}". They are waiting for your response. Open your dashboard here: {{link}} to view the message and reply securely.
+
+Sample values:
+label = Car GJ 01 XX 0000
+link = https://repiqr.com/dashboard?tab=chat
+
+Footer: None
+Buttons: None
+
+
+====================================
+TEMPLATE: chat_message
+====================================
+Category: Utility
+Language: en
+Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{label}} with "Variables parameters must be whole numbers..."
+Header: None
+
+Body:
+RepiQR new message: you have a new message from a visitor regarding your tag "{{label}}". The message reads: "{{message}}". Open your dashboard here: {{link}} to read and respond.
+
+Sample values:
+label = Car GJ 01 XX 0000
+message = Hi, I found your bag near the gate
+link = https://repiqr.com/dashboard?tab=chat
+
+Footer: None
+Buttons: None
+
+
+====================================
+TEMPLATE: safe_status
+====================================
+Category: Utility
+Language: en
+Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{label}} with "Variables parameters must be whole numbers..."
+Header: None
+
+Body:
+RepiQR resolved: the emergency situation on the registered tag "{{label}}" has been marked as SAFE and resolved by the registered user. Time of resolution: {{time}}. No further action is needed.
+
+Sample values:
+label = Car GJ 01 XX 0000
+time = 6:45 PM, 11 Sep 2026
+
+Footer: None
+Buttons: None
+
+
+====================================
+TEMPLATE: qr_activated
+====================================
+Category: Utility
+Language: en
+Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{label}} with "Variables parameters must be whole numbers..."
+Header: None
+
+Body:
+RepiQR activation: congratulations! Your registered tag "{{label}}" is now active and protecting you. Your tag is live and ready to receive alerts from anyone who scans it.
+
+Sample values:
+label = Car GJ 01 XX 0000
+
+Footer: None
+Buttons: None
+
+
+====================================
+TEMPLATE: otp_verification
+====================================
+SUBMIT THIS ONE LAST - the form is different, no Body text box at all.
+
+Category: Authentication
+Language: en
+Body content type: One-time passcode
+Add security recommendation: ON
+Code expiration: ON, 5 minutes
+Button type: Copy Code (not One-tap autofill)
+Sample code value: 123456

@@ -69,7 +69,6 @@ import {
 } from "lucide-react";
 import RepiChat, { customerTokenKey } from "../chat/RepiChat";
 import { isChatOpen as recallChatOpen, setChatOpen as rememberChatOpen } from "../../lib/chatStorage";
-import goldCoinsIllustration from "../../assets/illustrations/gold-coins-payment.jpg";
 import ScanPaymentModal from "./payment/ScanPaymentModal";
 
 /* WhatsApp logo SVG — matches the CategoryScanView WhatsAppIcon */
@@ -106,6 +105,11 @@ interface QrData {
   status: string;
   template: string;
   category?: string;
+  // Set when an admin (or the owner) restored this sticker from a soft
+  // delete via its recovery code — see QrModel._restoreDeletedSticker. Flags
+  // the scan page to prompt for re-verification instead of trusting the
+  // details as still-current.
+  recoveredAt?: string | null;
 }
 
 interface GeoLocation {
@@ -1301,6 +1305,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           vehicleNumber: `REG-${dbRecord.id.slice(-4)}`,
           template: dbRecord.template_name || "Default",
           category: dbRecord.category,
+          recovered_at: dbRecord.recovered_at,
         });
       } else if (cached) {
         // Legacy/local-only record with no matching DB row (e.g. offline demo data).
@@ -1340,6 +1345,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         status: record.status || "inactive",
         template: record.template || "Default",
         category: record.category,
+        recoveredAt: record.recovered_at || record.recoveredAt || null,
       };
       setQrData(data);
 
@@ -1651,10 +1657,11 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           </div>
         )}
 
-        {/* ============ ACTIVATION — Exact Design (Reference: sccanpagedesign.png & designformscanpage.png) ============ */}
-        {phase === "activation" && qrData && (
+        {/* ============ ACTIVATION & EMERGENCY CONTACTS (Windows-Style Multi-Step Wizard) ============ */}
+        {(phase === "activation" || phase === "register" || phase === "success") && qrData && (
           <div className="w-full flex items-center justify-center py-2 animate-fade-in">
             <ScanPaymentModal
+              phase={phase}
               price="₹299"
               userPhone={
                 regPhone
@@ -1677,7 +1684,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
               onOtpInputChange={setOtpInput}
               otpSending={otpSending}
               isProcessing={activatingQr}
-              error={activationError}
+              error={contactsError || activationError}
               onSubmit={otpStep ? handleVerifyOtpAndActivate : handleSendOtp}
               onResendOtp={handleSendOtp}
               onBackToPhone={() => {
@@ -1689,204 +1696,14 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                 if (onBack) onBack();
                 else window.location.href = "/";
               }}
+              emergencyContacts={emergencyContacts}
+              onAddEmergencyContact={addEmergencyContactRow}
+              onRemoveEmergencyContact={removeEmergencyContact}
+              onUpdateEmergencyContact={updateEmergencyContact}
+              onFinishEmergencyContacts={handleFinishEmergencyContacts}
+              onSkipEmergencyContacts={handleSkipEmergencyContacts}
+              onViewTag={() => setPhase("emergency")}
             />
-          </div>
-        )}
-
-        {/* ============ EMERGENCY CONTACTS (after identity verified, before final activation) ============ */}
-        {phase === "register" && qrData && (
-          <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col lg:flex-row min-h-[580px] animate-fade-in my-2">
-            {/* Left Panel: Golden Yellow Branding & Step Info */}
-            <div className="relative w-full lg:w-[35%] bg-[#FFC700] p-6 sm:p-8 flex flex-col justify-between select-none">
-              <div className="space-y-5 relative z-10">
-                {/* Brand Header */}
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-amber-400/50 border border-amber-500/40 flex items-center justify-center font-extrabold text-xl text-slate-950 shadow-xs">
-                    R
-                  </div>
-                  <span className="text-base sm:text-lg font-bold tracking-tight text-slate-950 font-display">
-                    RapiQR Safety Protection
-                  </span>
-                </div>
-
-                {/* Step Card */}
-                <div className="rounded-2xl bg-white p-5 shadow-xs border border-amber-200/50 text-left space-y-1.5">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">
-                    Step 2 of 2 · Guardian Network
-                  </span>
-                  <h2 className="text-xl font-bold font-display text-slate-950">Emergency Contacts</h2>
-                  <p className="text-xs text-slate-600 leading-relaxed pt-1">
-                    Add trusted family or friends who will receive your live GPS location in roadside emergencies.
-                  </p>
-                </div>
-
-                {/* Vehicle Tag Pill */}
-                <div className="rounded-xl bg-white p-3.5 shadow-xs border border-amber-200/50 flex items-center justify-between text-xs sm:text-sm font-medium text-slate-800">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center text-amber-900 flex-shrink-0">
-                      <Car size={13} />
-                    </div>
-                    <span className="truncate font-semibold text-slate-800">
-                      {qrData.vehicleNumber || qrData.vehicleName || qrData.id}
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                    Step 2
-                  </span>
-                </div>
-              </div>
-
-              {/* Bottom Gold Coins Illustration */}
-              <div className="relative z-0 mt-auto -mx-6 sm:-mx-8 -mb-6 sm:-mb-8 pt-4">
-                <div className="w-full relative overflow-hidden flex items-end">
-                  <img
-                    src={goldCoinsIllustration}
-                    alt="Safe & Secure"
-                    className="w-full h-44 sm:h-52 object-cover object-bottom"
-                  />
-                  <div className="absolute bottom-4 left-6 z-20 flex items-center gap-1.5 text-xs font-semibold text-slate-950">
-                    <span className="opacity-90">Secured by</span>
-                    <span className="font-extrabold italic tracking-tight flex items-center gap-1 text-slate-950">
-                      <svg className="w-3.5 h-3.5 inline fill-current text-blue-600" viewBox="0 0 24 24">
-                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                      </svg>
-                      Razorpay
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Panel: White Contact Entry Form */}
-            <div className="w-full lg:w-[65%] p-6 sm:p-8 flex flex-col justify-between bg-white text-left space-y-4">
-              <div className="space-y-4">
-                <div className="border-b border-slate-100 pb-3">
-                  <h3 className="text-lg font-bold font-display text-slate-900">Add Trusted Contacts</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    We will never share your personal numbers with bystanders.
-                  </p>
-                </div>
-
-                {isContactPickerSupported && (
-                  <button
-                    type="button"
-                    onClick={handleImportContact}
-                    className="w-full py-2.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <Smartphone size={14} /> Import from phone contacts
-                  </button>
-                )}
-
-                <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
-                  {emergencyContacts.map((contact, idx) => (
-                    <div key={contact.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-3 relative">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                          Contact {idx + 1} {idx === 0 ? "· Primary SOS" : ""}
-                        </span>
-                        {emergencyContacts.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeEmergencyContact(contact.id)}
-                            className="text-slate-400 hover:text-red-500 transition-colors cursor-pointer p-1"
-                            aria-label={`Remove contact ${idx + 1}`}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="rounded-xl bg-white px-4 py-2 border border-slate-200 focus-within:border-black transition-all">
-                        <input
-                          type="text"
-                          value={contact.name}
-                          onChange={(e) => updateEmergencyContact(contact.id, "name", e.target.value)}
-                          placeholder="Full name (e.g. Sarah Doe)"
-                          className="w-full bg-transparent text-xs font-semibold text-slate-900 outline-none placeholder:text-slate-400"
-                        />
-                      </div>
-
-                      <div>
-                        <div className="rounded-xl bg-white px-4 py-2 border border-slate-200 focus-within:border-black transition-all">
-                          <input
-                            type="text"
-                            value={contact.relationship}
-                            onChange={(e) => updateEmergencyContact(contact.id, "relationship", e.target.value)}
-                            placeholder="Relationship (e.g. Spouse / Parent)"
-                            className="w-full bg-transparent text-xs font-semibold text-slate-900 outline-none placeholder:text-slate-400"
-                          />
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {RELATIONSHIP_PRESETS.map((label) => (
-                            <button
-                              key={label}
-                              type="button"
-                              onClick={() => updateEmergencyContact(contact.id, "relationship", label)}
-                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
-                                contact.relationship === label
-                                  ? "border-black bg-black text-white font-bold"
-                                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                              }`}
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <PhoneInputWithCountry
-                        value={contact.phone}
-                        onChange={(full) => updateEmergencyContact(contact.id, "phone", full)}
-                        placeholder="10-digit mobile"
-                      />
-                      {contact.phone.trim() && !isValidContactPhone(contact.phone) && (
-                        <p className="text-[11px] font-semibold text-red-500">Enter a valid phone number.</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={addEmergencyContactRow}
-                  className="w-full py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                >
-                  + Add another contact
-                </button>
-
-                {(contactsError || activationError) && (
-                  <p className="text-xs font-semibold text-red-500 bg-red-50 rounded-2xl p-2.5">
-                    {contactsError || activationError}
-                  </p>
-                )}
-              </div>
-
-              <div className="pt-2 space-y-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={handleFinishEmergencyContacts}
-                  disabled={activatingQr}
-                  className="w-full py-4 rounded-xl bg-black hover:bg-zinc-900 text-white font-bold text-sm shadow-md active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {activatingQr ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 size={16} className="animate-spin" /> Saving…
-                    </span>
-                  ) : (
-                    <span>Save &amp; Activate Tag</span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSkipEmergencyContacts}
-                  disabled={activatingQr}
-                  className="block mx-auto text-slate-500 hover:text-slate-900 font-medium text-xs transition-colors cursor-pointer disabled:opacity-50 py-1"
-                >
-                  Skip for now →
-                </button>
-              </div>
-            </div>
           </div>
         )}
 
@@ -1974,6 +1791,20 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         {/* ============ EMERGENCY SCREEN (Redesigned matching requested design mockup) ============ */}
         {phase === "emergency" && qrData && (
           <div className="w-full max-w-md mx-auto animate-fade-in space-y-2 pb-6">
+            {/* Sticker was soft-deleted and later restored via its recovery
+                code (admin fleet or self-service) — recoveredAt is only set
+                on that path, see QrModel._restoreDeletedSticker. The details
+                below survived the delete, but flag them for re-verification
+                rather than silently trusting stale data. */}
+            {qrData.recoveredAt && (
+              <div className="flex items-start gap-2.5 bg-[#FFFBEB] border border-[#FCD34D] rounded-2xl px-3.5 py-3">
+                <ShieldAlert size={16} className="text-[#B45309] flex-shrink-0 mt-0.5" />
+                <p className="text-[11.5px] leading-snug text-[#92400E] font-semibold">
+                  Re-verification needed — this sticker's record was recovered after being deleted. Please confirm the owner and emergency details are still correct.
+                </p>
+              </div>
+            )}
+
             {/* ============ CATEGORY SCAN PAGE ============
                 Every category the admin can mint a sticker for except car and
                 bike, which keep the bespoke vehicle screens below. The whole
@@ -2961,44 +2792,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           </div>
         )}
 
-        {/* ============ ACTIVATION SUCCESS (owner just activated their sticker) ============ */}
-        {phase === "success" && qrData && (
-          <div className="w-full flex items-center justify-center py-6 animate-fade-in">
-            <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 sm:p-8 text-center space-y-5">
-              {/* Soft Cream Check Icon Box */}
-              <div className="w-20 h-20 rounded-2xl bg-[#FFFDF4] border border-[#F7EED8] flex items-center justify-center text-emerald-600 mx-auto shadow-inner">
-                <CheckCircle2 size={40} className="text-emerald-600" />
-              </div>
 
-              <div className="space-y-1.5">
-                <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">
-                  24/7 Protection Active
-                </span>
-                <h2 className="text-2xl font-bold font-display text-slate-900">
-                  All Set! Tag is Live.
-                </h2>
-                <p className="text-xs text-slate-600 leading-relaxed max-w-sm mx-auto pt-1">
-                  Your {getStickerCategoryLabel(qrData.category) || "smart sticker"} is now active and protected with 24/7 SafeSync™ call proxy and emergency SOS.
-                </p>
-              </div>
-
-              <div className="pt-2 space-y-3">
-                <button
-                  type="button"
-                  onClick={() => setPhase("emergency")}
-                  className="w-full py-3.5 rounded-xl bg-black hover:bg-zinc-900 active:scale-[0.99] text-white font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <span>Preview Public Scan View</span>
-                  <ArrowRight size={16} />
-                </button>
-
-                <p className="text-[11px] text-slate-400">
-                  You can manage settings, emergency contacts, and notifications anytime in your dashboard.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Floating Install App Button — the only install entry point on this
             page now; the old full-width promotional banner was removed so

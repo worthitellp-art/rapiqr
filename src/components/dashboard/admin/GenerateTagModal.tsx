@@ -1,4 +1,4 @@
-﻿import type React from "react";
+import type React from "react";
 import { useEffect, useState } from "react";
 import { X, Check, Copy, Download, Printer, AlertCircle, Loader2 } from "lucide-react";
 import { QrRecord } from "./types";
@@ -156,7 +156,7 @@ export default function GenerateTagModal({
   };
 
   return (
-    <div className="fx-modal-backdrop" style={{ fontFamily: "'Inter', ui-sans-serif, system-ui" }} onClick={onClose}>
+    <div className="fx-modal-backdrop" style={{ fontFamily: "'Pinterest Sans', 'Pin Sans', ui-sans-serif, system-ui" }} onClick={onClose}>
       <div className="fx-modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
         <button className="fx-modal-close" onClick={onClose} aria-label="Close">
           <X size={15} />

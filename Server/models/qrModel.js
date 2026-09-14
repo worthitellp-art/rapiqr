@@ -43,7 +43,7 @@ function getDuplicateDetails(err) {
 // document; without this whitelist, an unauthenticated caller who knows a
 // sticker's ID could pull a stranger's medical/contact details straight off
 // GET /api/qr/:id or the activate/scan response.
-const PUBLIC_QR_FIELDS = '_id client_id status scans_count last_scanned_at template_name fg_color bg_color category created_at';
+const PUBLIC_QR_FIELDS = '_id client_id status scans_count last_scanned_at template_name fg_color bg_color category created_at recovered_at';
 
 function toPublicQr(doc) {
   if (!doc) return null;
@@ -58,6 +58,11 @@ function toPublicQr(doc) {
     bg_color: doc.bg_color,
     category: doc.category,
     created_at: doc.created_at,
+    // Set once by _restoreDeletedSticker on a recovery-code restore — lets the
+    // scan page flag that this sticker's record was deleted and brought back,
+    // so a finder/owner knows to re-verify the details rather than trust them
+    // as still-current.
+    recovered_at: doc.recovered_at || null,
   };
 }
 
@@ -359,7 +364,7 @@ class QrModel {
       .select('+recovery_code_hash id_scheme_version deleted_at category normalized_phone_number '
         + 'qr_payload qr_version qr_ecc_level qr_mask_pattern module_size_px margin_modules '
         + 'fg_color bg_color encoder_name encoder_version rendered_image_sha256 '
-        + 'status client_id template_name scans_count last_scanned_at created_at details.activatedAt')
+        + 'status client_id template_name scans_count last_scanned_at created_at recovered_at details.activatedAt')
       .lean();
 
     if (!doc || doc.id_scheme_version !== ID_SCHEME_VERSION_V2) return { ok: false, reason: 'not_found' };

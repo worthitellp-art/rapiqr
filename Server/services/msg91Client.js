@@ -260,17 +260,35 @@ function stripNewlines(value) {
   return String(value).replace(/\r?\n+/g, ' — ').trim();
 }
 
+// MSG91's own sample payload for a NAMED-parameter template (returned from the
+// dashboard once qr_scan_alert was approved) tags every component with
+// `parameter_name` alongside `type`/`value` — e.g. body_label carries
+// parameter_name: "label". A POSITIONAL component (body_1, used by the
+// otp_verification Authentication template) has no such name, since Meta
+// numbers those instead of naming them.
+function deriveParamName(prefixedKey) {
+  const match = /^(?:body|header|button)_(.+)$/.exec(prefixedKey);
+  if (!match) return undefined;
+  const suffix = match[1];
+  return /^\d+$/.test(suffix) ? undefined : suffix;
+}
+
 function buildMsg91WhatsAppComponents({ variables = {}, components = {}, body = '', headerMediaUrl = '' } = {}) {
   const result = {};
 
   // 1. If pre-structured components object is provided, normalize each field
   if (components && typeof components === 'object' && Object.keys(components).length > 0) {
     for (const [key, val] of Object.entries(components)) {
+      const parameterName = deriveParamName(key);
       if (val && typeof val === 'object' && val.value !== undefined) {
         const type = val.type || 'text';
-        result[key] = { type, value: type === 'text' ? stripNewlines(val.value) : String(val.value) };
+        result[key] = {
+          type,
+          value: type === 'text' ? stripNewlines(val.value) : String(val.value),
+          ...(parameterName ? { parameter_name: parameterName } : {}),
+        };
       } else if (val !== undefined && val !== null) {
-        result[key] = { type: 'text', value: stripNewlines(val) };
+        result[key] = { type: 'text', value: stripNewlines(val), ...(parameterName ? { parameter_name: parameterName } : {}) };
       }
     }
   }
@@ -281,12 +299,11 @@ function buildMsg91WhatsAppComponents({ variables = {}, components = {}, body = 
     for (const [key, val] of Object.entries(variables)) {
       const formattedKey = key.startsWith('body_') || key.startsWith('header_') || key.startsWith('button_')
         ? key
-        : /^\d+$/.test(key)
-        ? `body_${key}`
         : `body_${key}`;
+      const parameterName = deriveParamName(formattedKey);
 
       if (!result[formattedKey]) {
-        result[formattedKey] = { type: 'text', value: stripNewlines(val) };
+        result[formattedKey] = { type: 'text', value: stripNewlines(val), ...(parameterName ? { parameter_name: parameterName } : {}) };
       }
     }
   }
@@ -356,6 +373,10 @@ async function sendMsg91WhatsApp({
     integrated_number: senderNumber,
     content_type: 'template',
     payload: {
+      // Present in MSG91's own sample payload for this endpoint (returned
+      // from the dashboard alongside the qr_scan_alert approval) — omitted
+      // here previously.
+      messaging_product: 'whatsapp',
       type: 'template',
       template: {
         name: targetTemplate,

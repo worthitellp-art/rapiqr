@@ -68,7 +68,7 @@ export default function AuthModal({
   return (
     <div
       className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in font-body"
-      style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+      style={{ fontFamily: "'Pinterest Sans', 'Pin Sans', sans-serif" }}
       onClick={onClose}
     >
       {/* ── Modal Card — 32px radius, matching the app's other large surfaces ── */}

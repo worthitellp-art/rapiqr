@@ -1100,6 +1100,7 @@ export const apiClient = {
       phone: string;
       email?: string;
       city?: string;
+      country?: string;
       notes?: string;
     }) {
       return request<{ success: boolean; data: any }>('/helplines/apply', {
@@ -1110,13 +1111,13 @@ export const apiClient = {
     async getAll() {
       return request<{ success: boolean; data: any[] }>('/helplines', { method: 'GET' });
     },
-    async create(provider: { category: string; serviceType?: string; categories?: string[]; label: string; phone: string; active?: boolean; email?: string | null; city?: string | null; notes?: string | null }) {
+    async create(provider: { category: string; serviceType?: string; categories?: string[]; label: string; phone: string; active?: boolean; email?: string | null; city?: string | null; country?: string | null; notes?: string | null }) {
       return request<{ success: boolean; data: any }>('/helplines', {
         method: 'POST',
         body: JSON.stringify(provider),
       });
     },
-    async update(id: string, updates: Partial<{ category: string; serviceType: string; categories: string[]; label: string; phone: string; active: boolean; email: string | null; city: string | null; notes: string | null }>) {
+    async update(id: string, updates: Partial<{ category: string; serviceType: string; categories: string[]; label: string; phone: string; active: boolean; email: string | null; city: string | null; country: string | null; notes: string | null }>) {
       return request<{ success: boolean; data: any }>(`/helplines/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(updates),

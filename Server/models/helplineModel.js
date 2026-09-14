@@ -23,6 +23,7 @@ function toApi(doc) {
     categories: Array.isArray(doc.categories) ? doc.categories : [],
     email: doc.email || null,
     city: doc.city || null,
+    country: doc.country || null,
     notes: doc.notes || null,
     created_at: doc.created_at,
   };
@@ -90,7 +91,7 @@ class HelplineModel {
     }
   }
 
-  static async create({ category, serviceType, categories, label, phone, active = true, email, city, notes }) {
+  static async create({ category, serviceType, categories, label, phone, active = true, email, city, country, notes }) {
     const doc = await Communication.create({
       category,
       label,
@@ -100,6 +101,7 @@ class HelplineModel {
       categories: Array.isArray(categories) ? categories : [],
       email: email || null,
       city: city || null,
+      country: country || null,
       notes: notes || null,
     });
     return toApi(doc);
@@ -115,6 +117,7 @@ class HelplineModel {
     if (updates.categories !== undefined) payload.categories = Array.isArray(updates.categories) ? updates.categories : [];
     if (updates.email !== undefined) payload.email = updates.email;
     if (updates.city !== undefined) payload.city = updates.city;
+    if (updates.country !== undefined) payload.country = updates.country;
     if (updates.notes !== undefined) payload.notes = updates.notes;
 
     const doc = await Communication.findByIdAndUpdate(id, { $set: payload }, { new: true }).lean();

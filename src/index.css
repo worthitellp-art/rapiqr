@@ -1,11 +1,103 @@
 @import "tailwindcss";
 
-/* ── Marketing / public-site theme (LandingPageMaster, ScanPage) ─────────────
-   Out of scope for the dashboard redesign — untouched. */
+/* ── Pinterest Sans Font Family ───────────────────────────────────────────────
+   Bespoke typography matching Pinterest's clean geometric aesthetic.
+   Configured with normal numeric variants so digits and '0' render in
+   Pinterest Sans unslashed style. */
+@font-face {
+  font-family: 'Pinterest Sans';
+  src: url('/fonts/Pin-Sans-Regular.woff2') format('woff2'),
+       url('https://s.pinimg.com/webapp/Pin-Sans-MacOS-Regular-708c49dd.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pinterest Sans';
+  src: url('/fonts/Pin-Sans-Medium.woff2') format('woff2'),
+       url('https://s.pinimg.com/webapp/Pin-Sans-MacOS-Medium-704a4f34.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pinterest Sans';
+  src: url('/fonts/Pin-Sans-Medium.woff2') format('woff2'),
+       url('https://s.pinimg.com/webapp/Pin-Sans-MacOS-Medium-704a4f34.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pinterest Sans';
+  src: url('/fonts/Pin-Sans-Bold.woff2') format('woff2'),
+       url('https://s.pinimg.com/webapp/Pin-Sans-MacOS-Bold-ce475d98.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pinterest Sans';
+  src: url('/fonts/Pin-Sans-Heavy.woff2') format('woff2'),
+       url('https://s.pinimg.com/webapp/Pin-Sans-MacOS-Heavy-2b6abf8c.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pin Sans';
+  src: url('/fonts/Pin-Sans-Regular.woff2') format('woff2'),
+       url('https://s.pinimg.com/webapp/Pin-Sans-MacOS-Regular-708c49dd.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pin Sans';
+  src: url('/fonts/Pin-Sans-Medium.woff2') format('woff2'),
+       url('https://s.pinimg.com/webapp/Pin-Sans-MacOS-Medium-704a4f34.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pin Sans';
+  src: url('/fonts/Pin-Sans-Medium.woff2') format('woff2'),
+       url('https://s.pinimg.com/webapp/Pin-Sans-MacOS-Medium-704a4f34.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pin Sans';
+  src: url('/fonts/Pin-Sans-Bold.woff2') format('woff2'),
+       url('https://s.pinimg.com/webapp/Pin-Sans-MacOS-Bold-ce475d98.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pin Sans';
+  src: url('/fonts/Pin-Sans-Heavy.woff2') format('woff2'),
+       url('https://s.pinimg.com/webapp/Pin-Sans-MacOS-Heavy-2b6abf8c.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
-  --font-sans: "Inter Display", "InterVariable", "Inter", "Plus Jakarta Sans", Helvetica, Arial, sans-serif;
-  --font-inter: "Inter Display", "InterVariable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-serif: "Fraunces", Georgia, serif;
+  --font-sans: "Pinterest Sans", "Pin Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-inter: "Pinterest Sans", "Pin Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Pinterest Sans", "Pin Sans", Georgia, serif;
 
   --color-cream: #F6F1E7;
   --color-cream-deep: #EEE4CF;
@@ -25,18 +117,27 @@
   --color-line-dark: rgba(255,254,251,0.12);
 }
 
-/* Dashboard chrome font utilities — used by both the admin and client
-   dashboards (inside `.fx-shell`) and repointed to the single Inter +
-   JetBrains Mono pairing. Class NAMES are kept as-is since many components
-   already reference them; only the family values changed. */
-.font-display { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; font-weight: 700; letter-spacing: -0.01em; }
-.font-title { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; font-weight: 600; }
-.font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
-.font-body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+/* Typography utilities configured with Pinterest Sans and clean 0 digits */
+.font-display { font-family: 'Pinterest Sans', 'Pin Sans', -apple-system, BlinkMacSystemFont, sans-serif; font-weight: 700; letter-spacing: -0.01em; }
+.font-title { font-family: 'Pinterest Sans', 'Pin Sans', -apple-system, BlinkMacSystemFont, sans-serif; font-weight: 600; }
+.font-mono { font-family: 'Pinterest Sans', 'Pin Sans', ui-monospace, monospace; font-variant-numeric: normal; }
+.font-body { font-family: 'Pinterest Sans', 'Pin Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
 
 * { box-sizing: border-box; }
-html { height: 100%; }
-body { height: 100%; -webkit-font-smoothing: antialiased; }
+html {
+  height: 100%;
+  font-family: 'Pinterest Sans', 'Pin Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+body {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  font-family: 'Pinterest Sans', 'Pin Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-variant-numeric: normal;
+}
+button, input, select, textarea {
+  font-family: inherit;
+  font-variant-numeric: normal;
+}
 #root { height: 100%; }
 
 ::selection { background: rgba(234,179,8,0.25); color: #EAB308; }
@@ -301,7 +402,8 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
   --fx-radius-pill: 999px;
   --fx-shadow-pop: 0 12px 28px rgba(31,27,22,0.12), 0 2px 6px rgba(31,27,22,0.06);
 
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: 'Pinterest Sans', 'Pin Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-variant-numeric: normal;
   background: var(--fx-canvas);
   color: var(--fx-ink);
 }
@@ -310,7 +412,8 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
 .fx-shell code,
 .fx-shell kbd,
 .fx-shell pre {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-family: 'Pinterest Sans', 'Pin Sans', ui-monospace, monospace;
+  font-variant-numeric: normal;
 }
 
 /* Neutral text-selection highlight inside the dashboards — the page-wide
@@ -320,7 +423,7 @@ body { height: 100%; -webkit-font-smoothing: antialiased; }
 .fx-shell ::-moz-selection { background: rgba(17,17,17,0.12); color: var(--fx-ink); }
 
 .fx-display {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Pinterest Sans', 'Pin Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -568,7 +671,7 @@ tbody .fx-tr:last-child .fx-td { border-bottom: none; }
 .fx-dot-green { background: var(--fx-green); }
 .fx-dot-amber { background: var(--fx-amber); }
 
-.fx-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px; letter-spacing: .01em; }
+.fx-mono { font-family: 'Pinterest Sans', 'Pin Sans', ui-monospace, monospace; font-variant-numeric: normal; font-size: 12.5px; letter-spacing: .01em; }
 
 .fx-seg { display: inline-flex; align-items: center; gap: 2px; background: var(--fx-canvas); border: 1px solid var(--fx-border); border-radius: 8px; padding: 2px; }
 .fx-seg button {

@@ -38,7 +38,7 @@ class HelplineController {
    */
   static async apply(req, res) {
     try {
-      const { category, serviceType, categories, label, phone, email, city, notes } = req.body || {};
+      const { category, serviceType, categories, label, phone, email, city, country, notes } = req.body || {};
       if (!category || !label || !phone) {
         return res.status(400).json({ success: false, error: 'category, label and phone are required' });
       }
@@ -50,6 +50,7 @@ class HelplineController {
         phone,
         email,
         city,
+        country,
         notes,
         active: false, // pending admin approval
       });
@@ -76,11 +77,11 @@ class HelplineController {
 
   static async create(req, res) {
     try {
-      const { category, serviceType, categories, label, phone, active, email, city, notes } = req.body || {};
+      const { category, serviceType, categories, label, phone, active, email, city, country, notes } = req.body || {};
       if (!category || !label || !phone) {
         return res.status(400).json({ success: false, error: 'category, label and phone are required' });
       }
-      const data = await HelplineModel.create({ category, serviceType, categories, label, phone, active, email, city, notes });
+      const data = await HelplineModel.create({ category, serviceType, categories, label, phone, active, email, city, country, notes });
       logger.rowInserted('communication', data.id, { category, label });
       return res.json({ success: true, data });
     } catch (err) {

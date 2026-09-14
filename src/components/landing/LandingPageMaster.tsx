@@ -65,34 +65,6 @@ import darkBgLogo from '../../../assets/darkbglogo.png';
    at 1.24 MB and 1.29 MB, and this is the hero's largest-contentful-paint, so
    that was 2.5 MB standing between a visitor and their first view of the page.
    Same pixels, 164 KB the pair. Regenerate with docs/hero-media.md. */
-import heroImage from '../../../assets/hero-bg.jpg';
-import heroImagePortrait from '../../../assets/hero-bg-portrait.jpg';
-/* hero-bg.mp4, not bg.mp4. The source master is 1920×1080 at 17 Mbps with its
-   moov atom written last, so a browser had to download nearly all 16 MB before
-   it could show a single frame. This is the web encode: same 1080p, H.264 High
-   at 2.2 Mbps, audio stripped, moov moved to the front — 2.1 MB, and it starts
-   playing while it streams.
-
-   It also loops properly. The source cuts hard at the wrap (its first and last
-   frames differ by 61/255), so the encode fades up from black at the head and
-   down to black at the tail; both ends now match and the seam is invisible.
-   That dip to black is the loop, and it is deliberate — see docs/hero-media.md.
-   Only the file imported here ships in the build. */
-import heroVideo from '../../../assets/hero-bg.mp4';
-
-/* Hero backdrop.
- *
- * Two crops of the same scene rather than one: hero.png is landscape (1717×916)
- * and gets letterboxed into a phone's tall viewport, cropping the subject out.
- * resbg.png is the portrait cut (849×1852) and is what a phone should get.
- * `<picture>` picks between them on orientation, so the browser downloads
- * exactly one — choosing in JS would download the wrong one first.
- *
- * The video is an enhancement layered on top and is never on the critical path;
- * see HeroBackdrop for when it is allowed to load at all. */
-const HERO_BG_LANDSCAPE = heroImage;
-const HERO_BG_PORTRAIT = heroImagePortrait;
-const HERO_VIDEO = heroVideo;
 
 /* ──────────────────────────────────────────────────────────────────────────
    PALETTE
@@ -559,35 +531,16 @@ function useBodyScrollLock(locked: boolean) {
 }
 
 /**
- * The hero backdrop: a responsive still that paints immediately, with the
- * video fading in over it only once it can actually play.
+ * The hero backdrop: no photography. A fine engineering-grid texture — the
+ * same device Linear, Vercel and Stripe hero sections use — vignette-masked
+ * so it reads as a spotlit field behind the headline rather than a flat tiled
+ * wallpaper cut off hard at the viewport edge.
  *
- * The still is the load-bearing part. It is what the first paint shows, what
- * the largest-contentful-paint is measured against, and what stays on screen
- * for anyone the video never reaches. The video is decoration on top — if it
- * loads late, or never, the hero is still finished and correct.
- *
- * The video is deliberately NOT loaded for everyone:
- *
- *  - `prefers-reduced-motion` — a looping backdrop is exactly what that asks
- *    us not to play.
- *  - Save-Data, or a connection reporting 2g/3g — background decoration must
- *    never spend someone's data allowance.
- *  - Coarse pointers / narrow viewports — phones get the still. At the file's
- *    current size this is the difference between a hero that appears at once
- *    and one that hijacks the connection for several seconds.
- *
- * Even when it is allowed, the fetch waits for an idle callback so it starts
- * after the page is interactive rather than competing with it, and playback is
- * suspended whenever the hero is off screen or the tab is hidden — decoding
- * video nobody can see is the usual reason a landing page scrolls badly.
- *
- * The still and the video are NOT the same footage, so the two must never be
- * visible together — see the hand-over effect below for how that is avoided.
+ * This is now the page's largest-contentful-paint element and it is text +
+ * one CSS layer: nothing to fetch, nothing to decode, nothing that can ever
+ * be the slow part of loading this page. It carries the scroll parallax the
+ * photo used to.
  */
-/** How long the video takes to reach full opacity while parked on its black frame 0. */
-const HERO_VIDEO_FADE_MS = 500;
-
 function HeroBackdrop({
   reduced,
   parallaxY,
@@ -597,157 +550,132 @@ function HeroBackdrop({
   parallaxY: MotionValue<string> | MotionValue<number>;
   parallaxScale: MotionValue<number>;
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const sectionRef = useRef<HTMLDivElement>(null);
-  const [wantsVideo, setWantsVideo] = useState(false);
-  /** Opaque, but still parked on its black first frame. */
-  const [videoVisible, setVideoVisible] = useState(false);
-  /** Cleared to run — only once the fade above has finished. */
-  const [videoPlaying, setVideoPlaying] = useState(false);
-
-  // Decide once, on the client, whether this visitor should get the video.
-  useEffect(() => {
-    if (reduced) return;
-
-    const connection = (navigator as Navigator & {
-      connection?: { saveData?: boolean; effectiveType?: string };
-    }).connection;
-    if (connection?.saveData) return;
-    if (connection?.effectiveType && /(^|-)(2g|3g)$/.test(connection.effectiveType)) return;
-
-    // Pointer type separates a phone from a small desktop window better than
-    // width alone: resizing a laptop browser shouldn't drop the video.
-    const isPhone =
-      window.matchMedia('(pointer: coarse)').matches && window.matchMedia('(max-width: 1023px)').matches;
-    if (isPhone) return;
-
-    setWantsVideo(true);
-  }, [reduced]);
-
-  // Attach the source only when idle, so the fetch never competes with the
-  // first paint. `preload="none"` plus no `src` means nothing is requested
-  // until this runs.
-  useEffect(() => {
-    if (!wantsVideo) return;
-    const video = videoRef.current;
-    if (!video || video.src) return;
-
-    const start = () => {
-      video.src = HERO_VIDEO;
-      video.load();
-    };
-    const idle = window.requestIdleCallback
-      ? window.requestIdleCallback(start, { timeout: 2500 })
-      : window.setTimeout(start, 900);
-
-    return () => {
-      if (window.cancelIdleCallback) window.cancelIdleCallback(idle as number);
-      else clearTimeout(idle as number);
-    };
-  }, [wantsVideo]);
-
-  /**
-   * Hand over from the still to the video without ever showing both.
-   *
-   * The still and the video are different footage — a different car, framing and
-   * lighting — so cross-dissolving them showed two pictures at once and read as
-   * a glitch. The fix is to only ever fade while the video has nothing to show:
-   * its first frame is encoded pure black, so we bring it up to full opacity
-   * while it is still PAUSED on that frame. All the viewer sees is the still
-   * dimming to black. Playback starts once the fade is over, revealing the
-   * video out of that black exactly as the loop itself does.
-   */
-  useEffect(() => {
-    if (!videoVisible || videoPlaying) return;
-    const t = setTimeout(() => setVideoPlaying(true), HERO_VIDEO_FADE_MS + 80);
-    return () => clearTimeout(t);
-  }, [videoVisible, videoPlaying]);
-
-  // Play only while the hero is actually on screen and the tab is focused.
-  useEffect(() => {
-    if (!videoPlaying) return;
-    const video = videoRef.current;
-    const section = sectionRef.current;
-    if (!video || !section) return;
-
-    let onScreen = true;
-    const sync = () => {
-      if (onScreen && document.visibilityState === 'visible') void video.play().catch(() => {});
-      else video.pause();
-    };
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        onScreen = entry.isIntersecting;
-        sync();
-      },
-      { threshold: 0.01 }
-    );
-    observer.observe(section);
-    document.addEventListener('visibilitychange', sync);
-    sync();
-
-    return () => {
-      observer.disconnect();
-      document.removeEventListener('visibilitychange', sync);
-    };
-  }, [videoPlaying]);
-
   const parallax = reduced ? undefined : { y: parallaxY, scale: parallaxScale };
+  const vignette = 'radial-gradient(ellipse 70% 65% at 50% 42%, black 45%, transparent 100%)';
 
   return (
-    <div ref={sectionRef} className="absolute inset-0 overflow-hidden">
-      <motion.div style={parallax} className="absolute inset-0">
-        <picture>
-          {/* Portrait viewports get the tall crop; everything else the wide one.
-              Only the matching source is ever fetched. */}
-          <source media="(orientation: portrait)" srcSet={HERO_BG_PORTRAIT} />
-          <img
-            src={HERO_BG_LANDSCAPE}
-            alt=""
-            aria-hidden="true"
-            /* The hero image IS the largest contentful paint — it must be
-               eager and high priority, never lazy. */
-            loading="eager"
-            fetchPriority="high"
-            decoding="async"
-            /* Held slightly out of focus on purpose: it reads as depth behind
-               the headline instead of competing with it. */
-            className="absolute inset-0 h-full w-full object-cover object-center blur-[1px]"
-          />
-        </picture>
-
-        {wantsVideo && (
-          <video
-            ref={videoRef}
-            muted
-            loop
-            playsInline
-            preload="none"
-            aria-hidden="true"
-            tabIndex={-1}
-            /* Enough is buffered to show frame 0 — which is black. Become
-               opaque now, while there is still nothing to see. */
-            onCanPlay={() => setVideoVisible(true)}
-            /* If the file fails or stalls, fall back to the still underneath —
-               no error state is needed because nothing is missing without it. */
-            onError={() => {
-              setVideoVisible(false);
-              setVideoPlaying(false);
-            }}
-            /* No blur here, unlike the still. The still is deliberately softened
-               so it sits behind the headline; the video is the real subject once
-               it takes over, and blurring it was throwing away the detail the
-               higher-bitrate encode exists to deliver. The swap happens through
-               black, so the difference in sharpness is never seen mid-fade. */
-            style={{ transitionDuration: `${HERO_VIDEO_FADE_MS}ms` }}
-            className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity ease-out ${
-              videoVisible ? 'opacity-100' : 'opacity-0'
-            }`}
-          />
-        )}
+    <div className="absolute inset-0 overflow-hidden">
+      {/* Warm wash — always present, even before JS paints AuroraGlow's
+          animation or under prefers-reduced-motion, so the hero never has a
+          split-second (or permanent, for reduced-motion visitors) flat-black
+          frame. */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(ellipse 90% 70% at 50% 18%, rgba(246,192,0,0.16) 0%, rgba(11,11,12,0) 60%),' +
+            'radial-gradient(ellipse 70% 60% at 85% 85%, rgba(246,192,0,0.08) 0%, rgba(11,11,12,0) 65%)',
+        }}
+        aria-hidden="true"
+      />
+      <motion.div
+        style={parallax}
+        className="absolute inset-0 opacity-[0.16]"
+        aria-hidden="true"
+      >
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: 'radial-gradient(rgba(255,255,255,0.95) 1.2px, transparent 1.2px)',
+            backgroundSize: '30px 30px',
+            WebkitMaskImage: vignette,
+            maskImage: vignette,
+          }}
+        />
       </motion.div>
     </div>
+  );
+}
+
+/**
+ * Soft, slowly drifting light — the "aurora" glow behind the fold on modern
+ * AI-product hero sections (Google's Gemini/Antigravity pages, Meta AI,
+ * Apple's Intelligence marketing). Replaces the old video loop: same sense of
+ * living motion, but it's three blurred CSS gradients, not a 2 MB decode —
+ * nothing to fetch, nothing that can stall or show a frozen frame on a slow
+ * connection, and it degrades to a static glow under `prefers-reduced-motion`
+ * for free instead of needing its own capability-detection dance.
+ *
+ * Amber only appears here at low opacity, screen-blended over the dark
+ * scrim — it reads as ambient light, not the flat "yellow wash" panel the
+ * palette comment above rules out.
+ */
+function AuroraGlow({ reduced }: { reduced: boolean | null }) {
+  const blobs = [
+    { color: '#F6C000', size: 760, top: '0%', left: '4%', duration: 24, opacity: 0.45 },
+    { color: '#F4F1EC', size: 620, top: '48%', left: '74%', duration: 30, opacity: 0.24 },
+    { color: '#F6C000', size: 560, top: '60%', left: '14%', duration: 27, opacity: 0.32 },
+    { color: '#F6C000', size: 420, top: '8%', left: '68%', duration: 21, opacity: 0.22 },
+  ];
+
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+      style={{ mixBlendMode: 'screen' }}
+      aria-hidden="true"
+    >
+      {blobs.map((b, i) => (
+        <motion.div
+          key={i}
+          className="absolute rounded-full"
+          style={{
+            width: b.size,
+            height: b.size,
+            top: b.top,
+            left: b.left,
+            background: `radial-gradient(circle, ${b.color} 0%, transparent 72%)`,
+            opacity: b.opacity,
+            filter: 'blur(90px)',
+          }}
+          animate={
+            reduced
+              ? undefined
+              : { x: [0, 36, -28, 0], y: [0, -26, 18, 0], scale: [1, 1.08, 0.95, 1] }
+          }
+          transition={{ duration: b.duration, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The hero's one concrete visual: a floating card styled like the physical
+ * sticker itself — ring-bordered surface, a real-proportioned QR mark inside,
+ * amber glow behind it. Desktop only (`hidden lg:block`): at hero-text width
+ * on a phone there's no room for it beside the centred headline without
+ * crowding it, so it stays a desktop-only accent rather than being shrunk to
+ * illegibility.
+ */
+function HeroStickerCard({ reduced }: { reduced: boolean | null }) {
+  return (
+    <motion.div
+      className="pointer-events-none absolute right-[6%] top-[16%] hidden lg:block"
+      initial={{ opacity: 0, y: 24, rotate: -6 }}
+      animate={
+        reduced
+          ? { opacity: 1, y: 0, rotate: -4 }
+          : { opacity: 1, y: [0, -14, 0], rotate: [-4, -1, -4] }
+      }
+      transition={
+        reduced
+          ? { duration: 0.9, ease: EASE }
+          : { opacity: { duration: 0.9, ease: EASE }, y: { duration: 7, repeat: Infinity, ease: 'easeInOut' }, rotate: { duration: 7, repeat: Infinity, ease: 'easeInOut' } }
+      }
+      aria-hidden="true"
+    >
+      {/* Glow, separate from the card so it can blur past the card's own edges. */}
+      <div
+        className="absolute inset-0 -z-10 rounded-[28px] blur-[46px]"
+        style={{ background: '#F6C000', opacity: 0.35 }}
+      />
+      <div className="w-[196px] rounded-[28px] border border-white/[0.145] bg-[#121212] p-5 shadow-[0_30px_60px_-24px_rgba(0,0,0,0.65)]">
+        <QrGlyph size="100%" color="#F8F6F3" className="block w-full" />
+        <div className="mt-4 flex items-center justify-center">
+          <span className="h-2 w-2 rounded-full bg-[#F6C000]" />
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -813,7 +741,35 @@ function ParticleRing() {
 }
 
 /** Decorative QR mark. Deterministic, and not a scannable code. */
-function QrGlyph({ size = 96, color = '#FFFFFF' }: { size?: number; color?: string }) {
+function QrGlyph({
+  size = 96,
+  color = '#FFFFFF',
+  opacity = 1,
+  className = '',
+}: {
+  size?: number | string;
+  color?: string;
+  opacity?: number;
+  className?: string;
+}) {
+  const boxSize = typeof size === 'number' ? `${size}px` : size;
+  // 21×21 — the same module count as a real Version-1 QR code, with proper
+  // finder patterns (not just a solid square) at three corners. The 11×11
+  // version this replaced looked like scattered blocks at any size big
+  // enough to notice; this reads as an actual QR code at a glance.
+  const N = 21;
+  const FINDER = [
+    [1, 1, 1, 1, 1, 1, 1],
+    [1, 0, 0, 0, 0, 0, 1],
+    [1, 0, 1, 1, 1, 0, 1],
+    [1, 0, 1, 1, 1, 0, 1],
+    [1, 0, 1, 1, 1, 0, 1],
+    [1, 0, 0, 0, 0, 0, 1],
+    [1, 1, 1, 1, 1, 1, 1],
+  ];
+  const inFinderZone = (r: number, c: number) =>
+    (r < 8 && c < 8) || (r < 8 && c >= N - 8) || (r >= N - 8 && c < 8);
+
   const cells = useMemo(() => {
     const grid: boolean[][] = [];
     let seed = 7;
@@ -821,27 +777,33 @@ function QrGlyph({ size = 96, color = '#FFFFFF' }: { size?: number; color?: stri
       seed = (seed * 1103515245 + 12345) % 2147483648;
       return seed / 2147483648;
     };
-    for (let r = 0; r < 11; r += 1) {
-      grid.push(Array.from({ length: 11 }, () => rand() > 0.48));
+    for (let r = 0; r < N; r += 1) {
+      grid.push(Array.from({ length: N }, (_, c) => (inFinderZone(r, c) ? false : rand() > 0.52)));
     }
     return grid;
   }, []);
 
   return (
-    <svg width={size} height={size} viewBox="0 0 11 11" aria-hidden="true">
+    <svg
+      viewBox={`0 0 ${N} ${N}`}
+      aria-hidden="true"
+      className={className}
+      style={{ width: boxSize, height: boxSize, opacity }}
+    >
       {cells.map((row, r) =>
-        row.map((on, c) =>
-          on ? <rect key={`${r}-${c}`} x={c} y={r} width={0.86} height={0.86} fill={color} /> : null
-        )
+        row.map((on, c) => (on ? <rect key={`${r}-${c}`} x={c} y={r} width={0.82} height={0.82} fill={color} /> : null))
       )}
       {[
         [0, 0],
-        [8, 0],
-        [0, 8],
-      ].map(([x, y]) => (
-        <g key={`${x}-${y}`}>
-          <rect x={x} y={y} width={3} height={3} fill={color} />
-          <rect x={x + 0.75} y={y + 0.75} width={1.5} height={1.5} fill={INK} />
+        [0, N - 7],
+        [N - 7, 0],
+      ].map(([fr, fc]) => (
+        <g key={`${fr}-${fc}`}>
+          {FINDER.map((frow, rr) =>
+            frow.map((v, cc) =>
+              v ? <rect key={`${rr}-${cc}`} x={fc + cc} y={fr + rr} width={1} height={1} fill={color} /> : null
+            )
+          )}
         </g>
       ))}
     </svg>
@@ -921,9 +883,6 @@ export default function LandingPageMaster({
   const [activeCategory, setActiveCategory] =
     useState<'All' | 'Vehicle' | 'Home' | 'Family' | 'Travel'>('All');
 
-  // How it works — driven by the pinned track's scroll progress on desktop.
-  const [activeHiwStep, setActiveHiwStep] = useState(0);
-
   // Interactive scan demo
   const [demoActionAlert, setDemoActionAlert] = useState<string | null>(null);
 
@@ -997,24 +956,6 @@ export default function LandingPageMaster({
   const heroImageScale = useTransform(heroProgress, [0, 1], [1.06, 1.28]);
   const heroCopyY = useTransform(heroProgress, [0, 1], [0, 140]);
   const heroScrimOpacity = useTransform(heroProgress, [0, 1], [0.26, 0.62]);
-
-  // Pinned "how it works" track.
-  const stepsTrackRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress: stepsProgress } = useScroll({
-    target: stepsTrackRef,
-    offset: ['start start', 'end end'],
-  });
-  const stepsLineHeight = useTransform(stepsProgress, [0, 1], ['0%', '100%']);
-
-  useMotionValueEvent(stepsProgress, 'change', (v) => {
-    // Below `lg` the track is display:none, so progress can arrive as NaN —
-    // clamping without a finite check would index the step array with NaN.
-    const raw = Math.floor(v * HOW_IT_WORKS_STEPS.length);
-    const next = Number.isFinite(raw)
-      ? Math.min(HOW_IT_WORKS_STEPS.length - 1, Math.max(0, raw))
-      : 0;
-    setActiveHiwStep((prev) => (prev === next ? prev : next));
-  });
 
   // Closing call to action: the ring block eases in as it centres.
   const ctaRef = useRef<HTMLElement>(null);
@@ -1251,7 +1192,6 @@ export default function LandingPageMaster({
 
   const cartSubtotal = cart.reduce((sum, i) => sum + i.product.price * i.qty, 0);
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
-  const activeStep = HOW_IT_WORKS_STEPS[activeHiwStep] ?? HOW_IT_WORKS_STEPS[0];
 
   const NAV_LINKS = [
     { id: 'hiw-section', label: 'How it works' },
@@ -1524,19 +1464,21 @@ export default function LandingPageMaster({
         )}
       </AnimatePresence>
 
-      {/* ── 2. HERO — photographic backdrop, parallaxed ─────────────────── */}
+      {/* ── 2. HERO — abstract backdrop, parallaxed ─────────────────────── */}
       <section
         ref={heroRef}
         id="hero-section"
         className="relative flex min-h-[100svh] items-center justify-center overflow-hidden bg-[#0B0B0C]"
       >
         <HeroBackdrop reduced={reduced} parallaxY={heroImageY} parallaxScale={heroImageScale} />
-        {/* Scrim: dark enough for white type at AA, and it deepens on scroll. */}
+        <AuroraGlow reduced={reduced} />
+        {/* Dims the grid/glyph/glow as the hero scrolls up and out, so the
+            backdrop never fights the copy for attention on the way past. */}
         <motion.div
           style={reduced ? undefined : { opacity: heroScrimOpacity }}
           className="absolute inset-0 bg-[#0B0B0C]"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0C]/75 via-[#0B0B0C]/15 to-[#0B0B0C]/85" />
+        <HeroStickerCard reduced={reduced} />
 
         <motion.div
           style={reduced ? undefined : { y: heroCopyY }}
@@ -1588,16 +1530,23 @@ export default function LandingPageMaster({
                 className="transition-transform duration-300 group-hover:translate-x-1.5 text-[#0B0B0C]"
               />
             </motion.button>
-            <div className="flex items-center gap-3 text-[12px] font-light text-white/75">
-              <span>Ships in 2–3 days · Zero subscriptions</span>
-              <span className="h-1 w-1 rounded-full bg-white/40" />
-              <button
-                onClick={() => handleSmoothScroll('hiw-section')}
-                className="cursor-pointer text-[#F6C000] hover:underline"
-              >
-                See how it works ↓
-              </button>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {['Ships in 2–3 days', 'Zero subscriptions'].map((fact) => (
+                <span
+                  key={fact}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 font-mono text-[10.5px] uppercase tracking-wider text-white/70"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-white/50" />
+                  {fact}
+                </span>
+              ))}
             </div>
+            <button
+              onClick={() => handleSmoothScroll('hiw-section')}
+              className="cursor-pointer text-[12px] font-light text-[#F6C000] hover:underline"
+            >
+              See how it works ↓
+            </button>
           </motion.div>
         </motion.div>
 
@@ -1629,7 +1578,7 @@ export default function LandingPageMaster({
                 delay={i * 0.09}
                 className={`px-2 text-center ${i > 0 ? 'md:border-l md:border-white/10' : ''}`}
               >
-                <div className="text-[clamp(2.2rem,5vw,3.6rem)] font-light leading-none tracking-[-0.04em] text-white">
+                <div className="font-mono text-[clamp(2.2rem,5vw,3.6rem)] font-medium leading-none tracking-[-0.03em] text-white">
                   <Counter to={stat.value} suffix={stat.suffix} kilo={stat.kilo} />
                 </div>
                 <div className="mt-3 text-[11px] font-light uppercase tracking-[0.16em] text-white/50">
@@ -1641,115 +1590,36 @@ export default function LandingPageMaster({
         </div>
       </section>
 
-      {/* ── 4. HOW IT WORKS — pinned, scroll-driven on desktop ──────────── */}
-      <section id="hiw-section" className="bg-[#F4F1EC]">
-        {/* Desktop: a tall track whose progress drives the pinned panel. */}
-        <div ref={stepsTrackRef} className="relative hidden h-[420vh] lg:block">
-          <div className="sticky top-0 flex h-screen items-center overflow-hidden">
-            <div className="mx-auto grid w-full max-w-[1400px] grid-cols-2 items-center gap-16 px-10">
-              {/* Left: the list */}
-              <div>
-                <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-black/60">
-                  How it works
-                </p>
-                <h2 className="max-w-md text-[clamp(2rem,3.4vw,3rem)] font-medium leading-[1.06] tracking-[-0.035em]">
-                  Getting protected takes about four minutes
-                </h2>
+      {/* ── 4. HOW IT WORKS ──────────────────────────────────────────────── */}
+      <section id="hiw-section" className="bg-[#F4F1EC] py-24 sm:py-28">
+        <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
+          <Reveal className="max-w-2xl">
+            <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-black/60">
+              How it works
+            </p>
+            <h2 className="text-[clamp(1.9rem,4.2vw,3rem)] font-medium leading-[1.06] tracking-[-0.035em]">
+              Getting protected takes about four minutes
+            </h2>
+          </Reveal>
 
-                <div className="relative mt-12 pl-8">
-                  {/* Rail + progress fill. The fill is the one saturated colour
-                      in the section, and it earns it: it is the read-out for how
-                      far through the story you have scrolled. */}
-                  <div className="absolute left-0 top-1 h-[calc(100%-0.5rem)] w-px bg-black/10">
-                    <motion.div style={{ height: stepsLineHeight }} className="w-px origin-top">
-                      <div className="h-full w-px" style={{ background: '#F6C000' }} />
-                    </motion.div>
-                  </div>
-
-                  <ul className="space-y-7">
-                    {HOW_IT_WORKS_STEPS.map((step, i) => {
-                      const on = i === activeHiwStep;
-                      return (
-                        <li key={step.step} className="relative">
-                          <span
-                            className={`absolute -left-8 top-2 h-2 w-2 -translate-x-[3.5px] rounded-full transition-all duration-500 ${
-                              on ? 'scale-150' : 'scale-100'
-                            }`}
-                            style={{ background: on ? '#F6C000' : 'rgba(0,0,0,0.18)' }}
-                          />
-                          <motion.div
-                            animate={{ opacity: on ? 1 : 0.32 }}
-                            transition={{ duration: 0.45, ease: EASE }}
-                          >
-                            <h3 className="text-xl font-medium tracking-[-0.02em]">
-                              <span className="mr-3 text-[13px] font-light text-black/60">
-                                0{step.step}
-                              </span>
-                              {step.title}
-                            </h3>
-                            <AnimatePresence initial={false}>
-                              {on && (
-                                <motion.p
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: 'auto', opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  transition={{ duration: 0.45, ease: EASE }}
-                                  className="overflow-hidden text-[14px] font-light leading-relaxed text-black/55"
-                                >
-                                  <span className="block pt-2">{step.body}</span>
-                                </motion.p>
-                              )}
-                            </AnimatePresence>
-                          </motion.div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              </div>
-
-              {/* Right: the image, crossfading with the active step */}
-              <div className="relative aspect-square overflow-hidden rounded-[2rem] bg-[#0B0B0C]">
-                <AnimatePresence mode="wait">
-                  <motion.img
-                    key={activeStep.img}
-                    src={activeStep.img}
-                    alt={activeStep.title}
-                    initial={{ opacity: 0, scale: 1.06 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.98 }}
-                    transition={{ duration: 0.7, ease: EASE }}
-                    className="absolute inset-0 h-full w-full object-cover"
-                  />
-                </AnimatePresence>
-
-                <div className="absolute bottom-6 left-6 flex items-center gap-2 rounded-full border border-white/15 bg-black/40 px-4 py-2 text-[12px] font-light text-white/85 backdrop-blur-md">
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#F6C000' }} />
-                  {activeStep.badge}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile: the same story, stacked */}
-        <div className="px-6 py-24 lg:hidden">
-          <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-black/60">
-            How it works
-          </p>
-          <h2 className="text-[clamp(1.9rem,7vw,2.4rem)] font-medium leading-[1.08] tracking-[-0.035em]">
-            Getting protected takes about four minutes
-          </h2>
-
-          <div className="mt-12 space-y-8">
+          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {HOW_IT_WORKS_STEPS.map((step, i) => (
-              <Reveal key={step.step} delay={i * 0.05}>
-                <div className="overflow-hidden rounded-3xl bg-[#0B0B0C]">
-                  <img src={step.img} alt={step.title} className="aspect-4/3 w-full object-cover" />
-                  <div className="p-6 text-white">
-                    <span className="text-[12px] font-light text-white/50">0{step.step}</span>
-                    <h3 className="mt-1 text-lg font-medium">{step.title}</h3>
-                    <p className="mt-2 text-[13px] font-light leading-relaxed text-white/50">
+              <Reveal key={step.step} delay={i * 0.06}>
+                <div className="group flex h-full flex-col overflow-hidden rounded-2xl border border-black/10 bg-white/60">
+                  <div className="relative aspect-4/3 overflow-hidden">
+                    <img
+                      src={step.img}
+                      alt={step.title}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    <span className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/40 px-3 py-1 font-mono text-[11px] text-white/85 backdrop-blur-md">
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#F6C000' }} />
+                      0{step.step}
+                    </span>
+                  </div>
+                  <div className="flex flex-1 flex-col p-6">
+                    <h3 className="text-lg font-medium tracking-[-0.02em]">{step.title}</h3>
+                    <p className="mt-2 text-[13px] font-light leading-relaxed text-black/55">
                       {step.body}
                     </p>
                   </div>

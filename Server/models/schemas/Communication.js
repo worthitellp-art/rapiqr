@@ -9,6 +9,7 @@ const communicationSchema = new Schema({
   categories: { type: [String], default: [] },
   email: { type: String, default: null },
   city: { type: String, default: null },
+  country: { type: String, default: null },
   notes: { type: String, default: null },
   created_at: { type: Date, default: Date.now },
 }, { versionKey: false });

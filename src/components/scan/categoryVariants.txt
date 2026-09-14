@@ -89,7 +89,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "We've detected an emergency or accident",
     tagline: "Car tag · GJ 01 XX 0000",
     cta: "Get Help",
-    alert: "I scanned the RepiQR tag on your car — there is an emergency at the vehicle.",
+    alert: "URGENT: Emergency with your car! Please respond now.",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "phone", line1: "Notify", line2: "Contacts", action: { kind: "notify", text: undefined } },
@@ -108,7 +108,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call Towing partner · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Towing partner", via: "partner" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your car needs towing — I am with the vehicle now." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your car needs towing now! I'm with it." } },
           { label: "Share my live location", style: "blue", action: { kind: "pin" } },
         ],
       },
@@ -123,7 +123,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "Adding your pin tells them exactly which car it is",
         ],
         actions: [
-          { label: "Ask the owner to move it", style: "wa", action: { kind: "notify", text: "Your car is blocking my way. Could you move it when you can?" } },
+          { label: "Ask the owner to move it", style: "wa", action: { kind: "notify", text: "Your car is blocking the way. Please move it now." } },
           { label: "Attach the exact spot", style: "blue", action: { kind: "pin" } },
           { label: "Write a message instead", style: "ghost", action: { kind: "write" } },
         ],
@@ -140,7 +140,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call Mechanic desk · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Mechanic desk", via: "partner" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your car has a breakdown — I have called a mechanic to the spot." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your car broke down. Mechanic called — please come fast." } },
           { label: "Find garages near me", style: "blue", action: { kind: "maps", query: "car repair near me" } },
         ],
       },
@@ -156,7 +156,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call Tyre assistance · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Tyre assistance", via: "partner" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your car has a flat tyre. Tyre assistance has been requested." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Flat tyre on your car! Help has been called." } },
           { label: "Find a tyre shop nearby", style: "blue", action: { kind: "maps", query: "tyre shop near me" } },
         ],
       },
@@ -173,7 +173,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Fuel delivery · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Fuel delivery", via: "partner" } },
           { label: "Send where the car is", style: "blue", action: { kind: "pin" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your car has run out of fuel — a delivery has been requested." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your car is out of fuel. Fuel delivery requested." } },
         ],
       },
       {
@@ -189,7 +189,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Emergency (all services) · 112", style: "primary", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
           { label: "Call Police · 100", style: "ghost", action: { kind: "call", number: "100", who: "Police", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "There has been an accident involving your car. Emergency services have been informed." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: Accident with your car! Emergency services informed." } },
         ],
       },
     ],
@@ -214,7 +214,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "We've detected an emergency or accident",
     tagline: "Bike tag · GJ 01 AB 1234",
     cta: "Get Help",
-    alert: "I scanned the RepiQR tag on your bike — there is an emergency at the vehicle.",
+    alert: "URGENT: Emergency with your bike! Please respond now.",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "phone", line1: "Notify", line2: "Contacts", action: { kind: "notify", text: undefined } },
@@ -233,7 +233,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call Bike towing · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Bike towing", via: "partner" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your bike needs towing — I am with it now." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your bike needs towing now! I'm with it." } },
           { label: "Share my live location", style: "blue", action: { kind: "pin" } },
         ],
       },
@@ -249,7 +249,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call Mechanic desk · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Mechanic desk", via: "partner" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your bike has broken down — a mechanic has been called to the spot." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your bike broke down. Mechanic called — please come fast." } },
           { label: "Find mechanics near me", style: "blue", action: { kind: "maps", query: "two wheeler mechanic near me" } },
         ],
       },
@@ -264,7 +264,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "Your pin tells them exactly which bike it is",
         ],
         actions: [
-          { label: "Ask the rider to move it", style: "wa", action: { kind: "notify", text: "Your bike is blocking the path. Could you move it when you can?" } },
+          { label: "Ask the rider to move it", style: "wa", action: { kind: "notify", text: "Your bike is blocking the path. Please move it now." } },
           { label: "Attach the exact spot", style: "blue", action: { kind: "pin" } },
           { label: "Write a message instead", style: "ghost", action: { kind: "write" } },
         ],
@@ -282,7 +282,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Puncture help · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Puncture help", via: "partner" } },
           { label: "Find puncture shops nearby", style: "blue", action: { kind: "maps", query: "puncture repair near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your bike has a puncture. Roadside tyre help has been requested." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Flat tyre on your bike! Help has been called." } },
         ],
       },
       {
@@ -296,7 +296,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "Police can be reached on 112 in the same flow",
         ],
         actions: [
-          { label: "Alert the owner now", style: "wa", action: { kind: "notify", text: "I think your bike is being tampered with or has been moved without you." } },
+          { label: "Alert the owner now", style: "wa", action: { kind: "notify", text: "URGENT: Your bike looks tampered or moved! Please check now." } },
           { label: "Call Emergency (all services) · 112", style: "primary", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
           { label: "Send where the bike is", style: "blue", action: { kind: "pin" } },
         ],
@@ -314,7 +314,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Fuel delivery · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Fuel delivery", via: "partner" } },
           { label: "Send where the bike is", style: "blue", action: { kind: "pin" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your bike has run out of fuel — a delivery has been requested." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your bike is out of fuel. Fuel delivery requested." } },
         ],
       },
     ],
@@ -339,7 +339,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "We've detected an emergency or accident",
     tagline: "Bicycle tag · Frame no. BC-4471",
     cta: "Get Help",
-    alert: "I scanned the RepiQR tag on your bicycle — there is an emergency at the cycle.",
+    alert: "URGENT: Emergency with your bicycle! Please respond now.",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "phone", line1: "Notify", line2: "Contacts", action: { kind: "notify", text: undefined } },
@@ -374,7 +374,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "Police are one tap away on 112 in the same sheet",
         ],
         actions: [
-          { label: "Alert the owner now", style: "wa", action: { kind: "notify", text: "I think your bicycle has been stolen or moved without you." } },
+          { label: "Alert the owner now", style: "wa", action: { kind: "notify", text: "URGENT: Your bicycle may be stolen! Please check now." } },
           { label: "Call Emergency (all services) · 112", style: "primary", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
           { label: "Send where the cycle is", style: "blue", action: { kind: "pin" } },
         ],
@@ -392,7 +392,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Cycle mechanic · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Cycle mechanic", via: "partner" } },
           { label: "Find a cycle shop nearby", style: "blue", action: { kind: "maps", query: "bicycle repair shop near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your bicycle has broken down — I have called for roadside help." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your bicycle broke down. Roadside help called." } },
         ],
       },
       {
@@ -408,7 +408,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Puncture help · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Puncture help", via: "partner" } },
           { label: "Find a puncture shop nearby", style: "blue", action: { kind: "maps", query: "cycle puncture repair near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your bicycle has a puncture. Roadside help has been requested." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Flat tyre on your bicycle! Help requested." } },
         ],
       },
       {
@@ -422,7 +422,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "Your pin tells them exactly which cycle it is",
         ],
         actions: [
-          { label: "Ask the owner to move it", style: "wa", action: { kind: "notify", text: "Your bicycle is chained across the path. Could you move it when you can?" } },
+          { label: "Ask the owner to move it", style: "wa", action: { kind: "notify", text: "Your bicycle is blocking the path. Please move it now." } },
           { label: "Attach the exact spot", style: "blue", action: { kind: "pin" } },
           { label: "Write a message instead", style: "ghost", action: { kind: "write" } },
         ],
@@ -438,7 +438,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "Support chases the owner if they never reply",
         ],
         actions: [
-          { label: "Tell the owner it is here", style: "wa", action: { kind: "notify", text: "Your bicycle has been standing in the same spot for days — is it lost?" } },
+          { label: "Tell the owner it is here", style: "wa", action: { kind: "notify", text: "Your bicycle hasn't moved in days. Is it lost? Please check." } },
           { label: "Add what you can see", style: "ghost", action: { kind: "write" } },
           { label: "Call RepiQR support · 1800 123 4567", style: "ghost", action: { kind: "call", number: "1800 123 4567", who: "RepiQR support", via: "support" } },
         ],
@@ -465,7 +465,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "You've scanned a helmet safety tag — stay with them",
     tagline: "Helmet tag · Blood group B+ · Rider",
     cta: "Get Help",
-    alert: "I scanned the RepiQR tag inside your helmet — the rider needs help right now.",
+    alert: "URGENT: Rider needs help now! Please respond.",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "people", line1: "Notify", line2: "Family", action: { kind: "notify", text: undefined } },
@@ -518,7 +518,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call Ambulance · 108", style: "primary", action: { kind: "call", number: "108", who: "Ambulance", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "The rider is being treated — please share their medical history with the paramedic." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: Rider is being treated! Share medical history now." } },
           { label: "Ask the RepiQR assistant", style: "ghost", action: { kind: "ask" } },
         ],
       },
@@ -535,7 +535,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Emergency (all services) · 112", style: "primary", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
           { label: "Call Police · 100", style: "ghost", action: { kind: "call", number: "100", who: "Police", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "There has been an accident involving the rider of this helmet. Emergency services have been informed." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: Accident! Rider is hurt. Emergency services informed." } },
         ],
       },
       {
@@ -565,7 +565,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "A police station is the safest handover if you cannot wait",
         ],
         actions: [
-          { label: "Tell the owner I have it", style: "wa", action: { kind: "notify", text: "I have found your helmet and it is safe with me right now." } },
+          { label: "Tell the owner I have it", style: "wa", action: { kind: "notify", text: "Found your helmet — it's safe with me. Please contact soon." } },
           { label: "Find the nearest police station", style: "blue", action: { kind: "maps", query: "police station near me" } },
           { label: "Say where I found it", style: "ghost", action: { kind: "write" } },
         ],
@@ -592,7 +592,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "Fire, gas leak, medical or security emergency",
     tagline: "Home gate tag · Block C, Flat 402",
     cta: "Get Help",
-    alert: "I scanned the RepiQR tag at your gate — something needs your attention at the property.",
+    alert: "URGENT: Attention needed at your property now! Please respond.",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "phone", line1: "Notify", line2: "Residents", action: { kind: "notify", text: undefined } },
@@ -612,7 +612,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Fire services · 101", style: "primary", action: { kind: "call", number: "101", who: "Fire services", via: "public" } },
           { label: "Call Emergency (all services) · 112", style: "ghost", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "There is a fire emergency at your property. Fire services have been called." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: FIRE at your property! Fire services called." } },
         ],
       },
       {
@@ -627,7 +627,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call LPG / gas leak helpline · 1906", style: "primary", action: { kind: "call", number: "1906", who: "LPG / gas leak helpline", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "There is a gas smell at your property — please shut the cylinder valve and ventilate." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: Gas leak at your property! Shut the valve now." } },
           { label: "Call Emergency (all services) · 112", style: "ghost", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
         ],
       },
@@ -642,7 +642,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "A partner plumber can be dispatched to the gate",
         ],
         actions: [
-          { label: "Alert the residents", style: "wa", action: { kind: "notify", text: "Water is leaking at your property — it looks like a burst line or an overflowing tank." } },
+          { label: "Alert the residents", style: "wa", action: { kind: "notify", text: "URGENT: Water leaking at your property! Please check now." } },
           { label: "Call Plumber on call · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Plumber on call", via: "partner" } },
           { label: "Write a message instead", style: "ghost", action: { kind: "write" } },
         ],
@@ -658,7 +658,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "Leave the drop instructions they reply with",
         ],
         actions: [
-          { label: "Tell the residents I am here", style: "wa", action: { kind: "notify", text: "I have a delivery for you at the gate. Where should I leave it?" } },
+          { label: "Tell the residents I am here", style: "wa", action: { kind: "notify", text: "Delivery at your gate. Where should I leave it?" } },
           { label: "Add a note about the parcel", style: "ghost", action: { kind: "write" } },
           { label: "Share where I am standing", style: "blue", action: { kind: "pin" } },
         ],
@@ -674,7 +674,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "They can reply on WhatsApp without sharing a number",
         ],
         actions: [
-          { label: "Announce me at the gate", style: "wa", action: { kind: "notify", text: "I am at your gate — could you let me in?" } },
+          { label: "Announce me at the gate", style: "wa", action: { kind: "notify", text: "I'm at your gate. Please let me in." } },
           { label: "Say who I am", style: "ghost", action: { kind: "write" } },
           { label: "Ask the RepiQR assistant", style: "ghost", action: { kind: "ask" } },
         ],
@@ -690,7 +690,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "Police are one tap away on 100 or 112",
         ],
         actions: [
-          { label: "Alert the residents", style: "wa", action: { kind: "notify", text: "There is suspicious activity at your property — please check your cameras." } },
+          { label: "Alert the residents", style: "wa", action: { kind: "notify", text: "URGENT: Suspicious activity at your property! Check cameras now." } },
           { label: "Call Emergency (all services) · 112", style: "primary", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
           { label: "Call Police · 100", style: "ghost", action: { kind: "call", number: "100", who: "Police", via: "public" } },
         ],
@@ -717,7 +717,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "Reach the resident without knowing their number",
     tagline: "Door tag · Flat 402, Block C",
     cta: "Notify the resident",
-    alert: "I am at your door and nobody is answering.",
+    alert: "I'm at your door. Nobody is answering — please respond.",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "bell", line1: "Notify", line2: "Resident", action: { kind: "notify", text: undefined } },
@@ -751,7 +751,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "Follow the drop instructions they reply with",
         ],
         actions: [
-          { label: "Tell the resident I am here", style: "wa", action: { kind: "notify", text: "I have a delivery for you at the door. Where should I leave it?" } },
+          { label: "Tell the resident I am here", style: "wa", action: { kind: "notify", text: "Delivery at your door. Where should I leave it?" } },
           { label: "Add a note about the parcel", style: "ghost", action: { kind: "write" } },
           { label: "Ask the RepiQR assistant", style: "ghost", action: { kind: "ask" } },
         ],
@@ -767,7 +767,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "Useful when the bell is broken or the flat is empty",
         ],
         actions: [
-          { label: "Announce me at the door", style: "wa", action: { kind: "notify", text: "I am at your door — could you let me in?" } },
+          { label: "Announce me at the door", style: "wa", action: { kind: "notify", text: "I'm at your door. Please let me in." } },
           { label: "Say who I am", style: "ghost", action: { kind: "write" } },
           { label: "Ask the RepiQR assistant", style: "ghost", action: { kind: "ask" } },
         ],
@@ -786,7 +786,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Emergency (all services) · 112", style: "primary", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
           { label: "Call Fire services · 101", style: "ghost", action: { kind: "call", number: "101", who: "Fire services", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "There is an emergency at your door — emergency services have been called." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: Emergency at your door! Services called." } },
         ],
       },
       {
@@ -800,7 +800,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "A partner plumber can be sent to the flat",
         ],
         actions: [
-          { label: "Alert the resident", style: "wa", action: { kind: "notify", text: "Water is leaking from your flat into the corridor." } },
+          { label: "Alert the resident", style: "wa", action: { kind: "notify", text: "URGENT: Water leaking from your flat! Please check now." } },
           { label: "Call Plumber on call · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Plumber on call", via: "partner" } },
           { label: "Write a message instead", style: "ghost", action: { kind: "write" } },
         ],
@@ -843,7 +843,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "Fire, lift entrapment, gas or medical emergency",
     tagline: "Apartment gate tag · Tower B · Security desk",
     cta: "Get Help",
-    alert: "I scanned the RepiQR tag at your society gate — there is an emergency in the building.",
+    alert: "URGENT: Emergency in the building! Please respond now.",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "people", line1: "Notify", line2: "Society", action: { kind: "notify", text: undefined } },
@@ -864,7 +864,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Fire services · 101", style: "primary", action: { kind: "call", number: "101", who: "Fire services", via: "public" } },
           { label: "Call Emergency (all services) · 112", style: "ghost", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "There is a fire in the building. Fire services have been called." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: FIRE in the building! Fire services called." } },
         ],
       },
       {
@@ -880,7 +880,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call Lift technician · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Lift technician", via: "partner" } },
-          { label: "Alert security now", style: "wa", action: { kind: "notify", text: "Someone is trapped in the lift — please send the technician and security now." } },
+          { label: "Alert security now", style: "wa", action: { kind: "notify", text: "URGENT: Someone trapped in the lift! Send technician now." } },
           { label: "Call Emergency (all services) · 112", style: "ghost", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
         ],
       },
@@ -896,7 +896,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call LPG / gas leak helpline · 1906", style: "primary", action: { kind: "call", number: "1906", who: "LPG / gas leak helpline", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "There is a gas smell in the building — please shut the cylinder valves and ventilate." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: Gas leak in the building! Shut valves now." } },
           { label: "Call Emergency (all services) · 112", style: "ghost", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
         ],
       },
@@ -911,7 +911,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "They can approve you without sharing a number",
         ],
         actions: [
-          { label: "Announce me at the gate", style: "wa", action: { kind: "notify", text: "I am at your society gate — could you approve my entry?" } },
+          { label: "Announce me at the gate", style: "wa", action: { kind: "notify", text: "I'm at your society gate. Please approve my entry." } },
           { label: "Say who I am", style: "ghost", action: { kind: "write" } },
           { label: "Ask the RepiQR assistant", style: "ghost", action: { kind: "ask" } },
         ],
@@ -927,7 +927,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "Leave the parcel exactly where they reply",
         ],
         actions: [
-          { label: "Tell the flat I am here", style: "wa", action: { kind: "notify", text: "I have a delivery at the society gate. Where should I leave it?" } },
+          { label: "Tell the flat I am here", style: "wa", action: { kind: "notify", text: "Delivery at the society gate. Where should I leave it?" } },
           { label: "Add a note about the parcel", style: "ghost", action: { kind: "write" } },
           { label: "Share which gate I am at", style: "blue", action: { kind: "pin" } },
         ],
@@ -943,7 +943,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "Police are one tap away on 100 or 112",
         ],
         actions: [
-          { label: "Alert security", style: "wa", action: { kind: "notify", text: "There is suspicious activity in the building — please check the cameras." } },
+          { label: "Alert security", style: "wa", action: { kind: "notify", text: "URGENT: Suspicious activity in the building! Check cameras now." } },
           { label: "Call Emergency (all services) · 112", style: "primary", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
           { label: "Call Police · 100", style: "ghost", action: { kind: "call", number: "100", who: "Police", via: "public" } },
         ],
@@ -970,7 +970,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "Thanks for stopping — let’s get it back to them",
     tagline: "Employee tag · Card EMP-2214 · access enabled",
     cta: "Notify the employer",
-    alert: "I have found your employee ID card and it is safe with me right now.",
+    alert: "Found your ID card — it's safe with me. Please contact soon.",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "bell", line1: "Notify", line2: "Employer", action: { kind: "notify", text: undefined } },
@@ -1004,7 +1004,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "A replacement is issued once the old card is blocked",
         ],
         actions: [
-          { label: "Ask them to block the card", style: "wa", action: { kind: "notify", text: "I have your access card — please deactivate it now, I will return the card itself." } },
+          { label: "Ask them to block the card", style: "wa", action: { kind: "notify", text: "I have your access card. Please deactivate it now." } },
           { label: "Call RepiQR support · 1800 123 4567", style: "primary", action: { kind: "call", number: "1800 123 4567", who: "RepiQR support", via: "support" } },
           { label: "Write a message instead", style: "ghost", action: { kind: "write" } },
         ],
@@ -1021,7 +1021,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call Company reception · 1800 123 4567", style: "primary", action: { kind: "call", number: "1800 123 4567", who: "Company reception", via: "support" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I found an employee card of yours. How should I return it?" } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Found your employee card. How should I return it?" } },
           { label: "Ask the RepiQR assistant", style: "ghost", action: { kind: "ask" } },
         ],
       },
@@ -1037,7 +1037,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Find the nearest counter", style: "blue", action: { kind: "maps", query: "lost and found counter near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I am leaving your ID card at the lost and found counter here." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Leaving your ID card at the lost and found counter." } },
           { label: "Share which building I am in", style: "blue", action: { kind: "pin" } },
         ],
       },
@@ -1053,7 +1053,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call Ambulance · 108", style: "primary", action: { kind: "call", number: "108", who: "Ambulance", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your employee has collapsed and needs medical help — an ambulance has been called." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: Your employee collapsed! Ambulance called." } },
           { label: "Send our exact location", style: "blue", action: { kind: "pin" } },
         ],
       },
@@ -1069,7 +1069,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Find the nearest police station", style: "blue", action: { kind: "maps", query: "police station near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Nobody replied, so I am depositing your ID card at the nearest police station." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "No reply — leaving your ID card at the nearest police station." } },
           { label: "Call Emergency (all services) · 112", style: "ghost", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
         ],
       },
@@ -1095,7 +1095,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "Reach the owner without either number being shown",
     tagline: "NFC tag · universal · tap or scan",
     cta: "Notify the owner",
-    alert: "I tapped your RepiQR smart tag — I have the item it is stuck to.",
+    alert: "Found your item — tapped your RepiQR tag. Please respond.",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "bell", line1: "Notify", line2: "Owner", action: { kind: "notify", text: undefined } },
@@ -1147,7 +1147,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Find a drop point near me", style: "blue", action: { kind: "maps", query: "safe drop point near me" } },
           { label: "Call Courier pickup · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Courier pickup", via: "partner" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I can drop your item at a RepiQR point or hand it to a courier — which do you prefer?" } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I can drop your item at a RepiQR point or courier. Which do you prefer?" } },
         ],
       },
       {
@@ -1221,7 +1221,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "You've scanned a child safety tag — stay with them",
     tagline: "School-bag tag · Age 7 · Blood group O+",
     cta: "Get Help",
-    alert: "I have found your child and I am with them right now. They are safe.",
+    alert: "URGENT: Found your child — safe with me right now!",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "people", line1: "Notify", line2: "Guardians", action: { kind: "notify", text: undefined } },
@@ -1240,7 +1240,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call Childline · 1098", style: "primary", action: { kind: "call", number: "1098", who: "Childline", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I have found your child and I am with them. Please call back through RepiQR." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Found your child, safe with me. Please call back now." } },
           { label: "Send where we are", style: "blue", action: { kind: "pin" } },
         ],
       },
@@ -1257,7 +1257,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Emergency (all services) · 112", style: "primary", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
           { label: "Find the nearest police station", style: "blue", action: { kind: "maps", query: "police station near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Nobody answered, so I am taking your child to the nearest police station." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "No reply — taking your child to the nearest police station now." } },
         ],
       },
       {
@@ -1272,7 +1272,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call Ambulance · 108", style: "primary", action: { kind: "call", number: "108", who: "Ambulance", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your child is being treated — please share their medical history with the paramedic." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: Your child is being treated! Share medical history now." } },
           { label: "Ask the RepiQR assistant", style: "ghost", action: { kind: "ask" } },
         ],
       },
@@ -1322,7 +1322,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Share where we are waiting", style: "blue", action: { kind: "pin" } },
           { label: "Find a staffed safe point", style: "blue", action: { kind: "maps", query: "police station near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "We are waiting in a safe public spot — here is where to find us." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "We're waiting in a safe public spot. Come here now." } },
         ],
       },
     ],
@@ -1347,7 +1347,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "You've scanned a senior safety tag — stay with them",
     tagline: "Senior keychain · Age 74 · Blood group A+",
     cta: "Get Help",
-    alert: "I have found your family member and I am with them right now. They are safe.",
+    alert: "URGENT: Found your family member — safe with me now!",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "people", line1: "Notify", line2: "Family", action: { kind: "notify", text: undefined } },
@@ -1366,7 +1366,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call Elderline · 14567", style: "primary", action: { kind: "call", number: "14567", who: "Elderline", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I have found your family member and I am with them. Please call back through RepiQR." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Found your family member, safe with me. Please call back now." } },
           { label: "Send where we are", style: "blue", action: { kind: "pin" } },
         ],
       },
@@ -1383,7 +1383,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call Ambulance · 108", style: "primary", action: { kind: "call", number: "108", who: "Ambulance", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your family member is being treated — please share their medical history with the paramedic." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: Your family member is being treated! Share medical history now." } },
           { label: "Ask the RepiQR assistant", style: "ghost", action: { kind: "ask" } },
         ],
       },
@@ -1433,7 +1433,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Emergency (all services) · 112", style: "primary", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
           { label: "Find the nearest police station", style: "blue", action: { kind: "maps", query: "police station near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Nobody answered, so I am taking your family member to the nearest police station." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "No reply — taking your family member to the nearest police station now." } },
         ],
       },
       {
@@ -1449,7 +1449,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Share where we are waiting", style: "blue", action: { kind: "pin" } },
           { label: "Find a staffed safe point", style: "blue", action: { kind: "maps", query: "pharmacy near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "We are waiting in a safe public spot — here is where to find us." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "We're waiting in a safe public spot. Come here now." } },
         ],
       },
     ],
@@ -1474,7 +1474,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "You've scanned a medical ID wristband",
     tagline: "Wristband · Epilepsy · Blood group O−",
     cta: "Get Help",
-    alert: "I scanned the RepiQR medical wristband — the wearer needs help right now.",
+    alert: "URGENT: Wearer needs help now! Please respond.",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "people", line1: "Notify", line2: "Contacts", action: { kind: "notify", text: undefined } },
@@ -1529,7 +1529,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call Ambulance · 108", style: "primary", action: { kind: "call", number: "108", who: "Ambulance", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "The wearer of this wristband is being treated — please share their medical history." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: Being treated now! Please share medical history." } },
           { label: "Ask the RepiQR assistant", style: "ghost", action: { kind: "ask" } },
         ],
       },
@@ -1546,7 +1546,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Find a hospital near me", style: "blue", action: { kind: "maps", query: "hospital emergency near me" } },
           { label: "Call Ambulance · 108", style: "primary", action: { kind: "call", number: "108", who: "Ambulance", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I am taking the wearer of this wristband to the nearest hospital." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: Taking to the nearest hospital now." } },
         ],
       },
       {
@@ -1578,7 +1578,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Health helpline · 104", style: "primary", action: { kind: "call", number: "104", who: "Health helpline", via: "public" } },
           { label: "Call Tele-MANAS · 14416", style: "ghost", action: { kind: "call", number: "14416", who: "Tele-MANAS", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I am with the wearer of this wristband and have called the health helpline." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: With the wearer — health helpline called." } },
         ],
       },
     ],
@@ -1603,7 +1603,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "Thanks for stopping — let's get them home",
     tagline: "Pet tag · Indie · 4 yrs · friendly",
     cta: "Notify the owner",
-    alert: "I have found your pet and they are safe with me right now.",
+    alert: "Found your pet — safe with me right now!",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "bell", line1: "Notify", line2: "Owner", action: { kind: "notify", text: undefined } },
@@ -1638,7 +1638,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Find a vet near me", style: "blue", action: { kind: "maps", query: "veterinary clinic near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your pet is hurt — I am taking them to the nearest vet." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: Your pet is hurt! Taking to nearest vet now." } },
           { label: "Call Animal helpline · 1962", style: "primary", action: { kind: "call", number: "1962", who: "Animal helpline", via: "public" } },
         ],
       },
@@ -1655,7 +1655,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Animal helpline · 1962", style: "primary", action: { kind: "call", number: "1962", who: "Animal helpline", via: "public" } },
           { label: "Send where the pet is", style: "blue", action: { kind: "pin" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your pet needs rescue help — I have called the animal helpline." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: Your pet needs rescue! Animal helpline called." } },
         ],
       },
       {
@@ -1670,7 +1670,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "Nervous around other dogs — keep the leash short",
         ],
         actions: [
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I have your pet. Anything I should know beyond the profile on the tag?" } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I have your pet. Anything else I should know?" } },
           { label: "Ask the RepiQR assistant", style: "ghost", action: { kind: "ask" } },
           { label: "Write a message instead", style: "ghost", action: { kind: "write" } },
         ],
@@ -1688,7 +1688,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Ask the RepiQR assistant", style: "ghost", action: { kind: "ask" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your pet is calm and with me. Where should we meet?" } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your pet is calm, with me. Where should we meet?" } },
           { label: "Share where we are", style: "blue", action: { kind: "pin" } },
         ],
       },
@@ -1704,7 +1704,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Find a shelter near me", style: "blue", action: { kind: "maps", query: "animal shelter near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I cannot wait any longer — I am leaving your pet at a registered shelter." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Can't wait longer — leaving your pet at a registered shelter." } },
           { label: "Call Animal helpline · 1962", style: "primary", action: { kind: "call", number: "1962", who: "Animal helpline", via: "public" } },
         ],
       },
@@ -1730,7 +1730,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "Thanks for stopping — let's get it back to them",
     tagline: "Luggage tag · Cabin trolley · dark blue",
     cta: "Notify the owner",
-    alert: "I have found your bag and it is safe with me right now.",
+    alert: "Found your bag — safe with me right now!",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "bell", line1: "Notify", line2: "Owner", action: { kind: "notify", text: undefined } },
@@ -1765,7 +1765,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Find the nearest counter", style: "blue", action: { kind: "maps", query: "lost and found counter near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I am handing your bag to the lost and found counter here." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Handing your bag to the lost and found counter now." } },
           { label: "Share which terminal I am in", style: "blue", action: { kind: "pin" } },
         ],
       },
@@ -1781,7 +1781,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Find the baggage desk", style: "blue", action: { kind: "maps", query: "airline baggage service desk" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your bag is at the airline baggage desk here — please claim it with your flight number." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your bag is at the airline desk. Please claim it with your flight number." } },
           { label: "Call RepiQR support · 1800 123 4567", style: "ghost", action: { kind: "call", number: "1800 123 4567", who: "RepiQR support", via: "support" } },
         ],
       },
@@ -1798,7 +1798,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Courier pickup · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Courier pickup", via: "partner" } },
           { label: "Send my pickup address", style: "blue", action: { kind: "pin" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I can hand your bag to a courier — send the pickup and I will keep it safe until then." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I can send your bag by courier. Please send pickup details." } },
         ],
       },
       {
@@ -1813,7 +1813,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Find the nearest police station", style: "blue", action: { kind: "maps", query: "police station near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Nobody replied, so I am depositing your bag at the nearest police station." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "No reply — leaving your bag at the nearest police station." } },
           { label: "Call Emergency (all services) · 112", style: "ghost", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
         ],
       },
@@ -1855,7 +1855,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "Documents inside — let’s get them back fast",
     tagline: "Travel tag · passport pouch · navy",
     cta: "Notify the owner",
-    alert: "I have found your travel pouch and it is safe with me right now.",
+    alert: "Found your travel pouch — safe with me right now!",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "bell", line1: "Notify", line2: "Owner", action: { kind: "notify", text: undefined } },
@@ -1907,7 +1907,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Find the baggage desk", style: "blue", action: { kind: "maps", query: "airline baggage service desk" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your travel pouch is at the airline desk here — please claim it with your flight number." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your travel pouch is at the airline desk. Please claim it with your flight number." } },
           { label: "Call RepiQR support · 1800 123 4567", style: "ghost", action: { kind: "call", number: "1800 123 4567", who: "RepiQR support", via: "support" } },
         ],
       },
@@ -1924,7 +1924,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Tourist helpline · 1363", style: "primary", action: { kind: "call", number: "1363", who: "Tourist helpline", via: "public" } },
           { label: "Call Railway helpline · 139", style: "ghost", action: { kind: "call", number: "139", who: "Railway helpline", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I have your travel pouch and have contacted the tourist helpline for you." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I have your travel pouch. Tourist helpline contacted." } },
         ],
       },
       {
@@ -1939,7 +1939,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Find the nearest police station", style: "blue", action: { kind: "maps", query: "police station near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Nobody replied, so I am depositing your travel pouch at the nearest police station." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "No reply — leaving your travel pouch at the nearest police station." } },
           { label: "Call Emergency (all services) · 112", style: "ghost", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
         ],
       },
@@ -1956,7 +1956,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Courier pickup · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Courier pickup", via: "partner" } },
           { label: "Send my pickup address", style: "blue", action: { kind: "pin" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I can hand your travel pouch to a courier — send the pickup and I will keep it safe until then." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I can send your travel pouch by courier. Please send pickup details." } },
         ],
       },
     ],
@@ -1981,7 +1981,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "Cards inside — the owner is probably panicking",
     tagline: "Wallet tag · brown leather · 4 cards",
     cta: "Notify the owner",
-    alert: "I have found your wallet and it is safe with me right now.",
+    alert: "Found your wallet — safe with me right now!",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "bell", line1: "Notify", line2: "Owner", action: { kind: "notify", text: undefined } },
@@ -2016,7 +2016,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "Never read the card numbers out to anyone, owner included",
         ],
         actions: [
-          { label: "Tell them to freeze the cards", style: "wa", action: { kind: "notify", text: "Your wallet is safe with me — freeze your cards in your bank app anyway until you have it back." } },
+          { label: "Tell them to freeze the cards", style: "wa", action: { kind: "notify", text: "Wallet is safe with me. Freeze your cards now, just in case." } },
           { label: "Write a message instead", style: "ghost", action: { kind: "write" } },
           { label: "Ask the RepiQR assistant", style: "ghost", action: { kind: "ask" } },
         ],
@@ -2033,7 +2033,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Call Cyber fraud helpline · 1930", style: "primary", action: { kind: "call", number: "1930", who: "Cyber fraud helpline", via: "public" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "There may already be fraud on your cards — report it on 1930 straight away." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "URGENT: Possible card fraud! Report now on 1930." } },
           { label: "Call Emergency (all services) · 112", style: "ghost", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
         ],
       },
@@ -2049,7 +2049,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Find the nearest police station", style: "blue", action: { kind: "maps", query: "police station near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Nobody replied, so I am depositing your wallet at the nearest police station." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "No reply — leaving your wallet at the nearest police station." } },
           { label: "Call Emergency (all services) · 112", style: "ghost", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
         ],
       },
@@ -2066,7 +2066,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Courier pickup · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Courier pickup", via: "partner" } },
           { label: "Send my pickup address", style: "blue", action: { kind: "pin" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I can hand your wallet to a courier — send the pickup and I will keep it safe." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I can send your wallet by courier. Please send pickup details." } },
         ],
       },
       {
@@ -2107,7 +2107,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
     sub: "Thanks for stopping — let's get them back safely",
     tagline: "Keychain tag · 3 keys · blue fob",
     cta: "Notify the owner",
-    alert: "I have found your keys and they are safe with me right now.",
+    alert: "Found your keys — safe with me right now!",
     mini: [
       { icon: "pin", line1: "Share Live", line2: "Location", action: { kind: "pin" } },
       { icon: "bell", line1: "Notify", line2: "Owner", action: { kind: "notify", text: undefined } },
@@ -2142,7 +2142,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Find a drop point near me", style: "blue", action: { kind: "maps", query: "safe drop point near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I am leaving your keys at a RepiQR drop point nearby." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Leaving your keys at a nearby RepiQR drop point." } },
           { label: "Share where I am", style: "blue", action: { kind: "pin" } },
         ],
       },
@@ -2158,7 +2158,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Find the nearest police station", style: "blue", action: { kind: "maps", query: "police station near me" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Nobody replied, so I am depositing your keys at the nearest police station." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "No reply — leaving your keys at the nearest police station." } },
           { label: "Call Emergency (all services) · 112", style: "ghost", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
         ],
       },
@@ -2175,7 +2175,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Call Courier pickup · 1800 200 4004", style: "primary", action: { kind: "call", number: "1800 200 4004", who: "Courier pickup", via: "partner" } },
           { label: "Send my pickup address", style: "blue", action: { kind: "pin" } },
-          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I can hand your keys to a courier — send the pickup and I will keep them safe." } },
+          { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "I can send your keys by courier. Please send pickup details." } },
         ],
       },
       {

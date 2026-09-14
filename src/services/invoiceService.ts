@@ -171,7 +171,7 @@ export function printOrderInvoice(invoice: OrderInvoice): void {
         <style>
           * {
             box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: 'Pinterest Sans', 'Pin Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             color: #0f172a;
           }
           body {
