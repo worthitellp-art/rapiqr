@@ -68,6 +68,25 @@ function loadScript(urls: string[]): Promise<void> {
 
 let initPromise: Promise<void> | null = null;
 
+/** Polls until `window.sendOtp` is attached — with exposeMethods, initSendOTP() sets it up asynchronously (builds an internal iframe/session first), so it isn't available the instant initSendOTP() returns. */
+function waitForWidgetMethods(timeoutMs = 8000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const check = () => {
+      if (typeof window.sendOtp === 'function') {
+        resolve();
+        return;
+      }
+      if (Date.now() - start > timeoutMs) {
+        reject(new Error('MSG91 widget did not finish initializing in time.'));
+        return;
+      }
+      setTimeout(check, 150);
+    };
+    check();
+  });
+}
+
 /** Loads the widget script (once) and initializes it with exposeMethods so this app can drive it with its own UI instead of MSG91's default popup. */
 export function initMsg91Widget(): Promise<void> {
   if (initPromise) return initPromise;
@@ -89,6 +108,10 @@ export function initMsg91Widget(): Promise<void> {
       success: () => {},
       failure: () => {},
     });
+    return waitForWidgetMethods();
+  }).catch((err) => {
+    initPromise = null; // let a retry re-run init instead of replaying a stale rejection
+    throw err;
   });
 
   return initPromise;

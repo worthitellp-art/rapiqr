@@ -1,7 +1,8 @@
 import type React from "react";
 import { useEffect, useState, useCallback } from "react";
-import { Send, CheckCircle2, XCircle, FlaskConical, MessageSquareText, RefreshCcw, Trash2, AlertTriangle } from "lucide-react";
+import { Send, CheckCircle2, XCircle, FlaskConical, MessageSquareText, RefreshCcw, Trash2, AlertTriangle, PhoneCall, ShieldCheck } from "lucide-react";
 import { apiClient } from "../../../lib/apiClient";
+import { sendMsg91Otp, verifyMsg91Otp, toMsg91Identifier } from "../../../lib/msg91Widget";
 
 type MessageStats = { total: number; sent: number; failed: number; simulated: number; sms: number; whatsapp: number; last24h: number };
 
@@ -49,6 +50,67 @@ export default function MessageManagerPage() {
   const [deleting, setDeleting] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Live OTP widget test — drives the real MSG91 widget (src/lib/msg91Widget.ts)
+  // directly in the browser so an admin can confirm the widget config actually
+  // sends/verifies against MSG91, independent of any QR activation flow.
+  const [testPhone, setTestPhone] = useState("");
+  const [testOtp, setTestOtp] = useState("");
+  const [testStep, setTestStep] = useState<"idle" | "sent" | "verified">("idle");
+  const [testSending, setTestSending] = useState(false);
+  const [testVerifying, setTestVerifying] = useState(false);
+  const [testError, setTestError] = useState<string | null>(null);
+  const [testToken, setTestToken] = useState<string | null>(null);
+
+  function isValidTestPhone(phone: string) {
+    return /^\d{10}$/.test(phone.replace(/\D/g, ""));
+  }
+
+  const handleTestSendOtp = async () => {
+    if (testSending) return;
+    setTestError(null);
+    if (!isValidTestPhone(testPhone)) {
+      setTestError("Enter a valid 10-digit mobile number.");
+      return;
+    }
+    setTestSending(true);
+    try {
+      await sendMsg91Otp(toMsg91Identifier(testPhone));
+      setTestOtp("");
+      setTestToken(null);
+      setTestStep("sent");
+    } catch (err: any) {
+      setTestError(err?.message || "Failed to send the test OTP.");
+    } finally {
+      setTestSending(false);
+    }
+  };
+
+  const handleTestVerifyOtp = async () => {
+    if (testVerifying) return;
+    setTestError(null);
+    if (!testOtp.trim()) {
+      setTestError("Enter the code you received.");
+      return;
+    }
+    setTestVerifying(true);
+    try {
+      const token = await verifyMsg91Otp(testOtp.trim());
+      setTestToken(token);
+      setTestStep("verified");
+    } catch (err: any) {
+      setTestError(err?.message || "Incorrect code — please try again.");
+    } finally {
+      setTestVerifying(false);
+    }
+  };
+
+  const handleTestReset = () => {
+    setTestStep("idle");
+    setTestOtp("");
+    setTestToken(null);
+    setTestError(null);
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -161,6 +223,98 @@ export default function MessageManagerPage() {
             <RefreshCcw size={13} className={loading ? "animate-spin" : ""} /> Refresh
           </button>
         </div>
+      </div>
+
+      {/* ── Live OTP Widget Test ── */}
+      <div className="bg-white border border-[var(--fx-border)] rounded-2xl shadow-xs p-4 sm:p-5 space-y-4">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h4 className="font-display font-bold text-[var(--fx-ink)] text-sm flex items-center gap-2">
+              <PhoneCall size={15} className="text-[var(--fx-ink-2)]" /> Test OTP Widget (Live)
+            </h4>
+            <p className="text-xs text-[var(--fx-ink-2)] mt-1 max-w-lg">
+              Sends a real OTP via the MSG91 widget to the number below, exactly like the activation flow. No sticker or account is touched.
+            </p>
+          </div>
+          {testStep !== "idle" && (
+            <button
+              type="button"
+              onClick={handleTestReset}
+              className="text-xs font-bold text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] underline underline-offset-2 cursor-pointer"
+            >
+              Start over
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 items-start">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="px-3 py-2.5 rounded-xl bg-[var(--fx-canvas)] border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink-2)]">+91</span>
+            <input
+              type="tel"
+              inputMode="numeric"
+              placeholder="10-digit mobile number"
+              value={testPhone}
+              disabled={testStep !== "idle"}
+              onChange={(e) => setTestPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+              className="flex-1 sm:w-56 px-3.5 py-2.5 rounded-xl border border-[var(--fx-border)] text-sm font-medium disabled:bg-[var(--fx-canvas)]/60 disabled:text-[var(--fx-ink-2)] focus:outline-none focus:ring-2 focus:ring-[var(--fx-accent)]/30"
+            />
+          </div>
+
+          {testStep === "idle" && (
+            <button
+              type="button"
+              onClick={handleTestSendOtp}
+              disabled={testSending}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--fx-accent)] text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50"
+            >
+              <Send size={13} /> {testSending ? "Sending…" : "Send Test OTP"}
+            </button>
+          )}
+
+          {(testStep === "sent" || testStep === "verified") && (
+            <>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="Enter code"
+                value={testOtp}
+                disabled={testStep === "verified"}
+                onChange={(e) => setTestOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                className="w-full sm:w-36 px-3.5 py-2.5 rounded-xl border border-[var(--fx-border)] text-sm font-medium disabled:bg-[var(--fx-canvas)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--fx-accent)]/30"
+              />
+              {testStep === "sent" && (
+                <button
+                  type="button"
+                  onClick={handleTestVerifyOtp}
+                  disabled={testVerifying}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--fx-ink)] text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  <ShieldCheck size={13} /> {testVerifying ? "Verifying…" : "Verify"}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+
+        {testError && (
+          <div className="flex items-start gap-2 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5">
+            <XCircle size={14} className="mt-0.5 flex-shrink-0" /> {testError}
+          </div>
+        )}
+
+        {testStep === "sent" && !testError && (
+          <div className="flex items-start gap-2 text-xs font-semibold text-[#B54708] bg-[#FEF6E7] border border-[#FBE5B8] rounded-xl px-3.5 py-2.5">
+            <FlaskConical size={14} className="mt-0.5 flex-shrink-0" /> Code sent to +91{testPhone}. Check the Message Manager log below once it lands.
+          </div>
+        )}
+
+        {testStep === "verified" && testToken && (
+          <div className="flex items-start gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-2.5">
+            <CheckCircle2 size={14} className="mt-0.5 flex-shrink-0" />
+            Widget verified successfully — access token received (<span className="font-mono">{testToken.slice(0, 16)}…</span>). MSG91 send/verify is working live.
+          </div>
+        )}
       </div>
 
       {/* ── Stat Tiles ── */}
