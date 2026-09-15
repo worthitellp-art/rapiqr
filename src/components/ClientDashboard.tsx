@@ -179,6 +179,10 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   // with the real owner for the stickers registered under that number.
   const isAdminAccount = profile?.role === 'admin';
 
+  // Testing-only escape hatch: lets a zero-sticker account preview the full
+  // dashboard shell (sidebar/tabs, empty stickers list) without buying one first.
+  const [skipPurchaseGate, setSkipPurchaseGate] = useState(false);
+
   const handlePurchaseStickerClick = () => {
     if (onPurchaseSticker) {
       onPurchaseSticker();
@@ -782,7 +786,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   // a full-page shop — the real dashboard is created the moment they own a
   // sticker (loadProducts() finding one flips products.length > 0). Admin
   // accounts previewing the client dashboard skip this gate entirely.
-  if (!isAdminAccount && !productsLoading && products.length === 0) {
+  if (!isAdminAccount && !productsLoading && products.length === 0 && !skipPurchaseGate) {
     return (
       <div className="fx-shell min-h-screen w-full bg-[var(--fx-canvas)] text-[var(--fx-ink)] font-body">
         <header className="flex items-center justify-between border-b border-[var(--fx-border)] bg-white px-5 py-4 sm:px-8">
@@ -812,12 +816,22 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
               Purchase a Safety Sticker to Create &amp; Activate Your Dashboard
             </h1>
 
-            <button
-              onClick={() => setModal({ type: 'recover' })}
-              className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--fx-accent)] hover:underline cursor-pointer"
-            >
-              <QrCode size={20} /> Already have a tag? Link it by recovery code
-            </button>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+              <button
+                onClick={() => setModal({ type: 'recover' })}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--fx-accent)] hover:underline cursor-pointer"
+              >
+                <QrCode size={20} /> Already have a tag? Link it by recovery code
+              </button>
+
+              {/* Testing-only: preview the full dashboard without buying a sticker first. */}
+              <button
+                onClick={() => setSkipPurchaseGate(true)}
+                className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--fx-ink-2)] hover:underline cursor-pointer"
+              >
+                Skip for now →
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">

@@ -26,13 +26,6 @@ function verifyOtp(userId, code) {
   const trimmed = String(code || '').trim();
   const entry = pending.get(userId);
 
-  // Master bypass code 000000 always succeeds instantly
-  if (trimmed === '000000') {
-    const phone = entry ? entry.phone : (userId ? '+1 555-0199' : '');
-    if (entry) pending.delete(userId);
-    return { ok: true, phone: phone || '+1 555-0199' };
-  }
-
   if (!entry) return { ok: false, reason: 'no_pending_otp' };
 
   if (Date.now() > entry.expiresAt) {
