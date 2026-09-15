@@ -702,9 +702,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   // seeds its greeting and suggested questions from the scanned tag's category.
   const [aiChatOpen, setAiChatOpen] = useState(false);
 
-  const [buyerPhone, setBuyerPhone] = useState("");
-  const [phoneMatchesBuyer, setPhoneMatchesBuyer] = useState(false);
-
   // OTP verification step state (two-step activation flow) — the MSG91 OTP
   // Widget (src/lib/msg91Widget.ts) sends and verifies the code in-browser;
   // POST /api/qr/:id/send-activation-otp is only a pre-flight phone-format
@@ -719,7 +716,9 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     return /^\d{10}$/.test(phone.replace(/\D/g, ""));
   }
 
-  // Prefill owner phone/name from the most recent purchase order (decision branch)
+  // Prefill owner phone/name from the most recent purchase order (convenience
+  // only — this is client-supplied localStorage and must never be trusted as
+  // proof of identity, so it no longer skips OTP verification; see handleSendOtp).
   useEffect(() => {
     try {
       const orders = JSON.parse(localStorage.getItem("repiqr-orders") || localStorage.getItem("namoqr-orders") || "[]");
@@ -728,7 +727,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         const last = orders[0];
         if (last?.phone) {
           const digits = String(last.phone).replace(/\D/g, "");
-          setBuyerPhone(digits);
           if (digits.length >= 10) {
             const local = digits.slice(-10);
             setRegPhone((prev) => prev || local);
@@ -738,14 +736,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       }
     } catch { /* ignore */ }
   }, []);
-
-  // Keep the buyer-match flag in sync with the entered phone
-  useEffect(() => {
-    const entered = regPhone.replace(/\D/g, "").replace(/^0+/, "");
-    setPhoneMatchesBuyer(
-      !!buyerPhone && entered.length >= 10 && buyerPhone.slice(-10) === entered.slice(-10)
-    );
-  }, [regPhone, buyerPhone]);
 
   const handleSendOtp = async () => {
     if (!qrData || otpSending) return;
@@ -792,30 +782,20 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         localStorage.setItem("namoqr-qrlist", JSON.stringify(list));
       }
 
-      // 2. If phone matches purchase record, skip OTP and proceed to emergency contacts
-      if (phoneMatchesBuyer) {
-        proceedToEmergencyContacts(true);
+      // 2. Send the activation OTP. Verification is mandatory from here on —
+      // no phone-match shortcut and no fail-open fallback: any failure blocks
+      // progress and asks the visitor to retry instead of silently treating
+      // an unverified identity as verified.
+      const res = await apiClient.qr.sendActivationOtp(qrData.id, fullPhone);
+      if (!res?.success) {
+        setActivationError(res?.error || "Couldn't send verification code — please try again.");
         return;
       }
-
-      // 3. Attempt OTP sending (if configured, offers extra verification). The
-      // pre-check just validates the number; the MSG91 widget does the actual send.
-      try {
-        const res = await apiClient.qr.sendActivationOtp(qrData.id, fullPhone);
-        if (res?.success) {
-          await sendMsg91Otp(toMsg91Identifier(fullPhone));
-          setOtpSimulated(false);
-          setOtpInput("");
-          setActivationError(null);
-          setOtpStep(true);
-          return;
-        }
-      } catch (smsErr) {
-        console.warn("SMS OTP unavailable, proceeding with direct activation:", smsErr);
-      }
-
-      // If SMS OTP is not active or fails, the sticker is already saved & linked! Proceed to next step.
-      proceedToEmergencyContacts(true);
+      await sendMsg91Otp(toMsg91Identifier(fullPhone));
+      setOtpSimulated(false);
+      setOtpInput("");
+      setActivationError(null);
+      setOtpStep(true);
     } catch (err: any) {
       setActivationError(err?.message || "Couldn't register sticker — please try again.");
     } finally {
