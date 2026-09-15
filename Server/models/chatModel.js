@@ -56,17 +56,40 @@ class ChatModel {
     customerToken = String(customerToken);
 
     try {
-      const existing = await ChatSession.findOne({ qr_code_id: qrCodeId, customer_token: customerToken, status: 'open' }).lean();
-      if (existing) return { session: sessionToApi(existing), isNew: false };
-
-      const created = await ChatSession.create({
-        qr_code_id: qrCodeId,
-        owner_id: ownerId || null,
-        customer_token: customerToken,
-        customer_name: customerName ? String(customerName) : 'Visitor',
-        vehicle_label: vehicleLabel || null,
-      });
-      return { session: sessionToApi(created), isNew: true };
+      // Atomic find-or-insert: a separate findOne-then-create here raced two
+      // near-simultaneous "start chat" requests (e.g. a double-fired mount
+      // effect in the browser) into both seeing no existing session and both
+      // creating one — each treated as "new", each firing its own CHAT_STARTED
+      // WhatsApp notification to the owner. upsert makes the DB pick a single
+      // winner; the loser's request just reads back the winner's document.
+      let result;
+      try {
+        result = await ChatSession.findOneAndUpdate(
+          { qr_code_id: qrCodeId, customer_token: customerToken, status: 'open' },
+          {
+            $setOnInsert: {
+              qr_code_id: qrCodeId,
+              owner_id: ownerId || null,
+              customer_token: customerToken,
+              customer_name: customerName ? String(customerName) : 'Visitor',
+              vehicle_label: vehicleLabel || null,
+              status: 'open',
+            },
+          },
+          { upsert: true, returnDocument: 'after', includeResultMetadata: true, setDefaultsOnInsert: true }
+        );
+      } catch (err) {
+        // Lost the upsert race against a concurrent request (unique index on
+        // qr_code_id+customer_token+status:'open' — see the schema). The winner
+        // already created the session; read it back instead of erroring.
+        if (err?.code === 11000) {
+          const existing = await ChatSession.findOne({ qr_code_id: qrCodeId, customer_token: customerToken, status: 'open' }).lean();
+          return { session: sessionToApi(existing), isNew: false };
+        }
+        throw err;
+      }
+      const isNew = Boolean(result.lastErrorObject?.upserted);
+      return { session: sessionToApi(result.value), isNew };
     } catch (err) {
       console.error('ChatModel.findOrCreateOpenSession Error:', err);
       throw err;

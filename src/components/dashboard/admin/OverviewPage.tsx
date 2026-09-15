@@ -294,9 +294,20 @@ export default function OverviewPage({
           if (deleteTarget) {
             const targetId = deleteTarget.id;
             setDeleteTarget(null);
-            const deleted = await apiClient.qr.deleteQrCode(targetId).then((res) => res?.success).catch(() => false);
-            if (!deleted) {
-              setToast(`Failed to delete ${targetId} — it still exists in the database. Please try again.`);
+            try {
+              const res = await apiClient.qr.deleteQrCode(targetId);
+              if (!res?.success) throw new Error('Delete request did not succeed');
+            } catch (err: any) {
+              // A 404 here means the sticker is already gone (e.g. a prior click's
+              // response never reached the UI) — that's the outcome we wanted, so
+              // reflect it in the list instead of showing a scary false failure.
+              if (err?.status === 404) {
+                setQrList((prev) => prev.filter((x) => x.id !== targetId));
+                setToast("QR sticker was already removed");
+                setTimeout(() => setToast(null), 1500);
+                return;
+              }
+              setToast(err?.message || `Failed to delete ${targetId} — please try again.`);
               setTimeout(() => setToast(null), 3000);
               return;
             }

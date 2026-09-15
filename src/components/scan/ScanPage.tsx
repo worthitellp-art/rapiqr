@@ -9,7 +9,7 @@ import { getCategoryVariant, BESPOKE_CATEGORIES, type VariantAction } from "./ca
 import type { CategoryButtonAction, ServiceProvider } from "./tileActions";
 import { handleCategoryButtonAction } from "./categoryButtonActions";
 import { apiClient } from "../../lib/apiClient";
-import { isRunningInstalled } from "../../lib/pwaInstall";
+import { isRunningInstalled, useInstallPrompt } from "../../lib/pwaInstall";
 import AppLogo from "../common/AppLogo";
 import groupLogo from "../../../assets/Group 1000005716.png";
 import groupLogo1 from "../../../assets/darkbglogo.png";
@@ -65,7 +65,8 @@ import {
   Shield,
   QrCode,
   Zap,
-  Radio
+  Radio,
+  Download
 } from "lucide-react";
 import RepiChat, { customerTokenKey } from "../chat/RepiChat";
 import { isChatOpen as recallChatOpen, setChatOpen as rememberChatOpen } from "../../lib/chatStorage";
@@ -459,6 +460,7 @@ function IconTheftDetected() {
 
 export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => void; onGoToDashboard?: () => void }) {
   const { profile } = useAuth();
+  const { installed: pwaInstalled, installing: pwaInstalling, hint: pwaHint, install: installPwa } = useInstallPrompt();
   const [phase, setPhase] = useState<Phase>("validating");
   const [qrData, setQrData] = useState<QrData | null>(null);
 
@@ -1725,6 +1727,26 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                 <p className="text-[11px] text-slate-400">
                   Coordinates are encrypted and only transmitted during active emergency dispatch.
                 </p>
+
+                {/* Explicit choice instead of silently continuing in whatever
+                    context the visitor happens to be in: stay in this browser
+                    tab (the button above), or install the app for next time. */}
+                {!pwaInstalled && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={installPwa}
+                      disabled={pwaInstalling}
+                      className="w-full py-3 rounded-xl bg-white border-2 border-slate-200 hover:border-slate-300 active:scale-[0.99] text-slate-700 font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-70"
+                    >
+                      <Download size={16} />
+                      <span>{pwaInstalling ? "Installing…" : "Download the RapiQR App"}</span>
+                    </button>
+                    {pwaHint && (
+                      <p className="text-[11px] text-slate-500">{pwaHint}</p>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </div>

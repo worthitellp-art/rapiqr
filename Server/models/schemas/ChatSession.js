@@ -16,4 +16,12 @@ const chatSessionSchema = new Schema({
 
 chatSessionSchema.index({ qr_code_id: 1, customer_token: 1, status: 1 });
 
+// Enforces at most one OPEN session per (sticker, visitor) pair at the DB
+// level — the actual guard against the race in ChatModel.findOrCreateOpenSession
+// (two near-simultaneous upserts can otherwise both "win" without this).
+chatSessionSchema.index(
+  { qr_code_id: 1, customer_token: 1 },
+  { unique: true, partialFilterExpression: { status: 'open' } }
+);
+
 module.exports = model('ChatSession', chatSessionSchema);

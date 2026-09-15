@@ -114,6 +114,16 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/push', pushRoutes);
 
+// Rescue for stickers printed while APP_URL was misconfigured to this backend's
+// own origin instead of the frontend (see qrModel.js's QR_HOST): their QR image
+// has this backend's host baked in permanently — that pixel pattern can't be
+// changed without reprinting. Anyone scanning one lands here first; redirect them
+// on to the real web app instead of showing a bare JSON 404. Scoped to GET/HEAD on
+// a single non-API path segment so it can never shadow a real API route.
+const FRONTEND_REDIRECT_BASE = (process.env.APP_URL || 'https://repiqr.com').replace(/\/+$/, '');
+app.get(/^\/[A-Za-z0-9_-]{3,}$/, (req, res) => {
+  res.redirect(302, `${FRONTEND_REDIRECT_BASE}${req.originalUrl}`);
+});
 
 // Global 404 Route Handler
 app.use((req, res) => {

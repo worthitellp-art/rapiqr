@@ -74,9 +74,12 @@ function getLocalPublicUrl(key) {
     return `http://localhost:${serverPort}/uploads/${normalizedKey}`;
   }
 
-  const appBaseUrl = process.env.APP_URL;
-  if (appBaseUrl) {
-    return `${appBaseUrl.replace(/\/+$/, '')}/uploads/${normalizedKey}`;
+  // /uploads is served by THIS backend (see server.js's express.static mount),
+  // not the frontend — needs the backend's own public origin (BACKEND_URL),
+  // never APP_URL (the web app the user's browser loads).
+  const backendBaseUrl = process.env.BACKEND_URL || process.env.APP_URL;
+  if (backendBaseUrl) {
+    return `${backendBaseUrl.replace(/\/+$/, '')}/uploads/${normalizedKey}`;
   }
 
   return `http://localhost:${serverPort}/uploads/${normalizedKey}`;

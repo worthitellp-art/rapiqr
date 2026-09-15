@@ -36,6 +36,22 @@ export default function QrCodesPage({
   const [searchText, setSearchText] = useState(searchQuery);
   const [openActionMenu, setOpenActionMenu] = useState<string | null>(null);
 
+  // The desktop table and mobile card list used to both render for every row,
+  // merely CSS-hidden (`hidden lg:block` / `lg:hidden`) below the `lg` breakpoint.
+  // QrRowActions' "More actions" menu portals to document.body, which escapes
+  // that display:none ancestor entirely — so opening a row's menu made BOTH the
+  // desktop and mobile copies of that row's dropdown portal in at once, showing
+  // two overlapping popups. Rendering only the layout actually in view fixes it.
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
   useEffect(() => { setSearchText(searchQuery); }, [searchQuery]);
 
   const filtered = useMemo(() => {
@@ -372,7 +388,8 @@ export default function QrCodesPage({
       ) : (
         <>
           {/* ── Desktop table ─────────────────────────────────── */}
-          <div className="fx-table-wrap hidden lg:block">
+          {isDesktop && (
+          <div className="fx-table-wrap">
             <table className="fx-table">
               <thead>
                 <tr>
@@ -471,9 +488,11 @@ export default function QrCodesPage({
               </div>
             )}
           </div>
+          )}
 
           {/* ── Mobile / tablet card list ─────────────────────── */}
-          <div className="lg:hidden fx-table-wrap">
+          {!isDesktop && (
+          <div className="fx-table-wrap">
             {paginated.map((q) => {
               const catKey = (q.category || "car") as any;
               const label = getCategoryLabel(catKey);
@@ -531,6 +550,7 @@ export default function QrCodesPage({
               </div>
             )}
           </div>
+          )}
         </>
       )}
 
@@ -557,17 +577,33 @@ export default function QrCodesPage({
                 onClick={async () => {
                   const targetId = deleteTarget.id;
                   setDeleteTarget(null);
-                  const deleted = await apiClient.qr.deleteQrCode(targetId).then((res) => res?.success).catch(() => false);
-                  if (!deleted) {
-                    setToast(`Failed to delete ${targetId} — it still exists in the database. Please try again.`);
+
+                  const removeFromList = () => {
+                    setQrList((prev) => {
+                      const updated = prev.filter((x) => x.id !== targetId);
+                      try { localStorage.setItem("repiqr-qrlist", JSON.stringify(updated)); localStorage.setItem("namoqr-qrlist", JSON.stringify(updated)); } catch { /* ignore */ }
+                      return updated;
+                    });
+                  };
+
+                  try {
+                    const res = await apiClient.qr.deleteQrCode(targetId);
+                    if (!res?.success) throw new Error('Delete request did not succeed');
+                  } catch (err: any) {
+                    // A 404 here means the sticker is already gone (e.g. a prior click's
+                    // response never reached the UI) — that's the outcome we wanted, so
+                    // reflect it in the list instead of showing a scary false failure.
+                    if (err?.status === 404) {
+                      removeFromList();
+                      setToast("QR sticker was already removed");
+                      setTimeout(() => setToast(null), 1500);
+                      return;
+                    }
+                    setToast(err?.message || `Failed to delete ${targetId} — please try again.`);
                     setTimeout(() => setToast(null), 3000);
                     return;
                   }
-                  setQrList((prev) => {
-                    const updated = prev.filter((x) => x.id !== targetId);
-                    try { localStorage.setItem("repiqr-qrlist", JSON.stringify(updated)); localStorage.setItem("namoqr-qrlist", JSON.stringify(updated)); } catch { /* ignore */ }
-                    return updated;
-                  });
+                  removeFromList();
                   setToast("QR deleted from database");
                   setTimeout(() => setToast(null), 1500);
                 }}

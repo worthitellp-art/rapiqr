@@ -1,5 +1,23 @@
-all templates has been verified and added in msg91 now implement perfectly send whasapp message and otp also need to implement where
+onnection timed out Error code 522
+Visit cloudflare.com for more information.
+2026-09-15 07:00:23 UTC
+You
+Browser
+Working
+Singapore
+Cloudflare
+Working
+www.repiqr.com
+Host
+Error
+What happened?
+The initial connection between Cloudflare's network and the origin web server timed out. As a result, the web page can not be displayed.
 
-phoen number was verifing all system has to fix and razor pay error fix 
+What can I do?
+If you're a visitor of this website:
+Please try again in a few minutes.
 
-Route /create-order not found (HTTP 500) Your order #NQ-367251 has been saved — nothing was charged. Please try paying again in a moment.
+If you're the owner of this website:
+Contact your hosting provider letting them know your web server is not completing requests. An Error 522 means that the request was able to connect to your web server, but that the request didn't finish. The most likely cause is that something on your server is hogging resources. Additional troubleshooting information here.
+
+Cloudflare Ray ID: a3b5c10bd84afdcb • Your IP: Click to reveal • Performance & security by Cloudflare

@@ -9,8 +9,11 @@ function formatToE164(num) {
   return digits.length === 10 ? `+91${digits}` : (digits.startsWith('91') ? `+${digits}` : `+91${digits.slice(-10)}`);
 }
 
+// This is a Twilio webhook callback URL — Twilio's own servers call it, so it
+// must be THIS backend's public origin, never the frontend (APP_URL, which
+// points at the web app the user's browser loads).
 function getPublicBaseUrl() {
-  return (process.env.APP_URL || 'https://rapiqr.onrender.com').replace(/\/+$/, '');
+  return (process.env.BACKEND_URL || process.env.APP_URL || 'https://rapiqr.onrender.com').replace(/\/+$/, '');
 }
 
 function escapeXml(str) {
