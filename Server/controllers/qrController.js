@@ -1,6 +1,7 @@
 const QrModel = require('../models/qrModel');
 const { logger } = require('../middleware/loggerMiddleware');
 const { verifyMsg91WidgetAccessToken } = require('../services/msg91Client');
+const { notifyContactsAdded } = require('../services/notificationService');
 
 class QrController {
   /**
@@ -138,8 +139,22 @@ class QrController {
     try {
       const { id } = req.params;
       const activationData = req.body;
-      const activated = await QrModel.activate(id, activationData);
+      const { newlyAddedContacts, ...activated } = await QrModel.activate(id, activationData);
       logger.rowUpdated('qr_codes', id, { action: 'activated', status: 'active' });
+
+      // Tell each newly-added emergency contact over WhatsApp that they've
+      // been listed — fire-and-forget so a slow/failed send never blocks the
+      // sticker owner's own activation response.
+      if (Array.isArray(newlyAddedContacts) && newlyAddedContacts.length > 0) {
+        notifyContactsAdded({
+          contacts: newlyAddedContacts,
+          ownerName: activationData.ownerName || 'A RapiQR user',
+          eventId: id,
+        }).catch((err) => {
+          logger.error('EMERGENCY_CONTACT_NOTIFY', `Failed to notify emergency contacts for ${id}`, err);
+        });
+      }
+
       return res.json({ success: true, data: activated });
     } catch (err) {
       if (err.code === 'DUPLICATE_PHONE') {

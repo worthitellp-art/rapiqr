@@ -19,7 +19,7 @@ export default function OrderInvoiceCard({
     <div className="rounded-2xl border border-slate-200 bg-linear-to-b from-white to-slate-50 p-5 sm:p-6 text-left shadow-sm space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 text-[#111111]">
             <FileText size={17} />
           </div>
           <div>
@@ -51,7 +51,7 @@ export default function OrderInvoiceCard({
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
             Amount Paid
           </span>
-          <span className="font-black text-amber-600 block">
+          <span className="font-black text-[#111111] block">
             ₹{taxBreakdown.grandTotal.toFixed(2)}{' '}
             <span className="text-[10px] font-normal text-slate-400">({paymentMethod})</span>
           </span>
@@ -62,7 +62,7 @@ export default function OrderInvoiceCard({
         <button
           type="button"
           onClick={onPrintInvoice}
-          className="flex-1 cursor-pointer rounded-xl bg-amber-400 hover:bg-amber-300 px-4 py-2.5 text-xs font-black text-slate-950 transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+          className="flex-1 cursor-pointer rounded-xl bg-[#111111] hover:bg-black px-4 py-2.5 text-xs font-black text-white transition-colors flex items-center justify-center gap-1.5 shadow-xs"
         >
           <Download size={14} />
           <span>Download / Print Invoice</span>

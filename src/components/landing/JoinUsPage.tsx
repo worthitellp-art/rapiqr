@@ -79,8 +79,8 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
   };
 
   return (
-    <main className="min-h-screen bg-[#F4F1EC] text-[#0B0B0C]">
-      <header className="border-b border-black/10 bg-[#F4F1EC]/90 backdrop-blur-md">
+    <main className="min-h-screen bg-[#FAFAFA] text-[#0B0B0C]">
+      <header className="border-b border-black/10 bg-[#FAFAFA]/90 backdrop-blur-md">
         <div className="mx-auto flex h-20 max-w-[1200px] items-center justify-between px-6 sm:px-10">
           <button onClick={onBack} className="flex cursor-pointer items-center gap-2 text-[13px] font-medium text-black/55 transition-colors hover:text-black">
             <ArrowLeft size={16} /> Back to home
@@ -120,7 +120,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                 Thanks, {label}. We will review your {service.label.toLowerCase()} listing for {city} and contact you on {phone}.
               </p>
               <button onClick={onBack} className="mt-8 flex cursor-pointer items-center gap-2 rounded-md bg-[#0B0B0C] px-6 py-3.5 text-[13px] font-semibold text-white">
-                Return to home <ArrowRight size={15} className="text-[#F6C000]" />
+                Return to home <ArrowRight size={15} className="text-[#111111]" />
               </button>
             </div>
           ) : (
@@ -210,7 +210,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
 
               {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-[13px] text-red-700">{error}</p>}
               <button type="submit" disabled={!valid || submitting} className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-[#0B0B0C] py-4 text-[14px] font-semibold text-white transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-35">
-                {submitting ? <><Loader2 size={16} className="animate-spin" /> Sending application</> : <>Submit application <ArrowRight size={16} className="text-[#F6C000]" /></>}
+                {submitting ? <><Loader2 size={16} className="animate-spin" /> Sending application</> : <>Submit application <ArrowRight size={16} className="text-[#111111]" /></>}
               </button>
               <p className="text-center text-[11px] text-black/60">We verify every provider before listing. There is no fee to apply.</p>
             </form>

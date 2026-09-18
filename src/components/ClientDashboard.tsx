@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
+import { dashboardTranslations } from '../i18n/dashboardTranslations';
+import LanguageSwitcher from './common/LanguageSwitcher';
 import { getCategoryIcon, getCategoryLabel } from '../stickerModules';
 import {
   Bell,
@@ -143,16 +146,23 @@ type TabId = 'setup' | 'overview' | 'products' | 'chat' | 'contacts' | 'history'
 // `section` groups the flat list in the sidebar (a small uppercase label
 // renders above each run of items sharing a section); items with no
 // `section` render ungrouped at the top, above every labeled group.
-const NAV_ITEMS: { id: TabId; label: string; icon: React.ComponentType<{ size?: number }>; section?: string }[] = [
-  { id: 'overview', label: 'Home Overview', icon: Grid },
-  { id: 'setup', label: 'Setup Guide', icon: Sparkles, section: 'My Tag' },
-  { id: 'products', label: 'Products', icon: ShoppingBag, section: 'My Tag' },
-  { id: 'chat', label: 'Live Visitor Chat', icon: MessageSquare, section: 'Communication' },
-  { id: 'contacts', label: 'Emergency Contacts', icon: Users, section: 'Communication' },
-  { id: 'history', label: 'Alert History', icon: History, section: 'Communication' },
-  { id: 'settings', label: 'Account Settings', icon: Settings, section: 'Account' },
-  { id: 'support', label: 'Support & Help', icon: LifeBuoy, section: 'Account' },
-];
+function buildNavItems(t: typeof dashboardTranslations['en']['client']): {
+  id: TabId;
+  label: string;
+  icon: React.ComponentType<{ size?: number }>;
+  section?: string;
+}[] {
+  return [
+    { id: 'overview', label: t.nav.overview, icon: Grid },
+    { id: 'setup', label: t.nav.setup, icon: Sparkles, section: t.navSections.myTag },
+    { id: 'products', label: t.nav.products, icon: ShoppingBag, section: t.navSections.myTag },
+    { id: 'chat', label: t.nav.chat, icon: MessageSquare, section: t.navSections.communication },
+    { id: 'contacts', label: t.nav.contacts, icon: Users, section: t.navSections.communication },
+    { id: 'history', label: t.nav.history, icon: History, section: t.navSections.communication },
+    { id: 'settings', label: t.nav.settings, icon: Settings, section: t.navSections.account },
+    { id: 'support', label: t.nav.support, icon: LifeBuoy, section: t.navSections.account },
+  ];
+}
 
 /**
  * The customer-facing view of an order's four fulfillment states. `cancelled`
@@ -174,6 +184,9 @@ type ModalState =
 
 export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDashboardProps) {
   const { profile, signOut, sendPhoneOtp, verifyPhoneOtp } = useAuth();
+  const { language } = useLanguage();
+  const t = dashboardTranslations[language].client;
+  const NAV_ITEMS = buildNavItems(t);
   // The admin account never links stickers by phone — the fleet console already sees
   // every sticker. Prompting it to verify a number only put the admin in competition
   // with the real owner for the stickers registered under that number.
@@ -643,11 +656,37 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     rememberOwnerThread(session?.id ?? null);
   }, []);
 
-  // The remembered id can only be matched once the sessions themselves arrive,
-  // and only on the first load — after that, a closed drawer stays closed.
+  // A WhatsApp/push alert link carries `&session=<id>` so it opens straight
+  // into that visitor's thread instead of dumping the owner on the inbox list
+  // to search for it themselves.
+  const deepLinkedSessionIdRef = useRef<string | null>(null);
+  const getDeepLinkedSessionId = () => {
+    const raw = window.location.hash || window.location.search;
+    const match = raw.match(/[?&]session=([^&]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  };
+
+  // The remembered/deep-linked id can only be matched once the sessions
+  // themselves arrive. Runs again whenever the session list refreshes (e.g. a
+  // fresh alert link while the dashboard is already open on another thread),
+  // but only re-applies a given deep link once so it doesn't fight the owner
+  // manually switching threads afterwards.
   const restoredChatRef = useRef(false);
   useEffect(() => {
-    if (restoredChatRef.current || ownerSessions.length === 0) return;
+    if (ownerSessions.length === 0) return;
+
+    const deepLinked = getDeepLinkedSessionId();
+    if (deepLinked && deepLinked !== deepLinkedSessionIdRef.current) {
+      deepLinkedSessionIdRef.current = deepLinked;
+      const match = ownerSessions.find((s) => s.id === deepLinked);
+      if (match) {
+        openChatSession(match);
+        restoredChatRef.current = true;
+        return;
+      }
+    }
+
+    if (restoredChatRef.current) return;
     restoredChatRef.current = true;
     const remembered = recallOwnerThread();
     if (!remembered) return;
@@ -794,6 +833,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
             <AppLogo variant="light" className="h-8 w-auto object-contain" />
           </button>
           <div className="flex items-center gap-3">
+            <LanguageSwitcher />
             <span className="hidden text-xs font-medium text-[var(--fx-ink-2)] sm:inline">
               Logged in as{' '}
               <span className="font-semibold text-[var(--fx-ink)]">
@@ -1019,23 +1059,25 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search stickers, contacts..."
+                  placeholder={t.searchPlaceholder}
                   className="bg-transparent border-none outline-none w-full text-xs text-[var(--fx-ink)] placeholder-[var(--fx-ink-2)]"
                 />
               </div>
             </div>
 
             <div className="flex items-center gap-2.5 sm:gap-3 text-xs flex-shrink-0">
+              <LanguageSwitcher />
+
               <button
                 onClick={handlePurchaseStickerClick}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 active:scale-[0.99] text-slate-950 font-bold text-xs shadow-xs transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#111111] hover:bg-black active:scale-[0.99] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
               >
                 <ShoppingBag size={13} />
-                <span>Buy Sticker</span>
+                <span>{t.buySticker}</span>
               </button>
 
               <span className="font-semibold text-[var(--fx-accent-ink)] hidden sm:inline-flex items-center gap-1.5 bg-[var(--fx-accent-soft)] px-2.5 py-1 rounded-full text-xs">
-                ◆ Pro Protection
+                {t.proProtection}
               </span>
               <button
                 onClick={() => setActiveTab('chat')}
@@ -1049,7 +1091,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   </span>
                 )}
               </button>
-              <span className="bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] rounded-lg px-2 py-1 text-xs font-bold shadow-2xs">✦ Active</span>
+              <span className="bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] rounded-lg px-2 py-1 text-xs font-bold shadow-2xs">{t.active}</span>
             </div>
           </header>
 
@@ -1217,12 +1259,12 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
 
                 {/* ─── STICKER PURCHASE REQUIRED HERO CARD (When 0 stickers) ─── */}
                 {products.length === 0 && !productsLoading && (
-                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0F1015] via-[#161822] to-[#0A0B0E] text-white p-6 sm:p-7 border border-amber-500/30 shadow-xl">
-                    <div className="pointer-events-none absolute -top-16 -right-16 w-64 h-64 bg-amber-400/15 rounded-full blur-3xl" />
+                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0F1015] via-[#161822] to-[#0A0B0E] text-white p-6 sm:p-7 border border-white/15 shadow-xl">
+                    <div className="pointer-events-none absolute -top-16 -right-16 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
 
                     <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
                       <div className="max-w-xl space-y-2 text-left">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-400 text-[11px] font-bold tracking-wide uppercase">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white text-[11px] font-bold tracking-wide uppercase">
                           <Sparkles size={13} /> Sticker Purchase Required
                         </div>
                         <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white font-display">
@@ -1233,7 +1275,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                         </p>
                         <div className="flex flex-wrap items-center gap-4 pt-1 text-xs text-zinc-400">
                           <span className="flex items-center gap-1"><ShieldCheck size={14} className="text-emerald-400" /> 100% Number Masking</span>
-                          <span className="flex items-center gap-1"><Zap size={14} className="text-amber-400" /> 0.4s Instant Alerts</span>
+                          <span className="flex items-center gap-1"><Zap size={14} className="text-white" /> 0.4s Instant Alerts</span>
                           <span className="flex items-center gap-1"><CheckCircle2 size={14} className="text-emerald-400" /> Free Delivery</span>
                         </div>
                       </div>
@@ -1241,7 +1283,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                       <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 shrink-0">
                         <button
                           onClick={handlePurchaseStickerClick}
-                          className="h-11 px-6 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-[0.99] text-black font-extrabold text-sm shadow-lg shadow-amber-400/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                          className="h-11 px-6 rounded-xl bg-white hover:bg-neutral-100 active:scale-[0.99] text-black font-extrabold text-sm shadow-lg shadow-black/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
                         >
                           <ShoppingBag size={17} />
                           <span>Purchase Sticker (₹199) →</span>
@@ -1339,7 +1381,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                         <div className="py-12 text-center text-xs text-[var(--fx-ink-2)]">Loading stickers...</div>
                       ) : products.length === 0 ? (
                         <div className="py-8 text-center text-xs text-[var(--fx-ink-2)] space-y-3">
-                          <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-400/10 text-amber-500 flex items-center justify-center">
+                          <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center">
                             <ShoppingBag size={22} />
                           </div>
                           <div>

@@ -12,12 +12,12 @@ export default function ScanPaymentSummaryPanel({
   userPhone = '+91 95747 13004',
 }: ScanPaymentSummaryPanelProps) {
   return (
-    <div className="relative w-full lg:w-[35%] bg-[#FFC700] p-6 sm:p-7 flex flex-col justify-between overflow-hidden select-none min-h-[520px]">
+    <div className="relative w-full lg:w-[35%] bg-gray-100 p-6 sm:p-7 flex flex-col justify-between overflow-hidden select-none min-h-[520px]">
       {/* Top Details Section */}
       <div className="space-y-5 relative z-10">
         {/* Brand Header: Square R Tile + RapiQR Safety Protection */}
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-amber-400/50 border border-amber-500/40 flex items-center justify-center font-extrabold text-xl text-slate-950 shadow-xs">
+          <div className="w-11 h-11 rounded-xl bg-[#111111] border border-black/20 flex items-center justify-center font-extrabold text-xl text-white shadow-xs">
             R
           </div>
           <span className="text-base sm:text-lg font-bold tracking-tight text-slate-950 font-display">
@@ -26,7 +26,7 @@ export default function ScanPaymentSummaryPanel({
         </div>
 
         {/* Price Summary Card */}
-        <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-xs border border-amber-200/50 text-left">
+        <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-xs border border-gray-200 text-left">
           <p className="text-xs sm:text-sm font-semibold text-slate-500">Price Summary</p>
           <p className="text-2xl sm:text-3xl font-black text-slate-950 mt-1 font-display tracking-tight">
             {price}
@@ -34,9 +34,9 @@ export default function ScanPaymentSummaryPanel({
         </div>
 
         {/* User Identity Pill Card */}
-        <div className="rounded-xl bg-white p-3.5 shadow-xs border border-amber-200/50 flex items-center justify-between text-xs sm:text-sm font-medium text-slate-800">
+        <div className="rounded-xl bg-white p-3.5 shadow-xs border border-gray-200 flex items-center justify-between text-xs sm:text-sm font-medium text-slate-800">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center text-amber-900 flex-shrink-0">
+            <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[#111111] flex-shrink-0">
               <User size={13} />
             </div>
             <span className="truncate font-semibold text-slate-800">Using as {userPhone}</span>

@@ -54,7 +54,7 @@ export default function AutocompleteField({
         onChange={(e) => { onChange(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         autoComplete="off"
-        className={inputClassName || 'w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/15 text-sm font-medium text-gray-900 outline-hidden transition-all'}
+        className={inputClassName || 'w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-white focus:border-[#111111] focus:ring-2 focus:ring-black/10 text-sm font-medium text-gray-900 outline-hidden transition-all'}
       />
       {open && matches.length > 0 && (
         <div className="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
@@ -63,7 +63,7 @@ export default function AutocompleteField({
               key={s}
               type="button"
               onClick={() => { onChange(s); onSelect?.(s); setOpen(false); }}
-              className="block w-full px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-amber-50 hover:text-gray-950 cursor-pointer"
+              className="block w-full px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-950 cursor-pointer"
             >
               {s}
             </button>

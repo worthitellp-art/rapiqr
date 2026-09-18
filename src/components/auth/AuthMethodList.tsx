@@ -38,7 +38,7 @@ export default function AuthMethodList({
       {/* Log In / Create Account Switcher */}
       <div className="relative flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200/60">
         <div
-          className="absolute top-1.5 bottom-1.5 left-1.5 w-[calc(50%-0.375rem)] rounded-xl bg-[#F6C000] shadow-sm transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          className="absolute top-1.5 bottom-1.5 left-1.5 w-[calc(50%-0.375rem)] rounded-xl bg-[#111111] shadow-sm transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
           style={{ transform: currentMode === 'signup' ? 'translateX(100%)' : 'translateX(0)' }}
           aria-hidden="true"
         />
@@ -46,7 +46,7 @@ export default function AuthMethodList({
           type="button"
           onClick={handleLoginTabClick}
           className={`relative flex-1 py-2.5 px-4 text-xs font-bold rounded-xl transition-colors duration-200 cursor-pointer ${
-            currentMode === 'login' ? 'text-[#4A3900]' : 'text-slate-600 hover:text-slate-900'
+            currentMode === 'login' ? 'text-[#FFFFFF]' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           Log In
@@ -55,7 +55,7 @@ export default function AuthMethodList({
           type="button"
           onClick={handleSignupTabClick}
           className={`relative flex-1 py-2.5 px-4 text-xs font-bold rounded-xl transition-colors duration-200 cursor-pointer ${
-            currentMode === 'signup' ? 'text-[#4A3900]' : 'text-slate-600 hover:text-slate-900'
+            currentMode === 'signup' ? 'text-[#FFFFFF]' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           Create Account
@@ -68,31 +68,31 @@ export default function AuthMethodList({
         <button
           type="button"
           onClick={handleSelectEmailStep}
-          className="w-full p-4 rounded-2xl border border-slate-200/90 bg-white hover:bg-[#FFFBF0] hover:border-[#F6C000] transition-all duration-200 flex items-center gap-3.5 group cursor-pointer active:scale-[0.99]"
+          className="w-full p-4 rounded-2xl border border-slate-200/90 bg-white hover:bg-[#F5F5F5] hover:border-[#111111] transition-all duration-200 flex items-center gap-3.5 group cursor-pointer active:scale-[0.99]"
         >
-          <div className="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center group-hover:bg-[#F6C000] group-hover:text-[#4A3900] transition-colors shrink-0">
+          <div className="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center group-hover:bg-[#111111] group-hover:text-[#FFFFFF] transition-colors shrink-0">
             <Mail size={20} />
           </div>
           <div className="text-sm font-bold text-slate-900 text-left flex-1">
             Continue with Email
           </div>
-          <ChevronRight size={18} className="text-slate-400 group-hover:text-[#A16207] transition-colors" />
+          <ChevronRight size={18} className="text-slate-400 group-hover:text-[#111111] transition-colors" />
         </button>
 
         {/* Passwordless Email OTP Option */}
         <button
           type="button"
           onClick={handleSelectOtpStep}
-          className="w-full p-4 rounded-2xl border border-slate-200/90 bg-white hover:bg-[#FFFBF0] hover:border-[#F6C000] transition-all duration-200 flex items-center gap-3.5 group cursor-pointer active:scale-[0.99]"
+          className="w-full p-4 rounded-2xl border border-slate-200/90 bg-white hover:bg-[#F5F5F5] hover:border-[#111111] transition-all duration-200 flex items-center gap-3.5 group cursor-pointer active:scale-[0.99]"
         >
-          <div className="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center group-hover:bg-[#F6C000] group-hover:text-[#4A3900] transition-colors shrink-0">
+          <div className="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center group-hover:bg-[#111111] group-hover:text-[#FFFFFF] transition-colors shrink-0">
             <KeyRound size={20} />
           </div>
           <div className="text-sm font-bold text-slate-900 text-left flex-1">
             Sign In with a Code
-            <span className="block text-[11px] font-medium text-slate-400 group-hover:text-[#A16207]">No password needed</span>
+            <span className="block text-[11px] font-medium text-slate-400 group-hover:text-[#111111]">No password needed</span>
           </div>
-          <ChevronRight size={18} className="text-slate-400 group-hover:text-[#A16207] transition-colors" />
+          <ChevronRight size={18} className="text-slate-400 group-hover:text-[#111111] transition-colors" />
         </button>
 
         {/* Google Sign-In Option */}
@@ -100,7 +100,7 @@ export default function AuthMethodList({
           type="button"
           disabled={isSubmitting}
           onClick={onGoogleSignIn}
-          className="w-full p-4 rounded-2xl border border-slate-200/90 bg-white hover:bg-[#FFFBF0] hover:border-[#F6C000] transition-all duration-200 flex items-center gap-3.5 group cursor-pointer active:scale-[0.99] disabled:opacity-60"
+          className="w-full p-4 rounded-2xl border border-slate-200/90 bg-white hover:bg-[#F5F5F5] hover:border-[#111111] transition-all duration-200 flex items-center gap-3.5 group cursor-pointer active:scale-[0.99] disabled:opacity-60"
         >
           <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center group-hover:bg-white transition-colors shrink-0">
             <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -125,7 +125,7 @@ export default function AuthMethodList({
           <div className="text-sm font-bold text-slate-900 text-left flex-1">
             Continue with Google
           </div>
-          <ChevronRight size={18} className="text-slate-400 group-hover:text-[#A16207] transition-colors" />
+          <ChevronRight size={18} className="text-slate-400 group-hover:text-[#111111] transition-colors" />
         </button>
       </div>
     </div>

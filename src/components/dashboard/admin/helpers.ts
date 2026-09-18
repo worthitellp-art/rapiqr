@@ -122,7 +122,7 @@ export async function compositeQrOnSticker(qrDataUrl: string, pos: StickerPos): 
  */
 export async function generateStickerBlob(rec: QrRecord, pos: StickerPos): Promise<Blob | null> {
   try {
-    const qrDataUrl = await generateQrDataUrl(qrFullUrl(rec.id), rec.fg || "EAB308", rec.bg || "FFFFFF", 512);
+    const qrDataUrl = await generateQrDataUrl(qrFullUrl(rec.id), rec.fg || "000000", rec.bg || "FFFFFF", 512);
     return await compositeQrOnSticker(qrDataUrl, pos);
   } catch (err) {
     console.warn("Failed to generate sticker image:", err);

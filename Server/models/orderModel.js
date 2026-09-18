@@ -1,4 +1,5 @@
 const Order = require('./schemas/Order');
+const { logger } = require('../middleware/loggerMiddleware');
 
 function toApi(doc) {
   if (!doc) return null;
@@ -18,6 +19,7 @@ function toApi(doc) {
     shippingAddress: doc.shipping_address,
     shiprocket: doc.shiprocket || null,
     payment: doc.payment || null,
+    stickers: doc.stickers || [],
     createdAt: doc.created_at,
   };
 }
@@ -75,6 +77,68 @@ class OrderModel {
     if (paymentData?.razorpayOrderId) update.razorpayOrderId = paymentData.razorpayOrderId;
     const doc = await Order.findByIdAndUpdate(String(id), { $set: update }, { new: true }).lean();
     return toApi(doc);
+  }
+
+  /**
+   * Mints one QR tag per unit purchased, once an order is paid — so an admin
+   * never has to open "Generate tag" by hand for a checkout sale (see
+   * paymentController verify()/webhook(), the only two callers). Idempotent:
+   * both of those can observe the same 'paid' transition (a browser /verify
+   * racing the Razorpay webhook), and re-running this must never mint a
+   * second batch of physical stickers for one order.
+   *
+   * Deliberately does NOT pre-fill the buyer's phone onto the new stickers —
+   * Sticker enforces one (category, phone) pair among live rows, so an order
+   * for two tags in the same category (two cars, two bags, ...) would collide
+   * on the second one. Ownership is set the normal way instead: the customer
+   * scans and registers each physical sticker themselves (ScanPage), or
+   * claims it later from the dashboard by verified phone (autoClaimByPhone).
+   */
+  static async generateStickersForOrder(id) {
+    if (typeof id !== 'string' && typeof id !== 'number') return [];
+
+    // Atomically claim the right to generate — whichever of verify()/webhook()
+    // gets here first flips the flag and proceeds; the other sees it already
+    // true and backs off instead of minting a duplicate batch.
+    const claimed = await Order.findOneAndUpdate(
+      { _id: String(id), stickers_generation_started: { $ne: true } },
+      { $set: { stickers_generation_started: true } },
+      { new: false }
+    ).select('items stickers').lean();
+    if (!claimed) {
+      const current = await Order.findById(String(id)).select('stickers').lean();
+      return current?.stickers || [];
+    }
+
+    const QrModel = require('./qrModel');
+    const { mapItemToStickerCategory } = require('../services/productCategoryMap');
+
+    const minted = [];
+    for (const item of claimed.items || []) {
+      const category = mapItemToStickerCategory(item);
+      const qty = Math.max(1, Math.min(100, Math.trunc(Number(item.qty) || 1)));
+      for (let i = 0; i < qty; i++) {
+        try {
+          const created = await QrModel.saveV2({ category });
+          if (created) {
+            minted.push({
+              id: created.id,
+              category: created.category,
+              qrUrl: created.qrPayload,
+              recoveryCode: created.recoveryCode,
+              itemName: item.name || null,
+            });
+          }
+        } catch (err) {
+          logger.error('ORDER_STICKER_AUTOGEN', `Failed to mint a sticker for order ${id} (item ${item.name || item.id || '?'})`, err);
+        }
+      }
+    }
+
+    if (minted.length === 0) return [];
+    const doc = await Order.findByIdAndUpdate(String(id), { $set: { stickers: minted } }, { new: true }).lean();
+    logger.event('ORDER', '🏷️', `Auto-minted ${minted.length} sticker(s) for paid order ${id}`);
+    return doc?.stickers || minted;
   }
 
   /** Reverse lookup for the Razorpay webhook, which only knows Razorpay's own ids. */

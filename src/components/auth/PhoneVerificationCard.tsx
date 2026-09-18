@@ -54,8 +54,8 @@ export default function PhoneVerificationCard({
       <div className="w-full max-w-[420px] bg-white rounded-3xl border border-slate-200/70 shadow-xl p-7 sm:p-8 space-y-6 animate-fade-in text-center z-10">
         
         {/* ── Top Minimal Icon Badge ── */}
-        <div className="mx-auto w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-600 shadow-2xs">
-          <Smartphone size={26} className="text-amber-600" />
+        <div className="mx-auto w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-[#111111] shadow-2xs">
+          <Smartphone size={26} className="text-[#111111]" />
         </div>
 
         {/* ── Header Title ── */}
@@ -129,7 +129,7 @@ export default function PhoneVerificationCard({
                 <button
                   type="button"
                   onClick={handleReturnToPhoneStep}
-                  className="text-xs text-amber-600 font-bold hover:underline cursor-pointer transition-colors"
+                  className="text-xs text-[#111111] font-bold hover:underline cursor-pointer transition-colors"
                 >
                   Change Phone
                 </button>
@@ -141,7 +141,7 @@ export default function PhoneVerificationCard({
                 value={otpCode}
                 onChange={handleOtpInputChange}
                 placeholder="0 0 0 0 0 0"
-                className="w-full h-14 text-center text-2xl tracking-[10px] font-mono font-semibold bg-slate-50 border-2 border-amber-500 focus:border-amber-600 focus:ring-4 focus:ring-amber-500/15 rounded-xl outline-none text-slate-900 shadow-2xs transition-all placeholder:text-slate-300"
+                className="w-full h-14 text-center text-2xl tracking-[10px] font-mono font-semibold bg-slate-50 border-2 border-[#111111] focus:border-black focus:ring-4 focus:ring-black/10 rounded-xl outline-none text-slate-900 shadow-2xs transition-all placeholder:text-slate-300"
               />
             </div>
 

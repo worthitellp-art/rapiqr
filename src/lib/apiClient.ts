@@ -684,7 +684,7 @@ export const apiClient = {
   orders: {
     async create(order: {
       name: string; email: string; phone: string;
-      items: { name: string; qty: number; price: number }[];
+      items: { id?: string; name: string; qty: number; price: number; category?: string }[];
       subtotal: number; deliveryFee: number; total: number;
       paymentMethod: string; deliveryMethod: string;
       shippingAddress?: Record<string, string>;

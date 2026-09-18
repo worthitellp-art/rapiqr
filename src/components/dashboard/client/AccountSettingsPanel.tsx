@@ -4,6 +4,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { apiClient, isApiBackendConfigured } from '../../../lib/apiClient';
 import { isPushSupported, getExistingSubscription, subscribeToPush, unsubscribeFromPush } from '../../../lib/push';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
+import { sendMsg91Otp, verifyMsg91Otp, toMsg91Identifier } from '../../../lib/msg91Widget';
 
 const inputCls = 'w-full px-3.5 py-2.5 text-sm bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-xl outline-none focus:border-[var(--fx-ink)]';
 const labelCls = 'block text-xs font-bold text-[var(--fx-ink-2)] mb-1';
@@ -156,17 +157,22 @@ function ProfileForm({ profile, refreshProfile, showToast, onProductsLinked }: a
     setPhoneBusy(true);
     setPhoneMsg(null);
     const res = await sendPhoneOtp(phoneDraft.trim());
-    setPhoneBusy(false);
     if (!res.success) {
+      setPhoneBusy(false);
       setPhoneMsg({ tone: 'error', text: res.error || 'Failed to send code.' });
       return;
     }
-    setOtpCode('');
-    setOtpStep(true);
-    setPhoneMsg({
-      tone: 'success',
-      text: "Code sent! Enter verification code or use master bypass code 000000 to verify instantly.",
-    });
+    try {
+      // Pre-check passed — the MSG91 widget actually sends the OTP.
+      await sendMsg91Otp(toMsg91Identifier(phoneDraft));
+      setOtpCode('');
+      setOtpStep(true);
+      setPhoneMsg({ tone: 'success', text: 'Code sent! Enter the verification code below.' });
+    } catch (err: any) {
+      setPhoneMsg({ tone: 'error', text: err?.message || 'Failed to send the verification code.' });
+    } finally {
+      setPhoneBusy(false);
+    }
   };
 
   const handleVerifyOtp = async () => {
@@ -176,7 +182,15 @@ function ProfileForm({ profile, refreshProfile, showToast, onProductsLinked }: a
     }
     setPhoneBusy(true);
     setPhoneMsg(null);
-    const res = await verifyPhoneOtp(otpCode.trim());
+    let res;
+    try {
+      const accessToken = await verifyMsg91Otp(otpCode.trim());
+      res = await verifyPhoneOtp(accessToken);
+    } catch (err: any) {
+      setPhoneBusy(false);
+      setPhoneMsg({ tone: 'error', text: err?.message || 'Incorrect code — please try again.' });
+      return;
+    }
     setPhoneBusy(false);
     if (!res.success) {
       setPhoneMsg({ tone: 'error', text: res.error || 'Verification failed.' });

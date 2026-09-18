@@ -95,7 +95,7 @@ export default function AuthModal({
         <div className="text-center pt-2 relative">
           {/* Soft brand glow behind the logo — pure CSS, no extra asset */}
           <div
-            className="pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full bg-[#F6C000]/20 blur-3xl"
+            className="pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full bg-[#111111]/20 blur-3xl"
             aria-hidden="true"
           />
           <AppLogo variant="light" className="relative h-9 w-auto mx-auto object-contain mb-3" />

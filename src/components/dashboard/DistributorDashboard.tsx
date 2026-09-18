@@ -5,6 +5,9 @@ import {
   ExternalLink, Sparkles, Copy, Check
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { dashboardTranslations } from '../../i18n/dashboardTranslations';
+import LanguageSwitcher from '../common/LanguageSwitcher';
 import AppLogo from '../common/AppLogo';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
 
@@ -19,6 +22,8 @@ interface CustomerTag {
 
 export default function DistributorDashboard({ onBack }: { onBack: () => void }) {
   const { profile, signOut } = useAuth();
+  const { language } = useLanguage();
+  const t = dashboardTranslations[language].distributor;
   const [activeTab, setActiveTab] = useState<'overview' | 'activate' | 'pos'>(() => {
     try {
       const saved = localStorage.getItem('repiqr-distributor-active-tab') || localStorage.getItem('namoqr-distributor-active-tab');
@@ -94,27 +99,29 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
             <button onClick={onBack} className="flex items-center gap-2.5 cursor-pointer">
               <AppLogo variant="light" className="h-7.5 w-auto object-contain" />
               <div>
-                <span className="font-black text-xs text-amber-600 uppercase tracking-wider block">Partner Desk</span>
+                <span className="font-black text-xs text-[#111111] uppercase tracking-wider block">{t.partnerDesk}</span>
               </div>
             </button>
           </div>
 
           <div className="flex items-center gap-3">
+            <LanguageSwitcher />
+
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
               <ShieldCheck size={14} className="text-emerald-600" />
-              <span>Verified Partner: {profile?.fullName || 'City Franchise'}</span>
+              <span>{t.verifiedPartner}: {profile?.fullName || 'City Franchise'}</span>
             </div>
 
             <button
               onClick={onBack}
               className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              Exit to Home
+              {t.exitToHome}
             </button>
             <button
               onClick={async () => { await signOut(); onBack(); }}
               className="p-2 rounded-xl text-red-600 hover:bg-red-50 transition-colors"
-              title="Log Out"
+              title={t.logOut}
             >
               <LogOut size={16} />
             </button>
@@ -126,12 +133,12 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
         
         {/* Welcome Banner */}
-        <div className="bg-gradient-to-r from-gray-950 via-gray-900 to-amber-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
-          <div className="absolute right-0 top-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="bg-gradient-to-r from-gray-950 via-gray-900 to-black text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+          <div className="absolute right-0 top-0 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
           
           <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
             <div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-500 text-gray-950 uppercase tracking-wider mb-3">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-white text-gray-950 uppercase tracking-wider mb-3">
                 <Sparkles size={13} /> Verified Master Distributor
               </span>
               <h1 className="text-2xl sm:text-3xl font-black">
@@ -145,7 +152,7 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => setActiveTab('activate')}
-                className="px-5 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-gray-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
+                className="px-5 py-3 rounded-2xl bg-white hover:bg-neutral-100 text-gray-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
               >
                 <Plus size={16} /> Activate Customer Tag
               </button>
@@ -191,7 +198,7 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
           <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-gray-500">Exclusive Territory</span>
-              <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+              <div className="w-8 h-8 rounded-xl bg-gray-100 text-[#111111] flex items-center justify-center font-bold">
                 <MapPin size={16} />
               </div>
             </div>
@@ -203,9 +210,9 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
         {/* Tabs Bar */}
         <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
           {[
-            { id: 'overview', label: 'Assigned Customer Tags', icon: QrCode },
-            { id: 'activate', label: 'Assign New Tag', icon: Plus },
-            { id: 'pos', label: 'POS Marketing Kits & Collateral', icon: Download },
+            { id: 'overview', label: t.tabs.overview, icon: QrCode },
+            { id: 'activate', label: t.tabs.activate, icon: Plus },
+            { id: 'pos', label: t.tabs.pos, icon: Download },
           ].map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -215,7 +222,7 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                   isActive
-                    ? 'bg-amber-500 text-gray-950 shadow-sm'
+                    ? 'bg-[#111111] text-white shadow-sm'
                     : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
                 }`}
               >
@@ -266,7 +273,7 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
                       <tr key={tag.id} className="hover:bg-gray-50/50">
                         <td className="py-3 font-bold text-gray-900">{tag.customerName}</td>
                         <td className="py-3 font-mono">{tag.phone}</td>
-                        <td className="py-3 font-mono font-bold text-amber-600">{tag.tagCode}</td>
+                        <td className="py-3 font-mono font-bold text-[#111111]">{tag.tagCode}</td>
                         <td className="py-3">
                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-700">
                             {tag.type}
@@ -309,7 +316,7 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
                   placeholder="e.g. Anish Kapoor"
                   value={newCustomer.name}
                   onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-amber-500"
+                  className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-[#111111]"
                 />
               </div>
 
@@ -331,7 +338,7 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
                     placeholder="e.g. CL-DIST-05"
                     value={newCustomer.tagCode}
                     onChange={e => setNewCustomer({ ...newCustomer, tagCode: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-amber-500 font-mono"
+                    className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-[#111111] font-mono"
                   />
                 </div>
               </div>
@@ -341,7 +348,7 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
                 <select
                   value={newCustomer.type}
                   onChange={e => setNewCustomer({ ...newCustomer, type: e.target.value as any })}
-                  className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-amber-500"
+                  className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-[#111111]"
                 >
                   <option value="Vehicle">Automobile / Two-Wheeler Safety Tag</option>
                   <option value="Home Gate">Home Gate / Apartment Security Tag</option>
@@ -351,7 +358,7 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
 
               <button
                 type="submit"
-                className="w-full py-3.5 rounded-xl font-bold bg-amber-500 text-gray-950 text-xs flex items-center justify-center gap-2 hover:bg-amber-400 transition-all shadow-md mt-4 cursor-pointer"
+                className="w-full py-3.5 rounded-xl font-bold bg-[#111111] text-white text-xs flex items-center justify-center gap-2 hover:bg-black transition-all shadow-md mt-4 cursor-pointer"
               >
                 <CheckCircle2 size={16} /> Link &amp; Activate Customer Sticker
               </button>
@@ -364,7 +371,7 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between">
               <div>
-                <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-gray-100 text-[#111111] flex items-center justify-center font-bold mb-4">
                   <Download size={22} />
                 </div>
                 <h4 className="font-extrabold text-sm text-gray-900 mb-1">Acrylic Counter Display Art</h4>

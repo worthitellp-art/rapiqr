@@ -8,7 +8,6 @@ import {
   useInView,
   useMotionValueEvent,
   useReducedMotion,
-  type MotionValue,
 } from 'framer-motion';
 import {
   ArrowRight,
@@ -42,6 +41,9 @@ import {
   LayoutDashboard,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { landingTranslations } from '../../i18n/landingTranslations';
+import LanguageSwitcher from '../common/LanguageSwitcher';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
 import {
   saveDistributorApplication,
@@ -61,6 +63,7 @@ import stepImg3 from '../../../assets/landing-step-3.webp';
 import stepImg4 from '../../../assets/landing-step-4.webp';
 import stepImg5 from '../../../assets/landing-step-5.webp';
 import darkBgLogo from '../../../assets/darkbglogo.png';
+import lightBgLogo from '../../../assets/logo for wh bg.png';
 /* JPEG, not the source PNGs. These are photographs — PNG stored them losslessly
    at 1.24 MB and 1.29 MB, and this is the hero's largest-contentful-paint, so
    that was 2.5 MB standing between a visitor and their first view of the page.
@@ -68,11 +71,13 @@ import darkBgLogo from '../../../assets/darkbglogo.png';
 
 /* ──────────────────────────────────────────────────────────────────────────
    PALETTE
-   Near-black and warm paper carry the whole page; amber is a signature, not a
-   theme — it appears only on arrow glyphs, the active progress line and a
-   handful of small dots. Every panel that used to be a yellow wash is paper.
+   Warm white paper (#FEFDF9) and near-black ink (#14120C) carry the whole
+   page; amber gold (#C9A227) is the signature action color — it appears only
+   on the handful of true conversion buttons (checkout, submit, primary CTA),
+   never as a section wash. Pure white (#FFFFFF) is the light accent on dark
+   surfaces.
    ────────────────────────────────────────────────────────────────────────── */
-const INK = '#0B0B0C';
+const INK = '#14120C';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -531,148 +536,33 @@ function useBodyScrollLock(locked: boolean) {
 }
 
 /**
- * The hero backdrop: no photography. A fine engineering-grid texture — the
- * same device Linear, Vercel and Stripe hero sections use — vignette-masked
- * so it reads as a spotlit field behind the headline rather than a flat tiled
- * wallpaper cut off hard at the viewport edge.
- *
- * This is now the page's largest-contentful-paint element and it is text +
- * one CSS layer: nothing to fetch, nothing to decode, nothing that can ever
- * be the slow part of loading this page. It carries the scroll parallax the
- * photo used to.
- */
-function HeroBackdrop({
-  reduced,
-  parallaxY,
-  parallaxScale,
-}: {
-  reduced: boolean | null;
-  parallaxY: MotionValue<string> | MotionValue<number>;
-  parallaxScale: MotionValue<number>;
-}) {
-  const parallax = reduced ? undefined : { y: parallaxY, scale: parallaxScale };
-  const vignette = 'radial-gradient(ellipse 70% 65% at 50% 42%, black 45%, transparent 100%)';
-
-  return (
-    <div className="absolute inset-0 overflow-hidden">
-      {/* Warm wash — always present, even before JS paints AuroraGlow's
-          animation or under prefers-reduced-motion, so the hero never has a
-          split-second (or permanent, for reduced-motion visitors) flat-black
-          frame. */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(ellipse 90% 70% at 50% 18%, rgba(246,192,0,0.16) 0%, rgba(11,11,12,0) 60%),' +
-            'radial-gradient(ellipse 70% 60% at 85% 85%, rgba(246,192,0,0.08) 0%, rgba(11,11,12,0) 65%)',
-        }}
-        aria-hidden="true"
-      />
-      <motion.div
-        style={parallax}
-        className="absolute inset-0 opacity-[0.16]"
-        aria-hidden="true"
-      >
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: 'radial-gradient(rgba(255,255,255,0.95) 1.2px, transparent 1.2px)',
-            backgroundSize: '30px 30px',
-            WebkitMaskImage: vignette,
-            maskImage: vignette,
-          }}
-        />
-      </motion.div>
-    </div>
-  );
-}
-
-/**
- * Soft, slowly drifting light — the "aurora" glow behind the fold on modern
- * AI-product hero sections (Google's Gemini/Antigravity pages, Meta AI,
- * Apple's Intelligence marketing). Replaces the old video loop: same sense of
- * living motion, but it's three blurred CSS gradients, not a 2 MB decode —
- * nothing to fetch, nothing that can stall or show a frozen frame on a slow
- * connection, and it degrades to a static glow under `prefers-reduced-motion`
- * for free instead of needing its own capability-detection dance.
- *
- * Amber only appears here at low opacity, screen-blended over the dark
- * scrim — it reads as ambient light, not the flat "yellow wash" panel the
- * palette comment above rules out.
- */
-function AuroraGlow({ reduced }: { reduced: boolean | null }) {
-  const blobs = [
-    { color: '#F6C000', size: 760, top: '0%', left: '4%', duration: 24, opacity: 0.45 },
-    { color: '#F4F1EC', size: 620, top: '48%', left: '74%', duration: 30, opacity: 0.24 },
-    { color: '#F6C000', size: 560, top: '60%', left: '14%', duration: 27, opacity: 0.32 },
-    { color: '#F6C000', size: 420, top: '8%', left: '68%', duration: 21, opacity: 0.22 },
-  ];
-
-  return (
-    <div
-      className="pointer-events-none absolute inset-0 overflow-hidden"
-      style={{ mixBlendMode: 'screen' }}
-      aria-hidden="true"
-    >
-      {blobs.map((b, i) => (
-        <motion.div
-          key={i}
-          className="absolute rounded-full"
-          style={{
-            width: b.size,
-            height: b.size,
-            top: b.top,
-            left: b.left,
-            background: `radial-gradient(circle, ${b.color} 0%, transparent 72%)`,
-            opacity: b.opacity,
-            filter: 'blur(90px)',
-          }}
-          animate={
-            reduced
-              ? undefined
-              : { x: [0, 36, -28, 0], y: [0, -26, 18, 0], scale: [1, 1.08, 0.95, 1] }
-          }
-          transition={{ duration: b.duration, repeat: Infinity, ease: 'easeInOut' }}
-        />
-      ))}
-    </div>
-  );
-}
-
-/**
- * The hero's one concrete visual: a floating card styled like the physical
- * sticker itself — ring-bordered surface, a real-proportioned QR mark inside,
- * amber glow behind it. Desktop only (`hidden lg:block`): at hero-text width
- * on a phone there's no room for it beside the centred headline without
- * crowding it, so it stays a desktop-only accent rather than being shrunk to
- * illegibility.
+ * The hero's one concrete visual: a single, plainly aligned card holding the
+ * real sticker photo (cropped tight, since the source frame is a captioned
+ * tutorial slide). Desktop only (`hidden lg:block`): at hero-text width on a
+ * phone there's no room for it beside the centred headline without crowding
+ * it.
  */
 function HeroStickerCard({ reduced }: { reduced: boolean | null }) {
   return (
     <motion.div
-      className="pointer-events-none absolute right-[6%] top-[16%] hidden lg:block"
-      initial={{ opacity: 0, y: 24, rotate: -6 }}
-      animate={
-        reduced
-          ? { opacity: 1, y: 0, rotate: -4 }
-          : { opacity: 1, y: [0, -14, 0], rotate: [-4, -1, -4] }
-      }
-      transition={
-        reduced
-          ? { duration: 0.9, ease: EASE }
-          : { opacity: { duration: 0.9, ease: EASE }, y: { duration: 7, repeat: Infinity, ease: 'easeInOut' }, rotate: { duration: 7, repeat: Infinity, ease: 'easeInOut' } }
-      }
+      className="pointer-events-none relative mx-auto w-full max-w-[380px]"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.9, ease: EASE }}
       aria-hidden="true"
     >
-      {/* Glow, separate from the card so it can blur past the card's own edges. */}
-      <div
-        className="absolute inset-0 -z-10 rounded-[28px] blur-[46px]"
-        style={{ background: '#F6C000', opacity: 0.35 }}
-      />
-      <div className="w-[196px] rounded-[28px] border border-white/[0.145] bg-[#121212] p-5 shadow-[0_30px_60px_-24px_rgba(0,0,0,0.65)]">
-        <QrGlyph size="100%" color="#F8F6F3" className="block w-full" />
-        <div className="mt-4 flex items-center justify-center">
-          <span className="h-2 w-2 rounded-full bg-[#F6C000]" />
+      <div className="overflow-hidden rounded-[22px] border border-[#14120C]/10 bg-[#FFFFFF] shadow-[0_24px_50px_-24px_rgba(20,18,12,0.3)]">
+        <div className="relative aspect-[4/3] overflow-hidden">
+          <img
+            src={stepImg2}
+            alt="A RapiQR safety sticker applied to a car window"
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ objectPosition: '50% 38%', transform: 'scale(1.55)' }}
+          />
+        </div>
+        <div className="flex items-center justify-between border-t border-[#14120C]/8 px-4 py-3">
+          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#14120C]/45">RapiQR · Active</span>
+          <span className="h-2 w-2 rounded-full" style={{ background: '#C9A227' }} />
         </div>
       </div>
     </motion.div>
@@ -740,76 +630,6 @@ function ParticleRing() {
   );
 }
 
-/** Decorative QR mark. Deterministic, and not a scannable code. */
-function QrGlyph({
-  size = 96,
-  color = '#FFFFFF',
-  opacity = 1,
-  className = '',
-}: {
-  size?: number | string;
-  color?: string;
-  opacity?: number;
-  className?: string;
-}) {
-  const boxSize = typeof size === 'number' ? `${size}px` : size;
-  // 21×21 — the same module count as a real Version-1 QR code, with proper
-  // finder patterns (not just a solid square) at three corners. The 11×11
-  // version this replaced looked like scattered blocks at any size big
-  // enough to notice; this reads as an actual QR code at a glance.
-  const N = 21;
-  const FINDER = [
-    [1, 1, 1, 1, 1, 1, 1],
-    [1, 0, 0, 0, 0, 0, 1],
-    [1, 0, 1, 1, 1, 0, 1],
-    [1, 0, 1, 1, 1, 0, 1],
-    [1, 0, 1, 1, 1, 0, 1],
-    [1, 0, 0, 0, 0, 0, 1],
-    [1, 1, 1, 1, 1, 1, 1],
-  ];
-  const inFinderZone = (r: number, c: number) =>
-    (r < 8 && c < 8) || (r < 8 && c >= N - 8) || (r >= N - 8 && c < 8);
-
-  const cells = useMemo(() => {
-    const grid: boolean[][] = [];
-    let seed = 7;
-    const rand = () => {
-      seed = (seed * 1103515245 + 12345) % 2147483648;
-      return seed / 2147483648;
-    };
-    for (let r = 0; r < N; r += 1) {
-      grid.push(Array.from({ length: N }, (_, c) => (inFinderZone(r, c) ? false : rand() > 0.52)));
-    }
-    return grid;
-  }, []);
-
-  return (
-    <svg
-      viewBox={`0 0 ${N} ${N}`}
-      aria-hidden="true"
-      className={className}
-      style={{ width: boxSize, height: boxSize, opacity }}
-    >
-      {cells.map((row, r) =>
-        row.map((on, c) => (on ? <rect key={`${r}-${c}`} x={c} y={r} width={0.82} height={0.82} fill={color} /> : null))
-      )}
-      {[
-        [0, 0],
-        [0, N - 7],
-        [N - 7, 0],
-      ].map(([fr, fc]) => (
-        <g key={`${fr}-${fc}`}>
-          {FINDER.map((frow, rr) =>
-            frow.map((v, cc) =>
-              v ? <rect key={`${rr}-${cc}`} x={fc + cc} y={fr + rr} width={1} height={1} fill={color} /> : null
-            )
-          )}
-        </g>
-      ))}
-    </svg>
-  );
-}
-
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function LandingPageMaster({
@@ -824,6 +644,8 @@ export default function LandingPageMaster({
   isEmbeddedInDashboard = false,
 }: LandingPageMasterProps) {
   const { isLoggedIn, profile } = useAuth();
+  const { language } = useLanguage();
+  const t = landingTranslations[language];
   const reduced = useReducedMotion();
 
   // Navigation
@@ -946,16 +768,13 @@ export default function LandingPageMaster({
     return () => window.removeEventListener('keydown', onKey);
   }, [isMobileMenuOpen, isCartOpen, isPartnerModalOpen]);
 
-  // Hero: the backdrop drifts down and grows while the copy floats up and out.
+  // Hero: the copy floats up and out as the section scrolls past.
   const heroRef = useRef<HTMLElement>(null);
   const { scrollYProgress: heroProgress } = useScroll({
     target: heroRef,
     offset: ['start start', 'end start'],
   });
-  const heroImageY = useTransform(heroProgress, [0, 1], ['0%', '24%']);
-  const heroImageScale = useTransform(heroProgress, [0, 1], [1.06, 1.28]);
   const heroCopyY = useTransform(heroProgress, [0, 1], [0, 140]);
-  const heroScrimOpacity = useTransform(heroProgress, [0, 1], [0.26, 0.62]);
 
   // Closing call to action: the ring block eases in as it centres.
   const ctaRef = useRef<HTMLElement>(null);
@@ -1194,11 +1013,11 @@ export default function LandingPageMaster({
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
 
   const NAV_LINKS = [
-    { id: 'hiw-section', label: 'How it works' },
-    { id: 'trust-section', label: 'Why RepiQR' },
-    { id: 'products-section', label: 'Products' },
-    { id: 'distributor-section', label: 'Franchise' },
-    { id: 'faq-section', label: 'FAQ' },
+    { id: 'hiw-section', label: t.navLinks.hiw },
+    { id: 'trust-section', label: t.navLinks.trust },
+    { id: 'products-section', label: t.navLinks.products },
+    { id: 'distributor-section', label: t.navLinks.distributor },
+    { id: 'faq-section', label: t.navLinks.faq },
   ];
 
   return (
@@ -1207,19 +1026,19 @@ export default function LandingPageMaster({
        all extend past the viewport by design) without making this element a
        scroll container — which `hidden` would, and which silently breaks the
        `position: sticky` the pinned How-it-works panel depends on. */
-    <div className="min-h-screen overflow-x-clip bg-white font-sans text-[#0B0B0C] antialiased selection:bg-[#0B0B0C] selection:text-white">
+    <div className="min-h-screen overflow-x-clip bg-[#FEFDF9] font-sans text-[#14120C] antialiased selection:bg-[#14120C] selection:text-[#FFFFFF]">
 
       {/* ── Page scroll progress ──────────────────────────────────────── */}
       <motion.div
         style={{ scaleX: progressScale }}
-        className="fixed inset-x-0 top-0 z-[80] h-[2px] origin-left bg-[#F6C000]"
+        className="fixed inset-x-0 top-0 z-[80] h-[2px] origin-left bg-[#FFFFFF]"
         aria-hidden="true"
       />
 
-      {/* ── 1. NAVBAR — transparent over the hero, glass once you move ── */}
+      {/* ── 1. NAVBAR — paper on the white hero, a touch of blur once you move ── */}
       <header
         className={`fixed inset-x-0 top-0 z-[70] transition-all duration-500 ${
-          isScrolled ? 'bg-[#0B0B0C]/85 backdrop-blur-xl border-b border-white/10' : 'bg-transparent'
+          isScrolled ? 'bg-[#FEFDF9]/90 backdrop-blur-xl border-b border-[#14120C]/10' : 'bg-transparent'
         }`}
       >
         <div className="mx-auto flex max-w-[1400px] items-center justify-between px-5 py-4 sm:px-8 lg:px-12">
@@ -1228,15 +1047,15 @@ export default function LandingPageMaster({
             className="flex cursor-pointer items-center focus:outline-hidden"
             aria-label="RepiQR home"
           >
-            <img src={darkBgLogo} alt="RepiQR" className="h-7 w-auto object-contain sm:h-8" />
+            <img src={lightBgLogo} alt="RepiQR" className="h-7 w-auto object-contain sm:h-8" />
           </button>
 
-          <nav className="hidden items-center gap-8 text-[13px] font-medium text-white/70 lg:flex">
+          <nav className="hidden items-center gap-8 text-[13px] font-medium text-[#14120C]/70 lg:flex">
             {NAV_LINKS.map((link) => (
               <button
                 key={link.id}
                 onClick={() => handleSmoothScroll(link.id)}
-                className="cursor-pointer transition-colors hover:text-white"
+                className="cursor-pointer transition-colors hover:text-[#14120C]"
               >
                 {link.label}
               </button>
@@ -1253,9 +1072,9 @@ export default function LandingPageMaster({
                 onClick={() => setIsJoinMenuOpen((open) => !open)}
                 aria-haspopup="true"
                 aria-expanded={isJoinMenuOpen}
-                className="flex cursor-pointer items-center gap-1.5 transition-colors hover:text-white"
+                className="flex cursor-pointer items-center gap-1.5 transition-colors hover:text-[#14120C]"
               >
-                Join us
+                {t.joinUs}
                 <ChevronDown
                   size={13}
                   className={`transition-transform duration-300 ${isJoinMenuOpen ? 'rotate-180' : ''}`}
@@ -1271,16 +1090,16 @@ export default function LandingPageMaster({
                     transition={{ duration: 0.25, ease: EASE }}
                     className="absolute left-1/2 top-full z-50 w-56 -translate-x-1/2 pt-4"
                   >
-                    <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#171719] p-2 shadow-[0_20px_45px_-18px_rgba(0,0,0,0.8)]">
-                      <p className="px-3 pb-2 pt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-white/50">
-                        Choose your service
+                    <div className="overflow-hidden rounded-2xl border border-[#14120C]/10 bg-[#FFFFFF] p-2 shadow-[0_20px_45px_-18px_rgba(0,0,0,0.25)]">
+                      <p className="px-3 pb-2 pt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[#14120C]/50">
+                        {t.chooseYourService}
                       </p>
                       <div className="grid max-h-72 overflow-y-auto">
                         {SERVICE_TYPES.filter((type) => type.slug !== 'police').map((type) => (
                           <button
                             key={type.slug}
                             onClick={() => handleJoinSelect(type.slug)}
-                            className="cursor-pointer rounded-xl px-3 py-2.5 text-left text-[13px] font-light text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                            className="cursor-pointer rounded-xl px-3 py-2.5 text-left text-[13px] font-light text-[#14120C]/70 transition-colors hover:bg-[#14120C]/5 hover:text-[#14120C]"
                           >
                             {type.label}
                           </button>
@@ -1294,26 +1113,28 @@ export default function LandingPageMaster({
           </nav>
 
           <div className="hidden items-center gap-5 lg:flex">
+            <LanguageSwitcher />
+
             {onOpenTrackOrder && (
               <button
                 onClick={onOpenTrackOrder}
-                className="cursor-pointer text-[13px] font-medium text-white/70 transition-colors hover:text-white flex items-center gap-1.5"
+                className="cursor-pointer text-[13px] font-medium text-[#14120C]/70 transition-colors hover:text-[#14120C] flex items-center gap-1.5"
                 title="Track order delivery"
               >
-              
+
               </button>
             )}
 
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative cursor-pointer p-2 text-white/70 transition-colors hover:text-white"
+              className="relative cursor-pointer p-2 text-[#14120C]/70 transition-colors hover:text-[#14120C]"
               aria-label="Open cart"
             >
               <ShoppingBag size={18} />
               {cartCount > 0 && (
                 <span
-                  className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-[#0B0B0C]"
-                  style={{ background: '#F6C000' }}
+                  className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-[#FFFFFF]"
+                  style={{ background: '#14120C' }}
                 >
                   {cartCount}
                 </span>
@@ -1323,31 +1144,31 @@ export default function LandingPageMaster({
             {isLoggedIn ? (
               <button
                 onClick={onOpenDashboard || onLogin}
-                className="cursor-pointer flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-[13px] font-semibold text-[#0B0B0C] shadow-sm transition-transform hover:scale-[1.03] active:scale-95"
+                className="cursor-pointer flex items-center gap-2 rounded-full bg-[#14120C] px-5 py-2.5 text-[13px] font-semibold text-[#FFFFFF] shadow-sm transition-transform hover:scale-[1.03] active:scale-95"
               >
                 <LayoutDashboard size={15} />
-                <span>Dashboard</span>
+                <span>{t.dashboard}</span>
               </button>
             ) : isEmbeddedInDashboard ? (
               <button
                 onClick={onOpenCheckout}
-                className="cursor-pointer rounded-full bg-white px-6 py-2.5 text-[13px] font-semibold text-[#0B0B0C] transition-transform hover:scale-[1.03] active:scale-95"
+                className="cursor-pointer rounded-full bg-[#14120C] px-6 py-2.5 text-[13px] font-semibold text-[#FFFFFF] transition-transform hover:scale-[1.03] active:scale-95"
               >
-                Order new tags
+                {t.orderNewTags}
               </button>
             ) : (
               <>
                 <button
                   onClick={onLogin}
-                  className="cursor-pointer text-[13px] font-medium text-white/70 transition-colors hover:text-white"
+                  className="cursor-pointer text-[13px] font-medium text-[#14120C]/70 transition-colors hover:text-[#14120C]"
                 >
-                  Log in
+                  {t.logIn}
                 </button>
                 <button
                   onClick={() => handleSmoothScroll('products-section')}
-                  className="cursor-pointer rounded-full bg-white px-6 py-2.5 text-[13px] font-semibold text-[#0B0B0C] transition-transform hover:scale-[1.03] active:scale-95"
+                  className="cursor-pointer rounded-full bg-[#14120C] px-6 py-2.5 text-[13px] font-semibold text-[#FFFFFF] transition-transform hover:scale-[1.03] active:scale-95"
                 >
-                  Choose tag
+                  {t.chooseTag}
                 </button>
               </>
             )}
@@ -1357,14 +1178,14 @@ export default function LandingPageMaster({
           <div className="flex items-center gap-1 lg:hidden">
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative p-2 text-white"
+              className="relative p-2 text-[#14120C]"
               aria-label="Open cart"
             >
               <ShoppingBag size={18} />
               {cartCount > 0 && (
                 <span
-                  className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-[#0B0B0C]"
-                  style={{ background: '#F6C000' }}
+                  className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-[#FFFFFF]"
+                  style={{ background: '#14120C' }}
                 >
                   {cartCount}
                 </span>
@@ -1372,7 +1193,7 @@ export default function LandingPageMaster({
             </button>
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-2 text-white"
+              className="p-2 text-[#14120C]"
               aria-label="Toggle navigation"
             >
               {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -1392,17 +1213,19 @@ export default function LandingPageMaster({
             /* Safe-area padding on both ends: the top clears the notch under the
                fixed header, the bottom keeps the two buttons off the iPhone
                home indicator, where they were previously unreachable. */
-            className="fixed inset-0 z-[69] flex flex-col bg-[#0B0B0C] px-6 pb-[max(2.5rem,calc(env(safe-area-inset-bottom)+1.5rem))] pt-[max(6rem,calc(env(safe-area-inset-top)+4.5rem))] lg:hidden"
+            className="fixed inset-0 z-[69] flex flex-col bg-[#14120C] px-6 pb-[max(2.5rem,calc(env(safe-area-inset-bottom)+1.5rem))] pt-[max(6rem,calc(env(safe-area-inset-top)+4.5rem))] lg:hidden"
           >
             <div className="flex-1 overflow-y-auto overscroll-contain">
-              {[...NAV_LINKS, { id: 'join-section', label: 'Join us' }].map((link, i) => (
+              <LanguageSwitcher variant="dark" className="mb-2" />
+
+              {[...NAV_LINKS, { id: 'join-section', label: t.joinUs }].map((link, i) => (
                 <motion.button
                   key={link.id}
                   initial={{ opacity: 0, y: 18 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.06 * i, duration: 0.5, ease: EASE }}
                   onClick={() => link.id === 'join-section' ? onOpenJoinUs?.() : handleSmoothScroll(link.id)}
-                  className="block w-full border-b border-white/10 py-5 text-left text-2xl font-light tracking-tight text-white"
+                  className="block w-full border-b border-[#FFFFFF]/10 py-5 text-left text-2xl font-light tracking-tight text-[#FFFFFF]"
                 >
                   {link.label}
                 </motion.button>
@@ -1417,10 +1240,10 @@ export default function LandingPageMaster({
                     setIsMobileMenuOpen(false);
                     onOpenTrackOrder();
                   }}
-                  className="flex w-full items-center gap-3 border-b border-white/10 py-5 text-left text-2xl font-light tracking-tight text-[#F6C000]"
+                  className="flex w-full items-center gap-3 border-b border-[#FFFFFF]/10 py-5 text-left text-2xl font-light tracking-tight text-[#FFFFFF]"
                 >
                   <Truck size={24} />
-                  <span>Track Order</span>
+                  <span>{t.trackOrder}</span>
                 </motion.button>
               )}
             </div>
@@ -1432,10 +1255,10 @@ export default function LandingPageMaster({
                     setIsMobileMenuOpen(false);
                     (onOpenDashboard || onLogin)?.();
                   }}
-                  className="flex w-full items-center justify-center gap-2 rounded-full bg-white py-3.5 text-sm font-semibold text-[#0B0B0C] transition-transform active:scale-95"
+                  className="flex w-full items-center justify-center gap-2 rounded-full bg-[#FFFFFF] py-3.5 text-sm font-semibold text-[#14120C] transition-transform active:scale-95"
                 >
                   <LayoutDashboard size={16} />
-                  <span>Go to Dashboard</span>
+                  <span>{t.goToDashboard}</span>
                 </button>
               ) : (
                 <>
@@ -1444,18 +1267,18 @@ export default function LandingPageMaster({
                       setIsMobileMenuOpen(false);
                       onLogin?.();
                     }}
-                    className="w-full rounded-full border border-white/20 py-3.5 text-sm font-medium text-white"
+                    className="w-full rounded-full border border-[#FFFFFF]/20 py-3.5 text-sm font-medium text-[#FFFFFF]"
                   >
-                    Log in
+                    {t.logIn}
                   </button>
                   <button
                     onClick={() => {
                       setIsMobileMenuOpen(false);
                       handleSmoothScroll('products-section');
                     }}
-                    className="w-full rounded-full bg-[#F6C000] py-3.5 text-sm font-bold text-[#0B0B0C]"
+                    className="w-full rounded-full bg-[#FFFFFF] py-3.5 text-sm font-bold text-[#14120C]"
                   >
-                    Choose tag
+                    {t.chooseTag}
                   </button>
                 </>
               )}
@@ -1464,89 +1287,96 @@ export default function LandingPageMaster({
         )}
       </AnimatePresence>
 
-      {/* ── 2. HERO — abstract backdrop, parallaxed ─────────────────────── */}
+      {/* ── 2. HERO — Rareblocks-style split: copy left, real sticker photo
+             right, on plain white ──────────────────────────────────────── */}
       <section
         ref={heroRef}
         id="hero-section"
-        className="relative flex min-h-[100svh] items-center justify-center overflow-hidden bg-[#0B0B0C]"
+        className="relative flex min-h-[100svh] items-center overflow-hidden bg-[#FEFDF9]"
       >
-        <HeroBackdrop reduced={reduced} parallaxY={heroImageY} parallaxScale={heroImageScale} />
-        <AuroraGlow reduced={reduced} />
-        {/* Dims the grid/glyph/glow as the hero scrolls up and out, so the
-            backdrop never fights the copy for attention on the way past. */}
-        <motion.div
-          style={reduced ? undefined : { opacity: heroScrimOpacity }}
-          className="absolute inset-0 bg-[#0B0B0C]"
-        />
-        <HeroStickerCard reduced={reduced} />
-
         <motion.div
           style={reduced ? undefined : { y: heroCopyY }}
-          className="relative z-10 mx-auto max-w-4xl px-6 pb-20 pt-32 text-center sm:pb-28"
+          className="relative z-10 mx-auto grid w-full max-w-[1400px] grid-cols-1 items-center gap-16 px-6 py-28 sm:px-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-10"
         >
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: EASE }}
-            className="mb-6 text-[10px] font-medium uppercase tracking-[0.2em] text-white/85"
-          >
-            Built for safer everyday journeys
-          </motion.div>
-
-          <h1 className="mx-auto max-w-3xl text-[clamp(2.5rem,6vw,5.6rem)] font-medium leading-[0.94] tracking-[-0.045em] text-white drop-shadow-[0_3px_24px_rgba(0,0,0,0.5)]">
-            <SplitWords text="India's 1st" delay={0.1} animateOnLoad />{' '}
-            <span className="text-[#F6C000]">
-              <SplitWords text="smartest" delay={0.22} animateOnLoad />
-            </span>
-            <br />
-            <SplitWords text="QR safety platform" delay={0.34} animateOnLoad />
-          </h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, delay: 0.7, ease: EASE }}
-            className="mx-auto mt-8 max-w-md text-[15px] font-light leading-relaxed text-white/85 sm:text-base"
-          >
-            One smart scan helps people reach you instantly, while your phone number stays private.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, delay: 0.85, ease: EASE }}
-            className="mt-9 flex flex-col items-center gap-4"
-          >
-            <motion.button
-              onClick={() => handleSmoothScroll('products-section')}
-              whileHover={reduced ? undefined : { y: -3 }}
-              whileTap={reduced ? undefined : { scale: 0.97 }}
-              transition={{ duration: 0.25, ease: EASE }}
-              className="group flex cursor-pointer items-center gap-4 rounded-md bg-[#F6C000] px-8 py-4 text-[15px] font-bold text-[#0B0B0C] shadow-[0_16px_40px_-18px_rgba(246,192,0,0.6)] sm:gap-6 sm:px-10 sm:py-5"
+          {/* Left: copy */}
+          <div className="text-left">
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, ease: EASE }}
+              className="mb-6 flex items-center gap-2.5 text-[10px] font-medium uppercase tracking-[0.2em] text-[#14120C]/60"
             >
-              Get your tag
-              <ArrowRight
-                size={18}
-                className="transition-transform duration-300 group-hover:translate-x-1.5 text-[#0B0B0C]"
-              />
-            </motion.button>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              {['Ships in 2–3 days', 'Zero subscriptions'].map((fact) => (
-                <span
-                  key={fact}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 font-mono text-[10.5px] uppercase tracking-wider text-white/70"
+              <span className="h-px w-8 bg-[#C9A227]" />
+              {t.heroKicker}
+            </motion.div>
+
+            <h1 className="max-w-2xl text-[clamp(2.6rem,5.6vw,4.6rem)] font-medium leading-[0.98] tracking-[-0.045em] text-[#14120C]">
+              <SplitWords text={t.heroHeadingLine1} delay={0.1} animateOnLoad />{' '}
+              <span className="text-[#C9A227]">
+                <SplitWords text={t.heroHeadingHighlight} delay={0.22} animateOnLoad />
+              </span>
+              <br />
+              <SplitWords text={t.heroHeadingLine2} delay={0.34} animateOnLoad />
+            </h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.9, delay: 0.7, ease: EASE }}
+              className="mt-7 max-w-md text-[15px] font-light leading-relaxed text-[#14120C]/70 sm:text-base"
+            >
+              {t.heroSubheading}
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.9, delay: 0.85, ease: EASE }}
+              className="mt-9 flex flex-col items-start gap-5"
+            >
+              <div className="flex flex-wrap items-center gap-3">
+                <motion.button
+                  onClick={() => handleSmoothScroll('products-section')}
+                  whileHover={reduced ? undefined : { y: -3 }}
+                  whileTap={reduced ? undefined : { scale: 0.97 }}
+                  transition={{ duration: 0.25, ease: EASE }}
+                  className="group flex cursor-pointer items-center gap-4 bg-[#14120C] px-8 py-4 text-[15px] font-bold text-[#FFFFFF] shadow-[0_16px_40px_-18px_rgba(20,18,12,0.35)] sm:gap-6 sm:px-10 sm:py-5"
                 >
-                  <span className="h-1.5 w-1.5 rounded-full bg-white/50" />
-                  {fact}
-                </span>
-              ))}
-            </div>
-            <button
-              onClick={() => handleSmoothScroll('hiw-section')}
-              className="cursor-pointer text-[12px] font-light text-[#F6C000] hover:underline"
-            >
-              See how it works ↓
-            </button>
+                  Get your tag
+                  <ArrowRight
+                    size={18}
+                    className="transition-transform duration-300 group-hover:translate-x-1.5 text-[#FFFFFF]"
+                  />
+                </motion.button>
+                <button
+                  onClick={() => handleSmoothScroll('hiw-section')}
+                  className="cursor-pointer border border-[#14120C]/20 px-6 py-4 text-[13px] font-medium text-[#14120C] transition-colors hover:border-[#14120C]/50"
+                >
+                  See how it works
+                </button>
+              </div>
+
+              {/* Trust list — a row of plain facts, not badges, matching the
+                  flat/list design language rather than pill decorations. */}
+              <ul className="flex flex-col gap-2 border-t border-[#14120C]/10 pt-5">
+                {['Ships in 2–3 days', 'Zero subscriptions', 'Lifetime tag validity'].map((fact) => (
+                  <li key={fact} className="flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-wider text-[#14120C]/55">
+                    <Check size={13} className="text-[#C9A227]" />
+                    {fact}
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          </div>
+
+          {/* Right: a single, plainly aligned card with the real sticker photo. */}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.9, delay: 0.4, ease: EASE }}
+            className="hidden lg:block"
+          >
+            <HeroStickerCard reduced={reduced} />
           </motion.div>
         </motion.div>
 
@@ -1561,27 +1391,27 @@ export default function LandingPageMaster({
           <motion.div
             animate={reduced ? undefined : { y: [0, 9, 0] }}
             transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-            className="flex h-9 w-[22px] items-start justify-center rounded-full border border-white/25 pt-2"
+            className="flex h-9 w-[22px] items-start justify-center rounded-full border border-[#14120C]/20 pt-2"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
+            <span className="h-1.5 w-1.5 rounded-full bg-[#14120C]/50" />
           </motion.div>
         </motion.div>
       </section>
 
       {/* ── 3. STATS BAND ───────────────────────────────────────────────── */}
-      <section className="border-t border-white/10 bg-[#0B0B0C] py-14 sm:py-20 lg:py-24">
+      <section className="border-t border-[#FFFFFF]/10 bg-[#14120C] py-14 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
           <div className="grid grid-cols-2 gap-y-12 md:grid-cols-4">
             {STATS.map((stat, i) => (
               <Reveal
                 key={stat.label}
                 delay={i * 0.09}
-                className={`px-2 text-center ${i > 0 ? 'md:border-l md:border-white/10' : ''}`}
+                className={`px-2 text-center ${i > 0 ? 'md:border-l md:border-[#FFFFFF]/10' : ''}`}
               >
-                <div className="font-mono text-[clamp(2.2rem,5vw,3.6rem)] font-medium leading-none tracking-[-0.03em] text-white">
+                <div className="font-mono text-[clamp(2.2rem,5vw,3.6rem)] font-medium leading-none tracking-[-0.03em] text-[#FFFFFF]">
                   <Counter to={stat.value} suffix={stat.suffix} kilo={stat.kilo} />
                 </div>
-                <div className="mt-3 text-[11px] font-light uppercase tracking-[0.16em] text-white/50">
+                <div className="mt-3 text-[11px] font-light uppercase tracking-[0.16em] text-[#FFFFFF]/50">
                   {stat.label}
                 </div>
               </Reveal>
@@ -1591,10 +1421,10 @@ export default function LandingPageMaster({
       </section>
 
       {/* ── 4. HOW IT WORKS ──────────────────────────────────────────────── */}
-      <section id="hiw-section" className="bg-[#F4F1EC] py-24 sm:py-28">
+      <section id="hiw-section" className="bg-[#FEFDF9] py-24 sm:py-28">
         <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
           <Reveal className="max-w-2xl">
-            <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-black/60">
+            <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-[#14120C]/60">
               How it works
             </p>
             <h2 className="text-[clamp(1.9rem,4.2vw,3rem)] font-medium leading-[1.06] tracking-[-0.035em]">
@@ -1602,24 +1432,28 @@ export default function LandingPageMaster({
             </h2>
           </Reveal>
 
-          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-14 divide-y divide-[#14120C]/10 border-y border-[#14120C]/10">
             {HOW_IT_WORKS_STEPS.map((step, i) => (
-              <Reveal key={step.step} delay={i * 0.06}>
-                <div className="group flex h-full flex-col overflow-hidden rounded-2xl border border-black/10 bg-white/60">
-                  <div className="relative aspect-4/3 overflow-hidden">
+              <Reveal key={step.step} delay={i * 0.05}>
+                <div className="group flex flex-col items-start gap-6 py-8 sm:flex-row sm:items-center sm:gap-10">
+                  <div className="flex shrink-0 items-baseline gap-4 sm:w-[220px]">
+                    <span className="font-mono text-[13px] text-[#14120C]/35">0{step.step}</span>
+                    <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#14120C]/50">
+                      {step.badge}
+                    </span>
+                  </div>
+
+                  <div className="w-full shrink-0 overflow-hidden sm:w-40">
                     <img
                       src={step.img}
                       alt={step.title}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      className="aspect-4/3 w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
-                    <span className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/40 px-3 py-1 font-mono text-[11px] text-white/85 backdrop-blur-md">
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#F6C000' }} />
-                      0{step.step}
-                    </span>
                   </div>
-                  <div className="flex flex-1 flex-col p-6">
+
+                  <div className="flex-1">
                     <h3 className="text-lg font-medium tracking-[-0.02em]">{step.title}</h3>
-                    <p className="mt-2 text-[13px] font-light leading-relaxed text-black/55">
+                    <p className="mt-1.5 max-w-xl text-[13px] font-light leading-relaxed text-[#14120C]/55">
                       {step.body}
                     </p>
                   </div>
@@ -1631,35 +1465,36 @@ export default function LandingPageMaster({
       </section>
 
       {/* ── 5. TRUST & PRIVACY PILLARS ──────────────────────────────────── */}
-      <section id="trust-section" className="border-t border-white/10 bg-[#0B0B0C] py-16 text-white sm:py-24 lg:py-32">
+      <section id="trust-section" className="border-t border-[#FFFFFF]/10 bg-[#14120C] py-16 text-[#FFFFFF] sm:py-24 lg:py-32">
         <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
           <Reveal className="mx-auto max-w-2xl text-center">
-            <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.18em] text-[#F6C000]">
+            <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.18em] text-[#FFFFFF]">
               Engineered for absolute trust
             </p>
             <h2 className="text-[clamp(2rem,4.2vw,3.4rem)] font-medium leading-[1.04] tracking-[-0.035em]">
               Security and privacy in every layer
             </h2>
-            <p className="mt-4 text-[15px] font-light leading-relaxed text-white/60">
+            <p className="mt-4 text-[15px] font-light leading-relaxed text-[#FFFFFF]/60">
               Your phone number is never exposed to strangers. Built with cloud-grade encryption,
               instant WhatsApp dispatch, and multi-contact emergency routing.
             </p>
           </Reveal>
 
-          {/* 4 Feature Trust Cards */}
-          <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {/* 4 Feature Trust rows — list, not cards, matching the app-wide
+              flat/list design language. */}
+          <div className="mt-14 divide-y divide-[#FFFFFF]/10 border-y border-[#FFFFFF]/10 sm:grid sm:grid-cols-2 sm:divide-y-0 sm:gap-x-10 sm:border-none">
             {FEATURE_CARDS.map((card, i) => (
-              <Reveal key={card.id} delay={i * 0.08}>
-                <div className="flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-colors hover:border-[#F6C000]/40">
+              <Reveal key={card.id} delay={i * 0.08} className="border-[#FFFFFF]/10 sm:border-t sm:py-8">
+                <div className="flex items-start gap-5 py-7 sm:py-0">
+                  <div className="h-20 w-28 shrink-0 overflow-hidden bg-[#14120C]/40">
+                    <img src={card.img} alt={card.title} className="h-full w-full object-cover opacity-80" />
+                  </div>
                   <div>
-                    <div className="mb-5 aspect-16/10 overflow-hidden rounded-xl bg-black/40">
-                      <img src={card.img} alt={card.title} className="h-full w-full object-cover opacity-80" />
-                    </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#F6C000]">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#FFFFFF]">
                       {card.tag}
                     </span>
-                    <h3 className="mt-2 text-lg font-medium text-white">{card.title}</h3>
-                    <p className="mt-2 text-[13px] font-light leading-relaxed text-white/55">
+                    <h3 className="mt-1 text-lg font-medium text-[#FFFFFF]">{card.title}</h3>
+                    <p className="mt-1.5 text-[13px] font-light leading-relaxed text-[#FFFFFF]/55">
                       {card.description}
                     </p>
                   </div>
@@ -1669,42 +1504,42 @@ export default function LandingPageMaster({
           </div>
 
           {/* Trust Guarantees Bar */}
-          <Reveal delay={0.2} className="mt-12 rounded-2xl border border-white/10 bg-white/[0.02] p-6 sm:p-8">
+          <Reveal delay={0.2} className="mt-12 border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.02] p-6 sm:p-8">
             <div className="grid grid-cols-1 gap-6 text-center sm:grid-cols-2 sm:text-left lg:grid-cols-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#F6C000]/30 bg-[#F6C000]/10 text-[#F6C000]">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-[#FFFFFF]/30 bg-[#FFFFFF]/10 text-[#FFFFFF]">
                   <Lock size={18} />
                 </div>
                 <div>
-                  <h4 className="text-[13px] font-semibold text-white">100% Number Masking</h4>
-                  <p className="text-[11px] text-white/50">Callers never see your number</p>
+                  <h4 className="text-[13px] font-semibold text-[#FFFFFF]">100% Number Masking</h4>
+                  <p className="text-[11px] text-[#FFFFFF]/50">Callers never see your number</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
                   <Zap size={18} />
                 </div>
                 <div>
-                  <h4 className="text-[13px] font-semibold text-white">0.4s Instant Alert</h4>
-                  <p className="text-[11px] text-white/50">WhatsApp &amp; SMS ping within 2s</p>
+                  <h4 className="text-[13px] font-semibold text-[#FFFFFF]">0.4s Instant Alert</h4>
+                  <p className="text-[11px] text-[#FFFFFF]/50">WhatsApp &amp; SMS ping within 2s</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-blue-500/30 bg-blue-500/10 text-blue-400">
                   <CheckCircle2 size={18} />
                 </div>
                 <div>
-                  <h4 className="text-[13px] font-semibold text-white">No Subscription Fees</h4>
-                  <p className="text-[11px] text-white/50">Pay once, protected for life</p>
+                  <h4 className="text-[13px] font-semibold text-[#FFFFFF]">No Subscription Fees</h4>
+                  <p className="text-[11px] text-[#FFFFFF]/50">Pay once, protected for life</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-[#FFFFFF]/20 bg-[#FFFFFF]/10 text-[#FFFFFF]">
                   <Truck size={18} />
                 </div>
                 <div>
-                  <h4 className="text-[13px] font-semibold text-white">Free Shipping</h4>
-                  <p className="text-[11px] text-white/50">Doorstep delivery across India</p>
+                  <h4 className="text-[13px] font-semibold text-[#FFFFFF]">Free Shipping</h4>
+                  <p className="text-[11px] text-[#FFFFFF]/50">Doorstep delivery across India</p>
                 </div>
               </div>
             </div>
@@ -1713,10 +1548,10 @@ export default function LandingPageMaster({
       </section>
 
       {/* ── 6. PHOTO WALL — authentic real-world tags ───────────────────── */}
-      <section className="relative overflow-hidden bg-[#0B0B0C] py-16 sm:py-24 lg:py-32">
+      <section className="relative overflow-hidden bg-[#14120C] py-16 sm:py-24 lg:py-32">
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
           <Reveal>
-            <h2 className="max-w-md px-6 text-center text-[clamp(1.8rem,4.6vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em] text-white drop-shadow-[0_4px_30px_rgba(0,0,0,0.9)]">
+            <h2 className="max-w-md px-6 text-center text-[clamp(1.8rem,4.6vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em] text-[#FFFFFF] drop-shadow-[0_4px_30px_rgba(0,0,0,0.9)]">
               Protected by RepiQR
             </h2>
           </Reveal>
@@ -1729,7 +1564,7 @@ export default function LandingPageMaster({
                 {column.map((img, ri) => (
                   <div
                     key={`${ci}-${ri}`}
-                    className="overflow-hidden rounded-xl border border-white/5 sm:rounded-2xl"
+                    className="overflow-hidden rounded-xl border border-[#FFFFFF]/5 sm:rounded-2xl"
                   >
                     <img src={img} alt="" aria-hidden="true" className="aspect-4/3 w-full object-cover" />
                   </div>
@@ -1739,18 +1574,18 @@ export default function LandingPageMaster({
           ))}
         </div>
 
-        <div className="pointer-events-none absolute inset-0 z-[15] bg-gradient-to-b from-[#0B0B0C] via-[#0B0B0C]/55 to-[#0B0B0C]" />
+        <div className="pointer-events-none absolute inset-0 z-[15] bg-gradient-to-b from-[#14120C] via-[#14120C]/55 to-[#14120C]" />
       </section>
 
       {/* ── 7. CATEGORY TICKER ──────────────────────────────────────────── */}
-      <section className="overflow-hidden border-y border-white/10 bg-[#0B0B0C] py-6">
+      <section className="overflow-hidden border-y border-[#FFFFFF]/10 bg-[#14120C] py-6">
         <Marquee duration={44}>
           {BADGE_ITEMS.map((item) => (
             <span
               key={`a-${item.label}`}
-              className="flex items-center gap-2.5 whitespace-nowrap rounded-full border border-white/10 px-5 py-2.5 text-[13px] font-light text-white/55"
+              className="flex items-center gap-2.5 whitespace-nowrap rounded-full border border-[#FFFFFF]/10 px-5 py-2.5 text-[13px] font-light text-[#FFFFFF]/55"
             >
-              <item.icon size={15} className="text-white/35" />
+              <item.icon size={15} className="text-[#FFFFFF]/35" />
               {item.label}
             </span>
           ))}
@@ -1758,25 +1593,25 @@ export default function LandingPageMaster({
       </section>
 
       {/* ── 8. PRODUCTS — Choose Product & Buy Now ──────────────────────── */}
-      <section id="products-section" className="bg-[#F4F1EC] py-16 sm:py-24 lg:py-32">
+      <section id="products-section" className="bg-[#FEFDF9] py-16 sm:py-24 lg:py-32">
         <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
-          <Reveal className="flex flex-col gap-8 border-b border-black/10 pb-10 lg:flex-row lg:items-end lg:justify-between">
+          <Reveal className="flex flex-col gap-8 border-b border-[#14120C]/10 pb-10 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-xl">
-              <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.18em] text-black/60">
+              <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.18em] text-[#14120C]/60">
                 The RepiQR collection
               </p>
               <h2 className="text-[clamp(2rem,4.2vw,3.4rem)] font-medium leading-[1.02] tracking-[-0.04em]">
                 <SplitWords text="Protection, made personal" />
               </h2>
-              <p className="mt-4 max-w-lg text-[15px] font-light leading-relaxed text-black/60">
+              <p className="mt-4 max-w-lg text-[15px] font-light leading-relaxed text-[#14120C]/60">
                 Choose a purpose-built tag for the things that move through your day.
                 Every one includes lifetime validity and private contact routing.
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-5 text-[11px] uppercase tracking-[0.14em] text-black/60">
-              <span><strong className="text-black">{products.length}</strong> tag styles</span>
-              <span className="h-5 w-px bg-black/15" />
-              <span><strong className="text-black">∞</strong> validity</span>
+            <div className="flex shrink-0 items-center gap-5 text-[11px] uppercase tracking-[0.14em] text-[#14120C]/60">
+              <span><strong className="text-[#14120C]">{products.length}</strong> tag styles</span>
+              <span className="h-5 w-px bg-[#14120C]/15" />
+              <span><strong className="text-[#14120C]">∞</strong> validity</span>
             </div>
           </Reveal>
 
@@ -1789,14 +1624,14 @@ export default function LandingPageMaster({
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
                   className={`relative cursor-pointer rounded-full px-5 py-2 text-[13px] font-medium transition-colors ${
-                    on ? 'text-white' : 'text-black/55 hover:text-black'
+                    on ? 'text-[#14120C]' : 'text-[#14120C]/55 hover:text-[#14120C]'
                   }`}
                 >
                   {on && (
                     <motion.span
                       layoutId="product-tab"
                       transition={{ duration: 0.45, ease: EASE }}
-                      className="absolute inset-0 rounded-full bg-[#0B0B0C]"
+                      className="absolute inset-0 rounded-full bg-[#C9A227]"
                     />
                   )}
                   <span className="relative z-10">{cat}</span>
@@ -1818,7 +1653,7 @@ export default function LandingPageMaster({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.7, delay: i * 0.07, ease: EASE }}
-                  className="group relative flex h-full flex-col overflow-hidden rounded-[1.75rem] bg-[#0B0B0C] shadow-[0_24px_60px_-28px_rgba(0,0,0,0.65)]"
+                  className="group relative flex h-full flex-col overflow-hidden rounded-[1.75rem] bg-[#14120C] shadow-[0_24px_60px_-28px_rgba(0,0,0,0.65)]"
                 >
                   <div className="relative aspect-[16/9] overflow-hidden">
                     <img
@@ -1826,35 +1661,35 @@ export default function LandingPageMaster({
                       alt={product.name}
                       className="h-full w-full object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0C] via-[#0B0B0C]/10 to-transparent" />
-                    <span className="absolute left-5 top-5 rounded-full border border-white/15 bg-black/40 px-3 py-1 text-[11px] font-light text-white/80 backdrop-blur-sm">
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#14120C] via-[#14120C]/10 to-transparent" />
+                    <span className="absolute left-5 top-5 rounded-full border border-[#FFFFFF]/15 bg-[#14120C]/40 px-3 py-1 text-[11px] font-light text-[#FFFFFF]/80 backdrop-blur-sm">
                       {product.badge}
                     </span>
-                    <span className="absolute bottom-5 left-5 text-[11px] font-medium uppercase tracking-[0.14em] text-white/55">
+                    <span className="absolute bottom-5 left-5 text-[11px] font-medium uppercase tracking-[0.14em] text-[#FFFFFF]/55">
                       {product.category}
                     </span>
                   </div>
 
-                  <div className="flex flex-1 flex-col justify-between p-6 pt-2 text-white sm:p-7 sm:pt-3">
+                  <div className="flex flex-1 flex-col justify-between p-6 pt-2 text-[#FFFFFF] sm:p-7 sm:pt-3">
                     <div>
                       <div className="flex items-start justify-between gap-4">
                         <h3 className="text-xl font-medium tracking-[-0.02em]">{product.name}</h3>
                         <div className="shrink-0 text-right">
                           <div className="text-lg font-medium">₹{product.price}</div>
-                          <div className="text-[11px] font-light text-white/50 line-through">
+                          <div className="text-[11px] font-light text-[#FFFFFF]/50 line-through">
                             ₹{product.mrp}
                           </div>
                         </div>
                       </div>
 
-                      <p className="mt-2.5 text-[13px] font-light leading-relaxed text-white/55">
+                      <p className="mt-2.5 text-[13px] font-light leading-relaxed text-[#FFFFFF]/55">
                         {product.desc}
                       </p>
 
                       <ul className="mt-5 space-y-2">
                         {product.features.map((f) => (
-                          <li key={f} className="flex items-start gap-2 text-[12px] font-light text-white/60">
-                            <Check size={13} className="mt-[3px] shrink-0" style={{ color: '#F6C000' }} />
+                          <li key={f} className="flex items-start gap-2 text-[12px] font-light text-[#FFFFFF]/60">
+                            <Check size={13} className="mt-[3px] shrink-0" style={{ color: '#FFFFFF' }} />
                             {f}
                           </li>
                         ))}
@@ -1866,14 +1701,14 @@ export default function LandingPageMaster({
                       <div className="mt-6 flex items-center gap-2.5">
                         <button
                           onClick={() => handleBuyNow(product)}
-                          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-[#F6C000] py-3 text-[13px] font-bold text-[#0B0B0C] shadow-md transition-all hover:bg-[#ffcf24] hover:shadow-lg active:scale-95"
+                          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-[#FFFFFF] py-3 text-[13px] font-bold text-[#14120C] shadow-md transition-all hover:bg-neutral-100 hover:shadow-lg active:scale-95"
                         >
                           <span>Buy Now</span>
                           <ArrowRight size={15} />
                         </button>
                         <button
                           onClick={() => addToCart(product, 1)}
-                          className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/20 text-white/80 transition-all hover:border-white/50 hover:bg-white/10 hover:text-white active:scale-95"
+                          className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-[#FFFFFF]/20 text-[#FFFFFF]/80 transition-all hover:border-[#FFFFFF]/50 hover:bg-[#FFFFFF]/10 hover:text-[#FFFFFF] active:scale-95"
                           title={`Add ${product.name} to cart`}
                           aria-label={`Add ${product.name} to cart`}
                         >
@@ -1882,8 +1717,8 @@ export default function LandingPageMaster({
                       </div>
 
                       {product.rating && (
-                        <div className="mt-4 flex items-center gap-1.5 text-[11px] font-light text-white/50">
-                          <Star size={12} style={{ color: '#F6C000' }} fill="#F6C000" />
+                        <div className="mt-4 flex items-center gap-1.5 text-[11px] font-light text-[#FFFFFF]/50">
+                          <Star size={12} style={{ color: '#FFFFFF' }} fill="#FFFFFF" />
                           {product.rating} · {product.reviewsCount?.toLocaleString('en-IN')} owners
                         </div>
                       )}
@@ -1897,13 +1732,13 @@ export default function LandingPageMaster({
       </section>
 
       {/* ── 11. PRICING ─────────────────────────────────────────────────── */}
-      <section id="pricing-section" className="bg-white py-16 sm:py-24 lg:py-32">
+      <section id="pricing-section" className="bg-[#FEFDF9] py-16 sm:py-24 lg:py-32">
         <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
           <Reveal className="text-center">
             <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em]">
               Pricing plans for every need
             </h2>
-            <p className="mx-auto mt-4 max-w-lg text-[15px] font-light text-black/60">
+            <p className="mx-auto mt-4 max-w-lg text-[15px] font-light text-[#14120C]/60">
               Lifetime validity, no recurring subscription. Talk to us for volume pricing.
             </p>
           </Reveal>
@@ -1916,23 +1751,23 @@ export default function LandingPageMaster({
                   transition={{ duration: 0.4, ease: EASE }}
                   className={`flex h-full flex-col justify-between rounded-3xl p-6 sm:p-8 ${
                     plan.featured
-                      ? 'bg-[#0B0B0C] text-white'
-                      : 'border border-black/10 bg-white text-[#0B0B0C]'
+                      ? 'bg-[#14120C] text-[#FFFFFF]'
+                      : 'border border-[#14120C]/10 bg-[#FFFFFF] text-[#14120C]'
                   }`}
                 >
                   <div>
                     <div className="flex items-center justify-between">
                       <span
                         className={`text-[11px] font-light uppercase tracking-[0.16em] ${
-                          plan.featured ? 'text-white/50' : 'text-black/60'
+                          plan.featured ? 'text-[#FFFFFF]/50' : 'text-[#14120C]/60'
                         }`}
                       >
                         {plan.name}
                       </span>
                       {plan.featured && (
                         <span
-                          className="rounded-full px-2.5 py-1 text-[10px] font-semibold text-[#0B0B0C]"
-                          style={{ background: '#F6C000' }}
+                          className="rounded-full px-2.5 py-1 text-[10px] font-semibold text-[#14120C]"
+                          style={{ background: '#FFFFFF' }}
                         >
                           Popular
                         </span>
@@ -1942,7 +1777,7 @@ export default function LandingPageMaster({
                     <div className="mt-5 text-[2rem] font-light tracking-[-0.04em]">Contact us</div>
                     <p
                       className={`mt-2 text-[13px] font-light ${
-                        plan.featured ? 'text-white/50' : 'text-black/60'
+                        plan.featured ? 'text-[#FFFFFF]/50' : 'text-[#14120C]/60'
                       }`}
                     >
                       {plan.desc}
@@ -1953,10 +1788,10 @@ export default function LandingPageMaster({
                         <li
                           key={f}
                           className={`flex items-start gap-2.5 text-[13px] font-light ${
-                            plan.featured ? 'text-white/70' : 'text-black/60'
+                            plan.featured ? 'text-[#FFFFFF]/70' : 'text-[#14120C]/60'
                           }`}
                         >
-                          <Check size={14} className="mt-[3px] shrink-0" style={{ color: '#C79E00' }} />
+                          <Check size={14} className="mt-[3px] shrink-0" style={{ color: '#FFFFFF' }} />
                           {f}
                         </li>
                       ))}
@@ -1970,8 +1805,8 @@ export default function LandingPageMaster({
                     }}
                     className={`mt-10 flex w-full cursor-pointer items-center justify-center gap-2 rounded-full py-3.5 text-[13px] font-semibold transition-transform hover:scale-[1.02] active:scale-95 ${
                       plan.featured
-                        ? 'bg-white text-[#0B0B0C]'
-                        : 'bg-[#0B0B0C] text-white'
+                        ? 'bg-[#FFFFFF] text-[#14120C]'
+                        : 'bg-[#C9A227] text-[#14120C]'
                     }`}
                   >
                     {plan.cta}
@@ -1985,16 +1820,16 @@ export default function LandingPageMaster({
       </section>
 
       {/* ── 12. JOIN US — service-provider application ───────────────────── */}
-      {false && <section id="join-section" className="bg-[#F4F1EC] py-16 sm:py-24 lg:py-32">
+      {false && <section id="join-section" className="bg-[#FEFDF9] py-16 sm:py-24 lg:py-32">
         <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
           <Reveal className="mx-auto max-w-2xl text-center">
-            <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-black/60">
+            <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-[#14120C]/60">
               Join us
             </p>
             <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em]">
               <SplitWords text="Become a service partner" />
             </h2>
-            <p className="mt-4 text-[15px] font-light leading-relaxed text-black/60">
+            <p className="mt-4 text-[15px] font-light leading-relaxed text-[#14120C]/60">
               Ambulance, towing, mechanic, plumber, vet, security — whatever you do, get
               listed once and take masked calls the moment a nearby tag is scanned.
             </p>
@@ -2003,16 +1838,16 @@ export default function LandingPageMaster({
           <div className="mt-14 grid items-stretch gap-5 lg:grid-cols-2">
             {/* Visual panel, retinted to the service picked in the navbar */}
             <Reveal className="h-full">
-              <div className="relative flex h-full min-h-[420px] flex-col justify-end overflow-hidden rounded-3xl bg-[#0B0B0C]">
+              <div className="relative flex h-full min-h-[420px] flex-col justify-end overflow-hidden rounded-3xl bg-[#14120C]">
                 <img
                   src={stepImg4}
                   alt="A RepiQR scan reaching a nearby service partner"
                   className="absolute inset-0 h-full w-full object-cover opacity-40"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0C] via-[#0B0B0C]/75 to-[#0B0B0C]/25" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#14120C] via-[#14120C]/75 to-[#14120C]/25" />
 
-                <div className="relative p-8 text-white sm:p-10">
-                  <div className="inline-flex items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-3.5 py-2.5 backdrop-blur-sm">
+                <div className="relative p-8 text-[#FFFFFF] sm:p-10">
+                  <div className="inline-flex items-center gap-3 rounded-2xl border border-[#FFFFFF]/15 bg-[#FFFFFF]/10 px-3.5 py-2.5 backdrop-blur-sm">
                     <span
                       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
                       style={{ background: joinServiceMeta.bg, color: joinServiceMeta.color }}
@@ -2020,7 +1855,7 @@ export default function LandingPageMaster({
                       <joinServiceMeta.Icon size={16} />
                     </span>
                     <span>
-                      <span className="block text-[10px] font-light uppercase tracking-[0.14em] text-white/50">
+                      <span className="block text-[10px] font-light uppercase tracking-[0.14em] text-[#FFFFFF]/50">
                         Applying as
                       </span>
                       <span className="block text-[13px] font-medium">
@@ -2037,9 +1872,9 @@ export default function LandingPageMaster({
                     {JOIN_BENEFITS.map((line) => (
                       <li
                         key={line}
-                        className="flex items-start gap-2.5 text-[13px] font-light leading-relaxed text-white/70"
+                        className="flex items-start gap-2.5 text-[13px] font-light leading-relaxed text-[#FFFFFF]/70"
                       >
-                        <CheckCircle2 size={15} className="mt-0.5 shrink-0" style={{ color: '#F6C000' }} />
+                        <CheckCircle2 size={15} className="mt-0.5 shrink-0" style={{ color: '#FFFFFF' }} />
                         {line}
                       </li>
                     ))}
@@ -2050,24 +1885,24 @@ export default function LandingPageMaster({
 
             {/* Application form */}
             <Reveal delay={0.12} className="h-full">
-              <div className="h-full rounded-3xl border border-black/8 bg-white p-7 sm:p-9">
+              <div className="h-full rounded-3xl border border-[#14120C]/8 bg-[#FFFFFF] p-7 sm:p-9">
                 {joinSubmitted ? (
                   <div className="flex h-full flex-col items-center justify-center py-10 text-center">
                     <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
                       <CheckCircle2 size={26} className="text-emerald-600" />
                     </div>
                     <h3 className="mt-5 text-xl font-medium">Application received</h3>
-                    <p className="mt-3 max-w-sm text-[14px] font-light leading-relaxed text-black/55">
-                      Thank you, <span className="font-medium text-[#0B0B0C]">{joinForm.label}</span>.
-                      Your <span className="font-medium text-[#0B0B0C]">{joinServiceType.label}</span>{' '}
-                      listing for <span className="font-medium text-[#0B0B0C]">{joinForm.city}</span> is
+                    <p className="mt-3 max-w-sm text-[14px] font-light leading-relaxed text-[#14120C]/55">
+                      Thank you, <span className="font-medium text-[#14120C]">{joinForm.label}</span>.
+                      Your <span className="font-medium text-[#14120C]">{joinServiceType.label}</span>{' '}
+                      listing for <span className="font-medium text-[#14120C]">{joinForm.city}</span> is
                       pending review. We will call you on{' '}
-                      <span className="font-medium text-[#0B0B0C]">{joinForm.phone}</span> once it is
+                      <span className="font-medium text-[#14120C]">{joinForm.phone}</span> once it is
                       approved.
                     </p>
                     <button
                       onClick={resetJoinForm}
-                      className="mt-7 cursor-pointer rounded-full bg-black/5 px-6 py-3 text-[13px] font-medium text-black/70 transition-colors hover:bg-black/10"
+                      className="mt-7 cursor-pointer rounded-full bg-[#14120C]/5 px-6 py-3 text-[13px] font-medium text-[#14120C]/70 transition-colors hover:bg-[#14120C]/10"
                     >
                       Submit another provider
                     </button>
@@ -2075,13 +1910,13 @@ export default function LandingPageMaster({
                 ) : (
                   <form onSubmit={handleJoinSubmit} className="space-y-5">
                     <div>
-                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-[#14120C]/60">
                         Service type
                       </label>
                       <select
                         value={joinForm.serviceType}
                         onChange={(e) => setJoinForm({ ...joinForm, serviceType: e.target.value })}
-                        className="w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#0B0B0C] sm:text-[14px]"
+                        className="w-full cursor-pointer rounded-xl border border-[#14120C]/12 bg-[#FFFFFF] px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#14120C] sm:text-[14px]"
                       >
                         {SERVICE_TYPES.map((t) => (
                           <option key={t.slug} value={t.slug}>
@@ -2092,7 +1927,7 @@ export default function LandingPageMaster({
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-[#14120C]/60">
                         Provider / business name *
                       </label>
                       <input
@@ -2101,13 +1936,13 @@ export default function LandingPageMaster({
                         placeholder={joinServiceMeta.placeholder}
                         /* 16px on phones: iOS Safari zooms the whole page when a
                            focused field is smaller, and never zooms back out. */
-                        className="w-full rounded-xl border border-black/12 px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#0B0B0C] sm:text-[14px]"
+                        className="w-full rounded-xl border border-[#14120C]/12 px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#14120C] sm:text-[14px]"
                       />
                     </div>
 
                     <div className="grid gap-5 sm:grid-cols-2">
                       <div>
-                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
+                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-[#14120C]/60">
                           Phone *
                         </label>
                         <PhoneInputWithCountry
@@ -2116,7 +1951,7 @@ export default function LandingPageMaster({
                         />
                       </div>
                       <div>
-                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
+                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-[#14120C]/60">
                           City / service area *
                         </label>
                         <input
@@ -2125,31 +1960,31 @@ export default function LandingPageMaster({
                           placeholder="e.g. Pune"
                           /* 16px on phones: iOS Safari zooms the whole page when a
                            focused field is smaller, and never zooms back out. */
-                        className="w-full rounded-xl border border-black/12 px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#0B0B0C] sm:text-[14px]"
+                        className="w-full rounded-xl border border-[#14120C]/12 px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#14120C] sm:text-[14px]"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-[#14120C]/60">
                         Email
                       </label>
                       <div className="relative">
-                        <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-black/30" />
+                        <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#14120C]/30" />
                         <input
                           type="email"
                           value={joinForm.email}
                           onChange={(e) => setJoinForm({ ...joinForm, email: e.target.value })}
                           placeholder="you@company.com"
-                          className="w-full rounded-xl border border-black/12 py-3 pl-11 pr-4 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                          className="w-full rounded-xl border border-[#14120C]/12 py-3 pl-11 pr-4 text-[14px] font-light outline-hidden transition-colors focus:border-[#14120C]"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="mb-2.5 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
+                      <label className="mb-2.5 block text-[11px] font-light uppercase tracking-[0.14em] text-[#14120C]/60">
                         Categories you cover
-                        <span className="ml-2 normal-case tracking-normal text-black/60">
+                        <span className="ml-2 normal-case tracking-normal text-[#14120C]/60">
                           — leave empty to cover all
                         </span>
                       </label>
@@ -2163,8 +1998,8 @@ export default function LandingPageMaster({
                               onClick={() => toggleJoinCategory(c.value)}
                               className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-4 py-2 text-[12px] font-light transition-all ${
                                 on
-                                  ? 'border-[#0B0B0C] bg-[#0B0B0C] text-white'
-                                  : 'border-black/12 text-black/60 hover:border-black/35'
+                                  ? 'border-[#14120C] bg-[#14120C] text-[#FFFFFF]'
+                                  : 'border-[#14120C]/12 text-[#14120C]/60 hover:border-[#14120C]/35'
                               }`}
                             >
                               {on && <Check size={11} />} {c.label}
@@ -2175,7 +2010,7 @@ export default function LandingPageMaster({
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-[#14120C]/60">
                         Anything else we should know
                       </label>
                       <textarea
@@ -2183,7 +2018,7 @@ export default function LandingPageMaster({
                         onChange={(e) => setJoinForm({ ...joinForm, notes: e.target.value })}
                         rows={3}
                         placeholder="Hours, coverage radius, fleet size, licence number…"
-                        className="w-full resize-none rounded-xl border border-black/12 px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#0B0B0C]"
+                        className="w-full resize-none rounded-xl border border-[#14120C]/12 px-4 py-3 text-[14px] font-light outline-hidden transition-colors focus:border-[#14120C]"
                       />
                     </div>
 
@@ -2196,7 +2031,7 @@ export default function LandingPageMaster({
                     <button
                       type="submit"
                       disabled={joinSubmitting || !joinFormIsValid}
-                      className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#0B0B0C] py-4 text-[13px] font-semibold text-white transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35"
+                      className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#14120C] py-4 text-[13px] font-semibold text-[#FFFFFF] transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35"
                     >
                       {joinSubmitting ? (
                         <>
@@ -2205,12 +2040,12 @@ export default function LandingPageMaster({
                       ) : (
                         <>
                           Submit application
-                          <ArrowRight size={14} style={{ color: '#F6C000' }} />
+                          <ArrowRight size={14} style={{ color: '#FFFFFF' }} />
                         </>
                       )}
                     </button>
 
-                    <p className="text-center text-[11px] font-light text-black/60">
+                    <p className="text-center text-[11px] font-light text-[#14120C]/60">
                       We verify every provider before listing. No fee to apply.
                     </p>
                   </form>
@@ -2222,16 +2057,16 @@ export default function LandingPageMaster({
       </section>}
 
       {/* ── 13. FRANCHISE ───────────────────────────────────────────────── */}
-      <section id="distributor-section" className="bg-[#0B0B0C] py-16 text-white sm:py-24 lg:py-32">
+      <section id="distributor-section" className="bg-[#14120C] py-16 text-[#FFFFFF] sm:py-24 lg:py-32">
         <div className="mx-auto max-w-[1400px] px-6 sm:px-10">
           <Reveal className="max-w-2xl">
-            <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-white/50">
+            <p className="mb-4 text-[11px] font-light uppercase tracking-[0.18em] text-[#FFFFFF]/50">
               Franchise
             </p>
             <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em]">
               Become a RepiQR distributor
             </h2>
-            <p className="mt-4 text-[15px] font-light leading-relaxed text-white/50">
+            <p className="mt-4 text-[15px] font-light leading-relaxed text-[#FFFFFF]/50">
               Retail kits, exclusive city territories and state-level master rights — with
               dealer dashboards, restock in a click and local leads routed to you.
             </p>
@@ -2244,13 +2079,13 @@ export default function LandingPageMaster({
                   whileHover={reduced ? undefined : { y: -6 }}
                   transition={{ duration: 0.4, ease: EASE }}
                   className={`flex h-full flex-col justify-between rounded-3xl p-6 sm:p-8 ${
-                    tier.isPopular ? 'bg-white text-[#0B0B0C]' : 'border border-white/12 bg-white/[0.03]'
+                    tier.isPopular ? 'bg-[#FFFFFF] text-[#14120C]' : 'border border-[#FFFFFF]/12 bg-[#FFFFFF]/[0.03]'
                   }`}
                 >
                   <div>
                     <span
                       className={`text-[11px] font-light uppercase tracking-[0.16em] ${
-                        tier.isPopular ? 'text-black/60' : 'text-white/50'
+                        tier.isPopular ? 'text-[#14120C]/60' : 'text-[#FFFFFF]/50'
                       }`}
                     >
                       {tier.badge}
@@ -2258,7 +2093,7 @@ export default function LandingPageMaster({
                     <h3 className="mt-4 text-xl font-medium tracking-[-0.02em]">{tier.name}</h3>
                     <p
                       className={`mt-2.5 text-[13px] font-light leading-relaxed ${
-                        tier.isPopular ? 'text-black/60' : 'text-white/50'
+                        tier.isPopular ? 'text-[#14120C]/60' : 'text-[#FFFFFF]/50'
                       }`}
                     >
                       {tier.desc}
@@ -2266,11 +2101,11 @@ export default function LandingPageMaster({
 
                     <div
                       className={`mt-6 flex items-center gap-4 border-y py-4 text-[12px] font-light ${
-                        tier.isPopular ? 'border-black/10 text-black/60' : 'border-white/10 text-white/55'
+                        tier.isPopular ? 'border-[#14120C]/10 text-[#14120C]/60' : 'border-[#FFFFFF]/10 text-[#FFFFFF]/55'
                       }`}
                     >
                       <span>{tier.minUnits}</span>
-                      <span className={tier.isPopular ? 'text-black/60' : 'text-white/50'}>·</span>
+                      <span className={tier.isPopular ? 'text-[#14120C]/60' : 'text-[#FFFFFF]/50'}>·</span>
                       <span className="font-medium">{tier.margin}</span>
                     </div>
 
@@ -2279,13 +2114,13 @@ export default function LandingPageMaster({
                         <li
                           key={f}
                           className={`flex items-start gap-2.5 text-[13px] font-light ${
-                            tier.isPopular ? 'text-black/60' : 'text-white/55'
+                            tier.isPopular ? 'text-[#14120C]/60' : 'text-[#FFFFFF]/55'
                           }`}
                         >
                           <Check
                             size={14}
                             className="mt-[3px] shrink-0"
-                            style={{ color: tier.isPopular ? '#C79E00' : '#F6C000' }}
+                            style={{ color: tier.isPopular ? '#FFFFFF' : '#FFFFFF' }}
                           />
                           {f}
                         </li>
@@ -2307,7 +2142,7 @@ export default function LandingPageMaster({
                       setIsPartnerModalOpen(true);
                     }}
                     className={`mt-10 flex w-full cursor-pointer items-center justify-center gap-2 rounded-full py-3.5 text-[13px] font-semibold transition-transform hover:scale-[1.02] active:scale-95 ${
-                      tier.isPopular ? 'bg-[#0B0B0C] text-white' : 'bg-white text-[#0B0B0C]'
+                      tier.isPopular ? 'bg-[#C9A227] text-[#14120C]' : 'bg-[#FFFFFF] text-[#14120C]'
                     }`}
                   >
                     {tier.ctaText}
@@ -2322,9 +2157,9 @@ export default function LandingPageMaster({
             <Reveal delay={0.2} className="mt-10">
               <button
                 onClick={onOpenDistributorDashboard}
-                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.04] py-4 text-[13px] font-medium text-white transition-colors hover:bg-white/10"
+                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-[#FFFFFF]/15 bg-[#FFFFFF]/[0.04] py-4 text-[13px] font-medium text-[#FFFFFF] transition-colors hover:bg-[#FFFFFF]/10"
               >
-                <Zap size={15} style={{ color: '#F6C000' }} />
+                <Zap size={15} style={{ color: '#FFFFFF' }} />
                 Your distributor dashboard is unlocked — open it
               </button>
             </Reveal>
@@ -2333,7 +2168,7 @@ export default function LandingPageMaster({
       </section>
 
       {/* ── 14. FAQ — full-bleed rows ───────────────────────────────────── */}
-      <section id="faq-section" className="bg-white py-16 sm:py-24 lg:py-32">
+      <section id="faq-section" className="bg-[#FEFDF9] py-16 sm:py-24 lg:py-32">
         <div className="mx-auto max-w-[1100px] px-6 sm:px-10">
           <Reveal className="mb-8 sm:mb-14">
             <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-medium leading-[1.05] tracking-[-0.035em]">
@@ -2341,24 +2176,24 @@ export default function LandingPageMaster({
             </h2>
           </Reveal>
 
-          <div className="border-t border-black/12">
+          <div className="border-t border-[#14120C]/12">
             {FAQS.map((faq, i) => {
               const open = expandedFaqId === faq.id;
               return (
                 <Reveal key={faq.id} delay={i * 0.05} y={16}>
-                  <div className="border-b border-black/12">
+                  <div className="border-b border-[#14120C]/12">
                     <button
                       onClick={() => handleToggleFaq(faq.id)}
                       aria-expanded={open}
                       className="group flex w-full cursor-pointer items-center justify-between gap-4 py-5 text-left sm:gap-6 sm:py-7"
                     >
-                      <span className="text-[clamp(1.05rem,2.2vw,1.5rem)] font-light leading-snug tracking-[-0.02em] transition-colors group-hover:text-black/60">
+                      <span className="text-[clamp(1.05rem,2.2vw,1.5rem)] font-light leading-snug tracking-[-0.02em] transition-colors group-hover:text-[#14120C]/60">
                         {faq.question}
                       </span>
                       <motion.span
                         animate={{ rotate: open ? 45 : 0 }}
                         transition={{ duration: 0.35, ease: EASE }}
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-black/12 text-black/50"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#14120C]/12 text-[#14120C]/50"
                       >
                         <Plus size={15} />
                       </motion.span>
@@ -2373,7 +2208,7 @@ export default function LandingPageMaster({
                           transition={{ duration: 0.45, ease: EASE }}
                           className="overflow-hidden"
                         >
-                          <p className="max-w-2xl pb-8 text-[14px] font-light leading-relaxed text-black/55">
+                          <p className="max-w-2xl pb-8 text-[14px] font-light leading-relaxed text-[#14120C]/55">
                             {faq.answer}
                           </p>
                         </motion.div>
@@ -2390,7 +2225,7 @@ export default function LandingPageMaster({
       {/* ── 15. CLOSING CALL TO ACTION ──────────────────────────────────── */}
       <section
         ref={ctaRef}
-        className="relative flex min-h-[80vh] items-center justify-center overflow-hidden bg-[#0B0B0C] py-20 sm:py-28"
+        className="relative flex min-h-[80vh] items-center justify-center overflow-hidden bg-[#14120C] py-20 sm:py-28"
       >
         <motion.div
           style={reduced ? undefined : { scale: ctaRingScale, opacity: ctaRingOpacity }}
@@ -2400,25 +2235,25 @@ export default function LandingPageMaster({
         </motion.div>
 
         <div className="relative z-10 mx-auto max-w-2xl px-6 text-center">
-          <h2 className="text-[clamp(2rem,5.4vw,3.8rem)] font-medium leading-[1.03] tracking-[-0.035em] text-white">
+          <h2 className="text-[clamp(2rem,5.4vw,3.8rem)] font-medium leading-[1.03] tracking-[-0.035em] text-[#FFFFFF]">
             Get Your
             <br />
             RepiQR tag today
           </h2>
 
           <Reveal delay={0.3}>
-            <p className="mx-auto mt-6 max-w-md text-[15px] font-light text-white/50">
+            <p className="mx-auto mt-6 max-w-md text-[15px] font-light text-[#FFFFFF]/50">
               Weatherproof tag, masked calls, lifetime dashboard. No subscription.
             </p>
 
             <button
               onClick={() => handleSmoothScroll('products-section')}
-              className="group mt-10 inline-flex cursor-pointer items-center gap-2.5 rounded-full bg-[#F6C000] px-9 py-4 text-sm font-bold text-[#0B0B0C] transition-transform hover:scale-[1.04] active:scale-95 shadow-lg"
+              className="group mt-10 inline-flex cursor-pointer items-center gap-2.5 rounded-full bg-[#FFFFFF] px-9 py-4 text-sm font-bold text-[#14120C] transition-transform hover:scale-[1.04] active:scale-95 shadow-lg"
             >
               Choose your tag
               <ArrowRight
                 size={15}
-                className="transition-transform group-hover:translate-x-1 text-[#0B0B0C]"
+                className="transition-transform group-hover:translate-x-1 text-[#14120C]"
               />
             </button>
           </Reveal>
@@ -2428,27 +2263,27 @@ export default function LandingPageMaster({
       {/* ── 16. FOOTER ──────────────────────────────────────────────────── */}
       <footer
         ref={footerRef}
-        className="relative overflow-hidden border-t border-white/10 bg-[#0B0B0C] pb-32 pt-14 text-white sm:pb-40 sm:pt-20"
+        className="relative overflow-hidden border-t border-[#FFFFFF]/10 bg-[#14120C] pb-32 pt-14 text-[#FFFFFF] sm:pb-40 sm:pt-20"
       >
         <div className="relative z-10 mx-auto max-w-[1400px] px-6 sm:px-10">
           <div className="grid gap-12 pb-16 md:grid-cols-12">
             <div className="space-y-4 md:col-span-4">
               <img src={darkBgLogo} alt="RepiQR" className="h-8 w-auto object-contain" />
-              <p className="text-[13px] font-light text-white/50">Scan. Connect. Stay Safe.</p>
+              <p className="text-[13px] font-light text-[#FFFFFF]/50">Scan. Connect. Stay Safe.</p>
             </div>
 
             <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 md:col-span-8">
               <div className="space-y-3.5">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/60">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#FFFFFF]/60">
                   Product
                 </div>
-                <ul className="space-y-2.5 text-[13px] font-light text-white/55">
+                <ul className="space-y-2.5 text-[13px] font-light text-[#FFFFFF]/55">
                   {['Vehicle Safety QR', 'Bike Safety QR', 'Child Safety QR', 'Home Safety QR'].map(
                     (label) => (
                       <li key={label}>
                         <button
                           onClick={onOpenCheckout}
-                          className="cursor-pointer text-left transition-colors hover:text-white"
+                          className="cursor-pointer text-left transition-colors hover:text-[#FFFFFF]"
                         >
                           {label}
                         </button>
@@ -2459,14 +2294,14 @@ export default function LandingPageMaster({
               </div>
 
               <div className="space-y-3.5">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/60">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#FFFFFF]/60">
                   Company
                 </div>
-                <ul className="space-y-2.5 text-[13px] font-light text-white/55">
+                <ul className="space-y-2.5 text-[13px] font-light text-[#FFFFFF]/55">
                   <li>
                     <button
                       onClick={() => handleSmoothScroll('hiw-section')}
-                      className="cursor-pointer text-left transition-colors hover:text-white"
+                      className="cursor-pointer text-left transition-colors hover:text-[#FFFFFF]"
                     >
                       About Us
                     </button>
@@ -2474,7 +2309,7 @@ export default function LandingPageMaster({
                   <li>
                     <a
                       href="mailto:admin@repiqr.com"
-                      className="cursor-pointer text-left transition-colors hover:text-white"
+                      className="cursor-pointer text-left transition-colors hover:text-[#FFFFFF]"
                     >
                       Contact
                     </a>
@@ -2482,7 +2317,7 @@ export default function LandingPageMaster({
                   <li>
                     <button
                       onClick={onOpenPrivacy}
-                      className="cursor-pointer text-left transition-colors hover:text-white"
+                      className="cursor-pointer text-left transition-colors hover:text-[#FFFFFF]"
                     >
                       Privacy Policy
                     </button>
@@ -2492,10 +2327,10 @@ export default function LandingPageMaster({
               </div>
 
               <div className="space-y-3.5">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/60">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#FFFFFF]/60">
                   Contact
                 </div>
-                <ul className="space-y-2.5 text-[13px] font-light leading-relaxed text-white/55">
+                <ul className="space-y-2.5 text-[13px] font-light leading-relaxed text-[#FFFFFF]/55">
                   <li>
                     38 Kadambari Complex,
                     <br />
@@ -2504,12 +2339,12 @@ export default function LandingPageMaster({
                     Surendranagar, Gujarat 363530
                   </li>
                   <li>
-                    <a href="mailto:admin@repiqr.com" className="transition-colors hover:text-white">
+                    <a href="mailto:admin@repiqr.com" className="transition-colors hover:text-[#FFFFFF]">
                       admin@repiqr.com
                     </a>
                   </li>
                   <li>
-                    <a href="tel:+919313719720" className="transition-colors hover:text-white">
+                    <a href="tel:+919313719720" className="transition-colors hover:text-[#FFFFFF]">
                       +91 93137 19720
                     </a>
                   </li>
@@ -2518,13 +2353,13 @@ export default function LandingPageMaster({
             </div>
           </div>
 
-          <div className="space-y-1.5 border-t border-white/10 pt-8 text-[12px] font-light text-white/50">
+          <div className="space-y-1.5 border-t border-[#FFFFFF]/10 pt-8 text-[12px] font-light text-[#FFFFFF]/50">
             <p>
-              <span className="font-semibold text-white/70">RepiQR</span> is a product of{' '}
-              <span className="font-semibold text-white/70">Worthite LLP</span> | LLPIN: ADA-2053 |
+              <span className="font-semibold text-[#FFFFFF]/70">RepiQR</span> is a product of{' '}
+              <span className="font-semibold text-[#FFFFFF]/70">Worthite LLP</span> | LLPIN: ADA-2053 |
               GSTIN: 24AAFFW7093N1ZH
             </p>
-            <p className="text-white/35">
+            <p className="text-[#FFFFFF]/35">
               © {new Date().getFullYear()} Worthite LLP. All rights reserved.
             </p>
           </div>
@@ -2536,7 +2371,7 @@ export default function LandingPageMaster({
           className="pointer-events-none absolute inset-x-0 bottom-0 select-none text-center"
           aria-hidden="true"
         >
-          <span className="block whitespace-nowrap text-[clamp(5rem,20vw,17rem)] font-medium leading-none tracking-[-0.05em] text-white/[0.045]">
+          <span className="block whitespace-nowrap text-[clamp(5rem,20vw,17rem)] font-medium leading-none tracking-[-0.05em] text-[#FFFFFF]/[0.045]">
             RepiQR
           </span>
         </motion.div>
@@ -2550,21 +2385,21 @@ export default function LandingPageMaster({
             animate={{ opacity: 1, x: 0, y: 0 }}
             exit={{ opacity: 0, x: 28, y: 12 }}
             transition={{ duration: 0.35, ease: EASE }}
-            className="fixed bottom-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))] right-5 z-[520] flex w-[min(360px,calc(100vw-2.5rem))] items-center gap-3 rounded-2xl border border-black/8 bg-white p-4 shadow-[0_20px_55px_-18px_rgba(0,0,0,0.45)]"
+            className="fixed bottom-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))] right-5 z-[520] flex w-[min(360px,calc(100vw-2.5rem))] items-center gap-3 rounded-2xl border border-[#14120C]/8 bg-[#FFFFFF] p-4 shadow-[0_20px_55px_-18px_rgba(0,0,0,0.45)]"
             role="status"
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0B0B0C] text-[#F6C000]">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#14120C] text-[#FFFFFF]">
               <Check size={17} />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-semibold text-[#0B0B0C]">Added to your cart</p>
-              <p className="mt-0.5 truncate text-[12px] font-light text-black/60">
+              <p className="text-[13px] font-semibold text-[#14120C]">Added to your cart</p>
+              <p className="mt-0.5 truncate text-[12px] font-light text-[#14120C]/60">
                 {cartNotice.qty > 1 ? `${cartNotice.qty} × ` : ''}{cartNotice.name}
               </p>
             </div>
             <button
               onClick={() => setIsCartOpen(true)}
-              className="shrink-0 cursor-pointer text-[12px] font-semibold text-black/60 underline underline-offset-4 transition-colors hover:text-black"
+              className="shrink-0 cursor-pointer text-[12px] font-semibold text-[#14120C]/60 underline underline-offset-4 transition-colors hover:text-[#14120C]"
             >
               View cart
             </button>
@@ -2583,7 +2418,7 @@ export default function LandingPageMaster({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              className="absolute inset-0 bg-[#14120C]/50 backdrop-blur-sm"
               onClick={() => setIsCartOpen(false)}
             />
             <motion.aside
@@ -2594,14 +2429,14 @@ export default function LandingPageMaster({
               /* Full-bleed on a phone, a panel from tablet up. The scroller is
                  the whole aside, so its bottom padding is what lifts the
                  checkout button clear of the home indicator. */
-              className="relative z-10 flex h-full w-full max-w-md flex-col justify-between overflow-y-auto overscroll-contain bg-white px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-7 sm:pb-[max(1.75rem,env(safe-area-inset-bottom))]"
+              className="relative z-10 flex h-full w-full max-w-md flex-col justify-between overflow-y-auto overscroll-contain bg-[#FFFFFF] px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-7 sm:pb-[max(1.75rem,env(safe-area-inset-bottom))]"
             >
               <div>
-                <div className="flex items-center justify-between border-b border-black/8 pb-5">
+                <div className="flex items-center justify-between border-b border-[#14120C]/8 pb-5">
                   <span className="text-lg font-medium tracking-[-0.02em]">Your cart</span>
                   <button
                     onClick={() => setIsCartOpen(false)}
-                    className="cursor-pointer rounded-full p-2 transition-colors hover:bg-black/5"
+                    className="cursor-pointer rounded-full p-2 transition-colors hover:bg-[#14120C]/5"
                     aria-label="Close cart"
                   >
                     <X size={18} />
@@ -2610,9 +2445,9 @@ export default function LandingPageMaster({
 
                 {cart.length === 0 ? (
                   <div className="py-20 text-center">
-                    <ShoppingBag size={36} className="mx-auto mb-4 text-black/15" />
+                    <ShoppingBag size={36} className="mx-auto mb-4 text-[#14120C]/15" />
                     <p className="text-[14px] font-medium">Your cart is empty</p>
-                    <p className="mt-1 text-[12px] font-light text-black/60">
+                    <p className="mt-1 text-[12px] font-light text-[#14120C]/60">
                       Add a tag to start protecting something.
                     </p>
                   </div>
@@ -2627,11 +2462,11 @@ export default function LandingPageMaster({
                         />
                         <div className="min-w-0 flex-1">
                           <h4 className="truncate text-[13px] font-medium">{item.product.name}</h4>
-                          <div className="mt-1 text-[13px] font-light text-black/60">
+                          <div className="mt-1 text-[13px] font-light text-[#14120C]/60">
                             ₹{item.product.price}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 rounded-full border border-black/10 p-1">
+                        <div className="flex items-center gap-2 rounded-full border border-[#14120C]/10 p-1">
                           <button
                             onClick={() =>
                               setCart((prev) =>
@@ -2642,7 +2477,7 @@ export default function LandingPageMaster({
                                   .filter((i) => i.qty > 0)
                               )
                             }
-                            className="cursor-pointer rounded-full p-1.5 transition-colors hover:bg-black/5"
+                            className="cursor-pointer rounded-full p-1.5 transition-colors hover:bg-[#14120C]/5"
                             aria-label="Decrease quantity"
                           >
                             <Minus size={12} />
@@ -2656,7 +2491,7 @@ export default function LandingPageMaster({
                                 )
                               )
                             }
-                            className="cursor-pointer rounded-full p-1.5 transition-colors hover:bg-black/5"
+                            className="cursor-pointer rounded-full p-1.5 transition-colors hover:bg-[#14120C]/5"
                             aria-label="Increase quantity"
                           >
                             <Plus size={12} />
@@ -2669,17 +2504,17 @@ export default function LandingPageMaster({
               </div>
 
               {cart.length > 0 && (
-                <div className="border-t border-black/8 pt-5">
+                <div className="border-t border-[#14120C]/8 pt-5">
                   <div className="mb-5 flex items-center justify-between text-base font-medium">
                     <span>Subtotal</span>
                     <span>₹{cartSubtotal}</span>
                   </div>
                   <button
                     onClick={openCheckout}
-                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#0B0B0C] py-4 text-[13px] font-semibold text-white transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#C9A227] py-4 text-[13px] font-semibold text-[#14120C] transition-transform hover:scale-[1.01] active:scale-[0.99]"
                   >
                     Proceed to checkout
-                    <ArrowRight size={14} style={{ color: '#F6C000' }} />
+                    <ArrowRight size={14} style={{ color: '#14120C' }} />
                   </button>
                 </div>
               )}
@@ -2700,7 +2535,7 @@ export default function LandingPageMaster({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-[#14120C]/60 backdrop-blur-sm"
               onClick={() => {
                 setIsPartnerModalOpen(false);
                 setPartnerSubmitted(false);
@@ -2711,14 +2546,14 @@ export default function LandingPageMaster({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 16, scale: 0.98 }}
               transition={{ duration: 0.4, ease: EASE }}
-              className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-7 text-left sm:p-9"
+              className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-[#FFFFFF] p-7 text-left sm:p-9"
             >
               <button
                 onClick={() => {
                   setIsPartnerModalOpen(false);
                   setPartnerSubmitted(false);
                 }}
-                className="absolute right-5 top-5 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/5 text-black/50 transition-colors hover:bg-black/10"
+                className="absolute right-5 top-5 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-[#14120C]/5 text-[#14120C]/50 transition-colors hover:bg-[#14120C]/10"
                 aria-label="Close"
               >
                 <X size={17} />
@@ -2730,9 +2565,9 @@ export default function LandingPageMaster({
                     <CheckCircle2 size={26} className="text-emerald-600" />
                   </div>
                   <h3 className="text-2xl font-medium tracking-[-0.02em]">Distributor approved</h3>
-                  <p className="mx-auto max-w-xs text-[13px] font-light leading-relaxed text-black/55">
+                  <p className="mx-auto max-w-xs text-[13px] font-light leading-relaxed text-[#14120C]/55">
                     Congratulations{' '}
-                    <span className="font-medium text-[#0B0B0C]">
+                    <span className="font-medium text-[#14120C]">
                       {profile?.fullName || userAppStatus.userName}
                     </span>
                     . Your franchise application has been verified and your distributor dashboard
@@ -2743,20 +2578,20 @@ export default function LandingPageMaster({
                       setIsPartnerModalOpen(false);
                       onOpenDistributorDashboard?.();
                     }}
-                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#0B0B0C] py-3.5 text-[13px] font-semibold text-white"
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#C9A227] py-3.5 text-[13px] font-semibold text-[#14120C]"
                   >
                     Open distributor dashboard <ArrowRight size={15} />
                   </button>
                 </div>
               ) : userAppStatus?.status === 'pending' || partnerSubmitted ? (
                 <div className="space-y-5 py-6 text-center">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-black/5">
-                    <Loader2 size={24} className="animate-spin text-black/40" />
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#14120C]/5">
+                    <Loader2 size={24} className="animate-spin text-[#14120C]/40" />
                   </div>
                   <h3 className="text-2xl font-medium tracking-[-0.02em]">Pending verification</h3>
-                  <p className="mx-auto max-w-xs text-[13px] font-light leading-relaxed text-black/55">
+                  <p className="mx-auto max-w-xs text-[13px] font-light leading-relaxed text-[#14120C]/55">
                     Thank you{' '}
-                    <span className="font-medium text-[#0B0B0C]">
+                    <span className="font-medium text-[#14120C]">
                       {partnerForm.name || userAppStatus?.userName || 'partner'}
                     </span>
                     . Please wait — our team will accept your distributor request and contact you shortly.
@@ -2766,7 +2601,7 @@ export default function LandingPageMaster({
                       setIsPartnerModalOpen(false);
                       setPartnerSubmitted(false);
                     }}
-                    className="cursor-pointer rounded-full bg-black/5 px-6 py-3 text-[13px] font-medium text-black/70 transition-colors hover:bg-black/10"
+                    className="cursor-pointer rounded-full bg-[#14120C]/5 px-6 py-3 text-[13px] font-medium text-[#14120C]/70 transition-colors hover:bg-[#14120C]/10"
                   >
                     Close
                   </button>
@@ -2774,12 +2609,12 @@ export default function LandingPageMaster({
               ) : (
                 <>
                   <div className="mb-6 flex items-center gap-3">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-black/[0.04]">
-                      <Handshake size={19} className="text-black/60" />
+                    <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#14120C]/[0.04]">
+                      <Handshake size={19} className="text-[#14120C]/60" />
                     </span>
                     <div>
                       <h3 className="text-xl font-medium tracking-[-0.02em]">Become a partner</h3>
-                      <p className="text-[12px] font-light text-black/60">
+                      <p className="text-[12px] font-light text-[#14120C]/60">
                         Apply for a RepiQR distributorship or franchise
                       </p>
                     </div>
@@ -2787,7 +2622,7 @@ export default function LandingPageMaster({
 
                   <form onSubmit={handlePartnerSubmit} className="space-y-4">
                     <div>
-                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
+                      <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-[#14120C]/60">
                         Full name / company
                       </label>
                       <input
@@ -2798,13 +2633,13 @@ export default function LandingPageMaster({
                         onChange={(e) => setPartnerForm({ ...partnerForm, name: e.target.value })}
                         /* 16px on phones: iOS Safari zooms the whole page when a
                            focused field is smaller, and never zooms back out. */
-                        className="w-full rounded-xl border border-black/12 px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#0B0B0C] sm:text-[14px]"
+                        className="w-full rounded-xl border border-[#14120C]/12 px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#14120C] sm:text-[14px]"
                       />
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
-                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
+                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-[#14120C]/60">
                           Phone / WhatsApp
                         </label>
                         <PhoneInputWithCountry
@@ -2814,7 +2649,7 @@ export default function LandingPageMaster({
                         />
                       </div>
                       <div>
-                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-black/60">
+                        <label className="mb-2 block text-[11px] font-light uppercase tracking-[0.14em] text-[#14120C]/60">
                           City &amp; state
                         </label>
                         <input
@@ -2825,17 +2660,17 @@ export default function LandingPageMaster({
                           onChange={(e) => setPartnerForm({ ...partnerForm, city: e.target.value })}
                           /* 16px on phones: iOS Safari zooms the whole page when a
                            focused field is smaller, and never zooms back out. */
-                        className="w-full rounded-xl border border-black/12 px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#0B0B0C] sm:text-[14px]"
+                        className="w-full rounded-xl border border-[#14120C]/12 px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#14120C] sm:text-[14px]"
                         />
                       </div>
                     </div>
 
                     <button
                       type="submit"
-                      className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#0B0B0C] py-4 text-[13px] font-semibold text-white transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                      className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#C9A227] py-4 text-[13px] font-semibold text-[#14120C] transition-transform hover:scale-[1.01] active:scale-[0.99]"
                     >
                       Submit application
-                      <ArrowRight size={14} style={{ color: '#F6C000' }} />
+                      <ArrowRight size={14} style={{ color: '#14120C' }} />
                     </button>
                   </form>
                 </>

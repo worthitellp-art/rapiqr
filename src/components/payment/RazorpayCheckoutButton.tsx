@@ -181,7 +181,7 @@ export const RazorpayCheckoutButton: React.FC<RazorpayCheckoutButtonProps> = ({
           </>
         ) : (
           <>
-            <CreditCard className="w-4 h-4 text-amber-400" />
+            <CreditCard className="w-4 h-4 text-white" />
             <span>{buttonText || defaultButtonLabel}</span>
           </>
         )}

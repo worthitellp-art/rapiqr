@@ -21,6 +21,13 @@ const { logger } = require('../middleware/loggerMiddleware');
 const { resolveProvider } = require('./providers');
 const { getTemplate, buildBody, buildVariables } = require('./notificationTemplates');
 
+/** Per (recipient, notification type) WhatsApp cap, resets every calendar month. */
+const MONTHLY_LIMIT_PER_TYPE = 10;
+
+// OTP is a login/verification code, never subject to the notification quota —
+// capping it could lock a client out of their own account.
+const UNLIMITED_TYPES = new Set(['OTP']);
+
 /**
  * Send one notification.
  *
@@ -36,6 +43,16 @@ async function notify({ type, to, data = {}, eventId = null }) {
   if (!template) {
     logger.warn('NOTIFY', `Unknown notification type "${type}" — nothing sent.`);
     return { sent: false, mock: false, status: 'skipped', error: 'unknown_type' };
+  }
+
+  const event = `NOTIFY_${type}`;
+
+  if (!UNLIMITED_TYPES.has(type)) {
+    const sentThisMonth = await MessageModel.countThisMonth({ to, event });
+    if (sentThisMonth >= MONTHLY_LIMIT_PER_TYPE) {
+      logger.warn('NOTIFY', `Monthly WhatsApp limit (${MONTHLY_LIMIT_PER_TYPE}) reached for ${type} to ${to} — skipping.`);
+      return { sent: false, mock: false, status: 'limit_reached', error: 'monthly_limit_reached' };
+    }
   }
 
   const body = buildBody(type, data);
@@ -54,7 +71,7 @@ async function notify({ type, to, data = {}, eventId = null }) {
     MessageModel.record({
       channel: 'whatsapp',
       to,
-      event: `NOTIFY_${type}`,
+      event,
       status: result.status,
       sid: result.providerMessageId || null,
       error: result.error || null,
@@ -64,7 +81,7 @@ async function notify({ type, to, data = {}, eventId = null }) {
     return { ...result, eventId };
   } catch (err) {
     logger.error('NOTIFY', `Provider "${provider.name}" threw sending ${type} to ${to}`, err);
-    MessageModel.record({ channel: 'whatsapp', to, event: `NOTIFY_${type}`, status: 'failed', error: err.message, body });
+    MessageModel.record({ channel: 'whatsapp', to, event, status: 'failed', error: err.message, body });
     return { sent: false, mock: false, status: 'failed', error: err.message };
   }
 }
@@ -86,6 +103,27 @@ const notifyOwner = ({ type, ownerPhone, data, eventId }) =>
 const notifyEmergencyContacts = ({ type = 'EMERGENCY_CONTACT_ALERT', contacts = [], data, eventId }) =>
   notifyMany({ type, recipients: contacts, data, eventId });
 
+/**
+ * "You've been added as an emergency contact" — sent once per contact when a
+ * sticker owner registers them (see QrController.activateQrCode). Unlike
+ * notifyMany, each contact needs ITS OWN name filled into the message
+ * alongside the owner's, so this sends one personalized `notify()` per
+ * contact rather than sharing a single `data` blob across all of them.
+ */
+const notifyContactsAdded = ({ contacts = [], ownerName, eventId = null }) => {
+  const targets = contacts.filter((c) => c?.phone);
+  return Promise.all(
+    targets.map((c) =>
+      notify({
+        type: 'EMERGENCY_CONTACT_ADDED',
+        to: c.phone,
+        data: { contact_name: c.name || 'there', owner_name: ownerName || 'A RapiQR user' },
+        eventId,
+      })
+    )
+  ).then((results) => ({ results, delivered: results.filter((r) => r.sent).length, attempted: targets.length }));
+};
+
 const sendQRScanAlert = ({ ownerPhone, data, eventId }) =>
   notify({ type: 'QR_SCAN_ALERT', to: ownerPhone, data, eventId });
 
@@ -106,6 +144,7 @@ module.exports = {
   notifyMany,
   notifyOwner,
   notifyEmergencyContacts,
+  notifyContactsAdded,
   sendQRScanAlert,
   sendEmergencyAlert,
   sendLocationAlert,

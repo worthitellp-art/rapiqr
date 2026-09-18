@@ -268,7 +268,7 @@ export default function ShopProductsPage({ setToast }: { setToast: (msg: string 
                       <span className="px-1.5 py-0.5 rounded bg-[var(--fx-canvas)] border border-[var(--fx-border)]">{p.category}</span>
                       {p.rating > 0 && (
                         <span className="inline-flex items-center gap-0.5">
-                          <Star size={11} className="text-amber-500" fill="currentColor" /> {p.rating}
+                          <Star size={11} className="text-[#111111]" fill="currentColor" /> {p.rating}
                         </span>
                       )}
                     </div>

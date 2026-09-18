@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { LanguageProvider } from './context/LanguageContext';
 import AdminAuthModal from './components/auth/AdminAuthModal';
 import AuthCallback from './pages/AuthCallback';
 
@@ -338,6 +339,10 @@ function MainAppContent() {
           onOrderComplete={() => {
             try { localStorage.removeItem('namoqr-cart'); } catch { /* ignore */ }
           }}
+          onRegisterSticker={(stickerId) => {
+            window.history.pushState({}, '', `/?sticker=${encodeURIComponent(stickerId)}`);
+            navigateTo('scan');
+          }}
         />
         <TrackOrderModal
           isOpen={trackModalOpen}
@@ -402,8 +407,10 @@ function MainAppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <MainAppContent />
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <MainAppContent />
+      </AuthProvider>
+    </LanguageProvider>
   );
 }

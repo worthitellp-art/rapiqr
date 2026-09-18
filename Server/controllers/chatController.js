@@ -66,7 +66,7 @@ async function fanOutMessage(session, message, isOwner, previewText) {
       notifyOwner({
         type: 'CHAT_MESSAGE',
         ownerPhone: product.details.ownerPhone,
-        data: { label, message: previewText, link: `${APP_URL}/#/dashboard?tab=chat` },
+        data: { label, message: previewText, link: `${APP_URL}/#/dashboard?tab=chat&session=${session.id}` },
         eventId: session.id,
       }).catch((err) => logger.error('CHAT_MESSAGE', 'Failed to notify owner', err));
     }
@@ -77,7 +77,7 @@ async function fanOutMessage(session, message, isOwner, previewText) {
       pushService.sendToUser(ownerId, {
         title: `New message about ${label}`,
         body: previewText,
-        url: '/#/dashboard?tab=chat',
+        url: `/#/dashboard?tab=chat&session=${session.id}`,
         tag: `chat-${session.id}`,
       }).catch((err) => logger.error('CHAT_MESSAGE', 'Failed to push-notify owner', err));
     }
@@ -205,7 +205,7 @@ class ChatController {
         notifyOwner({
           type: 'CHAT_STARTED',
           ownerPhone,
-          data: { label: vehicleLabel || 'your RapiQR item', link: `${APP_URL}/#/dashboard?tab=chat` },
+          data: { label: vehicleLabel || 'your RapiQR item', link: `${APP_URL}/#/dashboard?tab=chat&session=${session.id}` },
           eventId: session.id,
         }).catch((err) => logger.error('CHAT_STARTED', 'Failed to notify owner of new chat', err));
       }

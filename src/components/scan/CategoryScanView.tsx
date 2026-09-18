@@ -334,7 +334,7 @@ export default function CategoryScanView({
                     </div>
                     <a
                       href={`tel:${String(p.phone).replace(/\s/g, "")}`}
-                      className="bg-[#F6C000] hover:bg-[#E0AE00] text-[#4A3900] font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 flex-shrink-0 transition-colors"
+                      className="bg-[#111111] hover:bg-black text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 flex-shrink-0 transition-colors"
                     >
                       <Phone size={13} /> Call
                     </a>

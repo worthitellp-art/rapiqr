@@ -83,10 +83,30 @@ class AlertController {
         const label = alertPayload.vehicleName || alertPayload.vehicleNumber || product.name || 'your RapiQR item';
         const text = buildAlertChatText(label, alertPayload.message);
 
-        // The owner's copy carries a deep link into the dashboard inbox, so the
-        // notification is the entry point into the chat with whoever scanned the
-        // tag. Contacts don't get it — that inbox isn't theirs.
-        const chatLink = `${APP_URL}/#/dashboard?tab=chat`;
+        // Seed/continue the visitor's RepiChat thread with this alert first, so
+        // the chat link below can point straight at that thread instead of just
+        // the generic inbox — resolved ahead of notifyOwner deliberately.
+        if (alertPayload.customerToken) {
+          const { session } = await ChatModel.findOrCreateOpenSession({
+            qrCodeId: qrId,
+            customerToken: alertPayload.customerToken,
+            customerName: alertPayload.customerName || 'Visitor',
+            ownerId: product.user_id || null,
+            vehicleLabel: `${product.name || 'Vehicle'}${product.vehicle_number ? ` (${product.vehicle_number})` : ''}`,
+          });
+          if (session) {
+            chatSessionId = session.id;
+            const chatMessage = await ChatModel.insertMessage({ sessionId: session.id, senderType: 'customer', senderId: null, body: text });
+            if (chatMessage) getIo()?.to(`session:${session.id}`).emit('new_message', chatMessage);
+          }
+        }
+
+        // The owner's copy carries a deep link into the dashboard inbox — when a
+        // chat thread exists for this alert, straight into that thread, not just
+        // the generic inbox the owner would otherwise have to search through.
+        const chatLink = chatSessionId
+          ? `${APP_URL}/#/dashboard?tab=chat&session=${chatSessionId}`
+          : `${APP_URL}/#/dashboard?tab=chat`;
 
         // An alert that fans out to the family contact list is an emergency; one
         // that goes to the owner alone is a scan report. Same distinction the
@@ -114,23 +134,6 @@ class AlertController {
             eventId: alertPayload.productId || qrId,
           });
           contactsNotified = contactResult.delivered;
-        }
-
-        // Seed/continue the visitor's RepiChat thread with this alert so it
-        // shows up in the owner's chat inbox in real time.
-        if (alertPayload.customerToken) {
-          const { session } = await ChatModel.findOrCreateOpenSession({
-            qrCodeId: qrId,
-            customerToken: alertPayload.customerToken,
-            customerName: alertPayload.customerName || 'Visitor',
-            ownerId: product.user_id || null,
-            vehicleLabel: `${product.name || 'Vehicle'}${product.vehicle_number ? ` (${product.vehicle_number})` : ''}`,
-          });
-          if (session) {
-            chatSessionId = session.id;
-            const chatMessage = await ChatModel.insertMessage({ sessionId: session.id, senderType: 'customer', senderId: null, body: text });
-            if (chatMessage) getIo()?.to(`session:${session.id}`).emit('new_message', chatMessage);
-          }
         }
       }
 

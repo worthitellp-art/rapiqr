@@ -78,9 +78,9 @@ export default function OrderInvoiceModal({
         {/* Top Control Bar */}
         <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/90 px-5 py-3.5 sm:px-6">
           <div className="flex items-center gap-2 text-sm font-black text-slate-900">
-            <FileText size={18} className="text-amber-500" />
+            <FileText size={18} className="text-[#111111]" />
             <span id="invoice-modal-title">Tax Invoice Preview</span>
-            <span className="hidden sm:inline-block rounded-md bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">
+            <span className="hidden sm:inline-block rounded-md bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-900">
               #{invoiceNumber}
             </span>
           </div>
@@ -92,7 +92,7 @@ export default function OrderInvoiceModal({
               className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-800 shadow-xs"
               title="Print or save as PDF"
             >
-              <Printer size={14} className="text-amber-400" />
+              <Printer size={14} className="text-white" />
               <span>Print / PDF</span>
             </button>
             <button
@@ -113,7 +113,7 @@ export default function OrderInvoiceModal({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-950">
-                  RAPI<span className="text-amber-500">QR</span>
+                  RAPI<span className="text-[#111111]">QR</span>
                 </span>
                 <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-800 tracking-wider">
                   OFFICIAL TAX INVOICE
@@ -270,7 +270,7 @@ export default function OrderInvoiceModal({
               </div>
               <div className="flex justify-between border-t border-slate-300 pt-2 text-sm font-black text-slate-950">
                 <span>Total Amount Paid:</span>
-                <span className="text-amber-600">₹{taxBreakdown.grandTotal.toFixed(2)}</span>
+                <span className="text-[#111111]">₹{taxBreakdown.grandTotal.toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -294,7 +294,7 @@ export default function OrderInvoiceModal({
           <button
             type="button"
             onClick={onPrintInvoice}
-            className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 px-4 py-2 text-xs font-black text-slate-950 transition-colors shadow-xs"
+            className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#111111] hover:bg-black px-4 py-2 text-xs font-black text-white transition-colors shadow-xs"
           >
             <Download size={14} />
             <span>Download / Print Invoice</span>

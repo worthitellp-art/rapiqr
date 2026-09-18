@@ -3,7 +3,7 @@ import {
   ShoppingBag, Search, Truck, CheckCircle2, XCircle, Clock,
   Phone, Mail, MapPin, IndianRupee, Trash2, AlertTriangle, Loader2,
   RefreshCw, ExternalLink, Plus, ArrowUp, ArrowDown, ArrowUpDown,
-  ChevronLeft, ChevronRight, X
+  ChevronLeft, ChevronRight, X, Tag, Copy
 } from "lucide-react";
 import { apiClient, OrderTracking } from "../../../lib/apiClient";
 import { fmtDateTime } from "./helpers";
@@ -16,6 +16,13 @@ interface OrderPayment {
   amount?: number;
   currency?: string;
   paidAt?: string;
+}
+interface OrderSticker {
+  id: string;
+  category: string;
+  qrUrl?: string;
+  recoveryCode?: string;
+  itemName?: string | null;
 }
 interface Order {
   id: string;
@@ -33,6 +40,7 @@ interface Order {
   shippingAddress?: { address?: string; city?: string; state?: string; pincode?: string } | null;
   payment?: OrderPayment | null;
   shiprocket?: OrderTracking | null;
+  stickers?: OrderSticker[];
   createdAt: string;
 }
 
@@ -803,6 +811,39 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-[var(--fx-ink-2)] uppercase tracking-wide flex items-center gap-1.5 mb-1.5">
+                  <Tag size={11} /> Auto-Generated Stickers
+                </label>
+                {selectedOrder.stickers && selectedOrder.stickers.length > 0 ? (
+                  <div className="bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-[10px] divide-y divide-[var(--fx-border)] overflow-hidden">
+                    {selectedOrder.stickers.map((s) => (
+                      <div key={s.id} className="flex items-center justify-between gap-2 p-3">
+                        <div className="min-w-0">
+                          <div className="font-mono text-[11px] font-bold text-[var(--fx-ink)] truncate">{s.id}</div>
+                          <div className="text-[11px] text-[var(--fx-ink-2)] capitalize">{s.category}{s.itemName ? ` · ${s.itemName}` : ""}</div>
+                        </div>
+                        {s.recoveryCode && (
+                          <button
+                            className="fx-icon-btn flex items-center gap-1 text-[11px] font-mono font-semibold text-[var(--fx-ink)] bg-white border border-[var(--fx-border)] rounded-md px-2 py-1 flex-shrink-0"
+                            title="Copy recovery code"
+                            onClick={() => navigator.clipboard?.writeText(s.recoveryCode || "")}
+                          >
+                            {s.recoveryCode} <Copy size={11} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11.5px] text-[var(--fx-ink-2)] bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-[10px] p-3">
+                    {selectedOrder.payment?.status === "paid"
+                      ? "Generating…"
+                      : "Tags mint automatically once payment is confirmed."}
+                  </p>
+                )}
               </div>
 
               <div className="bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-[10px] p-3.5 space-y-1.5">

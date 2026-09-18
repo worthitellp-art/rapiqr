@@ -59,6 +59,29 @@ class MessageModel {
   }
 
   /**
+   * How many of this (recipient, event) pair have gone out since the start of
+   * the current calendar month — backs the per-type monthly WhatsApp cap in
+   * notificationService. Only successful sends count against the cap; a
+   * failed attempt didn't reach the client and shouldn't cost them a slot.
+   */
+  static async countThisMonth({ to, event, channel = 'whatsapp' }) {
+    try {
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      return await SmsMessage.countDocuments({
+        channel,
+        to_number: to,
+        event,
+        status: { $in: ['sent', 'simulated'] },
+        created_at: { $gte: startOfMonth },
+      });
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
    * Exact counts (not row-limited like getMessages), so the stat tiles stay
    * accurate however large the collection grows.
    */

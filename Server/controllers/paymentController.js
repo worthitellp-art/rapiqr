@@ -196,6 +196,25 @@ class PaymentController {
             paidAt: new Date().toISOString(),
           });
         }
+
+        // Mint the physical sticker(s) this order paid for right away — no
+        // admin has to open "Generate tag" for a checkout sale, and the
+        // buyer's own success screen can send them straight into registering
+        // it. Awaited (not fire-and-forget) so those ids are ready in THIS
+        // response — the signature check above already proved this is a
+        // genuine payment, and the call is idempotent (see
+        // generateStickersForOrder's atomic claim) so it's safe to run even
+        // when the Razorpay webhook already flipped this order to 'paid' and
+        // may be minting the same batch concurrently. A failure here must
+        // never fail payment verification — the money is already captured.
+        if (matchedOrder) {
+          try {
+            const stickers = await OrderModel.generateStickersForOrder(matchedOrder.id);
+            matchedOrder = { ...matchedOrder, stickers };
+          } catch (err) {
+            logger.error('ORDER_STICKER_AUTOGEN', `Failed to auto-generate stickers for order ${matchedOrder.id}`, err);
+          }
+        }
       } catch (dbError) {
         // Best effort reconciliation: do not fail verification if DB is offline/buffering
         logger.warn('PAYMENT_VERIFY', `Order database lookup skipped: ${dbError?.message}`);
@@ -287,6 +306,11 @@ class PaymentController {
           source: 'webhook',
         });
         logger.event('PAYMENT', '✅', `Payment captured via webhook for order ${order.id} (${entity.id})`);
+        // Mint the physical sticker(s) this order paid for right away —
+        // no admin has to open "Generate tag" for a checkout sale.
+        OrderModel.generateStickersForOrder(order.id).catch((err) => {
+          logger.error('ORDER_STICKER_AUTOGEN', `Failed to auto-generate stickers for order ${order.id}`, err);
+        });
       } else if (event === 'payment.failed') {
         // Never downgrade a paid order — a customer whose first attempt failed
         // and second succeeded can have the events arrive out of order.

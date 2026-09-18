@@ -68,7 +68,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
 
         {/* Header Icon & Title */}
         <div className="text-center">
-          <div className="w-13 h-13 rounded-2xl bg-[#FFF7DC] border border-[#F6C000]/40 text-[#A16207] flex items-center justify-center mx-auto mb-3.5">
+          <div className="w-13 h-13 rounded-2xl bg-[#F5F5F5] border border-[#111111]/40 text-[#111111] flex items-center justify-center mx-auto mb-3.5">
             <ShieldAlert size={26} />
           </div>
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
@@ -78,8 +78,8 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
 
         {/* Error Feedback Message */}
         {errorMessage && (
-          <div className="p-3.5 rounded-2xl bg-[#FFF7DC] border border-[#E0AE00]/40 text-[#4A3900] text-xs font-semibold flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#E0AE00] shrink-0" />
+          <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-red-600 shrink-0" />
             <span>{errorMessage}</span>
           </div>
         )}
@@ -98,7 +98,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
                 placeholder="worthitellp@gmail.com"
                 value={adminEmail}
                 onChange={handleAdminEmailChange}
-                className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#F6C000] focus:ring-2 focus:ring-[#F6C000]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
+                className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#111111] focus:ring-2 focus:ring-[#111111]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
               />
             </div>
           </div>
@@ -115,7 +115,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
                 placeholder="••••••••"
                 value={adminPassword}
                 onChange={handleAdminPasswordChange}
-                className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#F6C000] focus:ring-2 focus:ring-[#F6C000]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
+                className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#111111] focus:ring-2 focus:ring-[#111111]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
               />
             </div>
           </div>
@@ -123,7 +123,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-4 rounded-2xl font-bold text-[#4A3900] text-sm flex items-center justify-center gap-2 bg-[#F6C000] hover:bg-[#E0AE00] active:scale-[0.99] transition-all cursor-pointer disabled:opacity-60"
+            className="w-full py-4 rounded-2xl font-bold text-[#FFFFFF] text-sm flex items-center justify-center gap-2 bg-[#111111] hover:bg-[#000000] active:scale-[0.99] transition-all cursor-pointer disabled:opacity-60"
           >
             {isSubmitting ? (
               <Loader2 className="w-5 h-5 animate-spin" />

@@ -91,6 +91,14 @@ const MSG91_TEMPLATES = {
     body: 'RepiQR new message: you have a new message from a visitor regarding your tag "{{label}}". The message reads: "{{message}}". Open your dashboard here: {{link}} to read and respond.',
   },
 
+  EMERGENCY_CONTACT_ADDED: {
+    name: process.env.MSG91_WHATSAPP_CONTACT_ADDED_TEMPLATE || 'emergency_contact_added',
+    audience: 'emergency_contact',
+    variables: ['contact_name', 'owner_name'],
+    defaults: { contact_name: 'there', owner_name: 'A RapiQR user' },
+    body: 'Hi {{contact_name}}, {{owner_name}} has added you as an emergency contact on their RapiQR safety tag. If they are ever in an emergency, you may be contacted to help. No action is needed right now.',
+  },
+
   SAFE_STATUS: {
     name: 'safe_status',
     audience: 'emergency_contact',
@@ -117,7 +125,7 @@ const MSG91_TEMPLATES = {
 };
 
 /** Max clip length per variable key (message text tends to run long). */
-const CLIP_MAX = { label: 40, message: 80 };
+const CLIP_MAX = { label: 40, message: 80, contact_name: 40, owner_name: 40 };
 
 /**
  * Render an MSG91 body with the runtime values filled into {{1}}, {{2}}, ...

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ShieldCheck, Loader2, Check, X, Mail, Smartphone } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
+import { sendMsg91Otp, verifyMsg91Otp, toMsg91Identifier } from '../../../lib/msg91Widget';
 
 const inputCls = 'w-full px-3.5 py-2.5 text-sm bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-xl outline-none focus:border-[var(--fx-ink)]';
 
@@ -41,14 +42,22 @@ export default function CompleteProfilePopup({
     setBusy(true);
     setMsg(null);
     const res = await sendPhoneOtp(phoneDraft.trim());
-    setBusy(false);
     if (!res.success) {
+      setBusy(false);
       setMsg({ tone: 'error', text: res.error || 'Failed to send code.' });
       return;
     }
-    setOtpCode('');
-    setOtpStep(true);
-    setMsg({ tone: 'success', text: 'Code sent! Enter it below (or use 000000 as a bypass code).' });
+    try {
+      // Pre-check passed — the MSG91 widget actually sends the OTP.
+      await sendMsg91Otp(toMsg91Identifier(phoneDraft));
+      setOtpCode('');
+      setOtpStep(true);
+      setMsg({ tone: 'success', text: 'Code sent! Enter it below.' });
+    } catch (err: any) {
+      setMsg({ tone: 'error', text: err?.message || 'Failed to send the verification code.' });
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleDismissForever = () => {
@@ -67,7 +76,15 @@ export default function CompleteProfilePopup({
     }
     setBusy(true);
     setMsg(null);
-    const res = await verifyPhoneOtp(otpCode.trim());
+    let res;
+    try {
+      const accessToken = await verifyMsg91Otp(otpCode.trim());
+      res = await verifyPhoneOtp(accessToken);
+    } catch (err: any) {
+      setBusy(false);
+      setMsg({ tone: 'error', text: err?.message || 'Incorrect code — please try again.' });
+      return;
+    }
     setBusy(false);
     if (!res.success) {
       setMsg({ tone: 'error', text: res.error || 'Verification failed.' });

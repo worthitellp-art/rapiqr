@@ -27,7 +27,7 @@ function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
           href={match[3]}
           target={isMail ? undefined : '_blank'}
           rel={isMail ? undefined : 'noopener noreferrer'}
-          className="text-amber-700 underline hover:text-amber-800"
+          className="text-[#111111] underline hover:text-black"
         >
           {match[2]}
         </a>

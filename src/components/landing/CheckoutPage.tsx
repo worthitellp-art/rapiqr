@@ -71,6 +71,7 @@ interface CheckoutPageProps {
   onViewDashboard: () => void;
   onOrderComplete?: () => void;
   onTrackOrder?: (orderId: string, contact?: string) => void;
+  onRegisterSticker?: (stickerId: string) => void;
 }
 
 declare global {
@@ -97,6 +98,7 @@ export default function CheckoutPage({
   onViewDashboard,
   onOrderComplete,
   onTrackOrder,
+  onRegisterSticker,
 }: CheckoutPageProps) {
   const { isLoggedIn, profile } = useAuth();
 
@@ -107,6 +109,13 @@ export default function CheckoutPage({
   const [recognized, setRecognized] = useState(false);
   const [invoice, setInvoice] = useState<OrderInvoice | null>(null);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  // The QR tag(s) auto-minted for this order the moment payment cleared (see
+  // OrderModel.generateStickersForOrder) — surfaced on the success screen so
+  // the buyer can register their own sticker right away instead of waiting
+  // for it to arrive in the post and scanning it cold.
+  const [purchasedStickers, setPurchasedStickers] = useState<
+    { id: string; category: string; itemName?: string | null }[]
+  >([]);
 
   // Cart is persisted in localStorage
   const [cart, setCart] = useState<CheckoutCartItem[]>(() => {
@@ -448,10 +457,15 @@ export default function CheckoutPage({
       return;
     }
 
+    // id + category travel through to the backend so it can (a) validate price
+    // against the server catalog and (b) auto-mint the right sticker category
+    // per item once payment clears (see OrderModel.generateStickersForOrder).
     const items = cart.map((i) => ({
+      id: i.product.id,
       name: i.product.name,
       qty: i.qty,
       price: i.product.price,
+      category: i.product.category,
     }));
 
     let newOrderId: string = '';
@@ -572,7 +586,7 @@ export default function CheckoutPage({
         email: email.trim(),
         contact: phone.trim(),
       },
-      theme: { color: '#FACC15' },
+      theme: { color: '#111111' },
       handler: async (response: any) => {
         try {
           const verifyRes = await apiClient.payments.verify({
@@ -583,6 +597,9 @@ export default function CheckoutPage({
           });
           if (!verifyRes?.success)
             throw new Error(verifyRes?.error || 'Payment verification failed');
+          if (Array.isArray(verifyRes.data?.stickers)) {
+            setPurchasedStickers(verifyRes.data.stickers);
+          }
         } catch (err: any) {
           setStep('details');
           setError(
@@ -706,7 +723,7 @@ export default function CheckoutPage({
         {/* ── EMPTY CART STATE ── */}
         {cart.length === 0 && step !== 'success' && (
           <div className="max-w-md mx-auto my-16 p-8 bg-white rounded-2xl border border-gray-200 shadow-sm text-center">
-            <div className="w-14 h-14 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center mx-auto mb-4">
+            <div className="w-14 h-14 rounded-xl bg-gray-100 text-[#111111] flex items-center justify-center mx-auto mb-4">
               <ShoppingBag size={26} />
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-2">Your Cart is Empty</h3>
@@ -715,7 +732,7 @@ export default function CheckoutPage({
             </p>
             <button
               onClick={onBack}
-              className="w-full py-3 rounded-lg bg-amber-400 hover:bg-amber-300 text-gray-950 font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-3 rounded-lg bg-[#111111] hover:bg-black text-white font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>Browse Products</span>
               <ArrowRight size={16} />
@@ -739,15 +756,15 @@ export default function CheckoutPage({
                   </div>
                 </div>
               ) : (
-                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-950 text-xs sm:text-sm flex items-center justify-between gap-3">
+                <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-xs sm:text-sm flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <User size={16} className="text-amber-600 shrink-0" />
+                    <User size={16} className="text-[#111111] shrink-0" />
                     <span>Quick guest checkout — no password required.</span>
                   </div>
                   <button
                     type="button"
                     onClick={onOpenLogin}
-                    className="font-bold text-gray-950 underline hover:text-amber-700 shrink-0 cursor-pointer"
+                    className="font-bold text-gray-950 underline hover:text-black shrink-0 cursor-pointer"
                   >
                     Log In
                   </button>
@@ -759,7 +776,7 @@ export default function CheckoutPage({
                 {/* ── 1. Contact Information ── */}
                 <div className="space-y-3.5 rounded-xl border border-gray-200 bg-white p-5">
                   <div className="flex items-center gap-2.5 pb-2.5 border-b border-gray-100">
-                    <span className="w-5 h-5 rounded-full bg-gray-950 text-amber-300 text-[11px] font-bold flex items-center justify-center">
+                    <span className="w-5 h-5 rounded-full bg-gray-950 text-white text-[11px] font-bold flex items-center justify-center">
                       1
                     </span>
                     <h2 className="font-bold text-sm text-gray-950">Contact Information</h2>
@@ -773,7 +790,7 @@ export default function CheckoutPage({
                         aria-label="Full Name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/15 text-sm font-medium text-gray-900 outline-hidden transition-all"
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-white focus:border-[#111111] focus:ring-2 focus:ring-black/10 text-sm font-medium text-gray-900 outline-hidden transition-all"
                       />
                     </div>
 
@@ -799,7 +816,7 @@ export default function CheckoutPage({
                         placeholder="rahul@example.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-9 pr-3.5 py-2.5 rounded-lg border border-gray-200 bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/15 text-sm font-medium text-gray-900 outline-hidden transition-all"
+                        className="w-full pl-9 pr-3.5 py-2.5 rounded-lg border border-gray-200 bg-white focus:border-[#111111] focus:ring-2 focus:ring-black/10 text-sm font-medium text-gray-900 outline-hidden transition-all"
                       />
                     </div>
                   </div>
@@ -809,7 +826,7 @@ export default function CheckoutPage({
                 <div className="space-y-3.5 rounded-xl border border-gray-200 bg-white p-5">
                   <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-gray-100">
                     <div className="flex items-center gap-2.5">
-                      <span className="w-5 h-5 rounded-full bg-gray-950 text-amber-300 text-[11px] font-bold flex items-center justify-center">
+                      <span className="w-5 h-5 rounded-full bg-gray-950 text-white text-[11px] font-bold flex items-center justify-center">
                         2
                       </span>
                       <h2 className="font-bold text-sm text-gray-950">Shipping Address</h2>
@@ -818,7 +835,7 @@ export default function CheckoutPage({
                       type="button"
                       onClick={handleUseCurrentLocation}
                       disabled={locating}
-                      className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-700 hover:text-amber-800 cursor-pointer disabled:opacity-60"
+                      className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#111111] hover:text-black cursor-pointer disabled:opacity-60"
                     >
                       {locating ? <Loader2 size={13} className="animate-spin" /> : <LocateFixed size={13} />}
                       {locating ? 'Locating…' : 'Use current location'}
@@ -840,7 +857,7 @@ export default function CheckoutPage({
                         placeholder="Flat 402, Green Heights, Opp. City Park"
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
-                        className="w-full pl-9 pr-3.5 py-2.5 rounded-lg border border-gray-200 bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/15 text-sm font-medium text-gray-900 outline-hidden transition-all"
+                        className="w-full pl-9 pr-3.5 py-2.5 rounded-lg border border-gray-200 bg-white focus:border-[#111111] focus:ring-2 focus:ring-black/10 text-sm font-medium text-gray-900 outline-hidden transition-all"
                       />
                     </div>
                   </div>
@@ -859,7 +876,7 @@ export default function CheckoutPage({
                         onChange={(e) =>
                           setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))
                         }
-                        className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/15 text-sm font-medium text-gray-900 outline-hidden transition-all"
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-white focus:border-[#111111] focus:ring-2 focus:ring-black/10 text-sm font-medium text-gray-900 outline-hidden transition-all"
                       />
                       {pincodeStatus === 'looking' && (
                         <span className="text-[11px] text-gray-400 mt-1 block">
@@ -914,8 +931,8 @@ export default function CheckoutPage({
                   className="w-full py-3.5 rounded-xl bg-gray-950 hover:bg-gray-900 text-white font-bold text-[15px] transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
                 >
                   <span>Pay ₹{total} Securely</span>
-                  <Lock size={15} className="text-amber-400" />
-                  <ArrowRight size={16} className="text-amber-400" />
+                  <Lock size={15} className="text-white" />
+                  <ArrowRight size={16} className="text-white" />
                 </button>
 
                 <p className="text-center text-[11px] text-gray-500 leading-relaxed">
@@ -931,7 +948,7 @@ export default function CheckoutPage({
 
                 <div className="flex items-center justify-between pb-3 border-b border-gray-100">
                   <div className="flex items-center gap-2 font-bold text-gray-950 text-sm">
-                    <Lock size={15} className="text-amber-500" />
+                    <Lock size={15} className="text-[#111111]" />
                     <span>Order Summary</span>
                   </div>
                   <span className="text-[11px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
@@ -982,7 +999,7 @@ export default function CheckoutPage({
                   </div>
                   <div className="flex items-center justify-between pt-2.5 border-t border-gray-200 text-base font-bold text-gray-950">
                     <span>Total Payable</span>
-                    <span className="text-amber-600">₹{total}</span>
+                    <span className="text-[#111111]">₹{total}</span>
                   </div>
                 </div>
 
@@ -998,7 +1015,7 @@ export default function CheckoutPage({
         {/* ── STEP: PROCESSING MODAL ── */}
         {step === 'processing' && (
           <div className="max-w-md mx-auto my-16 p-8 bg-white rounded-2xl border border-gray-200 shadow-lg text-center space-y-3.5">
-            <div className="w-14 h-14 rounded-full border-4 border-amber-400 border-t-transparent animate-spin mx-auto" />
+            <div className="w-14 h-14 rounded-full border-4 border-[#111111] border-t-transparent animate-spin mx-auto" />
             <h3 className="text-lg font-bold text-gray-950">Processing Payment Securely</h3>
             <p className="text-sm text-gray-500">
               Please do not close or refresh this page. Connecting to Razorpay…
@@ -1017,7 +1034,7 @@ export default function CheckoutPage({
               <h2 className="text-xl sm:text-2xl font-bold text-gray-950">Order Confirmed!</h2>
               <p className="text-sm text-gray-600 mt-2">
                 Thank you, <strong>{name.trim()}</strong>! Your order{' '}
-                <span className="font-mono font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                <span className="font-mono font-bold text-[#111111] bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">
                   {orderId}
                 </span>{' '}
                 of <strong>₹{confirmedTotal}</strong> is confirmed.
@@ -1031,6 +1048,36 @@ export default function CheckoutPage({
                 onViewInvoice={() => setIsInvoiceModalOpen(true)}
                 onPrintInvoice={() => printOrderInvoice(invoice)}
               />
+            )}
+
+            {/* ── Register Your Sticker(s) — the tag id(s) already exist server-side
+                (auto-minted the moment payment cleared), so the buyer can register
+                ownership now instead of waiting for the physical sticker to arrive
+                and scanning it cold. Name/phone/address carry over automatically
+                (see ScanPage's prefill-from-last-order effect). ── */}
+            {purchasedStickers.length > 0 && onRegisterSticker && (
+              <div className="p-5 rounded-xl bg-[#EFF4FF] border border-[#C7D7FE] text-left space-y-3">
+                <div className="flex items-center gap-2 font-bold text-[#1E3A8A] text-sm">
+                  <ShieldCheck size={17} className="text-[#446FF2]" />
+                  <span>Register Your Sticker{purchasedStickers.length > 1 ? 's' : ''} Now</span>
+                </div>
+                <p className="text-xs text-[#3B4A6B] leading-relaxed">
+                  Your tag{purchasedStickers.length > 1 ? 's are' : ' is'} ready to activate — add your details and
+                  emergency contacts now so protection is live before it even arrives in the post.
+                </p>
+                <div className="space-y-2">
+                  {purchasedStickers.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => onRegisterSticker(s.id)}
+                      className="w-full py-2.5 px-4 rounded-lg bg-[#111111] hover:bg-black text-white font-bold text-xs transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                    >
+                      <span className="capitalize">Register {s.itemName || s.category} Tag</span>
+                      <ArrowRight size={13} />
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
 
             {recognized ? (
@@ -1048,14 +1095,14 @@ export default function CheckoutPage({
                     className="flex-1 py-2.5 rounded-lg bg-gray-950 hover:bg-gray-900 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <span>Open Client Dashboard</span>
-                    <ArrowRight size={13} className="text-amber-400" />
+                    <ArrowRight size={13} className="text-white" />
                   </button>
                   {onTrackOrder && (
                     <button
                       onClick={() => onTrackOrder(orderId, email.trim() || phone.trim())}
                       className="py-2.5 px-4 rounded-lg bg-white hover:bg-gray-100 text-gray-800 font-bold text-xs border border-gray-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <Truck size={13} className="text-amber-500" />
+                      <Truck size={13} className="text-[#111111]" />
                       <span>Track Order</span>
                     </button>
                   )}
@@ -1070,13 +1117,13 @@ export default function CheckoutPage({
                   Create a free account with your purchase email to track live scan events, set private phone numbers, and manage masked telephony.
                 </p>
                 <div className="p-2.5 rounded-lg bg-white border border-gray-200 text-xs font-mono text-gray-700 flex items-center gap-2">
-                  <Mail size={13} className="text-amber-500" />
+                  <Mail size={13} className="text-[#111111]" />
                   <span>{email.trim()}</span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <button
                     onClick={() => onOpenSignup(email.trim())}
-                    className="flex-1 py-2.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-gray-950 font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    className="flex-1 py-2.5 rounded-lg bg-[#111111] hover:bg-black text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <span>Create Free Account</span>
                     <ArrowRight size={13} />
@@ -1086,7 +1133,7 @@ export default function CheckoutPage({
                       onClick={() => onTrackOrder(orderId, email.trim() || phone.trim())}
                       className="py-2.5 px-4 rounded-lg bg-gray-950 hover:bg-gray-900 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <Truck size={13} className="text-amber-400" />
+                      <Truck size={13} className="text-white" />
                       <span>Track Order</span>
                     </button>
                   )}

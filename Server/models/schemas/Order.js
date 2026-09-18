@@ -22,6 +22,14 @@ const orderSchema = new Schema({
   shiprocket: { type: Schema.Types.Mixed, default: null },
   // Promoted out of shiprocket.awbCode, same reason.
   awbCode: { type: String, default: null, index: true },
+  // One entry per physical sticker this order is owed, auto-minted once
+  // payment clears (OrderModel.generateStickersForOrder) so an admin never
+  // has to hand-generate a QR tag for a paid order. Empty until then.
+  stickers: { type: [Schema.Types.Mixed], default: [] },
+  // Atomic claim flag so a browser /verify call racing the Razorpay webhook
+  // (both can observe the same paid transition) can't both mint a batch of
+  // stickers for the same order — see OrderModel.generateStickersForOrder.
+  stickers_generation_started: { type: Boolean, default: false },
   created_at: { type: Date, default: Date.now },
 }, { _id: false, versionKey: false });
 

@@ -224,7 +224,7 @@ function initChatSocket(httpServer, allowedOrigins) {
             notifyOwner({
               type: 'CHAT_MESSAGE',
               ownerPhone: product.details.ownerPhone,
-              data: { label, message: text, link: `${APP_URL}/#/dashboard?tab=chat` },
+              data: { label, message: text, link: `${APP_URL}/#/dashboard?tab=chat&session=${sessionId}` },
               eventId: sessionId,
             }).catch(() => { /* best effort */ });
           }
@@ -232,7 +232,7 @@ function initChatSocket(httpServer, allowedOrigins) {
             pushService.sendToUser(ownerId, {
               title: `New message about ${label}`,
               body: text,
-              url: '/#/dashboard?tab=chat',
+              url: `/#/dashboard?tab=chat&session=${sessionId}`,
               tag: `chat-${sessionId}`,
             }).catch(() => { /* best effort */ });
           }

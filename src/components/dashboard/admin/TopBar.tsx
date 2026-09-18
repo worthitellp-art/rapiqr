@@ -1,6 +1,9 @@
 ﻿import { useState, useRef, useEffect } from "react";
 import { Bell, Plus, Tag, UserPlus, Menu } from "lucide-react";
 import { FxSearchInput, FxIconButton } from "../shared/FxTopBar";
+import { useLanguage } from "../../../context/LanguageContext";
+import { dashboardTranslations } from "../../../i18n/dashboardTranslations";
+import LanguageSwitcher from "../../common/LanguageSwitcher";
 
 export default function TopBar({
   admin,
@@ -21,6 +24,8 @@ export default function TopBar({
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { language } = useLanguage();
+  const t = dashboardTranslations[language].admin;
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -44,19 +49,21 @@ export default function TopBar({
           <Menu size={16} />
         </button>
 
-        <FxSearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Quick Search..." className="max-w-[240px]" />
+        <FxSearchInput value={searchQuery} onChange={setSearchQuery} placeholder={t.quickSearch} className="max-w-[240px]" />
       </div>
 
       {/* ── Right Action Cluster ──────────────────────────────────── */}
       <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
+        <LanguageSwitcher />
+
         {/* Status Badge */}
         <div className="hidden lg:inline-flex items-center gap-2 text-[12px] text-[var(--fx-ink-2)]">
           <span className="w-1.5 h-1.5 rounded-full bg-[var(--fx-green)]" />
-          <span className="font-bold text-[var(--fx-ink)]">{activeCount}</span> tags active
+          <span className="font-bold text-[var(--fx-ink)]">{activeCount}</span> {t.tagsActive}
         </div>
 
         {/* Notifications Button */}
-        <FxIconButton icon={<Bell size={16} />} onClick={() => setPage("alerts")} title="Alerts & Notifications" badge />
+        <FxIconButton icon={<Bell size={16} />} onClick={() => setPage("alerts")} title={t.alertsAndNotifications} badge />
 
         {/* "+ New" Action Button Dropdown */}
         <div className="relative" ref={dropdownRef}>
@@ -65,7 +72,7 @@ export default function TopBar({
             className="inline-flex items-center gap-1.5 px-3.5 py-[8px] rounded-full bg-[var(--fx-accent)] text-white font-semibold text-[13px] hover:bg-[var(--fx-accent-ink)] transition-colors cursor-pointer"
           >
             <Plus size={14} strokeWidth={2.5} />
-            <span>New</span>
+            <span>{t.new}</span>
           </button>
 
           {dropdownOpen && (
@@ -75,7 +82,7 @@ export default function TopBar({
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] font-medium transition-colors text-left"
               >
                 <Tag size={15} className="text-[var(--fx-accent)]" />
-                <span>Generate Tag</span>
+                <span>{t.generateTag}</span>
               </button>
 
               <button
@@ -83,7 +90,7 @@ export default function TopBar({
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] font-medium transition-colors text-left"
               >
                 <UserPlus size={15} className="text-[var(--fx-green)]" />
-                <span>Add User Account</span>
+                <span>{t.addUserAccount}</span>
               </button>
             </div>
           )}

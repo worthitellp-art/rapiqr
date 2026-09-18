@@ -207,7 +207,7 @@ function TrackingOrderSummary({ order }: SummaryProps) {
       {courier?.awbCode && (
         <div className="mt-2 rounded-xl bg-white p-3 border border-slate-200 text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Truck size={16} className="text-amber-500" />
+            <Truck size={16} className="text-[#111111]" />
             <div>
               <p className="font-semibold text-slate-900">
                 {courier.courierName || 'Expedited Courier'}
@@ -220,7 +220,7 @@ function TrackingOrderSummary({ order }: SummaryProps) {
               href={courier.trackingUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 hover:underline"
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-[#111111] hover:underline"
             >
               <span>Live Courier</span>
               <ExternalLink size={12} />
@@ -259,7 +259,7 @@ function TrackingMilestones({ timeline }: MilestonesProps) {
       <div className="space-y-3 border-l-2 border-slate-200 pl-4">
         {timeline.map((event, index) => (
           <div key={index} className="relative">
-            <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-amber-500 ring-4 ring-white" />
+            <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-[#111111] ring-4 ring-white" />
             <p className="text-xs font-semibold text-slate-900">{event.activity || event.status}</p>
             <div className="flex items-center gap-2 text-[11px] text-slate-500">
               {event.location && <span>{event.location}</span>}
@@ -353,7 +353,7 @@ export default function TrackOrderModal({
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 border border-amber-200">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-[#111111] border border-gray-200">
               <Package size={20} />
             </div>
             <div>
@@ -383,7 +383,7 @@ export default function TrackOrderModal({
                 value={orderId}
                 onChange={(e) => setOrderId(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono font-bold text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-amber-400 focus:outline-none transition-colors"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono font-bold text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#111111] focus:outline-none transition-colors"
               />
             </div>
             <div>
@@ -396,7 +396,7 @@ export default function TrackOrderModal({
                 value={contact}
                 onChange={(e) => setContact(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-amber-400 focus:outline-none transition-colors"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#111111] focus:outline-none transition-colors"
               />
             </div>
           </div>
@@ -408,12 +408,12 @@ export default function TrackOrderModal({
           >
             {loading ? (
               <>
-                <RefreshCw size={14} className="animate-spin text-amber-400" />
+                <RefreshCw size={14} className="animate-spin text-white" />
                 <span>Searching order records...</span>
               </>
             ) : (
               <>
-                <Search size={14} className="text-amber-400" />
+                <Search size={14} className="text-white" />
                 <span>Track Delivery Status</span>
               </>
             )}
@@ -422,8 +422,8 @@ export default function TrackOrderModal({
 
         {/* Error banner */}
         {errorMessage && (
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 flex items-start gap-2">
-            <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800 flex items-start gap-2">
+            <AlertCircle size={16} className="text-red-600 shrink-0 mt-0.5" />
             <span>{errorMessage}</span>
           </div>
         )}
@@ -441,12 +441,12 @@ export default function TrackOrderModal({
             <TrackingMilestones timeline={trackedOrder.shiprocket?.timeline} />
 
             {/* Account linking banner if user wants to claim stickers */}
-            <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-xs space-y-2">
-              <div className="flex items-center gap-2 font-bold text-amber-900">
-                <ShieldCheck size={16} className="text-amber-600" />
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs space-y-2">
+              <div className="flex items-center gap-2 font-bold text-gray-900">
+                <ShieldCheck size={16} className="text-[#111111]" />
                 <span>Activate Tag Telephony & Emergency Contacts</span>
               </div>
-              <p className="text-amber-800 leading-relaxed text-[11px]">
+              <p className="text-gray-700 leading-relaxed text-[11px]">
                 Sign in with the email used for this order to program your vehicle plate, link emergency responders, and manage private masked calls.
               </p>
               {onOpenDashboard && (
@@ -455,7 +455,7 @@ export default function TrackOrderModal({
                     onClose();
                     onOpenDashboard();
                   }}
-                  className="mt-1 font-bold text-amber-900 hover:underline cursor-pointer flex items-center gap-1"
+                  className="mt-1 font-bold text-gray-900 hover:underline cursor-pointer flex items-center gap-1"
                 >
                   <span>Go to Client Dashboard</span>
                   <span>→</span>

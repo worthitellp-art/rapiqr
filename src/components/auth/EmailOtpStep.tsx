@@ -44,7 +44,7 @@ export default function EmailOtpStep({
       </button>
 
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-[#F6C000] text-[#4A3900] flex items-center justify-center shrink-0">
+        <div className="w-10 h-10 rounded-xl bg-[#111111] text-[#FFFFFF] flex items-center justify-center shrink-0">
           <KeyRound size={20} />
         </div>
         <h3 className="text-lg font-bold text-slate-900">Sign In with a Code</h3>
@@ -67,7 +67,7 @@ export default function EmailOtpStep({
                 placeholder="name@example.com"
                 value={email}
                 onChange={handleEmailInputChange}
-                className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#F6C000] focus:ring-2 focus:ring-[#F6C000]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
+                className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#111111] focus:ring-2 focus:ring-[#111111]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
               />
             </div>
           </div>
@@ -75,7 +75,7 @@ export default function EmailOtpStep({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-4 rounded-2xl font-bold text-[#4A3900] text-sm bg-[#F6C000] hover:bg-[#E0AE00] active:scale-[0.99] transition-all duration-200 cursor-pointer disabled:opacity-60 mt-2 flex items-center justify-center gap-2"
+            className="w-full py-4 rounded-2xl font-bold text-[#FFFFFF] text-sm bg-[#111111] hover:bg-[#000000] active:scale-[0.99] transition-all duration-200 cursor-pointer disabled:opacity-60 mt-2 flex items-center justify-center gap-2"
           >
             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Send Code</span>}
           </button>
@@ -90,7 +90,7 @@ export default function EmailOtpStep({
               type="button"
               onClick={onSendCode}
               disabled={isSubmitting}
-              className="text-xs text-[#A16207] hover:underline font-bold cursor-pointer disabled:opacity-60"
+              className="text-xs text-[#111111] hover:underline font-bold cursor-pointer disabled:opacity-60"
             >
               Resend
             </button>
@@ -104,13 +104,13 @@ export default function EmailOtpStep({
             placeholder="0 0 0 0 0 0"
             value={otpCode}
             onChange={handleOtpInputChange}
-            className="w-full h-14 text-center text-2xl tracking-[10px] font-mono font-semibold bg-slate-50 border-2 border-[#F6C000] focus:border-[#E0AE00] focus:ring-4 focus:ring-[#F6C000]/20 rounded-2xl outline-none text-slate-900 transition-all placeholder:text-slate-300"
+            className="w-full h-14 text-center text-2xl tracking-[10px] font-mono font-semibold bg-slate-50 border-2 border-[#111111] focus:border-[#000000] focus:ring-4 focus:ring-[#111111]/20 rounded-2xl outline-none text-slate-900 transition-all placeholder:text-slate-300"
           />
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-4 rounded-2xl font-bold text-[#4A3900] text-sm bg-[#F6C000] hover:bg-[#E0AE00] active:scale-[0.99] transition-all duration-200 cursor-pointer disabled:opacity-60 mt-2 flex items-center justify-center gap-2"
+            className="w-full py-4 rounded-2xl font-bold text-[#FFFFFF] text-sm bg-[#111111] hover:bg-[#000000] active:scale-[0.99] transition-all duration-200 cursor-pointer disabled:opacity-60 mt-2 flex items-center justify-center gap-2"
           >
             {isSubmitting ? (
               <Loader2 className="w-4 h-4 animate-spin" />

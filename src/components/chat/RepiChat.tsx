@@ -1018,12 +1018,12 @@ export default function RepiChat({
         )}
 
         <div className="relative shrink-0">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#F6C000] text-[#4A3900] flex items-center justify-center font-bold text-sm">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#111111] text-[#FFFFFF] flex items-center justify-center font-bold text-sm">
             {peerInitial === "?" ? <MessageCircle size={18} /> : peerInitial}
           </div>
           <span
             className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white transition-colors ${
-              connected ? "bg-emerald-500" : "bg-[#E0AE00]"
+              connected ? "bg-emerald-500" : "bg-amber-500"
             }`}
             aria-hidden
           />
@@ -1068,7 +1068,7 @@ export default function RepiChat({
             </div>
           ) : messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center px-8 gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-[#FFF7DC] text-[#A16207] flex items-center justify-center">
+              <div className="w-14 h-14 rounded-2xl bg-[#F1F5F9] text-[#111111] flex items-center justify-center">
                 <MessageCircle size={26} />
               </div>
               <div>
@@ -1098,7 +1098,7 @@ export default function RepiChat({
 
               {peerTyping && (
                 <div className="flex items-end gap-2 mt-1.5">
-                  <div className="w-7 h-7 rounded-full bg-[#F6C000] text-[#4A3900] flex items-center justify-center text-[11px] font-bold shrink-0">
+                  <div className="w-7 h-7 rounded-full bg-[#111111] text-[#FFFFFF] flex items-center justify-center text-[11px] font-bold shrink-0">
                     {peerInitial}
                   </div>
                   <div className="bg-white border border-[#EAEAE5] rounded-lg rounded-bl-sm px-3.5 py-3 flex items-center gap-1.5">
@@ -1183,12 +1183,12 @@ export default function RepiChat({
             disabled={!ready && !sessionId}
             enterKeyHint="send"
             aria-label="Message"
-            className="flex-1 min-w-0 resize-none max-h-[132px] bg-[#F6F6F3] border border-transparent focus:border-[#F6C000] focus:bg-white rounded-2xl px-3.5 py-2.5 text-[15px] sm:text-sm leading-snug text-[#211922] placeholder-[#91918C] outline-none disabled:opacity-50 transition-colors"
+            className="flex-1 min-w-0 resize-none max-h-[132px] bg-[#F6F6F3] border border-transparent focus:border-[#111111] focus:bg-white rounded-2xl px-3.5 py-2.5 text-[15px] sm:text-sm leading-snug text-[#211922] placeholder-[#91918C] outline-none disabled:opacity-50 transition-colors"
           />
           <button
             type="submit"
             disabled={!input.trim() || (!ready && !sessionId)}
-            className="w-11 h-11 sm:w-10 sm:h-10 shrink-0 rounded-full bg-[#F6C000] hover:bg-[#E0AE00] disabled:bg-[#EFEFEA] disabled:text-[#91918C] disabled:cursor-not-allowed text-[#4A3900] flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+            className="w-11 h-11 sm:w-10 sm:h-10 shrink-0 rounded-full bg-[#111111] hover:bg-black disabled:bg-[#EFEFEA] disabled:text-[#91918C] disabled:cursor-not-allowed text-[#FFFFFF] flex items-center justify-center transition-colors cursor-pointer active:scale-95"
             aria-label="Send message"
           >
             <Send size={17} />
@@ -1198,9 +1198,9 @@ export default function RepiChat({
 
       {/* ── Drop target ──────────────────────────────────────────────── */}
       {dragActive && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#F6C000]/10 backdrop-blur-[2px] pointer-events-none">
-          <div className="flex flex-col items-center gap-2 px-6 py-5 rounded-2xl bg-white border-2 border-dashed border-[#F6C000] shadow-xl">
-            <ImagePlus size={26} className="text-[#A16207]" />
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#111111]/10 backdrop-blur-[2px] pointer-events-none">
+          <div className="flex flex-col items-center gap-2 px-6 py-5 rounded-2xl bg-white border-2 border-dashed border-[#111111] shadow-xl">
+            <ImagePlus size={26} className="text-[#111111]" />
             <p className="text-sm font-bold text-gray-700">Drop to send</p>
           </div>
         </div>
@@ -1294,7 +1294,7 @@ function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubble
       {/* The peer's avatar anchors the last bubble of their block; earlier ones are indented to match. */}
       {!isOwn &&
         (lastOfGroup ? (
-          <div className="w-7 h-7 rounded-full bg-[#F6C000] text-[#4A3900] flex items-center justify-center text-[11px] font-bold shrink-0">
+          <div className="w-7 h-7 rounded-full bg-[#111111] text-[#FFFFFF] flex items-center justify-center text-[11px] font-bold shrink-0">
             {peerInitial}
           </div>
         ) : (

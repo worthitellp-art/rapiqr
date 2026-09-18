@@ -444,6 +444,12 @@ class QrModel {
 
     const update = { status: 'active' };
     let normalizedPhone = null;
+    // Contacts present in this call's list but not in the sticker's PRIOR
+    // details — the ones a "WhatsApp them that they've been added" message
+    // should go to. Diffed here (before `details` is overwritten below) so a
+    // later re-save of the same unchanged list (e.g. an unrelated edit that
+    // resends the full contacts array) never re-notifies someone twice.
+    let newlyAddedContacts = [];
 
     if (activationData.ownerName || activationData.ownerPhone || activationData.notes || activationData.message) {
       const requestedUserId = activationData.userId || activationData.user_id || null;
@@ -460,6 +466,14 @@ class QrModel {
       if (activationData.notes) details.notes = activationData.notes;
       if (activationData.message) details.notes = activationData.message;
       if (Array.isArray(activationData.emergencyContacts) && activationData.emergencyContacts.length) {
+        const priorPhones = new Set(
+          (Array.isArray(current.details?.emergencyContacts) ? current.details.emergencyContacts : [])
+            .map((c) => normalizePhone(c?.phone))
+            .filter(Boolean)
+        );
+        newlyAddedContacts = activationData.emergencyContacts.filter(
+          (c) => c?.phone && !priorPhones.has(normalizePhone(c.phone))
+        );
         details.emergencyContacts = activationData.emergencyContacts;
       } else if (!Array.isArray(details.emergencyContacts)) {
         details.emergencyContacts = [];
@@ -481,7 +495,7 @@ class QrModel {
       const doc = await Sticker.findByIdAndUpdate(current._id, { $set: update }, { new: true })
         .select(PUBLIC_QR_FIELDS)
         .lean();
-      return toPublicQr(doc);
+      return { ...toPublicQr(doc), newlyAddedContacts };
     } catch (err) {
       if (isDuplicateError(err)) {
         const dup = getDuplicateDetails(err);

@@ -227,7 +227,7 @@ function Security3DGraphic() {
   return (
     <div className="relative w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center flex-shrink-0">
       {/* Background concentric glowing rings */}
-      <div className="absolute inset-0 rounded-full bg-amber-400/20 blur-md animate-pulse" />
+      <div className="absolute inset-0 rounded-full bg-white/20 blur-md animate-pulse" />
       <div className="absolute inset-0 rounded-full border border-white/20 scale-100" />
       <div className="absolute -inset-1 rounded-full border border-white/15 scale-90" />
       <div className="absolute -inset-2.5 rounded-full border border-white/10 scale-75" />
@@ -237,10 +237,10 @@ function Security3DGraphic() {
         <svg viewBox="0 0 100 110" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
           <defs>
             <linearGradient id="shieldGradMain" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#FEF08A" />
-              <stop offset="35%" stopColor="#FACC15" />
-              <stop offset="85%" stopColor="#EAB308" />
-              <stop offset="100%" stopColor="#CA8A04" />
+              <stop offset="0%" stopColor="#E5E5E5" />
+              <stop offset="35%" stopColor="#4B5563" />
+              <stop offset="85%" stopColor="#1F2937" />
+              <stop offset="100%" stopColor="#000000" />
             </linearGradient>
             <linearGradient id="shieldGlassShine" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="rgba(255, 255, 255, 0.75)" />
@@ -735,6 +735,11 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           }
         }
         if (last?.name) setRegName((prev) => prev || String(last.name));
+        const shipping = last?.invoice?.shippingAddress;
+        if (shipping?.address) {
+          const line = [shipping.address, shipping.city, shipping.state, shipping.pincode].filter(Boolean).join(", ");
+          setRegAddress((prev) => prev || line);
+        }
       }
     } catch { /* ignore */ }
   }, []);
@@ -1562,13 +1567,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   }, [phase, qrData, getChatCustomerToken, liveSharing]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-[#F5F6FC] to-slate-100 text-slate-900 flex flex-col items-center justify-start font-sans relative selection:bg-amber-500 selection:text-slate-950 overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-[#F5F6FC] to-slate-100 text-slate-900 flex flex-col items-center justify-start font-sans relative selection:bg-black/10 selection:text-slate-950 overflow-x-hidden">
       {/* ── Multi-Layered Ambient Light Atmosphere ── */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        {/* Top Radiant Amber / Gold Ambient Aura */}
+        {/* Top Radiant Ambient Aura */}
         <div
           className="absolute -top-24 left-1/2 -translate-x-1/2 w-[650px] h-[380px] rounded-full blur-[100px] opacity-45 pointer-events-none"
-          style={{ background: "radial-gradient(circle, rgba(245,158,11,0.35) 0%, rgba(251,191,36,0.15) 50%, transparent 75%)" }}
+          style={{ background: "radial-gradient(circle, rgba(17,17,17,0.10) 0%, rgba(17,17,17,0.05) 50%, transparent 75%)" }}
         />
 
         {/* Subtle Bottom Cool Indigo / Cyan Glow */}
@@ -1584,8 +1589,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         {/* ============ VALIDATING STATE (prevents blank screen during lookup) ============ */}
         {phase === "validating" && (
           <div className="w-full max-w-md mx-auto animate-fade-in p-8 text-center flex flex-col items-center justify-center min-h-[400px]">
-            <div className="w-16 h-16 rounded-3xl bg-white shadow-xl border border-slate-100 flex items-center justify-center text-[#E11D48] mb-5">
-              <Loader2 size={32} className="animate-spin text-[#E11D48]" />
+            <div className="w-16 h-16 rounded-3xl bg-white shadow-xl border border-slate-100 flex items-center justify-center text-[#111111] mb-5">
+              <Loader2 size={32} className="animate-spin text-[#111111]" />
             </div>
             <h3 className="text-lg font-black text-slate-900">Verifying Smart Tag…</h3>
             <p className="text-xs text-slate-500 mt-1 font-medium">Connecting securely to RapiQR network</p>
@@ -1596,7 +1601,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         {phase === "error" && (
           <div className="w-full max-w-md mx-auto animate-fade-in p-6 text-center">
             <div className="bg-white/95 backdrop-blur-2xl rounded-[32px] border border-slate-200/80 shadow-2xl p-8 space-y-5">
-              <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-600 mx-auto">
+              <div className="w-16 h-16 rounded-2xl bg-gray-100 border border-gray-200 flex items-center justify-center text-[#111111] mx-auto">
                 <AlertTriangle size={32} />
               </div>
               <div>
@@ -1623,7 +1628,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         {phase === "gps-off" && (
           <div className="w-full max-w-md mx-auto animate-fade-in p-6 text-center">
             <div className="bg-white/95 backdrop-blur-2xl rounded-[32px] border border-slate-200/80 shadow-2xl p-8 space-y-5">
-              <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-600 mx-auto">
+              <div className="w-16 h-16 rounded-2xl bg-gray-100 border border-gray-200 flex items-center justify-center text-[#111111] mx-auto">
                 <MapPin size={32} />
               </div>
               <div>
@@ -1698,8 +1703,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           <div className="w-full flex items-center justify-center py-6 animate-fade-in">
             <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 sm:p-8 text-center space-y-5">
               {/* Soft Cream Icon Box */}
-              <div className="w-20 h-20 rounded-2xl bg-[#FFFDF4] border border-[#F7EED8] flex items-center justify-center text-[#FFC700] mx-auto shadow-inner">
-                <MapPin size={38} className="text-amber-500" />
+              <div className="w-20 h-20 rounded-2xl bg-gray-100 border border-gray-200 flex items-center justify-center text-[#111111] mx-auto shadow-inner">
+                <MapPin size={38} className="text-[#111111]" />
               </div>
 
               <div className="space-y-1.5">
@@ -1931,10 +1936,10 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                     {/* 2. Mechanic */}
                     <button
                       onClick={() => setActiveSubMenu("mechanical")}
-                      className="bg-white border border-gray-100 hover:border-yellow-300 rounded-2xl p-2.5 flex flex-col items-center justify-between text-center cursor-pointer active:scale-95 transition-all min-h-[100px] shadow-2xs hover:shadow-sm relative group"
+                      className="bg-white border border-gray-100 hover:border-slate-300 rounded-2xl p-2.5 flex flex-col items-center justify-between text-center cursor-pointer active:scale-95 transition-all min-h-[100px] shadow-2xs hover:shadow-sm relative group"
                     >
                       <ChevronRight size={12} className="text-gray-300 absolute top-2 right-2 group-hover:text-gray-500 transition-colors" />
-                      <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center mb-1 flex-shrink-0 group-hover:scale-105 transition-transform">
+                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-1 flex-shrink-0 group-hover:scale-105 transition-transform">
                         <img src={mechanicIcon} alt="Mechanic" className="w-6 h-6 object-contain" />
                       </div>
                       <div>
@@ -2248,7 +2253,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       </div>
 
                       {/* Manual Full-Colored RepiChat Action Card */}
-                      <div className="bg-amber-50/60 border border-amber-100 rounded-2xl p-4 text-center space-y-2">
+                      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-center space-y-2">
                         <p className="text-xs font-bold text-gray-900">Need Mechanic Assistance?</p>
                         <p className="text-[11px] text-gray-500 font-medium">Send a direct WhatsApp notification to the owner to report a mechanical issue.</p>
                         <button
@@ -2549,12 +2554,12 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                           <ArrowLeft size={14} /> Back
                         </button>
                         <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                          <Lightbulb size={16} className="text-amber-500" /> Headlights
+                          <Lightbulb size={16} className="text-[#111111]" /> Headlights
                         </span>
                       </div>
 
                       {/* Manual Full-Colored RepiChat Action Card */}
-                      <div className="bg-amber-50/60 border border-amber-100 rounded-2xl p-4 text-center space-y-2">
+                      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-center space-y-2">
                         <p className="text-xs font-bold text-gray-900">Headlights Left On?</p>
                         <p className="text-[11px] text-gray-500 font-medium">Alert the owner immediately on WhatsApp so their vehicle battery doesn't drain.</p>
                         <button
@@ -2688,7 +2693,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                         <div className="bg-white border border-gray-200/80 rounded-2xl p-4 space-y-3 shadow-2xs">
                           <p className="text-[11px] font-semibold text-gray-500 px-0.5">Add a photo of the flat tyre so help arrives prepared.</p>
                           <div className="grid grid-cols-2 gap-3">
-                            <label className="bg-[#EAB308] hover:bg-[#CA8A04] text-gray-950 font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95 transition-all text-center">
+                            <label className="bg-[#111111] hover:bg-black text-white font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95 transition-all text-center">
                               <Camera size={18} />
                               <span>Take Photo</span>
                               <input
@@ -2707,7 +2712,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                               />
                             </label>
 
-                            <label className="bg-white border-2 border-yellow-300 hover:bg-yellow-50/50 text-amber-800 font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-xs cursor-pointer active:scale-95 transition-all text-center">
+                            <label className="bg-white border-2 border-[#111111] hover:bg-gray-50 text-[#111111] font-extrabold text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-xs cursor-pointer active:scale-95 transition-all text-center">
                               <Upload size={18} />
                               <span>Upload Picture</span>
                               <input

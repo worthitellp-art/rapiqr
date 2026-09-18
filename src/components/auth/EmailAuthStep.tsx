@@ -58,7 +58,7 @@ export default function EmailAuthStep({
       </button>
 
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-[#F6C000] text-[#4A3900] flex items-center justify-center shrink-0">
+        <div className="w-10 h-10 rounded-xl bg-[#111111] text-[#FFFFFF] flex items-center justify-center shrink-0">
           <Mail size={20} />
         </div>
         <h3 className="text-lg font-bold text-slate-900">
@@ -80,7 +80,7 @@ export default function EmailAuthStep({
                 placeholder="Mihir Rathod"
                 value={fullName}
                 onChange={handleFullNameInputChange}
-                className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#F6C000] focus:ring-2 focus:ring-[#F6C000]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
+                className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#111111] focus:ring-2 focus:ring-[#111111]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
               />
             </div>
           </div>
@@ -98,7 +98,7 @@ export default function EmailAuthStep({
               placeholder="name@example.com"
               value={email}
               onChange={handleEmailInputChange}
-              className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#F6C000] focus:ring-2 focus:ring-[#F6C000]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
+              className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#111111] focus:ring-2 focus:ring-[#111111]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
             />
           </div>
         </div>
@@ -112,7 +112,7 @@ export default function EmailAuthStep({
               <button
                 type="button"
                 onClick={onForgotPasswordClick}
-                className="text-xs text-[#A16207] hover:underline font-bold cursor-pointer"
+                className="text-xs text-[#111111] hover:underline font-bold cursor-pointer"
               >
                 Forgot?
               </button>
@@ -127,7 +127,7 @@ export default function EmailAuthStep({
               minLength={6}
               value={password}
               onChange={handlePasswordInputChange}
-              className="w-full pl-10 pr-12 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#F6C000] focus:ring-2 focus:ring-[#F6C000]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
+              className="w-full pl-10 pr-12 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#111111] focus:ring-2 focus:ring-[#111111]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
             />
             <button
               type="button"
@@ -143,7 +143,7 @@ export default function EmailAuthStep({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full py-4 rounded-2xl font-bold text-[#4A3900] text-sm bg-[#F6C000] hover:bg-[#E0AE00] active:scale-[0.99] transition-all duration-200 cursor-pointer disabled:opacity-60 mt-2 flex items-center justify-center gap-2"
+          className="w-full py-4 rounded-2xl font-bold text-[#FFFFFF] text-sm bg-[#111111] hover:bg-[#000000] active:scale-[0.99] transition-all duration-200 cursor-pointer disabled:opacity-60 mt-2 flex items-center justify-center gap-2"
         >
           {isSubmitting ? (
             <Loader2 className="w-4 h-4 animate-spin" />
