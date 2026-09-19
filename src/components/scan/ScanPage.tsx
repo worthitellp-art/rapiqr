@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { getStickerCategoryLabel, getCategoryIcon, getCategoryLabel } from "../../stickerModules";
+import { getStickerCategoryLabel, getCategoryIcon, getCategoryLabel, isVehicleCategory } from "../../stickerModules";
 import PhoneInputWithCountry from "../common/PhoneInputWithCountry";
 import InstallAppFab from "../common/InstallAppFab";
 import CategoryScanView from "./CategoryScanView";
@@ -8,6 +8,7 @@ import AssistantChat from "./AssistantChat";
 import { getCategoryVariant, BESPOKE_CATEGORIES, type VariantAction } from "./categoryVariants";
 import type { CategoryButtonAction, ServiceProvider } from "./tileActions";
 import { handleCategoryButtonAction } from "./categoryButtonActions";
+import SentToast, { type SentToastTone } from "./SentToast";
 import { apiClient } from "../../lib/apiClient";
 import { isRunningInstalled, useInstallPrompt } from "../../lib/pwaInstall";
 import AppLogo from "../common/AppLogo";
@@ -20,6 +21,7 @@ import towIcon from "../../../assets/tow.png";
 import mechanicIcon from "../../../assets/mechanic.png";
 import flatTireIcon from "../../../assets/flat-tire.png";
 import {
+  Phone,
   PhoneCall,
   ShieldAlert,
   MapPin,
@@ -510,17 +512,16 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       if (qrData.vehicleName) {
         setReverifyOwnerName(qrData.vehicleName.replace(/\s*\([A-Z0-9_-]+\)$/i, ""));
       }
-      if (qrData.vehicleNumber) {
+      if (isVehicleCategory(qrData.category) && qrData.vehicleNumber && !qrData.vehicleNumber.startsWith("REG-")) {
         setReverifyVehicleNumber(qrData.vehicleNumber);
+      } else {
+        setReverifyVehicleNumber("");
       }
       if (qrData.details?.ownerPhone || qrData.phoneNumber) {
         setReverifyOwnerPhone(qrData.details?.ownerPhone || qrData.phoneNumber || "");
       }
-      if (qrData.vehicleNumber && !regMessage) {
-        setRegMessage(qrData.vehicleNumber);
-      }
     }
-  }, [qrData?.id]);
+  }, [qrData?.id, qrData?.category]);
 
   const handleReverifySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -548,6 +549,12 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       if (qrData) {
         const cleanQrId = qrData.id.trim().toUpperCase();
         const stored = localStorage.getItem("repiqr-qrlist") || localStorage.getItem("namoqr-qrlist");
+        const isVehicle = isVehicleCategory(qrData.category);
+        const resolvedReverifyVehicleNumber = isVehicle ? reverifyVehicleNumber.trim().toUpperCase() : "";
+        const resolvedReverifyVehicleName = isVehicle
+          ? (resolvedReverifyVehicleNumber ? `Vehicle (${resolvedReverifyVehicleNumber})` : reverifyOwnerName.trim())
+          : reverifyOwnerName.trim();
+
         if (stored) {
           try {
             const list = JSON.parse(stored);
@@ -555,8 +562,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
             if (idx !== -1) {
               list[idx].recovered_at = null;
               list[idx].recoveredAt = null;
-              list[idx].vehicleName = reverifyOwnerName.trim();
-              list[idx].vehicleNumber = reverifyVehicleNumber.trim() || list[idx].vehicleNumber;
+              list[idx].vehicleName = resolvedReverifyVehicleName;
+              list[idx].vehicleNumber = resolvedReverifyVehicleNumber;
               localStorage.setItem("repiqr-qrlist", JSON.stringify(list));
             }
           } catch (err) {
@@ -570,8 +577,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           prev
             ? {
                 ...prev,
-                vehicleName: reverifyOwnerName.trim(),
-                vehicleNumber: reverifyVehicleNumber.trim() || prev.vehicleNumber,
+                vehicleName: resolvedReverifyVehicleName,
+                vehicleNumber: resolvedReverifyVehicleNumber,
                 recoveredAt: null,
               }
             : null
@@ -709,13 +716,17 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   const sendQuickIssueAlert = async (alertType: string, defaultMessage: string) => {
     if (!qrData) return;
     if (alertCooldown) {
-      flashVariantBanner("Alert already sent — please wait a moment before sending another.");
+      showSentToast("Alert already sent — please wait a moment before sending another.", "warning");
       setChatOpen(true);
       return;
     }
     setAlertCooldown(true);
     if (alertCooldownTimerRef.current) clearTimeout(alertCooldownTimerRef.current);
     alertCooldownTimerRef.current = setTimeout(() => setAlertCooldown(false), 20000); // 20s cooldown
+
+    // Instant feedback the moment the button is tapped — the success/error
+    // toast below replaces this one once the send actually completes.
+    showSentToast("Sending message…", "pending");
 
     const locationText = location ? `\n📍 Location: https://www.google.com/maps?q=${location.lat},${location.lng}` : "";
     const fullMessage = `🚨 RepiQR Emergency Alert: ${alertType}\n🏷️ Item/Vehicle: ${qrData.vehicleName} (${qrData.vehicleNumber})\n\n${defaultMessage}${locationText}`;
@@ -750,6 +761,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     }
 
     // 2. Post alert to backend server
+    let delivered = true;
     try {
       await apiClient.alerts.createAlert({
         qrId: qrData.id,
@@ -767,12 +779,16 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         type: "emergency",
       });
     } catch {
-      /* ignore non-critical backend logger failure */
+      delivered = false;
     }
 
     // 3. WhatsApp is dispatched automatically by the backend (via MSG91) straight
     // to the owner — the visitor never sees the owner's number. Opening
     // api.whatsapp.com here would leak that number, so it is deliberately not done.
+    showSentToast(
+      delivered ? "Message sent to the owner via WhatsApp" : "Couldn't reach the server — please try again.",
+      delivered ? "success" : "error"
+    );
 
     setChatInitialMessage(undefined);
     setChatOpen(true);
@@ -790,6 +806,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   // Registration form fields (after activation code is validated)
   const [regName, setRegName] = useState("");
   const [regPhone, setRegPhone] = useState("");
+  const [regVehicleNumber, setRegVehicleNumber] = useState("");
   const [regMessage, setRegMessage] = useState("");
   const [regBloodGroup, setRegBloodGroup] = useState("O+");
   const [regAllergies, setRegAllergies] = useState("");
@@ -866,23 +883,40 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       return;
     }
 
+    const isVehicle = isVehicleCategory(qrData.category);
+    if (isVehicle && !regVehicleNumber.trim()) {
+      setActivationError("Please enter vehicle registration number (e.g. MH 02 AB 1234).");
+      return;
+    }
+
     const fullPhone = `${regCountry}${regPhone.trim().replace(/\s+/g, "")}`;
-    const effectiveName = regName.trim() || "Vehicle Owner";
+    const effectiveVehicleNumber = isVehicle ? regVehicleNumber.trim().toUpperCase() : "";
+    const effectiveName = regName.trim() || (isVehicle ? "Vehicle Owner" : "Tag Owner");
+    const effectiveVehicleName = isVehicle
+      ? (effectiveVehicleNumber ? `Vehicle (${effectiveVehicleNumber})` : effectiveName)
+      : effectiveName;
     const effectiveNotes = regMessage.trim();
 
     setOtpSending(true);
     try {
       // 1. Immediately register and link the phone number & name to the sticker in MongoDB
       const activationRes = await apiClient.qr.activateQrCode(qrData.id, {
-        category: qrData.category || "car",
+        category: qrData.category || (isVehicle ? "car" : "home"),
         ownerName: effectiveName,
         ownerPhone: fullPhone,
+        vehicleNumber: effectiveVehicleNumber || undefined,
+        vehicleName: effectiveVehicleName,
         notes: effectiveNotes,
         userId: profile?.id,
       });
 
       if (activationRes?.data) {
-        setQrData((prev) => (prev ? { ...prev, status: "active", vehicleName: effectiveName } : null));
+        setQrData((prev) => (prev ? {
+          ...prev,
+          status: "active",
+          vehicleName: effectiveVehicleName,
+          vehicleNumber: effectiveVehicleNumber,
+        } : null));
       }
 
       // Update local storage backup
@@ -894,6 +928,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         list[idx].ownerName = effectiveName;
         list[idx].ownerPhone = fullPhone;
         list[idx].notes = effectiveNotes;
+        if (isVehicle) {
+          list[idx].vehicleNumber = effectiveVehicleNumber;
+          list[idx].vehicleName = effectiveVehicleName;
+        } else {
+          list[idx].vehicleNumber = "";
+          list[idx].vehicleName = effectiveName;
+        }
         localStorage.setItem("repiqr-qrlist", JSON.stringify(list));
         localStorage.setItem("namoqr-qrlist", JSON.stringify(list));
       }
@@ -1168,6 +1209,12 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
      reuses the same backend alert + RepiChat routes the vehicle screen uses. */
   const [variantBanner, setVariantBanner] = useState<string | null>(null);
 
+  // Floating "message sent" confirmation — one instance for the whole page so
+  // every send button (quick-issue tiles, the WhatsApp button, category
+  // SEND_SMS actions) gets the same popup regardless of which screen is active.
+  const [sentToast, setSentToast] = useState<{ text: string; tone: SentToastTone } | null>(null);
+  const showSentToast = (text: string, tone: SentToastTone = "success") => setSentToast({ text, tone });
+
 
   const flashVariantBanner = (text: string) => {
     setVariantBanner(text);
@@ -1207,8 +1254,9 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         return;
       }
       case "notify":
+        // sendQuickIssueAlert shows its own "message sent" toast once the
+        // dispatch actually completes.
         sendQuickIssueAlert(context, action.text || getCategoryVariant(qrData?.category).alert);
-        flashVariantBanner("Alert sent — the owner and their emergency contacts have been notified.");
         return;
       case "maps": {
         const around = location ? `/@${location.lat},${location.lng},14z` : "";
@@ -1245,6 +1293,11 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     if (!qrData || variantBusy) return;
 
     setVariantBusy(true);
+    if (action.actionType === "SEND_SMS") {
+      // Instant feedback the moment the button is tapped — the success/error
+      // toast below replaces this one once the send actually completes.
+      showSentToast("Sending message…", "pending");
+    }
     try {
       const result = await handleCategoryButtonAction(
         {
@@ -1272,19 +1325,25 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       );
 
       if (result.kind === "error") {
-        flashVariantBanner(result.message);
+        if (action.actionType === "SEND_SMS") {
+          // Replace the "Sending…" pending toast rather than leaving it stuck.
+          showSentToast(result.message, "error");
+        } else {
+          flashVariantBanner(result.message);
+        }
         return;
       }
 
       if (result.kind === "sms") {
         // Report what actually happened — the alert is always saved, but the
         // WhatsApp itself can be simulated (no provider configured) or fail.
-        flashVariantBanner(
+        showSentToast(
           result.ownerNotified
-            ? "WhatsApp sent — the owner has been notified."
+            ? "Message sent to the owner via WhatsApp"
             : result.simulated
-              ? "Logged for the owner. WhatsApp is in test mode, so nothing was delivered."
-              : "Saved to the owner's alert history, but the WhatsApp could not be delivered."
+              ? "Logged for the owner — WhatsApp is in test mode, so nothing was delivered."
+              : "Saved to the owner's alert history, but the WhatsApp could not be delivered.",
+          result.ownerNotified ? "success" : result.simulated ? "warning" : "error"
         );
       }
     } finally {
@@ -1397,12 +1456,16 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     apiClient.qr.getQrCodeById(cleanQrId).then((res) => {
       const dbRecord = res?.data || null;
       if (dbRecord) {
+        const isVehicle = isVehicleCategory(dbRecord.category);
+        const resolvedVehicleNumber = dbRecord.vehicle_number || cached?.vehicleNumber || (isVehicle ? "" : "");
+        const resolvedVehicleName = dbRecord.name || cached?.vehicleName || (isVehicle ? (resolvedVehicleNumber ? `Vehicle (${resolvedVehicleNumber})` : `Vehicle (${dbRecord.id})`) : (cached?.vehicleName || `Tag (${dbRecord.id})`));
+
         resolveQr({
           id: dbRecord.id,
           clientId: dbRecord.client_id,
           status: dbRecord.status,
-          vehicleName: `Vehicle (${dbRecord.id})`,
-          vehicleNumber: `REG-${dbRecord.id.slice(-4)}`,
+          vehicleName: resolvedVehicleName,
+          vehicleNumber: resolvedVehicleNumber,
           template: dbRecord.template_name || "Default",
           category: dbRecord.category,
           recovered_at: dbRecord.recovered_at,
@@ -1436,11 +1499,17 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     });
 
     function resolveQr(record: any) {
+      const isVehicle = isVehicleCategory(record.category);
+      const resolvedVehicleNumber = record.vehicleNumber && !record.vehicleNumber.startsWith("REG-")
+        ? record.vehicleNumber
+        : (isVehicle ? (record.vehicleNumber || "") : "");
+      const resolvedVehicleName = record.vehicleName || (isVehicle ? `Vehicle (${record.id})` : `Tag (${record.id})`);
+
       const data = {
         id: record.id,
         qrUrl: `${getQrBaseUrl()}/${record.id}`,
-        vehicleName: record.vehicleName || `Vehicle (${record.id})`,
-        vehicleNumber: record.vehicleNumber || `REG-${record.id.slice(-4)}`,
+        vehicleName: resolvedVehicleName,
+        vehicleNumber: resolvedVehicleNumber,
         clientId: record.clientId || record.id,
         status: record.status || "inactive",
         template: record.template || "Default",
@@ -1448,6 +1517,12 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         recoveredAt: record.recovered_at || record.recoveredAt || null,
       };
       setQrData(data);
+
+      if (isVehicle && resolvedVehicleNumber && !resolvedVehicleNumber.startsWith("REG-")) {
+        setRegVehicleNumber(resolvedVehicleNumber);
+      } else {
+        setRegVehicleNumber("");
+      }
 
       // First-time scan → show the registration/activation form; already active → emergency page
       if (record.status === "inactive") {
@@ -1467,7 +1542,14 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     setActivationError(null);
     setContactsError(null);
 
-    const effectiveName = regName.trim() || profile?.full_name || qrData.vehicleName || "Sticker Owner";
+    const isVehicle = isVehicleCategory(qrData.category);
+    const effectiveVehicleNumber = isVehicle
+      ? (regVehicleNumber.trim().toUpperCase() || (qrData.vehicleNumber && !qrData.vehicleNumber.startsWith("REG-") ? qrData.vehicleNumber : ""))
+      : "";
+    const effectiveName = regName.trim() || profile?.full_name || qrData.vehicleName || (isVehicle ? "Vehicle Owner" : "Sticker Owner");
+    const effectiveVehicleName = isVehicle
+      ? (effectiveVehicleNumber ? `Vehicle (${effectiveVehicleNumber})` : `Vehicle (${qrData.id})`)
+      : effectiveName;
     const effectivePhone = regPhone.trim() || profile?.phoneNumber || "0000000000";
 
     const fullPhone = effectivePhone.startsWith("+")
@@ -1482,7 +1564,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     let activationResult: any = { success: true };
     try {
       const res = await apiClient.qr.activateQrCode(qrData.id, {
-        category: qrData.category || "car",
+        category: qrData.category || (isVehicle ? "car" : "home"),
         ownerName: effectiveName,
         ownerPhone: fullPhone,
         emergencyContacts: validContacts,
@@ -1490,6 +1572,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         allergies: regAllergies.trim(),
         address: regAddress.trim(),
         notes: regMessage.trim(),
+        vehicleNumber: effectiveVehicleNumber || undefined,
+        vehicleName: effectiveVehicleName,
         userId: profile?.id,
       });
       if (res?.data) activationResult = res.data;
@@ -1525,6 +1609,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         list[idx].allergies = registrationData.allergies;
         list[idx].address = registrationData.address;
         list[idx].visitorMessage = "Self-activated via code";
+        if (isVehicle) {
+          list[idx].vehicleNumber = effectiveVehicleNumber || list[idx].vehicleNumber;
+          list[idx].vehicleName = effectiveVehicleName;
+        } else {
+          list[idx].vehicleNumber = "";
+          list[idx].vehicleName = effectiveName;
+        }
         localStorage.setItem("repiqr-qrlist", JSON.stringify(list));
         localStorage.setItem("namoqr-qrlist", JSON.stringify(list));
       } else {
@@ -1532,8 +1623,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           id: qrData.id,
           qrUrl: qrData.qrUrl,
           clientId: qrData.clientId,
-          vehicleName: qrData.vehicleName,
-          vehicleNumber: qrData.vehicleNumber,
+          vehicleName: effectiveVehicleName,
+          vehicleNumber: effectiveVehicleNumber,
           status: "active",
           template: qrData.template,
           category: qrData.category,
@@ -1558,7 +1649,12 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         /* ignore */
       }
 
-      setQrData((prev) => (prev ? { ...prev, status: "active" } : null));
+      setQrData((prev) => (prev ? {
+        ...prev,
+        status: "active",
+        vehicleNumber: effectiveVehicleNumber,
+        vehicleName: effectiveVehicleName,
+      } : null));
       setActivatingQr(false);
 
       // Fire-and-forget: confirmation + sample "what responders see" test-scan email.
@@ -1677,6 +1773,12 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-[#F5F6FC] to-slate-100 text-slate-900 flex flex-col items-center justify-start font-sans relative selection:bg-black/10 selection:text-slate-950 overflow-x-hidden">
+      {/* "Message sent" confirmation popup — floats above everything, works
+          the same for every send button on every scan-page screen. */}
+      {sentToast && (
+        <SentToast text={sentToast.text} tone={sentToast.tone} onClose={() => setSentToast(null)} />
+      )}
+
       {/* ── Multi-Layered Ambient Light Atmosphere ── */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         {/* Top Radiant Ambient Aura */}
@@ -1769,8 +1871,9 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                   : profile?.phoneNumber || "+91 95747 13004"
               }
               qrId={qrData.id}
-              category={getStickerCategoryLabel(qrData.category) || "Car & Auto & Truck"}
-              vehicleNumber={qrData.vehicleNumber}
+              category={getStickerCategoryLabel(qrData.category) || (isVehicleCategory(qrData.category) ? "Car & Auto & Truck" : "Home & Office")}
+              vehicleNumber={regVehicleNumber}
+              onVehicleNumberChange={setRegVehicleNumber}
               name={regName}
               onNameChange={setRegName}
               phone={regPhone}
@@ -1948,44 +2051,44 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                 )}
 
                 {/* Form to confirm owner and emergency details */}
-                <form onSubmit={handleReverifySubmit} className="space-y-3.5 pt-1">
+                <form onSubmit={handleReverifySubmit} className="space-y-4 pt-1">
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-900 mb-1.5">
                       Owner Name <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
-                      <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input
                         type="text"
                         required
                         placeholder="Owner full name"
                         value={reverifyOwnerName}
                         onChange={(e) => setReverifyOwnerName(e.target.value)}
-                        className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#14120C] focus:ring-2 focus:ring-[#FFD444]/40 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                        className="w-full h-11 pl-10 pr-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-900 mb-1.5">
                       Owner Phone Number <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
-                      <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input
                         type="tel"
                         required
                         placeholder="e.g. +91 98765 43210"
                         value={reverifyOwnerPhone}
                         onChange={(e) => setReverifyOwnerPhone(e.target.value)}
-                        className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#14120C] focus:ring-2 focus:ring-[#FFD444]/40 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                        className="w-full h-11 pl-10 pr-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-900 mb-1.5">
                         Emergency Contact Name
                       </label>
                       <input
@@ -1993,42 +2096,44 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                         placeholder="e.g. Spouse / Brother"
                         value={reverifyEmergencyName}
                         onChange={(e) => setReverifyEmergencyName(e.target.value)}
-                        className="w-full h-11 px-3.5 rounded-xl border border-slate-200 focus:border-[#14120C] focus:ring-2 focus:ring-[#FFD444]/40 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                        className="w-full h-11 px-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-900 mb-1.5">
                         Emergency Phone <span className="text-rose-500">*</span>
                       </label>
                       <div className="relative">
-                        <PhoneCall size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <PhoneCall size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                         <input
                           type="tel"
                           required
                           placeholder="e.g. +91 91234 56789"
                           value={reverifyEmergencyPhone}
                           onChange={(e) => setReverifyEmergencyPhone(e.target.value)}
-                          className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#14120C] focus:ring-2 focus:ring-[#FFD444]/40 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                          className="w-full h-11 pl-10 pr-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
                         />
                       </div>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
-                      Vehicle / Tag Identifier
-                    </label>
-                    <div className="relative">
-                      <Car size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="text"
-                        placeholder="e.g. MH 12 AB 1234"
-                        value={reverifyVehicleNumber}
-                        onChange={(e) => setReverifyVehicleNumber(e.target.value)}
-                        className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#14120C] focus:ring-2 focus:ring-[#FFD444]/40 text-sm font-mono font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all uppercase"
-                      />
+                  {isVehicleCategory(qrData.category) && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-1.5">
+                        Vehicle Number
+                      </label>
+                      <div className="relative">
+                        <Car size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="e.g. MH 12 AB 1234"
+                          value={reverifyVehicleNumber}
+                          onChange={(e) => setReverifyVehicleNumber(e.target.value.toUpperCase())}
+                          className="w-full h-11 pl-10 pr-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm font-mono text-gray-900 placeholder:text-gray-400 outline-none transition-all uppercase"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <label className="flex items-start gap-2.5 cursor-pointer pt-1">
                     <input
@@ -2036,9 +2141,9 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       required
                       checked={reverifyConfirmed}
                       onChange={(e) => setReverifyConfirmed(e.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-slate-300 text-[#14120C] focus:ring-[#FFD444]"
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-black focus:ring-black"
                     />
-                    <span className="text-xs text-slate-600 leading-snug font-medium">
+                    <span className="text-xs text-gray-600 leading-snug font-medium">
                       I confirm the owner identity and emergency details are accurate and current for this sticker.
                     </span>
                   </label>
@@ -2046,16 +2151,16 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                   <button
                     type="submit"
                     disabled={reverifySubmitting}
-                    className="w-full h-12 rounded-xl bg-[#14120C] text-white font-bold text-sm tracking-wide shadow-lg shadow-black/10 hover:bg-[#2A2826] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
+                    className="w-full h-11 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-sm shadow-xs active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
                   >
                     {reverifySubmitting ? (
                       <>
-                        <Loader2 size={16} className="animate-spin text-[#FFD444]" />
+                        <Loader2 size={16} className="animate-spin text-black" />
                         <span>Confirming Details...</span>
                       </>
                     ) : (
                       <>
-                        <ShieldCheck size={18} className="text-[#FFD444]" />
+                        <ShieldCheck size={18} className="text-black" />
                         <span>Confirm & Access Sticker</span>
                       </>
                     )}
@@ -2074,7 +2179,11 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
               <CategoryScanView
                 variant={categoryVariant}
                 category={(qrData.category || "").trim().toLowerCase()}
-                tagline={[qrData.vehicleName, qrData.vehicleNumber].filter(Boolean).join(" · ") || null}
+                tagline={
+                  isVehicleCategory(qrData.category)
+                    ? [qrData.vehicleName, qrData.vehicleNumber].filter(Boolean).join(" · ") || null
+                    : qrData.vehicleName || null
+                }
                 onAction={runVariantAction}
                 onButton={runCategoryButton}
                 onTileChange={() => setVariantProviderPanel(null)}
@@ -2278,31 +2387,31 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
                 </div>
 
-                {/* 5. MESSAGE VEHICLE OWNER CARD — Big button opens popup & auto-sends SMS alert to owner */}
+                {/* 5. NEAREST HOSPITAL CARD — Opens Google Maps search for the closest hospital */}
                 <div className="bg-white rounded-3xl p-4 sm:p-5 border border-gray-100 shadow-sm space-y-3.5">
                   <div className="flex items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0 font-bold">
-                      <MessageSquare size={22} />
+                    <div className="w-11 h-11 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0 font-bold">
+                      <Stethoscope size={22} />
                     </div>
                     <div className="text-left min-w-0">
                       <h4 className="text-sm font-bold text-gray-900 leading-tight">
-                        Message Vehicle Owner
+                        Nearest Hospital
                       </h4>
                       <p className="text-[11.5px] text-gray-400 font-medium mt-0.5">
-                        Start a private chat. The owner receives a WhatsApp alert automatically.
+                        Find the closest hospital for a medical emergency.
                       </p>
                     </div>
                   </div>
 
                   <button
                     onClick={() => {
-                      const msg = "Hi, I scanned your vehicle's RapiQR code and need to contact you.";
-                      openChatWithMessage(msg);
+                      const around = location ? `/@${location.lat},${location.lng},14z` : "";
+                      window.open(`https://www.google.com/maps/search/${encodeURIComponent("hospital")}${around}`);
                     }}
-                    className="w-full py-4 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer"
+                    className="w-full py-4 px-5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-red-600/20 flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer"
                   >
-                    <MessageCircle className="w-5 h-5" />
-                    <span>Message Owner</span>
+                    <Navigation className="w-5 h-5" />
+                    <span>Find Nearest Hospital</span>
                   </button>
                 </div>
 
@@ -2423,55 +2532,56 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       })()}
 
                       {/* WhatsApp / Chat / Assistant / Share — 4 quick actions in a 2x2 grid */}
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-2.5">
                         <button
                           onClick={() => {
+                            // sendQuickIssueAlert shows its own "message sent" toast
+                            // once the dispatch actually completes.
                             sendQuickIssueAlert("Emergency Alert", qrData?.category === "car"
                               ? "I scanned the RepiQR tag on your car — there is an emergency at the vehicle."
                               : "I scanned the RepiQR tag on your bike — there is an emergency at the vehicle.");
-                            flashVariantBanner("WhatsApp alert sent — the owner has been notified.");
                           }}
-                          className="bg-gradient-to-br from-[#22C55E] to-[#15A34A] hover:brightness-105 text-white rounded-2xl p-4 flex flex-col items-center justify-center gap-2 shadow-md shadow-green-600/20 active:scale-[0.97] transition-all cursor-pointer aspect-square"
+                          className="bg-gradient-to-br from-[#22C55E] to-[#15A34A] hover:brightness-105 text-white rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 shadow-md shadow-green-600/20 active:scale-[0.97] transition-all cursor-pointer aspect-square"
                         >
-                          <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center">
-                            <WhatsAppSvg size={22} />
+                          <div className="w-9 h-9 rounded-xl bg-white/25 ring-1 ring-white/40 flex items-center justify-center">
+                            <WhatsAppSvg size={20} />
                           </div>
-                          <p className="text-xs font-black tracking-tight">WhatsApp</p>
+                          <p className="text-[11px] font-black tracking-tight">WhatsApp</p>
                         </button>
 
                         <button
                           onClick={() => openChatWithMessage("Hi, I scanned your vehicle's RapiQR code and need to contact you.")}
-                          className="bg-gradient-to-br from-indigo-600 to-indigo-800 hover:brightness-105 text-white rounded-2xl p-4 flex flex-col items-center justify-center gap-2 shadow-md shadow-indigo-600/20 active:scale-[0.97] transition-all cursor-pointer aspect-square"
+                          className="bg-gradient-to-br from-indigo-600 to-indigo-800 hover:brightness-105 text-white rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 shadow-md shadow-indigo-600/20 active:scale-[0.97] transition-all cursor-pointer aspect-square"
                         >
-                          <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center">
-                            <MessageCircle size={22} />
+                          <div className="w-9 h-9 rounded-xl bg-white/25 ring-1 ring-white/40 flex items-center justify-center">
+                            <MessageCircle size={20} />
                           </div>
-                          <p className="text-xs font-black tracking-tight">Chat</p>
+                          <p className="text-[11px] font-black tracking-tight">Chat</p>
                         </button>
 
                         <button
                           onClick={() => setAiChatOpen(true)}
-                          className="bg-gradient-to-br from-purple-600 to-fuchsia-700 hover:brightness-105 text-white rounded-2xl p-4 flex flex-col items-center justify-center gap-2 shadow-md shadow-purple-600/20 active:scale-[0.97] transition-all cursor-pointer aspect-square"
+                          className="bg-gradient-to-br from-purple-600 to-fuchsia-700 hover:brightness-105 text-white rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 shadow-md shadow-purple-600/20 active:scale-[0.97] transition-all cursor-pointer aspect-square"
                         >
-                          <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center">
-                            <Bot size={22} />
+                          <div className="w-9 h-9 rounded-xl bg-white/25 ring-1 ring-white/40 flex items-center justify-center">
+                            <Bot size={20} />
                           </div>
-                          <p className="text-xs font-black tracking-tight">Ask Repi</p>
+                          <p className="text-[11px] font-black tracking-tight">Ask Repi</p>
                         </button>
 
                         <button
                           onClick={handleShareLocation}
                           disabled={locationSharing}
-                          className={`rounded-2xl p-4 flex flex-col items-center justify-center gap-2 active:scale-[0.97] transition-all cursor-pointer disabled:opacity-70 aspect-square text-white shadow-md ${
+                          className={`rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 active:scale-[0.97] transition-all cursor-pointer disabled:opacity-70 aspect-square text-white shadow-md ${
                             liveSharing
                               ? "bg-gradient-to-br from-blue-700 to-blue-900 shadow-blue-700/30"
                               : "bg-gradient-to-br from-blue-600 to-indigo-700 hover:brightness-105 shadow-blue-600/20"
                           }`}
                         >
-                          <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center">
-                            {locationSharing ? <Loader2 size={22} className="animate-spin" /> : <Navigation size={22} />}
+                          <div className="w-9 h-9 rounded-xl bg-white/25 ring-1 ring-white/40 flex items-center justify-center">
+                            {locationSharing ? <Loader2 size={20} className="animate-spin" /> : <Navigation size={20} />}
                           </div>
-                          <p className="text-xs font-black tracking-tight">{liveSharing ? "Live — Stop" : "Share"}</p>
+                          <p className="text-[11px] font-black tracking-tight">{liveSharing ? "Live — Stop" : "Share"}</p>
                         </button>
                       </div>
 

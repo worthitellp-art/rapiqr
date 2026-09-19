@@ -43,7 +43,7 @@ export default function AutocompleteField({
   return (
     <div ref={wrapRef} className={`relative ${className || ''}`}>
       {label && (
-        <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
+        <label className="block text-sm font-medium text-gray-900 mb-1.5">
           {label}{required && ' *'}
         </label>
       )}
@@ -54,7 +54,7 @@ export default function AutocompleteField({
         onChange={(e) => { onChange(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         autoComplete="off"
-        className={inputClassName || 'w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-white focus:border-[#111111] focus:ring-2 focus:ring-black/10 text-sm font-medium text-gray-900 outline-hidden transition-all'}
+        className={inputClassName || 'w-full h-11 px-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all'}
       />
       {open && matches.length > 0 && (
         <div className="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">

@@ -13,20 +13,27 @@
       "default_variables": null,
       "code": [
         {
-          "text": "*💬 RepiChat – New Message*\nSomeone has sent you a message about your RepiQR tag *{{label}}*.\nTap the link below to view and reply:\n*{{link}}* \n— RepiQR Safety",
+          "text": "*💬 RepiChat – New Message*\nSomeone has sent you a message about your RepiQR tag *{{label}}*.\n— RepiQR Safety",
           "type": "BODY",
           "example": {
             "body_text_named_params": [
               {
                 "example": "label = Car GJ 01 XX 0000",
                 "param_name": "label"
-              },
-              {
-                "example": "message = Hi, I found your bag near the gate",
-                "param_name": "link"
               }
             ]
           }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "URL",
+              "text": "View & Reply",
+              "url": "https://repiqr.com/#/dashboard?tab=chat&session={{1}}",
+              "example": ["6aae76dcae7ca2804553a390"]
+            }
+          ]
         }
       ],
       "gtwy_thread_id": null,
@@ -35,16 +42,15 @@
       "backup_templates": [],
       "variables": [
         "body_label",
-        "body_link"
+        "button_1"
       ],
       "variable_type": {
         "body_label": {
           "type": "text",
           "parameter_name": "label"
         },
-        "body_link": {
-          "type": "text",
-          "parameter_name": "link"
+        "button_1": {
+          "type": "text"
         }
       }
     }

@@ -72,12 +72,18 @@ function generateRequestId() {
   return 'req_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 10);
 }
 
-function getStatusBadge(status) {
-  if (status >= 500) return `🔴 ${status}`;
-  if (status >= 400) return `🟡 ${status}`;
-  if (status >= 300) return `🔵 ${status}`;
-  if (status >= 200) return `🟢 ${status}`;
-  return `⚪ ${status}`;
+/* ── Plain console formatter ───────────────────────────────────────────── */
+// Single-line, aligned, plain text (no ANSI color codes) — safe for any
+// terminal, log file, or process manager that doesn't render escape codes.
+
+function formatConsoleLine(meta) {
+  const level = meta.level.padEnd(7);
+  const scope = meta.category ? `${meta.category}:${meta.tag}` : meta.tag;
+  let line = `${formatTimestamp()} ${level} [${scope}] ${meta.message}`;
+  if (meta.details && typeof meta.details === 'object' && Object.keys(meta.details).length) {
+    line += ` ${JSON.stringify(sanitize(meta.details))}`;
+  }
+  return line;
 }
 
 /* ── Data sanitizer (security rule: never log sensitive data) ──────────── */
@@ -274,7 +280,7 @@ async function writeLogToDatabase(payload) {
   pushToMemoryBuffer(logItem);
 
   // Only persist important user activity, security events, and errors to MongoDB
-  if (!DB_LOGS_ENABLED || !shouldPersistToDatabase(logItem)) {
+  if (!dbLogsEnabled() || !shouldPersistToDatabase(logItem)) {
     return;
   }
 
@@ -321,38 +327,38 @@ function inferCategory(tag) {
 
 /* ── Logging core ───────────────────────────────────────────────────────── */
 
-// Console output turned off for now (terminal noise during dev) — set
-// SERVER_CONSOLE_LOGS=true in Server/.env to bring it back. Nothing else
-// changes: the in-memory buffer (admin Live Logs) and DB persistence for
-// significant events still run exactly as before.
-const CONSOLE_LOGS_ENABLED = String(process.env.SERVER_CONSOLE_LOGS || '').toLowerCase() === 'true';
+// Set SERVER_CONSOLE_LOGS=true / SERVER_DB_LOGS=true in Server/.env to control
+// these. Read lazily (not frozen into a const at module load) because this
+// module is required before dotenv.config() runs (server.js requires it
+// ahead of config/db.js, which is where .env actually gets loaded) — a
+// frozen const here would always see the pre-dotenv env and ignore .env.
+function consoleLogsEnabled() {
+  return String(process.env.SERVER_CONSOLE_LOGS || '').toLowerCase() === 'true';
+}
 
-// DB persistence turned off for now too — set SERVER_DB_LOGS=true in
-// Server/.env to resume writing to the ServerLog collection. The in-memory
-// buffer (admin Live Logs page, live within this process's uptime) keeps
-// working regardless — only the database write is skipped.
-const DB_LOGS_ENABLED = String(process.env.SERVER_DB_LOGS || '').toLowerCase() === 'true';
+// The in-memory buffer (admin Live Logs page, live within this process's
+// uptime) keeps working regardless — only the database write is gated.
+function dbLogsEnabled() {
+  return String(process.env.SERVER_DB_LOGS || '').toLowerCase() === 'true';
+}
 
 function emit(payload) {
   const meta = {
     level: payload.level || 'INFO',
+    category: payload.category || null,
     tag: payload.tag || payload.event || 'SERVER',
     message: payload.message || '',
     details: payload.details || payload.metadata || null
   };
 
-  if (CONSOLE_LOGS_ENABLED) {
-    const emoji = payload.emoji || '';
-    const line = emoji
-      ? `[${formatTimestamp()}] ${emoji} [${meta.tag}] ${meta.message}`
-      : `[${formatTimestamp()}] ${meta.level} [${meta.tag}] ${meta.message}`;
-
+  if (consoleLogsEnabled()) {
+    const line = formatConsoleLine(meta);
     if (meta.level === 'ERROR' || meta.level === 'FATAL') {
-      console.error(line, meta.details ? JSON.stringify(sanitize(meta.details)) : '');
+      console.error(line);
     } else if (meta.level === 'WARN') {
-      console.warn(line, meta.details ? JSON.stringify(sanitize(meta.details)) : '');
+      console.warn(line);
     } else {
-      console.log(line, meta.details ? JSON.stringify(sanitize(meta.details)) : '');
+      console.log(line);
     }
   }
 
@@ -393,17 +399,13 @@ const logger = {
   requestEnd(req, res, startTime) {
     const durationMs = Date.now() - startTime;
     const url = req.originalUrl || req.url;
-    const badge = getStatusBadge(res.statusCode);
     const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
-    if (CONSOLE_LOGS_ENABLED) {
-      console.log(`[${formatTimestamp()}] ${badge} [HTTP ${req.method}] ${url} (${res.statusCode}) finished in ${durationMs}ms`);
-    }
     emit({
       level: res.statusCode >= 500 ? 'ERROR' : res.statusCode >= 400 ? 'WARN' : 'HTTP',
       category: 'HTTP',
       event: 'REQUEST_END',
       tag: `HTTP_${req.method}`,
-      message: `${req.method} request to ${url} responded with status ${res.statusCode}`,
+      message: `${req.method} ${url} -> ${res.statusCode} (${durationMs}ms)`,
       method: req.method,
       url,
       statusCode: res.statusCode,

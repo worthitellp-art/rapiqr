@@ -1,4 +1,5 @@
 const Communication = require('./schemas/Communication');
+const { logger } = require('../middleware/loggerMiddleware');
 
 /** "Flat Tire" -> "flat_tire", so legacy rows still match a serviceType lookup. */
 function slugify(value) {
@@ -39,6 +40,7 @@ class HelplineModel {
       return docs.map(toApi);
     } catch (err) {
       console.error('HelplineModel.getAll Error:', err);
+      logger.error('DB_HELPLINE', 'HelplineModel.getAll failed', err);
       return [];
     }
   }
@@ -77,6 +79,7 @@ class HelplineModel {
       });
     } catch (err) {
       console.error('HelplineModel.getActive Error:', err);
+      logger.error('DB_HELPLINE', 'HelplineModel.getActive failed', err);
       return [];
     }
   }
@@ -87,6 +90,7 @@ class HelplineModel {
       return toApi(doc);
     } catch (err) {
       console.error(`HelplineModel.getById (${id}) Error:`, err);
+      logger.error('DB_HELPLINE', `HelplineModel.getById failed (${id})`, err);
       return null;
     }
   }

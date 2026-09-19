@@ -13,7 +13,7 @@
       "default_variables": null,
       "code": [
         {
-          "text": "*🔔 QR Scan Alert*\nYour tag *{{label}}* was just scanned.\nMessage: *{{message}}*\nCheck details and reply here: *{{link}}*\n— RepiQR",
+          "text": "*🔔 QR Scan Alert*\nYour tag *{{label}}* was just scanned.\nMessage: *{{message}}*\n— RepiQR",
           "type": "BODY",
           "example": {
             "body_text_named_params": [
@@ -24,13 +24,20 @@
               {
                 "example": "{{message}} = A visitor sent a test alert.",
                 "param_name": "message"
-              },
-              {
-                "example": "{{link}} = https://example.com/dashboard",
-                "param_name": "link"
               }
             ]
           }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "URL",
+              "text": "View & Reply",
+              "url": "https://repiqr.com/#/dashboard?tab=chat&session={{1}}",
+              "example": ["6aae76dcae7ca2804553a390"]
+            }
+          ]
         }
       ],
       "gtwy_thread_id": null,
@@ -40,7 +47,7 @@
       "variables": [
         "body_label",
         "body_message",
-        "body_link"
+        "button_1"
       ],
       "variable_type": {
         "body_label": {
@@ -51,9 +58,8 @@
           "type": "text",
           "parameter_name": "message"
         },
-        "body_link": {
-          "type": "text",
-          "parameter_name": "link"
+        "button_1": {
+          "type": "text"
         }
       }
     }

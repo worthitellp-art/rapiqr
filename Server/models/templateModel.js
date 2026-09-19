@@ -1,4 +1,5 @@
 const Template = require('./schemas/Template');
+const { logger } = require('../middleware/loggerMiddleware');
 
 // Single shared row (name: 'Default') holds the admin's default sticker QR
 // placement — was localStorage-only on the frontend (see StickerEditor.tsx),
@@ -13,6 +14,7 @@ class TemplateModel {
       return doc?.sticker_pos || null;
     } catch (err) {
       console.error('TemplateModel.getDefaultStickerPosition Error:', err);
+      logger.error('DB_TEMPLATE', 'TemplateModel.getDefaultStickerPosition failed', err);
       return null;
     }
   }

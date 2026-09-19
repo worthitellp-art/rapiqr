@@ -102,31 +102,31 @@ export default function PhoneInputWithCountry({
 
   return (
     <div className="flex flex-col w-full">
-      <div className={`flex items-center gap-1 bg-[#F5F6FA] border border-[#E8ECF4] rounded-xl overflow-visible focus-within:border-[#111111] ${disabled ? 'opacity-60 cursor-not-allowed' : ''} ${className}`}>
+      <div className={`flex items-center h-11 bg-white border border-gray-300 rounded-lg overflow-visible focus-within:border-black focus-within:ring-1 focus-within:ring-black transition-all ${disabled ? 'opacity-60 cursor-not-allowed' : ''} ${className}`}>
         {/* Country Code Dropdown */}
-        <div className="relative" ref={dropdownRef}>
+        <div className="relative h-full" ref={dropdownRef}>
           <button
             type="button"
             disabled={disabled}
             onClick={() => setDropdownOpen((o) => !o)}
-            className="flex items-center gap-1 bg-transparent text-xs font-bold text-gray-800 py-2.5 pl-2.5 pr-1 outline-none border-r border-[#E8ECF4] cursor-pointer hover:bg-gray-100/50"
+            className="flex items-center gap-1.5 bg-gray-50 h-full text-xs font-semibold text-gray-800 px-3 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-100 rounded-l-[7px]"
           >
             <FlagIcon iso={selectedCountryInfo.iso} />
             <span>{selectedCountryInfo.code}</span>
           </button>
 
           {dropdownOpen && (
-            <ul className="absolute z-20 top-full left-0 mt-1 w-48 max-h-64 overflow-y-auto bg-white border border-[#E8ECF4] rounded-lg shadow-lg py-1">
+            <ul className="absolute z-20 top-full left-0 mt-1 w-48 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg py-1">
               {COUNTRY_CODES.map((c) => (
                 <li key={c.code}>
                   <button
                     type="button"
                     onClick={() => handleCountrySelect(c.code)}
-                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left hover:bg-gray-100 ${c.code === selectedCountry ? 'bg-gray-50 font-bold' : ''}`}
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left hover:bg-gray-50 ${c.code === selectedCountry ? 'bg-gray-100 font-semibold' : ''}`}
                   >
                     <FlagIcon iso={c.iso} />
                     <span className="font-mono">{c.code}</span>
-                    <span className="text-gray-500 truncate">{c.name}</span>
+                    <span className="text-gray-600 truncate">{c.name}</span>
                   </button>
                 </li>
               ))}

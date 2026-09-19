@@ -153,6 +153,13 @@ class QrController {
         }).catch((err) => {
           logger.error('QR_ACTIVATED_NOTIFY', `Failed to notify owner for ${id}`, err);
         });
+      } else {
+        // Previously silent — this skip left zero trace anywhere (no log, no
+        // ServerLog/messages row), which is exactly why "QR activated" alerts
+        // appeared to never send: nothing recorded whether it was ever even
+        // attempted. Surfacing it so a missing ownerPhone/phoneNumber on the
+        // activation payload is visible in the admin Live Logs feed.
+        logger.warn('QR_ACTIVATED_NOTIFY', `Skipped owner notification for ${id} — no ownerPhone/phoneNumber in activation payload`);
       }
 
       // Tell each newly-added emergency contact over WhatsApp that they've

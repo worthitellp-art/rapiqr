@@ -163,3 +163,23 @@ export function getStickerCategoryLabel(value?: string): string {
  * All module ids as a readonly array.
  */
 export const MODULE_IDS: StickerModuleId[] = STICKER_MODULES.map((m) => m.id);
+
+/**
+ * Check whether a category value or display label belongs to a vehicle.
+ * Covers 'car' (Car & Auto & Truck), 'bike' (Bike), 'truck', 'auto', etc.
+ */
+export function isVehicleCategory(category?: string | null): boolean {
+  if (!category) return false;
+  const lower = category.trim().toLowerCase();
+  if (['car', 'bike', 'truck', 'auto', 'bicycle', 'helmet', 'motorcycle', 'vehicle', 'scooter'].includes(lower)) {
+    return true;
+  }
+  return (
+    lower.includes('car') ||
+    lower.includes('truck') ||
+    lower.includes('auto') ||
+    lower.includes('bike') ||
+    lower.includes('motor') ||
+    lower.includes('vehicle')
+  );
+}

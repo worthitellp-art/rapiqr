@@ -13,7 +13,7 @@
       "default_variables": null,
       "code": [
         {
-          "text": "an *urgent *alert has been raised for \"{{label}}\". The person who scanned your tag reports: \"{{message}}\". Open your dashboard here: {{link}} to view visitor details and take action.",
+          "text": "🚨 *URGENT — ACCIDENT ALERT*\n\nPossible accident involving {{label}}.\nMessage: {{message}}\n\n— *RepiQR Safety*",
           "type": "BODY",
           "example": {
             "body_text_named_params": [
@@ -24,13 +24,20 @@
               {
                 "example": "message = Found your car unlocked with lights on",
                 "param_name": "message"
-              },
-              {
-                "example": "link = https://repiqr.com/dashboard?tab=chat",
-                "param_name": "link"
               }
             ]
           }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "URL",
+              "text": "View & Take Action",
+              "url": "https://repiqr.com/#/dashboard?tab=chat&session={{1}}",
+              "example": ["6aae76dcae7ca2804553a390"]
+            }
+          ]
         }
       ],
       "gtwy_thread_id": null,
@@ -40,7 +47,7 @@
       "variables": [
         "body_label",
         "body_message",
-        "body_link"
+        "button_1"
       ],
       "variable_type": {
         "body_label": {
@@ -51,9 +58,8 @@
           "type": "text",
           "parameter_name": "message"
         },
-        "body_link": {
-          "type": "text",
-          "parameter_name": "link"
+        "button_1": {
+          "type": "text"
         }
       }
     }

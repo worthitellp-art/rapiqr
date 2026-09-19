@@ -831,7 +831,7 @@ export default function CheckoutPage({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
                     <div>
-                      <label className="block text-xs font-bold text-[#14120C]/75 mb-1.5">
+                      <label className="block text-sm font-medium text-gray-900 mb-1.5">
                         Full Name *
                       </label>
                       <input
@@ -840,12 +840,12 @@ export default function CheckoutPage({
                         aria-label="Full Name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full h-12 px-4 rounded-2xl border border-[#14120C]/12 bg-[#FAFAF8]/60 focus:bg-white text-sm font-medium text-[#14120C] outline-hidden focus:border-[#14120C] focus:ring-4 focus:ring-[#FFD444]/25 transition-all"
+                        className="w-full h-11 px-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-[#14120C]/75 mb-1.5">
+                      <label className="block text-sm font-medium text-gray-900 mb-1.5">
                         Phone Number *
                       </label>
                       <PhoneInputWithCountry
@@ -856,41 +856,41 @@ export default function CheckoutPage({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-[#14120C]/75 mb-1.5">
+                    <label className="block text-sm font-medium text-gray-900 mb-1.5">
                       Email Address (for receipts &amp; tag proxy activation) *
                     </label>
                     <div className="relative">
-                      <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#14120C]/40" />
+                      <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input
                         type="email"
                         placeholder="rahul@example.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full h-12 pl-11 pr-4 rounded-2xl border border-[#14120C]/12 bg-[#FAFAF8]/60 focus:bg-white text-sm font-medium text-[#14120C] outline-hidden focus:border-[#14120C] focus:ring-4 focus:ring-[#FFD444]/25 transition-all"
+                        className="w-full h-11 pl-10 pr-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* ── 2. Shipping Address ── */}
-                <div className="space-y-4 rounded-[28px] border border-[#14120C]/8 bg-white p-6 sm:p-7 shadow-[0_12px_40px_-15px_rgba(20,18,12,0.05)]">
-                  <div className="flex items-center justify-between gap-3 pb-3 border-b border-[#14120C]/6">
+                <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-6 sm:p-7 shadow-xs">
+                  <div className="flex items-center justify-between gap-3 pb-3 border-b border-gray-100">
                     <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 rounded-full bg-[#14120C] text-white text-xs font-bold flex items-center justify-center">
+                      <span className="w-6 h-6 rounded-full bg-black text-white text-xs font-bold flex items-center justify-center">
                         2
                       </span>
                       <div>
-                        <h2 className="font-extrabold text-sm sm:text-base text-[#14120C]">Shipping Address</h2>
-                        <p className="text-[11px] text-[#14120C]/50">Physical stickers delivered in 2–3 business days across India</p>
+                        <h2 className="font-semibold text-sm sm:text-base text-gray-900">Shipping Address</h2>
+                        <p className="text-xs text-gray-500">Physical stickers delivered in 2–3 business days across India</p>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={handleUseCurrentLocation}
                       disabled={locating}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#14120C]/[0.04] hover:bg-[#14120C]/[0.08] text-[11px] font-bold text-[#14120C] cursor-pointer disabled:opacity-60 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 cursor-pointer disabled:opacity-60 transition-colors"
                     >
-                      {locating ? <Loader2 size={13} className="animate-spin" /> : <LocateFixed size={13} />}
+                      {locating ? <Loader2 size={13} className="animate-spin text-gray-500" /> : <LocateFixed size={13} />}
                       <span>{locating ? 'Locating…' : 'Use location'}</span>
                     </button>
                   </div>
@@ -900,24 +900,24 @@ export default function CheckoutPage({
                   )}
 
                   <div>
-                    <label className="block text-xs font-bold text-[#14120C]/75 mb-1.5">
+                    <label className="block text-sm font-medium text-gray-900 mb-1.5">
                       Street Address / House / Flat *
                     </label>
                     <div className="relative">
-                      <MapPin size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#14120C]/40" />
+                      <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input
                         type="text"
                         placeholder="Flat 402, Green Heights, Opp. City Park"
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
-                        className="w-full h-12 pl-11 pr-4 rounded-2xl border border-[#14120C]/12 bg-[#FAFAF8]/60 focus:bg-white text-sm font-medium text-[#14120C] outline-hidden focus:border-[#14120C] focus:ring-4 focus:ring-[#FFD444]/25 transition-all"
+                        className="w-full h-11 pl-10 pr-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-[#14120C]/75 mb-1.5">
+                      <label className="block text-sm font-medium text-gray-900 mb-1.5">
                         Pincode *
                       </label>
                       <input
@@ -929,20 +929,20 @@ export default function CheckoutPage({
                         onChange={(e) =>
                           setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))
                         }
-                        className="w-full h-12 px-4 rounded-2xl border border-[#14120C]/12 bg-[#FAFAF8]/60 focus:bg-white text-sm font-medium text-[#14120C] outline-hidden focus:border-[#14120C] focus:ring-4 focus:ring-[#FFD444]/25 transition-all"
+                        className="w-full h-11 px-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
                       />
                       {pincodeStatus === 'looking' && (
-                        <span className="text-[11px] text-[#14120C]/50 mt-1 block">
+                        <span className="text-xs text-gray-500 mt-1 block">
                           Looking up location…
                         </span>
                       )}
                       {pincodeStatus === 'found' && (
-                        <span className="text-[11px] text-emerald-600 font-bold mt-1 block">
+                        <span className="text-xs text-emerald-600 font-medium mt-1 block">
                           ✓ City &amp; State found
                         </span>
                       )}
                       {pincodeStatus === 'not-found' && (
-                        <span className="text-[11px] text-[#14120C]/50 mt-1 block">
+                        <span className="text-xs text-gray-500 mt-1 block">
                           Enter city manually
                         </span>
                       )}
@@ -972,7 +972,7 @@ export default function CheckoutPage({
 
                 {/* Error Banner */}
                 {error && (
-                  <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm font-semibold flex items-center gap-3">
+                  <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm font-medium flex items-center gap-3">
                     <AlertCircle size={18} className="shrink-0 text-red-500" />
                     <span>{error}</span>
                   </div>
@@ -981,14 +981,14 @@ export default function CheckoutPage({
                 {/* Submit Action */}
                 <button
                   type="submit"
-                  className="w-full h-13 py-4 rounded-full sm:rounded-2xl bg-[#14120C] hover:bg-black text-white font-extrabold text-[15px] shadow-[0_8px_24px_-4px_rgba(20,18,12,0.25)] hover:shadow-[0_12px_32px_-4px_rgba(20,18,12,0.35)] transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-[0.99] group"
+                  className="w-full h-11 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-sm shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-[0.99] group"
                 >
                   <span>Pay ₹{total} Securely</span>
-                  <Lock size={15} className="text-[#FFD444]" />
-                  <ArrowRight size={16} className="text-white transition-transform group-hover:translate-x-0.5" />
+                  <Lock size={15} className="text-black" />
+                  <ArrowRight size={16} className="text-black transition-transform group-hover:translate-x-0.5" />
                 </button>
 
-                <p className="text-center text-[11px] text-[#14120C]/50 leading-relaxed">
+                <p className="text-center text-xs text-gray-500 leading-relaxed">
                   By proceeding you agree to RepiQR Terms of Service &amp; Privacy Policy. Free replacement within 7 days.
                 </p>
 
@@ -997,14 +997,14 @@ export default function CheckoutPage({
 
             {/* ── RIGHT COLUMN: FINAL BILLING SUMMARY (5 COLS) ── */}
             <div className="lg:col-span-5">
-              <div className="sticky top-24 space-y-4 rounded-[28px] border border-[#14120C]/8 bg-[#FEFDF9] p-6 shadow-[0_12px_40px_-15px_rgba(20,18,12,0.06)]">
+              <div className="sticky top-24 space-y-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-xs">
 
-                <div className="flex items-center justify-between pb-3.5 border-b border-[#14120C]/8">
-                  <div className="flex items-center gap-2 font-extrabold text-[#14120C] text-base">
-                    <Lock size={16} className="text-[#14120C]" />
+                <div className="flex items-center justify-between pb-3.5 border-b border-gray-100">
+                  <div className="flex items-center gap-2 font-semibold text-gray-900 text-base">
+                    <Lock size={16} className="text-gray-900" />
                     <span>Order Summary</span>
                   </div>
-                  <span className="text-xs font-bold text-[#14120C] bg-[#FFD444] px-2.5 py-0.5 rounded-full">
+                  <span className="text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-full">
                     {cart.reduce((s, i) => s + i.qty, 0)} Items
                   </span>
                 </div>
@@ -1087,19 +1087,19 @@ export default function CheckoutPage({
 
         {/* ── STEP: SUCCESS CONFIRMATION ── */}
         {step === 'success' && (
-          <div className="max-w-xl mx-auto my-10 p-6 sm:p-8 bg-white rounded-2xl border border-gray-200 shadow-lg text-center space-y-5">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto">
-              <CheckCircle2 size={36} />
+          <div className="max-w-xl mx-auto my-10 p-6 sm:p-8 bg-white rounded-2xl border border-gray-200 shadow-xs text-center space-y-5">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto">
+              <CheckCircle2 size={30} />
             </div>
 
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-950">Order Confirmed!</h2>
-              <p className="text-sm text-gray-600 mt-2">
-                Thank you, <strong>{name.trim()}</strong>! Your order{' '}
-                <span className="font-mono font-bold text-[#111111] bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">
+              <h2 className="text-2xl font-bold text-gray-900">Order Confirmed!</h2>
+              <p className="text-sm text-gray-600 mt-1.5">
+                Thank you, <span className="font-semibold text-gray-900">{name.trim()}</span>! Your order{' '}
+                <span className="font-mono font-medium text-gray-900 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
                   {orderId}
                 </span>{' '}
-                of <strong>₹{confirmedTotal}</strong> is confirmed.
+                of <span className="font-semibold text-gray-900">₹{confirmedTotal}</span> is confirmed.
               </p>
             </div>
 
@@ -1112,81 +1112,80 @@ export default function CheckoutPage({
               />
             )}
 
-            {/* ── Register Your Sticker(s) — the tag id(s) already exist server-side
-                (auto-minted the moment payment cleared), so the buyer can register
-                ownership now instead of waiting for the physical sticker to arrive
-                and scanning it cold. Name/phone/address carry over automatically
-                (see ScanPage's prefill-from-last-order effect). ── */}
+            {/* ── Register Your Sticker(s) ── */}
             {purchasedStickers.length > 0 && onRegisterSticker && (
-              <div className="p-5 rounded-xl bg-[#EFF4FF] border border-[#C7D7FE] text-left space-y-3">
-                <div className="flex items-center gap-2 font-bold text-[#1E3A8A] text-sm">
-                  <ShieldCheck size={17} className="text-[#446FF2]" />
+              <div className="p-5 rounded-xl border border-gray-200 bg-white text-left space-y-3 shadow-xs">
+                <div className="flex items-center gap-2 font-semibold text-gray-900 text-sm">
+                  <ShieldCheck size={16} className="text-gray-700" />
                   <span>Register Your Sticker{purchasedStickers.length > 1 ? 's' : ''} Now</span>
                 </div>
-                <p className="text-xs text-[#3B4A6B] leading-relaxed">
+                <p className="text-xs text-gray-600 leading-relaxed">
                   Your tag{purchasedStickers.length > 1 ? 's are' : ' is'} ready to activate — add your details and
                   emergency contacts now so protection is live before it even arrives in the post.
                 </p>
                 <div className="space-y-2">
-                  {purchasedStickers.map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => onRegisterSticker(s.id)}
-                      className="w-full py-2.5 px-4 rounded-lg bg-[#111111] hover:bg-black text-white font-bold text-xs transition-colors flex items-center justify-between gap-2 cursor-pointer"
-                    >
-                      <span className="capitalize">Register {s.itemName || s.category} Tag</span>
-                      <ArrowRight size={13} />
-                    </button>
-                  ))}
+                  {purchasedStickers.map((s) => {
+                    const cleanName = (s.itemName || s.category || 'Safety').replace(/\s*tag\s*$/i, '');
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => onRegisterSticker(s.id)}
+                        className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-between gap-2 cursor-pointer shadow-xs"
+                      >
+                        <span className="capitalize">Register {cleanName} Tag</span>
+                        <ArrowRight size={13} />
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
             {recognized ? (
-              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-left space-y-2.5">
-                <div className="flex items-center gap-2 font-bold text-emerald-900 text-sm">
-                  <CheckCircle2 size={17} className="text-emerald-600" />
+              <div className="p-5 rounded-xl border border-gray-200 bg-white text-left space-y-3 shadow-xs">
+                <div className="flex items-center gap-2 font-semibold text-gray-900 text-sm">
+                  <CheckCircle2 size={16} className="text-emerald-600" />
                   <span>Order Linked to Your Account</span>
                 </div>
-                <p className="text-xs text-emerald-800 leading-relaxed">
+                <p className="text-xs text-gray-600 leading-relaxed">
                   Your safety tags are provisioned in your Client Dashboard. You can assign contacts and configure alert routing now.
                   {isLoggedIn && ' Taking you there now…'}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <button
                     onClick={onViewDashboard}
-                    className="flex-1 py-2.5 rounded-lg bg-gray-950 hover:bg-gray-900 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    className="flex-1 py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                   >
                     <span>Open Client Dashboard</span>
-                    <ArrowRight size={13} className="text-white" />
+                    <ArrowRight size={13} />
                   </button>
                   {onTrackOrder && (
                     <button
                       onClick={() => onTrackOrder(orderId, phone.trim())}
-                      className="py-2.5 px-4 rounded-lg bg-white hover:bg-gray-100 text-gray-800 font-bold text-xs border border-gray-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black font-semibold text-xs border border-gray-300 hover:border-black transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                     >
-                      <Truck size={13} className="text-[#111111]" />
+                      <Truck size={13} />
                       <span>Track Order</span>
                     </button>
                   )}
                 </div>
               </div>
             ) : (
-              <div className="p-5 rounded-xl bg-gray-50 border border-gray-200 text-left space-y-3">
-                <div className="font-bold text-gray-950 text-sm">
+              <div className="p-5 rounded-xl border border-gray-200 bg-white text-left space-y-3 shadow-xs">
+                <div className="font-semibold text-gray-900 text-sm">
                   Activate &amp; Manage Your Safety Tag
                 </div>
                 <p className="text-xs text-gray-600 leading-relaxed">
                   Create a free account with your purchase email to track live scan events, set private phone numbers, and manage masked telephony.
                 </p>
-                <div className="p-2.5 rounded-lg bg-white border border-gray-200 text-xs font-mono text-gray-700 flex items-center gap-2">
-                  <Mail size={13} className="text-[#111111]" />
+                <div className="h-11 px-3.5 rounded-lg bg-white border border-gray-300 text-xs font-mono text-gray-700 flex items-center gap-2">
+                  <Mail size={14} className="text-gray-400" />
                   <span>{email.trim()}</span>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
                   <button
                     onClick={() => onOpenSignup(email.trim())}
-                    className="flex-1 py-2.5 rounded-lg bg-[#111111] hover:bg-black text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    className="flex-1 py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                   >
                     <span>Create Free Account</span>
                     <ArrowRight size={13} />
@@ -1194,15 +1193,15 @@ export default function CheckoutPage({
                   {onTrackOrder && (
                     <button
                       onClick={() => onTrackOrder(orderId, phone.trim())}
-                      className="py-2.5 px-4 rounded-lg bg-gray-950 hover:bg-gray-900 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                     >
-                      <Truck size={13} className="text-white" />
+                      <Truck size={13} />
                       <span>Track Order</span>
                     </button>
                   )}
                   <button
                     onClick={onBack}
-                    className="py-2.5 px-4 rounded-lg bg-white hover:bg-gray-100 text-gray-700 font-bold text-xs border border-gray-200 transition-colors cursor-pointer"
+                    className="py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black font-semibold text-xs border border-gray-300 hover:border-black transition-colors cursor-pointer shadow-xs"
                   >
                     Home
                   </button>

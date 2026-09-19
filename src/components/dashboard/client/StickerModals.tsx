@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { X, AlertTriangle, Plus, Trash2, ArrowRightLeft, History, Loader2, ExternalLink, Download, Copy, Check, QrCode, Printer, RefreshCw } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { DashboardSticker, EmergencyContact } from './types';
@@ -45,8 +45,8 @@ function ModalHeader({ title, onClose }: { title: string; onClose: () => void })
   );
 }
 
-const inputCls = 'w-full px-3.5 py-2.5 text-sm bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-xl outline-none focus:border-[var(--fx-ink)]';
-const labelCls = 'block text-xs font-bold text-[var(--fx-ink-2)] mb-1';
+const inputCls = 'w-full h-11 px-3.5 text-sm bg-white border border-gray-300 rounded-lg outline-none focus:border-black focus:ring-1 focus:ring-black text-gray-900 placeholder:text-gray-400 transition-all';
+const labelCls = 'block text-sm font-medium text-gray-900 mb-1.5';
 
 /* ─── EDIT DETAILS MODAL ─── */
 export function EditDetailsModal({
@@ -99,15 +99,15 @@ export function EditDetailsModal({
         </div>
       </div>
       <div className="flex gap-3 mt-6">
-        <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer">
+        <button onClick={onClose} className="flex-1 h-11 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer transition-all">
           Cancel
         </button>
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm shadow-[var(--fx-accent)]/20 transition-all"
+          className="flex-1 h-11 rounded-lg text-sm font-semibold text-black bg-white hover:bg-gray-50 border border-gray-300 hover:border-black disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 shadow-xs transition-all"
         >
-          {saving && <Loader2 size={13} className="animate-spin" />} Save Changes
+          {saving && <Loader2 size={14} className="animate-spin text-black" />} Save Changes
         </button>
       </div>
     </ModalShell>
@@ -180,15 +180,15 @@ export function EditContactsModal({
         </button>
       </div>
       <div className="flex gap-3 mt-6">
-        <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer">
+        <button onClick={onClose} className="flex-1 h-11 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer transition-all">
           Cancel
         </button>
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm shadow-[var(--fx-accent)]/20 transition-all"
+          className="flex-1 h-11 rounded-lg text-sm font-semibold text-black bg-white hover:bg-gray-50 border border-gray-300 hover:border-black disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 shadow-xs transition-all"
         >
-          {saving && <Loader2 size={13} className="animate-spin" />} Save Contacts
+          {saving && <Loader2 size={14} className="animate-spin text-black" />} Save Contacts
         </button>
       </div>
     </ModalShell>
@@ -229,7 +229,7 @@ export function TransferModal({
   return (
     <ModalShell onClose={onClose}>
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(37,99,235,0.12)', color: 'var(--fx-accent)' }}>
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-gray-100 text-gray-900 border border-gray-200">
           <ArrowRightLeft size={18} />
         </div>
         <h3 className="font-bold text-gray-900 text-base leading-snug">Transfer Sticker Ownership</h3>
@@ -249,16 +249,15 @@ export function TransferModal({
         <p className="text-xs font-bold text-[#B45309] mt-2">Click "Confirm Transfer" again to finalize — this cannot be undone.</p>
       )}
       <div className="flex gap-3 mt-6">
-        <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer">
+        <button onClick={onClose} className="flex-1 h-11 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer transition-all">
           Cancel
         </button>
         <button
           onClick={handleSubmit}
           disabled={busy}
-          className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90 cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60"
-          style={{ background: 'var(--fx-accent)' }}
+          className="flex-1 h-11 rounded-lg text-sm font-semibold text-black bg-white hover:bg-gray-50 border border-gray-300 hover:border-black transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-60"
         >
-          {busy && <Loader2 size={13} className="animate-spin" />} {confirming ? 'Confirm Transfer' : 'Transfer'}
+          {busy && <Loader2 size={14} className="animate-spin text-black" />} {confirming ? 'Confirm Transfer' : 'Transfer'}
         </button>
       </div>
     </ModalShell>

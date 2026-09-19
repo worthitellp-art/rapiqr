@@ -293,17 +293,27 @@ function buildMsg91WhatsAppComponents({ variables = {}, components = {}, body = 
     }
   }
 
-  // 2. Named variables map directly to named MSG91 body components.
+  // 2. Variables map to named MSG91 body components and positional aliases (body_1, body_2)
   if (variables && typeof variables === 'object' && Object.keys(variables).length > 0) {
-    // Keys are template variable names, e.g. { label: 'Car', link: 'https://...' }.
+    let bodyIndex = 1;
     for (const [key, val] of Object.entries(variables)) {
-      const formattedKey = key.startsWith('body_') || key.startsWith('header_') || key.startsWith('button_')
-        ? key
-        : `body_${key}`;
-      const parameterName = deriveParamName(formattedKey);
+      if (key.startsWith('button_') || key.startsWith('header_')) {
+        const parameterName = deriveParamName(key);
+        result[key] = { type: 'text', value: stripNewlines(val), ...(parameterName ? { parameter_name: parameterName } : {}) };
+      } else {
+        const formattedKey = key.startsWith('body_') ? key : `body_${key}`;
+        const parameterName = deriveParamName(formattedKey);
 
-      if (!result[formattedKey]) {
-        result[formattedKey] = { type: 'text', value: stripNewlines(val), ...(parameterName ? { parameter_name: parameterName } : {}) };
+        if (!result[formattedKey]) {
+          result[formattedKey] = { type: 'text', value: stripNewlines(val), ...(parameterName ? { parameter_name: parameterName } : {}) };
+        }
+
+        // Also add positional alias body_1, body_2... in case template is numbered {{1}}, {{2}}
+        const positionalKey = `body_${bodyIndex}`;
+        if (!result[positionalKey]) {
+          result[positionalKey] = { type: 'text', value: stripNewlines(val) };
+        }
+        bodyIndex++;
       }
     }
   }

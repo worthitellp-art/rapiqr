@@ -1,6 +1,7 @@
 const Sticker = require('./schemas/Sticker');
 const Alert = require('./schemas/Alert');
 const { normalizePhone, isSamePhone } = require('../utils/phone');
+const { logger } = require('../middleware/loggerMiddleware');
 
 function isDuplicateError(err) {
   return err && (String(err.code) === '11000' || String(err.code) === 'E11000' || String(err.errmsg || '').includes('duplicate key'));
@@ -135,6 +136,7 @@ class ProductModel {
       });
     } catch (err) {
       console.error('ProductModel.searchAll Error:', err);
+      logger.error('DB_PRODUCT', 'ProductModel.searchAll failed', err);
       return [];
     }
   }
@@ -148,6 +150,7 @@ class ProductModel {
       return docs.map(toApi);
     } catch (err) {
       console.error('ProductModel.getAllByUser Error:', err);
+      logger.error('DB_PRODUCT', 'ProductModel.getAllByUser failed', err);
       return [];
     }
   }
@@ -204,6 +207,7 @@ class ProductModel {
       return claimed;
     } catch (err) {
       console.error('ProductModel.autoClaimByPhone Error:', err);
+      logger.error('DB_PRODUCT', 'ProductModel.autoClaimByPhone failed', err);
       return [];
     }
   }
@@ -247,6 +251,7 @@ class ProductModel {
       return claimed;
     } catch (err) {
       console.error('ProductModel.claimStickersByIds Error:', err);
+      logger.error('DB_PRODUCT', 'ProductModel.claimStickersByIds failed', err);
       return [];
     }
   }
@@ -267,6 +272,7 @@ class ProductModel {
         .map(toApi);
     } catch (err) {
       console.error('ProductModel.findByOwnerPhone Error:', err);
+      logger.error('DB_PRODUCT', 'ProductModel.findByOwnerPhone failed', err);
       return [];
     }
   }
@@ -278,6 +284,7 @@ class ProductModel {
       return toApi(doc);
     } catch (err) {
       console.error(`ProductModel.getById (${productId}) Error:`, err);
+      logger.error('DB_PRODUCT', `ProductModel.getById failed (${productId})`, err);
       return null;
     }
   }
@@ -377,6 +384,7 @@ class ProductModel {
       return { ...toApi(doc), newlyAddedContacts };
     } catch (err) {
       console.error(`ProductModel.updateContacts (${productId}) Error:`, err);
+      logger.error('DB_PRODUCT', `ProductModel.updateContacts failed (${productId})`, err);
       return null;
     }
   }
@@ -387,6 +395,7 @@ class ProductModel {
       return toApi(doc);
     } catch (err) {
       console.error(`ProductModel.setStatus (${productId}) Error:`, err);
+      logger.error('DB_PRODUCT', `ProductModel.setStatus failed (${productId})`, err);
       return null;
     }
   }
@@ -404,6 +413,7 @@ class ProductModel {
       return toApi(doc);
     } catch (err) {
       console.error(`ProductModel.transfer (${productId}) Error:`, err);
+      logger.error('DB_PRODUCT', `ProductModel.transfer failed (${productId})`, err);
       return null;
     }
   }
@@ -429,6 +439,7 @@ class ProductModel {
       }));
     } catch (err) {
       console.error(`ProductModel.getHistory (${productId}) Error:`, err);
+      logger.error('DB_PRODUCT', `ProductModel.getHistory failed (${productId})`, err);
       return [];
     }
   }

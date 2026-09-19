@@ -9,8 +9,6 @@ const pushService = require('../services/pushService');
 const { logger } = require('../middleware/loggerMiddleware');
 const { getIo, getOnlineOwners, markDeliveredIfPeerPresent } = require('../sockets/chatSocket');
 
-const APP_URL = process.env.APP_URL || 'https://rapiqr.worthitellp.workers.dev';
-
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif'];
 /** Post-compression ceiling. The client downscales before upload; this is the backstop. */
 const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
@@ -66,7 +64,9 @@ async function fanOutMessage(session, message, isOwner, previewText) {
       notifyOwner({
         type: 'CHAT_MESSAGE',
         ownerPhone: product.details.ownerPhone,
-        data: { label, message: previewText, link: `${APP_URL}/#/dashboard?tab=chat&session=${session.id}` },
+        // button_1 is the dynamic suffix of the "Open Dashboard" WhatsApp
+        // button's URL now, not body text (see msg91Templates.js CHAT_MESSAGE.buttons).
+        data: { label, message: previewText, button_1: session.id },
         eventId: session.id,
       }).catch((err) => logger.error('CHAT_MESSAGE', 'Failed to notify owner', err));
     }
@@ -205,7 +205,9 @@ class ChatController {
         notifyOwner({
           type: 'CHAT_STARTED',
           ownerPhone,
-          data: { label: vehicleLabel || 'your RapiQR item', link: `${APP_URL}/#/dashboard?tab=chat&session=${session.id}` },
+          // button_1 is the dynamic suffix of the "Open Dashboard" WhatsApp
+          // button's URL now, not body text (see msg91Templates.js CHAT_STARTED.buttons).
+          data: { label: vehicleLabel || 'your RapiQR item', button_1: session.id },
           eventId: session.id,
         }).catch((err) => logger.error('CHAT_STARTED', 'Failed to notify owner of new chat', err));
       }

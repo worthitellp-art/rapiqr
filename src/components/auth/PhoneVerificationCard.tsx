@@ -90,7 +90,7 @@ export default function PhoneVerificationCard({
         {otpStep === 'input' ? (
           <form onSubmit={handleSendPhoneVerification} className="space-y-4 text-left">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              <label className="block text-sm font-medium text-gray-900 mb-2">
                 Mobile Phone Number
               </label>
               <PhoneInputWithCountry
@@ -103,11 +103,11 @@ export default function PhoneVerificationCard({
             <button
               type="submit"
               disabled={linkingLoading || !linkingPhone.trim()}
-              className="w-full py-4 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm shadow-md active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full h-11 px-5 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-sm shadow-xs active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {linkingLoading ? (
                 <>
-                  <Loader2 size={18} className="animate-spin text-white" />
+                  <Loader2 size={16} className="animate-spin text-black" />
                   <span>Sending OTP...</span>
                 </>
               ) : (
@@ -122,14 +122,14 @@ export default function PhoneVerificationCard({
           /* ── Step 2: OTP Verification ── */
           <form onSubmit={handleConfirmPhoneOtp} className="space-y-4 text-left">
             <div>
-              <div className="flex justify-between items-center mb-1.5">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-medium text-gray-900">
                   Enter 6-Digit OTP Code
                 </label>
                 <button
                   type="button"
                   onClick={handleReturnToPhoneStep}
-                  className="text-xs text-[#111111] font-bold hover:underline cursor-pointer transition-colors"
+                  className="text-xs text-gray-700 font-semibold hover:underline cursor-pointer transition-colors"
                 >
                   Change Phone
                 </button>
@@ -140,24 +140,24 @@ export default function PhoneVerificationCard({
                 maxLength={6}
                 value={otpCode}
                 onChange={handleOtpInputChange}
-                placeholder="0 0 0 0 0 0"
-                className="w-full h-14 text-center text-2xl tracking-[10px] font-mono font-semibold bg-slate-50 border-2 border-[#111111] focus:border-black focus:ring-4 focus:ring-black/10 rounded-xl outline-none text-slate-900 shadow-2xs transition-all placeholder:text-slate-300"
+                placeholder="000000"
+                className="w-full h-12 text-center text-xl tracking-[8px] font-mono font-semibold bg-white border border-gray-300 focus:border-black focus:ring-1 focus:ring-black rounded-lg outline-none text-gray-900 shadow-xs transition-all placeholder:text-gray-300"
               />
             </div>
 
             <button
               type="submit"
               disabled={linkingLoading || !otpCode.trim()}
-              className="w-full py-4 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm shadow-md active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full h-11 px-5 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-sm shadow-xs active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {linkingLoading ? (
                 <>
-                  <Loader2 size={18} className="animate-spin text-white" />
+                  <Loader2 size={16} className="animate-spin text-black" />
                   <span>Verifying...</span>
                 </>
               ) : (
                 <>
-                  <ShieldCheck size={18} className="text-white" />
+                  <ShieldCheck size={16} className="text-black" />
                   <span>Verify &amp; Access Dashboard</span>
                 </>
               )}

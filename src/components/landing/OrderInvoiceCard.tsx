@@ -16,19 +16,19 @@ export default function OrderInvoiceCard({
   const { invoiceNumber, issueDate, customerName, taxBreakdown, paymentMethod } = invoice;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-linear-to-b from-white to-slate-50 p-5 sm:p-6 text-left shadow-sm space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 text-[#111111]">
-            <FileText size={17} />
+    <div className="rounded-xl border border-gray-200 bg-white p-5 text-left shadow-xs space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-700">
+            <FileText size={16} />
           </div>
           <div>
-            <h3 className="text-sm font-black text-slate-900">Order Tax Invoice</h3>
-            <div className="text-[11px] text-slate-500 font-mono">#{invoiceNumber}</div>
+            <h3 className="text-sm font-semibold text-gray-900">Order Tax Invoice</h3>
+            <div className="text-xs text-gray-500 font-mono">#{invoiceNumber}</div>
           </div>
         </div>
 
-        <div className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-700">
+        <div className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-xs font-medium text-gray-700">
           <CheckCircle2 size={12} className="text-emerald-600" />
           <span>GST Paid</span>
         </div>
@@ -36,24 +36,24 @@ export default function OrderInvoiceCard({
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+          <span className="text-[11px] font-medium text-gray-500 block mb-0.5">
             Billed To
           </span>
-          <span className="font-extrabold text-slate-800 truncate block">{customerName}</span>
+          <span className="font-semibold text-gray-900 truncate block">{customerName}</span>
         </div>
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+          <span className="text-[11px] font-medium text-gray-500 block mb-0.5">
             Invoice Date
           </span>
-          <span className="font-semibold text-slate-700 block">{issueDate}</span>
+          <span className="font-medium text-gray-900 block">{issueDate}</span>
         </div>
         <div className="col-span-2 sm:col-span-1">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+          <span className="text-[11px] font-medium text-gray-500 block mb-0.5">
             Amount Paid
           </span>
-          <span className="font-black text-[#111111] block">
+          <span className="font-semibold text-gray-900 block">
             ₹{taxBreakdown.grandTotal.toFixed(2)}{' '}
-            <span className="text-[10px] font-normal text-slate-400">({paymentMethod})</span>
+            <span className="text-[11px] font-normal text-gray-500">({paymentMethod})</span>
           </span>
         </div>
       </div>
@@ -62,7 +62,7 @@ export default function OrderInvoiceCard({
         <button
           type="button"
           onClick={onPrintInvoice}
-          className="flex-1 cursor-pointer rounded-xl bg-[#111111] hover:bg-black px-4 py-2.5 text-xs font-black text-white transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+          className="flex-1 cursor-pointer rounded-lg bg-white hover:bg-gray-50 border border-gray-300 hover:border-black px-4 py-2.5 text-xs font-semibold text-black transition-colors flex items-center justify-center gap-2 shadow-xs"
         >
           <Download size={14} />
           <span>Download / Print Invoice</span>
@@ -71,9 +71,9 @@ export default function OrderInvoiceCard({
         <button
           type="button"
           onClick={onViewInvoice}
-          className="cursor-pointer rounded-xl border border-slate-200 bg-white hover:bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-800 transition-colors flex items-center justify-center gap-1.5"
+          className="cursor-pointer rounded-lg border border-gray-300 hover:border-black bg-white hover:bg-gray-50 px-4 py-2.5 text-xs font-semibold text-black transition-colors flex items-center justify-center gap-2 shadow-xs"
         >
-          <Eye size={14} className="text-slate-500" />
+          <Eye size={14} className="text-gray-500" />
           <span>View Details</span>
         </button>
       </div>

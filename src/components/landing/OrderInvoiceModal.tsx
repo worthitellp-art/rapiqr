@@ -283,18 +283,18 @@ export default function OrderInvoiceModal({
         </div>
 
         {/* Modal Action Footer */}
-        <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-3.5 sm:px-6">
+        <div className="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50/50 px-5 py-3.5 sm:px-6">
           <button
             type="button"
             onClick={onClose}
-            className="cursor-pointer rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100"
+            className="cursor-pointer rounded-lg border border-gray-300 hover:border-black bg-white hover:bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-700 transition-colors"
           >
             Close
           </button>
           <button
             type="button"
             onClick={onPrintInvoice}
-            className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#111111] hover:bg-black px-4 py-2 text-xs font-black text-white transition-colors shadow-xs"
+            className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-white hover:bg-gray-50 border border-gray-300 hover:border-black px-4 py-2 text-xs font-semibold text-black transition-colors shadow-xs"
           >
             <Download size={14} />
             <span>Download / Print Invoice</span>

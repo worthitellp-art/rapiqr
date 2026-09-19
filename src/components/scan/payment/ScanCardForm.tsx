@@ -175,16 +175,16 @@ export default function ScanCardForm({
           </div>
         )}
 
-        {/* Action Button: Solid Black "Continue" Button */}
+        {/* Action Button: White Background Button with Black Text */}
         <div className="pt-4">
           <button
             type="submit"
             disabled={isProcessing}
-            className="w-full py-3.5 rounded-xl bg-black hover:bg-zinc-800 active:scale-[0.99] text-white font-bold text-base transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full h-11 rounded-lg bg-white hover:bg-gray-50 active:scale-[0.99] text-black border border-gray-300 hover:border-black font-semibold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isProcessing ? (
               <>
-                <Loader2 size={18} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin text-black" />
                 <span>Processing...</span>
               </>
             ) : (

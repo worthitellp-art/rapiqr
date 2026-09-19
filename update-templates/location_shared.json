@@ -13,24 +13,33 @@
       "default_variables": null,
       "code": [
         {
-          "text": "*📍 Location Shared*\nSomeone has shared their live location for *{{label}}*.\nView the location: *{{maps_url}}*\nCheck details and reply here: *{{link}}*\n— RepiQR Safety",
+          "text": "*📍 Location Shared*\nSomeone has shared their live location for *{{label}}*.\n— RepiQR Safety",
           "type": "BODY",
           "example": {
             "body_text_named_params": [
               {
                 "example": "label = Car GJ 01 XX 0000",
                 "param_name": "label"
-              },
-              {
-                "example": "maps_url = https://maps.google.com/?q=23.0225,72.5714",
-                "param_name": "maps_url"
-              },
-              {
-                "example": "link = https://repiqr.com/dashboard?tab=chat",
-                "param_name": "link"
               }
             ]
           }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "URL",
+              "text": "View Location",
+              "url": "https://maps.google.com/?q={{1}}",
+              "example": ["23.0225,72.5714"]
+            },
+            {
+              "type": "URL",
+              "text": "Open Dashboard",
+              "url": "https://repiqr.com/#/dashboard?tab=chat&session={{1}}",
+              "example": ["6aae76dcae7ca2804553a390"]
+            }
+          ]
         }
       ],
       "gtwy_thread_id": null,
@@ -39,21 +48,19 @@
       "backup_templates": [],
       "variables": [
         "body_label",
-        "body_maps_url",
-        "body_link"
+        "button_1",
+        "button_2"
       ],
       "variable_type": {
         "body_label": {
           "type": "text",
           "parameter_name": "label"
         },
-        "body_maps_url": {
-          "type": "text",
-          "parameter_name": "maps_url"
+        "button_1": {
+          "type": "text"
         },
-        "body_link": {
-          "type": "text",
-          "parameter_name": "link"
+        "button_2": {
+          "type": "text"
         }
       }
     }

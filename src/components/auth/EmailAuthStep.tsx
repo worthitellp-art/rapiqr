@@ -69,57 +69,57 @@ export default function EmailAuthStep({
       <form onSubmit={onSubmit} className="space-y-4 pt-2">
         {currentMode === 'signup' && (
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+            <label className="block text-sm font-medium text-gray-900 mb-1.5">
               Full Name
             </label>
             <div className="relative">
-              <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 required
-                placeholder="Mihir Rathod"
+                placeholder="Rahul Sharma"
                 value={fullName}
                 onChange={handleFullNameInputChange}
-                className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#111111] focus:ring-2 focus:ring-[#111111]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
+                className="w-full pl-10 pr-4 h-11 text-sm bg-white border border-gray-300 rounded-lg outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-gray-900 font-normal placeholder:text-gray-400"
               />
             </div>
           </div>
         )}
 
         <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+          <label className="block text-sm font-medium text-gray-900 mb-1.5">
             Email Address
           </label>
           <div className="relative">
-            <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="email"
               required
               placeholder="name@example.com"
               value={email}
               onChange={handleEmailInputChange}
-              className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#111111] focus:ring-2 focus:ring-[#111111]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
+              className="w-full pl-10 pr-4 h-11 text-sm bg-white border border-gray-300 rounded-lg outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-gray-900 font-normal placeholder:text-gray-400"
             />
           </div>
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <label className="block text-sm font-medium text-gray-900">
               Password
             </label>
             {currentMode === 'login' && (
               <button
                 type="button"
                 onClick={onForgotPasswordClick}
-                className="text-xs text-[#111111] hover:underline font-bold cursor-pointer"
+                className="text-xs text-gray-700 hover:underline font-semibold cursor-pointer"
               >
                 Forgot?
               </button>
             )}
           </div>
           <div className="relative">
-            <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type={isPasswordVisible ? 'text' : 'password'}
               required
@@ -127,15 +127,15 @@ export default function EmailAuthStep({
               minLength={6}
               value={password}
               onChange={handlePasswordInputChange}
-              className="w-full pl-10 pr-12 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#111111] focus:ring-2 focus:ring-[#111111]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
+              className="w-full pl-10 pr-11 h-11 text-sm bg-white border border-gray-300 rounded-lg outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-gray-900 font-normal placeholder:text-gray-400"
             />
             <button
               type="button"
               onClick={onTogglePasswordVisibility}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors p-1 cursor-pointer"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors p-1 cursor-pointer"
               aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
             >
-              {isPasswordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+              {isPasswordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
         </div>
@@ -143,10 +143,10 @@ export default function EmailAuthStep({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full py-4 rounded-2xl font-bold text-[#FFFFFF] text-sm bg-[#111111] hover:bg-[#000000] active:scale-[0.99] transition-all duration-200 cursor-pointer disabled:opacity-60 mt-2 flex items-center justify-center gap-2"
+          className="w-full h-11 rounded-lg font-semibold text-black text-sm bg-white hover:bg-gray-50 border border-gray-300 hover:border-black active:scale-[0.99] transition-all cursor-pointer disabled:opacity-60 mt-2 flex items-center justify-center gap-2 shadow-xs"
         >
           {isSubmitting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-4 h-4 animate-spin text-black" />
           ) : (
             <span>{currentMode === 'login' ? 'Sign In' : 'Create Account'}</span>
           )}

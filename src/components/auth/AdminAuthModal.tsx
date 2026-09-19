@@ -87,35 +87,35 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
         {/* Admin Login Form */}
         <form onSubmit={handleAdminLoginSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+            <label className="block text-sm font-medium text-gray-900 mb-1.5">
               Email
             </label>
             <div className="relative">
-              <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="email"
                 required
-                placeholder="worthitellp@gmail.com"
+                placeholder="admin@repiqr.com"
                 value={adminEmail}
                 onChange={handleAdminEmailChange}
-                className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#111111] focus:ring-2 focus:ring-[#111111]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
+                className="w-full pl-10 pr-4 h-11 text-sm bg-white border border-gray-300 rounded-lg outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-gray-900 font-normal placeholder:text-gray-400"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+            <label className="block text-sm font-medium text-gray-900 mb-1.5">
               Password
             </label>
             <div className="relative">
-              <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="password"
                 required
                 placeholder="••••••••"
                 value={adminPassword}
                 onChange={handleAdminPasswordChange}
-                className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#111111] focus:ring-2 focus:ring-[#111111]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
+                className="w-full pl-10 pr-4 h-11 text-sm bg-white border border-gray-300 rounded-lg outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-gray-900 font-normal placeholder:text-gray-400"
               />
             </div>
           </div>
@@ -123,10 +123,10 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-4 rounded-2xl font-bold text-[#FFFFFF] text-sm flex items-center justify-center gap-2 bg-[#111111] hover:bg-[#000000] active:scale-[0.99] transition-all cursor-pointer disabled:opacity-60"
+            className="w-full h-11 rounded-lg font-semibold text-black text-sm flex items-center justify-center gap-2 bg-white hover:bg-gray-50 border border-gray-300 hover:border-black active:scale-[0.99] transition-all cursor-pointer disabled:opacity-60 shadow-xs mt-2"
           >
             {isSubmitting ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin text-black" />
             ) : (
               <>
                 <span>Sign In</span>

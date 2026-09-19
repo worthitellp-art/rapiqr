@@ -13,6 +13,7 @@ const {
   isValidCodeFormat: isValidCodeFormatV2,
 } = require('../services/stickerCrypto');
 const { computePinnedQrParams, renderPinnedQrPng, ENCODER_NAME, ENCODER_VERSION, DEFAULT_MODULE_SIZE_PX, DEFAULT_MARGIN_MODULES } = require('../services/qrPinning');
+const { logger } = require('../middleware/loggerMiddleware');
 
 // v2 stickers resolve to https://<host>/<id> — same public URL shape v1 uses
 // (see helpers.ts qrFullUrl) — kept identical so scanning behaves the same
@@ -43,7 +44,7 @@ function getDuplicateDetails(err) {
 // document; without this whitelist, an unauthenticated caller who knows a
 // sticker's ID could pull a stranger's medical/contact details straight off
 // GET /api/qr/:id or the activate/scan response.
-const PUBLIC_QR_FIELDS = '_id client_id status scans_count last_scanned_at template_name fg_color bg_color category created_at recovered_at';
+const PUBLIC_QR_FIELDS = '_id client_id status scans_count last_scanned_at template_name fg_color bg_color category created_at recovered_at vehicle_number';
 
 function toPublicQr(doc) {
   if (!doc) return null;
@@ -63,6 +64,7 @@ function toPublicQr(doc) {
     // so a finder/owner knows to re-verify the details rather than trust them
     // as still-current.
     recovered_at: doc.recovered_at || null,
+    vehicle_number: doc.vehicle_number || null,
   };
 }
 
@@ -96,6 +98,7 @@ async function resolveOwnerId(userId, ownerPhone) {
       if (account && account.role !== 'admin') return userId;
     } catch (err) {
       console.error('QrModel.resolveOwnerId Error:', err);
+      logger.error('DB_QR', 'QrModel.resolveOwnerId failed', err);
     }
   }
 
@@ -116,6 +119,7 @@ async function resolveOwnerId(userId, ownerPhone) {
       }
     } catch (err) {
       console.error('QrModel.resolveOwnerId phone match Error:', err);
+      logger.error('DB_QR', 'QrModel.resolveOwnerId phone match failed', err);
     }
   }
 
@@ -165,7 +169,10 @@ class QrModel {
           Sticker.updateOne(
             { _id: doc._id },
             { $set: { recovery_code: recoveryCode, recovery_code_hash: codeHash } }
-          ).catch((err) => console.error('Failed to backfill recovery_code on sticker:', doc._id, err));
+          ).catch((err) => {
+            console.error('Failed to backfill recovery_code on sticker:', doc._id, err);
+            logger.error('DB_QR', `Failed to backfill recovery_code on sticker (${doc._id})`, err);
+          });
         }
 
         return {
@@ -189,6 +196,7 @@ class QrModel {
       });
     } catch (err) {
       console.error('QrModel.getAll Error:', err);
+      logger.error('DB_QR', 'QrModel.getAll failed', err);
       return [];
     }
   }
@@ -204,6 +212,7 @@ class QrModel {
       return toPublicQr(doc);
     } catch (err) {
       console.error('QrModel.getById Error:', err);
+      logger.error('DB_QR', 'QrModel.getById failed', err);
       return null;
     }
   }
@@ -220,6 +229,7 @@ class QrModel {
       return toPublicQr(doc);
     } catch (err) {
       console.error('QrModel.getByRecoveryCode Error:', err);
+      logger.error('DB_QR', 'QrModel.getByRecoveryCode failed', err);
       return null;
     }
   }
@@ -260,6 +270,7 @@ class QrModel {
         throw errObj;
       }
       console.error('QrModel.save Error:', err);
+      logger.error('DB_QR', 'QrModel.save failed', err);
       return null;
     }
   }
@@ -340,6 +351,7 @@ class QrModel {
         throw errObj;
       }
       console.error('QrModel.saveV2 Error:', err);
+      logger.error('DB_QR', 'QrModel.saveV2 failed', err);
       return null;
     }
   }
@@ -481,6 +493,7 @@ class QrModel {
       if (activationData.bloodGroup) details.bloodGroup = activationData.bloodGroup;
       if (activationData.allergies) details.allergies = activationData.allergies;
       if (activationData.address) details.address = activationData.address;
+      if (activationData.vehicleNumber) details.vehicleNumber = activationData.vehicleNumber;
       details.activatedAt = details.activatedAt || new Date();
 
       update.details = details;
@@ -522,6 +535,7 @@ class QrModel {
       return toPublicQr(doc);
     } catch (err) {
       console.error(`QrModel.recordScan (${qrId}) Error:`, err);
+      logger.error('DB_QR', `QrModel.recordScan failed (${qrId})`, err);
       return null;
     }
   }

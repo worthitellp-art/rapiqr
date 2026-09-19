@@ -12,8 +12,10 @@ import {
   HeartHandshake,
   Trash2,
   Plus,
+  Info,
 } from 'lucide-react';
 import ScanExitConfirmModal from './ScanExitConfirmModal';
+import { isVehicleCategory } from '../../../stickerModules';
 
 export interface EmergencyContactItem {
   id: string;
@@ -28,6 +30,7 @@ export interface ScanPaymentModalProps {
   qrId?: string;
   category?: string;
   vehicleNumber?: string;
+  onVehicleNumberChange?: (vehicleNumber: string) => void;
   name?: string;
   onNameChange?: (name: string) => void;
   phone?: string;
@@ -87,6 +90,7 @@ export default function ScanPaymentModal({
   qrId = 'A4517DA1',
   category = 'Car & Auto & Truck',
   vehicleNumber = '',
+  onVehicleNumberChange,
   name = '',
   onNameChange,
   phone = '',
@@ -126,6 +130,7 @@ export default function ScanPaymentModal({
   }, [category]);
 
   const CategoryIconComponent = getCategoryIcon(selectedCategory || category);
+  const isVehicle = isVehicleCategory(selectedCategory || category);
 
   // Compute active step index across the unified multi-step journey
   const computeActiveStepIndex = (): number => {
@@ -160,7 +165,7 @@ export default function ScanPaymentModal({
     if (onSubmit) {
       onSubmit();
     } else if (onSuccess) {
-      onSuccess({ name, phone, category: selectedCategory, qrId, message });
+      onSuccess({ name, phone, category: selectedCategory, qrId, vehicleNumber, message });
     }
   };
 
@@ -287,37 +292,35 @@ export default function ScanPaymentModal({
             <form onSubmit={handleFormSubmit} className="space-y-6 flex-1 flex flex-col justify-between">
               <div className="space-y-5">
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
-                    About your tag
+                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
+                    Tell us a bit more
                   </h2>
                 </div>
 
-                {/* Form Field Rows */}
-                <div className="space-y-4 pt-2">
+                {/* Form Fields: Minimal Top-Aligned Style */}
+                <div className="space-y-4 pt-1">
                   {/* Field: Full Name */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 items-center">
-                    <label className="text-xs sm:text-sm font-semibold text-slate-700">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
                       Your full name
                     </label>
-                    <div className="md:col-span-2">
-                      <input
-                        type="text"
-                        value={name}
-                        onChange={(e) => onNameChange?.(e.target.value)}
-                        placeholder="Full name"
-                        required
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none text-sm font-medium text-slate-900 placeholder:text-slate-400 transition-all"
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => onNameChange?.(e.target.value)}
+                      placeholder="e.g. Rahul Sharma"
+                      required
+                      className="w-full h-11 px-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none text-sm font-normal text-gray-900 placeholder:text-gray-400 transition-all"
+                    />
                   </div>
 
                   {/* Field: Mobile Number */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 items-center">
-                    <label className="text-xs sm:text-sm font-semibold text-slate-700">
-                      Mobile number
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Mobile phone number
                     </label>
-                    <div className="md:col-span-2 flex items-center rounded-xl border border-slate-200 bg-white focus-within:border-black focus-within:ring-1 focus-within:ring-black overflow-hidden transition-all">
-                      <div className="px-3 py-2.5 bg-slate-50 border-r border-slate-200 text-xs font-bold text-slate-700 select-none">
+                    <div className="flex items-center h-11 rounded-lg border border-gray-300 bg-white focus-within:border-black focus-within:ring-1 focus-within:ring-black overflow-hidden transition-all">
+                      <div className="px-3.5 h-full bg-gray-50 border-r border-gray-200 text-sm font-medium text-gray-700 select-none flex items-center">
                         {country}
                       </div>
                       <input
@@ -327,86 +330,103 @@ export default function ScanPaymentModal({
                         onChange={(e) => onPhoneChange?.(e.target.value.replace(/\D/g, '').slice(0, 10))}
                         placeholder="10-digit mobile number"
                         required
-                        className="w-full px-3.5 py-2.5 bg-transparent text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none"
+                        className="w-full px-3.5 h-full bg-transparent text-sm font-normal text-gray-900 placeholder:text-gray-400 outline-none"
                       />
                     </div>
                   </div>
 
-                  {/* Field: Preselected Tag Category (Auto-generated from tag QR) */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 items-center">
-                    <label className="text-xs sm:text-sm font-semibold text-slate-700">
+                  {/* Field: Preselected Tag Category */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
                       Tag category
                     </label>
-                    <div className="md:col-span-2 flex items-center gap-2">
-                      <div className="inline-flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/80 text-slate-900 text-xs sm:text-sm font-semibold shadow-2xs">
-                        <CategoryIconComponent size={16} className="text-slate-800" />
-                        <span>{selectedCategory || category || 'Car & Auto & Truck'}</span>
-                        <span className="text-[10px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                          Preselected
-                        </span>
+                    <div className="flex items-center justify-between h-11 px-3.5 rounded-lg border border-gray-300 bg-white text-sm text-gray-900">
+                      <div className="flex items-center gap-2">
+                        <CategoryIconComponent size={16} className="text-gray-700" />
+                        <span className="font-medium">{selectedCategory || category || 'Car & Auto & Truck'}</span>
                       </div>
+                      <span className="text-xs text-gray-400 font-medium">Preselected</span>
                     </div>
                   </div>
 
-                  {/* Field: Vehicle Plate / Description */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 items-center">
-                    <label className="text-xs sm:text-sm font-semibold text-slate-700">
-                      Vehicle plate / Note
-                    </label>
-                    <div className="md:col-span-2">
+                  {/* Field: Vehicle Number (Vehicle Categories Only: Car, Truck, Auto, Bike) */}
+                  {isVehicle && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">
+                        Vehicle number <span className="text-rose-500 font-bold">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={vehicleNumber}
+                        onChange={(e) => onVehicleNumberChange?.(e.target.value.toUpperCase())}
+                        placeholder="e.g. MH 02 AB 1234"
+                        required
+                        className="w-full h-11 px-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none text-sm font-mono font-medium text-gray-900 placeholder:text-gray-400 uppercase transition-all"
+                      />
+                    </div>
+                  )}
+
+                  {/* Field: Tag Note (Non-Vehicle Categories: Home, Pet, Kids, Luggage) */}
+                  {!isVehicle && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">
+                        Tag note / Label
+                      </label>
                       <input
                         type="text"
                         value={message}
                         onChange={(e) => onMessageChange?.(e.target.value)}
-                        placeholder={vehicleNumber ? `e.g. ${vehicleNumber}` : "e.g. MH 02 AB 1234 (optional)"}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none text-sm font-medium text-slate-900 placeholder:text-slate-400 transition-all"
+                        placeholder="e.g. Main Gate, Office, Pet Name (optional)"
+                        className="w-full h-11 px-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none text-sm font-normal text-gray-900 placeholder:text-gray-400 transition-all"
                       />
                     </div>
-                  </div>
+                  )}
 
-                  {/* Field: Privacy Proxy Checkbox */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 items-center pt-1">
-                    <div className="hidden md:block" />
-                    <div className="md:col-span-2">
-                      <label className="flex items-center gap-2.5 text-xs text-slate-600 font-medium cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={agreeTerms}
-                          onChange={(e) => setAgreeTerms(e.target.checked)}
-                          className="w-4 h-4 rounded border-slate-300 text-black focus:ring-black accent-black cursor-pointer"
-                        />
-                        <span>Enable SafeSync™ call masking (keeps phone number private)</span>
-                      </label>
-                    </div>
+                  {/* Field: SafeSync Privacy Checkbox */}
+                  <div className="pt-2">
+                    <label className="flex items-center gap-2.5 text-sm text-gray-700 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={agreeTerms}
+                        onChange={(e) => setAgreeTerms(e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                      />
+                      <span>I'm okay with sharing this with the SafeSync team.</span>
+                      <Info size={14} className="text-gray-400" />
+                    </label>
                   </div>
                 </div>
 
                 {/* Error message */}
                 {error && (
-                  <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-600">
+                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-600">
                     {error}
                   </div>
                 )}
               </div>
 
-              {/* Bottom Action CTA: Clean Black Button */}
-              <div className="pt-6 mt-6 border-t border-slate-100 flex items-center justify-end">
+              {/* Bottom Action CTA: White Background Button with Black Text */}
+              <div className="pt-6 mt-6 border-t border-gray-100 flex flex-col items-center">
                 <button
                   type="submit"
                   disabled={isProcessing || otpSending}
-                  className="w-full sm:w-auto min-w-[140px] px-8 py-3 rounded-xl bg-black hover:bg-zinc-800 active:scale-[0.99] text-white font-semibold text-sm shadow-sm hover:shadow transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full h-11 rounded-lg bg-white hover:bg-gray-50 active:scale-[0.99] text-black border border-gray-300 hover:border-black font-semibold text-sm shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {isProcessing || otpSending ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" />
+                      <Loader2 size={16} className="animate-spin text-black" />
                       <span>Sending OTP...</span>
                     </>
                   ) : (
-                    <>
-                      <span>Continue</span>
-                      <ArrowRight size={16} />
-                    </>
+                    <span>Continue</span>
                   )}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenExitConfirm}
+                  className="mt-3 text-sm text-gray-500 hover:text-gray-900 font-medium transition-colors cursor-pointer"
+                >
+                  Skip for now
                 </button>
               </div>
             </form>
@@ -417,39 +437,37 @@ export default function ScanPaymentModal({
             <form onSubmit={handleFormSubmit} className="space-y-6 flex-1 flex flex-col justify-between">
               <div className="space-y-5">
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
                     Verify phone number
                   </h2>
-                  <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                    Enter the 6-digit code sent to <span className="font-bold text-slate-800">{country} {phone}</span>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Enter the 6-digit code sent to <span className="font-semibold text-gray-800">{country} {phone}</span>
                   </p>
                 </div>
 
-                <div className="space-y-4 pt-2 max-w-md">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4 items-center">
-                    <label className="text-xs sm:text-sm font-semibold text-slate-700">
+                <div className="space-y-4 pt-1 max-w-md">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
                       Verification code
                     </label>
-                    <div className="md:col-span-2">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={6}
-                        value={otpInput}
-                        onChange={(e) => onOtpInputChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="000000"
-                        required
-                        autoFocus
-                        className="w-full tracking-[0.4em] text-center text-2xl font-bold py-2.5 rounded-xl border-2 border-slate-900 bg-white focus:ring-2 focus:ring-black/10 outline-none text-slate-900"
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={otpInput}
+                      onChange={(e) => onOtpInputChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="000000"
+                      required
+                      autoFocus
+                      className="w-full h-12 tracking-[0.3em] text-center text-xl font-semibold rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none text-gray-900 transition-all"
+                    />
                   </div>
 
                   <div className="flex items-center justify-between text-xs pt-1">
                     <button
                       type="button"
                       onClick={onBackToPhone}
-                      className="font-semibold text-slate-500 hover:text-slate-900 cursor-pointer"
+                      className="font-medium text-gray-500 hover:text-gray-900 cursor-pointer"
                     >
                       ← Change number
                     </button>
@@ -457,7 +475,7 @@ export default function ScanPaymentModal({
                       type="button"
                       onClick={onResendOtp}
                       disabled={otpSending}
-                      className="font-bold text-slate-900 hover:underline cursor-pointer disabled:opacity-50"
+                      className="font-semibold text-gray-900 hover:underline cursor-pointer disabled:opacity-50"
                     >
                       {otpSending ? 'Resending code...' : 'Resend code'}
                     </button>
@@ -465,30 +483,34 @@ export default function ScanPaymentModal({
                 </div>
 
                 {error && (
-                  <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-600">
+                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-600">
                     {error}
                   </div>
                 )}
               </div>
 
-              {/* Bottom Action CTA: Clean Black Button */}
-              <div className="pt-6 mt-6 border-t border-slate-100 flex items-center justify-end">
+              {/* Bottom Action CTA: White Background Button with Black Text */}
+              <div className="pt-6 mt-6 border-t border-gray-100 flex flex-col items-center">
                 <button
                   type="submit"
                   disabled={isProcessing || otpSending}
-                  className="w-full sm:w-auto min-w-[160px] px-8 py-3 rounded-xl bg-black hover:bg-zinc-800 active:scale-[0.99] text-white font-semibold text-sm shadow-sm hover:shadow transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full h-11 rounded-lg bg-white hover:bg-gray-50 active:scale-[0.99] text-black border border-gray-300 hover:border-black font-semibold text-sm shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {isProcessing ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" />
+                      <Loader2 size={16} className="animate-spin text-black" />
                       <span>Verifying...</span>
                     </>
                   ) : (
-                    <>
-                      <span>Verify & Continue</span>
-                      <ArrowRight size={16} />
-                    </>
+                    <span>Continue</span>
                   )}
+                </button>
+                <button
+                  type="button"
+                  onClick={onBackToPhone}
+                  className="mt-3 text-sm text-gray-500 hover:text-gray-900 font-medium transition-colors cursor-pointer"
+                >
+                  Change phone number
                 </button>
               </div>
             </form>
@@ -499,10 +521,10 @@ export default function ScanPaymentModal({
             <div className="space-y-6 flex-1 flex flex-col justify-between">
               <div className="space-y-5">
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
                     Emergency contacts
                   </h2>
-                  <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                  <p className="text-sm text-gray-500 mt-1">
                     Add trusted family or friends who receive live GPS alerts during emergencies.
                   </p>
                 </div>
@@ -512,58 +534,68 @@ export default function ScanPaymentModal({
                   {emergencyContacts.map((contact, index) => (
                     <div
                       key={contact.id}
-                      className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/70 space-y-3 relative"
+                      className="p-4 rounded-xl border border-gray-200 bg-white space-y-3 relative"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-700">
+                        <span className="text-xs font-semibold text-gray-700">
                           Contact {index + 1} {index === 0 ? '· Primary SOS' : ''}
                         </span>
                         {emergencyContacts.length > 1 && onRemoveEmergencyContact && (
                           <button
                             type="button"
                             onClick={() => onRemoveEmergencyContact(contact.id)}
-                            className="text-slate-400 hover:text-red-500 transition-colors p-1 cursor-pointer"
+                            className="text-gray-400 hover:text-red-500 transition-colors p-1 cursor-pointer"
                           >
                             <Trash2 size={15} />
                           </button>
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <input
-                          type="text"
-                          value={contact.name}
-                          onChange={(e) => onUpdateEmergencyContact?.(contact.id, 'name', e.target.value)}
-                          placeholder="Contact full name"
-                          className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-900 outline-none focus:border-black focus:ring-1 focus:ring-black"
-                        />
-                        <input
-                          type="tel"
-                          value={contact.phone}
-                          onChange={(e) => onUpdateEmergencyContact?.(contact.id, 'phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
-                          placeholder="10-digit mobile number"
-                          className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-900 outline-none focus:border-black focus:ring-1 focus:ring-black"
-                        />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+                          <input
+                            type="text"
+                            value={contact.name}
+                            onChange={(e) => onUpdateEmergencyContact?.(contact.id, 'name', e.target.value)}
+                            placeholder="Full name"
+                            className="w-full h-10 px-3 rounded-lg bg-white border border-gray-300 text-sm font-normal text-gray-900 outline-none focus:border-black focus:ring-1 focus:ring-black"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Mobile</label>
+                          <input
+                            type="tel"
+                            value={contact.phone}
+                            onChange={(e) => onUpdateEmergencyContact?.(contact.id, 'phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                            placeholder="10-digit number"
+                            className="w-full h-10 px-3 rounded-lg bg-white border border-gray-300 text-sm font-normal text-gray-900 outline-none focus:border-black focus:ring-1 focus:ring-black"
+                          />
+                        </div>
                       </div>
 
-                      <div className="flex flex-wrap gap-1.5 pt-0.5">
-                        {RELATIONSHIP_PRESETS.map((label) => {
-                          const isPicked = contact.relationship === label;
-                          return (
-                            <button
-                              key={label}
-                              type="button"
-                              onClick={() => onUpdateEmergencyContact?.(contact.id, 'relationship', label)}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] border transition-all cursor-pointer ${
-                                isPicked
-                                  ? 'border-black bg-black text-white font-semibold'
-                                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 font-medium'
-                              }`}
-                            >
-                              {label}
-                            </button>
-                          );
-                        })}
+                      {/* Relationship Option Pills matching screenshot */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5">Relationship</label>
+                        <div className="flex flex-wrap gap-2">
+                          {RELATIONSHIP_PRESETS.map((label) => {
+                            const isPicked = contact.relationship === label;
+                            return (
+                              <button
+                                key={label}
+                                type="button"
+                                onClick={() => onUpdateEmergencyContact?.(contact.id, 'relationship', label)}
+                                className={`px-3.5 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                                  isPicked
+                                    ? 'border border-blue-600 bg-blue-50/40 text-blue-600 font-semibold ring-1 ring-blue-600'
+                                    : 'border border-gray-200 bg-white text-gray-700 hover:border-gray-400 font-medium'
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -573,7 +605,7 @@ export default function ScanPaymentModal({
                   <button
                     type="button"
                     onClick={onAddEmergencyContact}
-                    className="w-full py-2.5 rounded-xl border border-dashed border-slate-300 bg-slate-50/50 hover:bg-slate-100 text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                    className="w-full h-11 rounded-lg border border-dashed border-gray-300 bg-white hover:bg-gray-50 text-xs font-semibold text-gray-700 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                   >
                     <Plus size={15} />
                     <span>Add another contact</span>
@@ -581,43 +613,39 @@ export default function ScanPaymentModal({
                 )}
 
                 {error && (
-                  <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-600">
+                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-600">
                     {error}
                   </div>
                 )}
               </div>
 
-              {/* Bottom Action CTAs: Clean Black Button */}
-              <div className="pt-6 mt-6 border-t border-slate-100 flex items-center justify-between gap-3">
+              {/* Bottom Action CTAs: White Background Button with Black Text */}
+              <div className="pt-6 mt-6 border-t border-gray-100 flex flex-col items-center">
+                <button
+                  type="button"
+                  onClick={onFinishEmergencyContacts}
+                  disabled={isProcessing}
+                  className="w-full h-11 rounded-lg bg-white hover:bg-gray-50 active:scale-[0.99] text-black border border-gray-300 hover:border-black font-semibold text-sm shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin text-black" />
+                      <span>Activating...</span>
+                    </>
+                  ) : (
+                    <span>Save & Activate Tag</span>
+                  )}
+                </button>
                 {onSkipEmergencyContacts && (
                   <button
                     type="button"
                     onClick={onSkipEmergencyContacts}
                     disabled={isProcessing}
-                    className="text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+                    className="mt-3 text-sm text-gray-500 hover:text-gray-900 font-medium transition-colors cursor-pointer"
                   >
                     Skip for now
                   </button>
                 )}
-
-                <button
-                  type="button"
-                  onClick={onFinishEmergencyContacts}
-                  disabled={isProcessing}
-                  className="ml-auto px-8 py-3 rounded-xl bg-black hover:bg-zinc-800 active:scale-[0.99] text-white font-semibold text-sm shadow-sm hover:shadow transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Activating...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Save & Activate Tag</span>
-                      <ArrowRight size={16} />
-                    </>
-                  )}
-                </button>
               </div>
             </div>
           )}
@@ -626,22 +654,22 @@ export default function ScanPaymentModal({
           {activeStepIndex === 3 && (
             <div className="space-y-6 flex-1 flex flex-col justify-between text-center py-4">
               <div className="space-y-4 my-auto">
-                <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mx-auto shadow-inner">
-                  <CheckCircle2 size={36} className="text-emerald-600" />
+                <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 mx-auto">
+                  <CheckCircle2 size={32} className="text-emerald-600" />
                 </div>
 
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
                     All set! Tag is live
                   </h2>
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-slate-100 flex items-center justify-center">
+              <div className="pt-6 border-t border-gray-100 flex items-center justify-center">
                 <button
                   type="button"
                   onClick={onViewTag}
-                  className="w-full sm:w-auto px-8 py-3 rounded-xl bg-black hover:bg-zinc-800 active:scale-[0.99] text-white font-semibold text-sm shadow-sm hover:shadow transition-all cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto h-11 px-8 rounded-lg bg-white hover:bg-gray-50 active:scale-[0.99] text-black border border-gray-300 hover:border-black font-semibold text-sm shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <span>View Public Scan Tag</span>
                   <ArrowRight size={16} />

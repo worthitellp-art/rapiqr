@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const path = require('path');
+const { logger } = require('../middleware/loggerMiddleware');
 
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
@@ -25,19 +26,22 @@ async function connectDB() {
   try {
     connectionPromise = mongoose.connect(primaryUri, { serverSelectionTimeoutMS: 5000 });
     await connectionPromise;
-    console.log('[DATABASE] Connected to primary MongoDB cluster successfully.');
+    logger.db('DB_CONNECT', 'Connected to primary MongoDB cluster successfully.', { target: 'primary' });
     return mongoose.connection;
   } catch (err) {
-    console.warn('[DATABASE] Primary MongoDB connection failed (likely IP whitelist or network issue):', err.message);
-    console.log('[DATABASE] Attempting connection to local MongoDB fallback at:', localUri);
+    logger.warn('DB_CONNECT_FAILOVER', 'Primary MongoDB connection failed, attempting local fallback', { error: err.message, localUri });
     try {
       connectionPromise = mongoose.connect(localUri, { serverSelectionTimeoutMS: 3000 });
       await connectionPromise;
-      console.log('[DATABASE] Connected to local MongoDB fallback.');
+      logger.db('DB_CONNECT', 'Connected to local MongoDB fallback.', { target: 'local_fallback' });
       return mongoose.connection;
     } catch (localErr) {
-      console.error('[DATABASE] Local MongoDB fallback failed:', localErr.message);
-      console.error('[DATABASE] To fix: Whitelist IP 0.0.0.0/0 on MongoDB Atlas (https://cloud.mongodb.com/ -> Network Access) or start local mongod.');
+      logger.fatal(
+        'DB_CONNECT_FAILED',
+        'Both primary and local MongoDB connections failed — server cannot start. ' +
+          'Fix: whitelist IP 0.0.0.0/0 on MongoDB Atlas (Network Access) or start local mongod.',
+        localErr
+      );
       throw err;
     }
   }

@@ -1,4 +1,5 @@
 const Alert = require('./schemas/Alert');
+const { logger } = require('../middleware/loggerMiddleware');
 
 class AlertModel {
   /**
@@ -42,6 +43,7 @@ class AlertModel {
       return { id: String(doc._id), qr_code_id: doc.sticker_id, status: doc.status, created_at: doc.created_at };
     } catch (err) {
       console.error('AlertModel.createAlert Error:', err);
+      logger.error('DB_ALERT', 'AlertModel.createAlert failed', err);
       // Do not fabricate a fake success object here — this is the emergency SOS
       // alert path, and a caller/reporter must know the alert was NOT actually
       // saved so the UI can tell them to retry (task.md #13).
@@ -70,6 +72,7 @@ class AlertModel {
       }));
     } catch (err) {
       console.error('AlertModel.getAlerts Error:', err);
+      logger.error('DB_ALERT', 'AlertModel.getAlerts failed', err);
       return [];
     }
   }
@@ -83,6 +86,7 @@ class AlertModel {
       return { deletedCount: result.deletedCount || 0 };
     } catch (err) {
       console.error('AlertModel.deleteAllAlerts Error:', err);
+      logger.error('DB_ALERT', 'AlertModel.deleteAllAlerts failed', err);
       throw err;
     }
   }
@@ -96,6 +100,7 @@ class AlertModel {
       return { success: Boolean(result) };
     } catch (err) {
       console.error('AlertModel.deleteAlert Error:', err);
+      logger.error('DB_ALERT', 'AlertModel.deleteAlert failed', err);
       throw err;
     }
   }
@@ -109,6 +114,7 @@ class AlertModel {
       return { success: Boolean(result), data: result };
     } catch (err) {
       console.error('AlertModel.resolveAlert Error:', err);
+      logger.error('DB_ALERT', 'AlertModel.resolveAlert failed', err);
       throw err;
     }
   }

@@ -1,7 +1,7 @@
 const { Schema, model } = require('mongoose');
 
 const serverLogSchema = new Schema({
-  created_at: { type: Date, default: Date.now, index: true },
+  created_at: { type: Date, default: Date.now },
   level: { type: String, default: null, index: true },
   tag: { type: String, default: null, index: true },
   category: { type: String, default: null, index: true },

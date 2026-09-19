@@ -1,6 +1,7 @@
 const User = require('./schemas/User');
 const { ADMIN_EMAIL } = require('../middleware/authMiddleware');
 const { normalizePhone, isSamePhone } = require('../utils/phone');
+const { logger } = require('../middleware/loggerMiddleware');
 
 const PUBLIC_FIELDS = 'email full_name phone_number avatar_url role subscription_plan is_subscribed metadata email_verified created_at';
 
@@ -32,6 +33,7 @@ class UserModel {
       return toApi(doc);
     } catch (err) {
       console.error('UserModel.findById Error:', err);
+      logger.error('DB_USER', 'UserModel.findById failed', err);
       return null;
     }
   }
@@ -67,6 +69,7 @@ class UserModel {
       return toApi(doc) || profile;
     } catch (err) {
       console.error('UserModel.reconcileAdminRole Error:', err);
+      logger.error('DB_USER', 'UserModel.reconcileAdminRole failed', err);
       return profile;
     }
   }
@@ -90,6 +93,7 @@ class UserModel {
       return hit ? toApi(hit) : null;
     } catch (err) {
       console.error('UserModel.findByPhone Error:', err);
+      logger.error('DB_USER', 'UserModel.findByPhone failed', err);
       return null;
     }
   }
@@ -104,6 +108,7 @@ class UserModel {
       return toApi(doc);
     } catch (err) {
       console.error('UserModel.findByEmail Error:', err);
+      logger.error('DB_USER', 'UserModel.findByEmail failed', err);
       return null;
     }
   }
@@ -127,6 +132,7 @@ class UserModel {
       return toApi(doc);
     } catch (err) {
       console.error('UserModel.updateProfile Error:', err);
+      logger.error('DB_USER', 'UserModel.updateProfile failed', err);
       throw err;
     }
   }
@@ -146,6 +152,7 @@ class UserModel {
       return toApi(doc);
     } catch (err) {
       console.error('UserModel.mergeMetadata Error:', err);
+      logger.error('DB_USER', 'UserModel.mergeMetadata failed', err);
       return null;
     }
   }
@@ -179,6 +186,7 @@ class UserModel {
       return await User.findById(userId).select('+password_hash');
     } catch (err) {
       console.error('UserModel.findAuthById Error:', err);
+      logger.error('DB_USER', 'UserModel.findAuthById failed', err);
       return null;
     }
   }
@@ -232,6 +240,7 @@ class UserModel {
         .lean();
     } catch (err) {
       console.error('UserModel.getSecurityMeta Error:', err);
+      logger.error('DB_USER', 'UserModel.getSecurityMeta failed', err);
       return null;
     }
   }
@@ -249,6 +258,7 @@ class UserModel {
       });
     } catch (err) {
       console.error('UserModel.recordLogin Error:', err);
+      logger.error('DB_USER', 'UserModel.recordLogin failed', err);
     }
   }
 
@@ -257,6 +267,7 @@ class UserModel {
       await User.findByIdAndUpdate(userId, { $set: { last_logout_at: new Date() } });
     } catch (err) {
       console.error('UserModel.recordLogout Error:', err);
+      logger.error('DB_USER', 'UserModel.recordLogout failed', err);
     }
   }
 
@@ -281,6 +292,7 @@ class UserModel {
       return docs.map(toApi);
     } catch (err) {
       console.error('UserModel.searchAll Error:', err);
+      logger.error('DB_USER', 'UserModel.searchAll failed', err);
       return [];
     }
   }

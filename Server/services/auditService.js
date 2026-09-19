@@ -1,5 +1,5 @@
 const AuditLog = require('../models/schemas/AuditLog');
-const { sanitize, getRequestId, getUserId } = require('../middleware/loggerMiddleware');
+const { sanitize, getRequestId, getUserId, logger } = require('../middleware/loggerMiddleware');
 const SecurityEventTypes = require('../utils/securityEventTypes');
 const { trackFailedLogin, resetFailedLogins, trackServerError } = require('./securityAlertService');
 
@@ -85,6 +85,7 @@ async function logAuditEvent({
   } catch (err) {
     // Audit logging must be non-blocking to protect application request flow
     console.error(`[AUDIT_LOG_FAILURE] Failed to write audit event ${eventType}:`, err.message);
+    logger.fatal('AUDIT_LOG_FAILURE', `Failed to write compliance audit event ${eventType}`, err);
     return null;
   }
 }

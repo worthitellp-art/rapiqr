@@ -39,21 +39,47 @@ function clip(value, max = 120) {
  *   body:       the EXACT message you paste into MSG91, with named placeholders.
  * }
  */
+// Static prefix registered with Meta for every "open the dashboard" button
+// below; each template supplies only the dynamic suffix (a chat session id,
+// or '' when there's no session yet) as its button_N component value.
+const DASHBOARD_BUTTON_BASE_URL = 'https://repiqr.com/#/dashboard?tab=chat&session=';
+
 const MSG91_TEMPLATES = {
   QR_SCAN_ALERT: {
     name: process.env.MSG91_WHATSAPP_TEMPLATE_NAME || 'qr_scan_alert',
     audience: 'owner',
-    variables: ['label', 'message', 'link'],
-    defaults: { label: 'your tag', message: 'an issue was reported', link: 'https://repiqr.com/dashboard?tab=chat' },
-    body: '*🔔 QR Scan Alert*\nYour tag *{{label}}* was just scanned.\nMessage: *{{message}}*\nCheck details and reply here: *{{link}}*\n— RepiQR',
+    // `link` used to be a 3rd body variable rendered as plain text — now a
+    // WhatsApp button instead (see `buttons`). button_1 is positional (Meta
+    // requires dynamic URL button variables to be positional, not named).
+    variables: ['label', 'message', 'button_1'],
+    defaults: { label: 'your tag', message: 'an issue was reported', button_1: '' },
+    body: '*🔔 QR Scan Alert*\nYour tag *{{label}}* was just scanned.\nMessage: *{{message}}*\n— RepiQR',
+    buttons: [
+      { type: 'URL', urlType: 'dynamic', text: 'View & Reply', baseUrl: DASHBOARD_BUTTON_BASE_URL },
+    ],
   },
 
   EMERGENCY_ALERT: {
-    name: process.env.MSG91_WHATSAPP_EMERGENCY_TEMPLATE || 'emergency_alert',
+    name: process.env.MSG91_WHATSAPP_EMERGENCY_TEMPLATE || 'emergency_alert_v2',
     audience: 'owner',
-    variables: ['label', 'message', 'link'],
-    defaults: { label: 'your tag', message: 'an emergency alert was raised', link: 'https://repiqr.com/dashboard?tab=chat' },
-    body: 'an *urgent *alert has been raised for "{{label}}". The person who scanned your tag reports: "{{message}}". Open your dashboard here: {{link}} to view visitor details and take action.',
+    // `link` used to be a 3rd body variable rendered as plain text. It's now a
+    // WHATSAPP BUTTON instead (see `buttons` below) — the dashboard/chat link
+    // is submitted as the dynamic suffix of a URL call-to-action button, not
+    // printed in the message body. `button_1` is positional (Meta requires
+    // dynamic URL button variables to be positional, not named), and flows
+    // through unchanged: buildVariables -> notify -> provider.send ->
+    // sendMsg91WhatsApp -> buildMsg91WhatsAppComponents, which already treats
+    // any `button_*`-prefixed key as a button component (see msg91Client.js).
+    variables: ['label', 'message', 'button_1'],
+    defaults: { label: 'your tag', message: 'an emergency alert was raised', button_1: '' },
+    body: '🚨 *URGENT — ACCIDENT ALERT*\n\nPossible accident involving {{label}}.\nMessage: {{message}}\n\n— *RepiQR Safety*',
+    // Documentation for submitting this template in the MSG91 dashboard
+    // (control.msg91.com → WhatsApp → Templates → Create) — the `body` above
+    // goes in the Body field; this describes the one Call-to-Action button to
+    // add alongside it. Not read by any runtime code.
+    buttons: [
+      { type: 'URL', urlType: 'dynamic', text: 'View & Take Action', baseUrl: DASHBOARD_BUTTON_BASE_URL },
+    ],
   },
 
   EMERGENCY_CONTACT_ALERT: {
@@ -67,25 +93,37 @@ const MSG91_TEMPLATES = {
   LOCATION_SHARED: {
     name: 'location_shared',
     audience: 'owner',
-    variables: ['label', 'maps_url', 'link'],
-    defaults: { label: 'your tag', maps_url: '', link: 'https://repiqr.com/dashboard?tab=chat' },
-    body: '*📍 Location Shared*\nSomeone has shared their live location for *{{label}}*.\nView the location: *{{maps_url}}*\nCheck details and reply here: *{{link}}*\n— RepiQR Safety',
+    // maps_url and link were both plain body text — now two buttons.
+    // button_1 = "View Location" (Google Maps), button_2 = "Open Dashboard".
+    variables: ['label', 'button_1', 'button_2'],
+    defaults: { label: 'your tag', button_1: '', button_2: '' },
+    body: '*📍 Location Shared*\nSomeone has shared their live location for *{{label}}*.\n— RepiQR Safety',
+    buttons: [
+      { type: 'URL', urlType: 'dynamic', text: 'View Location', baseUrl: 'https://maps.google.com/?q=' },
+      { type: 'URL', urlType: 'dynamic', text: 'Open Dashboard', baseUrl: DASHBOARD_BUTTON_BASE_URL },
+    ],
   },
 
   CHAT_STARTED: {
     name: 'chat_started',
     audience: 'owner',
-    variables: ['label', 'link'],
-    defaults: { label: 'your tag', link: 'https://repiqr.com/dashboard?tab=chat' },
-    body: 'RepiQR chat alert: a visitor has started a conversation about your tag "{{label}}". They are waiting for your response. Open your dashboard here: {{link}} to view the message and reply securely.',
+    variables: ['label', 'button_1'],
+    defaults: { label: 'your tag', button_1: '' },
+    body: 'RepiQR chat alert: a visitor has started a conversation about your tag "{{label}}". They are waiting for your response.',
+    buttons: [
+      { type: 'URL', urlType: 'dynamic', text: 'Reply Now', baseUrl: DASHBOARD_BUTTON_BASE_URL },
+    ],
   },
 
   CHAT_MESSAGE: {
     name: 'chat_message',
     audience: 'owner',
-    variables: ['label', 'link'],
-    defaults: { label: 'your tag', link: 'https://repiqr.com/dashboard?tab=chat' },
-    body: '*💬 RepiChat – New Message*\nSomeone has sent you a message about your RepiQR tag *{{label}}*.\nTap the link below to view and reply:\n*{{link}}* \n— RepiQR Safety',
+    variables: ['label', 'button_1'],
+    defaults: { label: 'your tag', button_1: '' },
+    body: '*💬 RepiChat – New Message*\nSomeone has sent you a message about your RepiQR tag *{{label}}*.\n— RepiQR Safety',
+    buttons: [
+      { type: 'URL', urlType: 'dynamic', text: 'View & Reply', baseUrl: DASHBOARD_BUTTON_BASE_URL },
+    ],
   },
 
   EMERGENCY_CONTACT_ADDED: {

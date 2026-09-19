@@ -107,7 +107,7 @@ export default function AuthPage({
   };
 
   return (
-    <div className="auth-scope min-h-screen w-full flex flex-col justify-between bg-[#FAFAF8] text-[#14120C] selection:bg-[#FFD444] selection:text-[#14120C] font-sans antialiased">
+    <div className="auth-scope min-h-screen w-full flex flex-col justify-between bg-slate-50 text-[#14120C] selection:bg-slate-200 selection:text-[#14120C] font-sans antialiased">
       {/* ── Top Bar ── */}
       <header className="w-full max-w-5xl mx-auto px-5 py-6 flex items-center justify-between">
         <button
@@ -129,7 +129,7 @@ export default function AuthPage({
 
       {/* ── Centered Clean Auth Card ── */}
       <main className="w-full my-auto flex items-center justify-center px-4 py-8">
-        <div className="w-full max-w-[420px] mx-auto bg-white rounded-[32px] border border-[#14120C]/8 p-7 sm:p-10 shadow-[0_20px_50px_-20px_rgba(20,18,12,0.06)]">
+        <div className="w-full max-w-[420px] mx-auto bg-white rounded-2xl border border-gray-200 p-7 sm:p-9 shadow-sm">
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <button
@@ -143,14 +143,14 @@ export default function AuthPage({
 
           {/* Mode Switcher (Sign In vs Create Account) */}
           {currentView !== 'forgot' && (
-            <div className="mb-6 p-1 rounded-full bg-[#14120C]/[0.04] border border-[#14120C]/6 flex items-center gap-1">
+            <div className="mb-6 p-1 rounded-lg bg-gray-100 border border-gray-200 flex items-center gap-1">
               <button
                 type="button"
                 onClick={handleSwitchToLogin}
-                className={`flex-1 py-2 text-xs sm:text-[13px] font-bold rounded-full transition-all cursor-pointer ${
+                className={`flex-1 py-1.5 text-xs sm:text-[13px] font-semibold rounded-md transition-all cursor-pointer ${
                   currentView === 'login'
-                    ? 'bg-white text-[#14120C] shadow-xs'
-                    : 'text-[#14120C]/55 hover:text-[#14120C]'
+                    ? 'bg-white text-gray-900 shadow-xs'
+                    : 'text-gray-500 hover:text-gray-900'
                 }`}
               >
                 Sign In
@@ -158,10 +158,10 @@ export default function AuthPage({
               <button
                 type="button"
                 onClick={handleSwitchToSignup}
-                className={`flex-1 py-2 text-xs sm:text-[13px] font-bold rounded-full transition-all cursor-pointer ${
+                className={`flex-1 py-1.5 text-xs sm:text-[13px] font-semibold rounded-md transition-all cursor-pointer ${
                   currentView === 'signup'
-                    ? 'bg-white text-[#14120C] shadow-xs'
-                    : 'text-[#14120C]/55 hover:text-[#14120C]'
+                    ? 'bg-white text-gray-900 shadow-xs'
+                    : 'text-gray-500 hover:text-gray-900'
                 }`}
               >
                 Create Account
@@ -171,12 +171,12 @@ export default function AuthPage({
 
           {/* Header Titles */}
           <div className="mb-6 text-center">
-            <h1 className="text-2xl font-extrabold tracking-tight text-[#14120C]">
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900">
               {currentView === 'login' && 'Welcome back'}
               {currentView === 'signup' && 'Create your account'}
               {currentView === 'forgot' && 'Reset your password'}
             </h1>
-            <p className="text-xs sm:text-sm text-[#14120C]/60 mt-1.5">
+            <p className="text-xs sm:text-sm text-gray-500 mt-1.5">
               {currentView === 'login' && 'Sign in to access your tags and dashboard'}
               {currentView === 'signup' && 'Protect your vehicle and assets with private QR tags'}
               {currentView === 'forgot' && "Enter your email and we'll send a recovery link"}
@@ -190,7 +190,7 @@ export default function AuthPage({
                 type="button"
                 onClick={handleGoogleAuthentication}
                 disabled={isSubmitting}
-                className="w-full h-12 rounded-2xl border border-[#14120C]/12 bg-white hover:bg-[#FAFAF8] hover:border-[#14120C]/25 active:scale-[0.99] transition-all flex items-center justify-center cursor-pointer shadow-xs disabled:opacity-50 group"
+                className="w-full h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 hover:border-black active:scale-[0.99] transition-all flex items-center justify-center cursor-pointer shadow-xs disabled:opacity-50 group"
               >
                 <svg className="w-4 h-4 shrink-0 transition-transform group-hover:scale-105" viewBox="0 0 24 24">
                   <path
@@ -210,15 +210,15 @@ export default function AuthPage({
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                   />
                 </svg>
-                <span className="text-xs sm:text-sm ml-3 font-bold text-[#14120C]">
+                <span className="text-xs sm:text-sm ml-3 font-semibold text-gray-900">
                   Continue with Google
                 </span>
               </button>
 
               {/* Minimal Divider */}
               <div className="relative flex items-center justify-center">
-                <div className="w-full border-t border-[#14120C]/10" />
-                <span className="bg-white px-3 text-[11px] font-bold uppercase tracking-wider text-[#14120C]/40 absolute">
+                <div className="w-full border-t border-gray-200" />
+                <span className="bg-white px-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 absolute">
                   or
                 </span>
               </div>
@@ -227,14 +227,14 @@ export default function AuthPage({
 
           {/* Sign-in Method Tabs (Password vs OTP) */}
           {currentView === 'login' && (
-            <div className="flex items-center justify-between mb-4 p-1 rounded-xl bg-[#14120C]/[0.03] border border-[#14120C]/6">
+            <div className="flex items-center justify-between mb-4 p-1 rounded-lg bg-gray-100 border border-gray-200">
               <button
                 type="button"
                 onClick={() => setLoginMethod('password')}
-                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                   loginMethod === 'password'
-                    ? 'bg-white text-[#14120C] shadow-xs'
-                    : 'text-[#14120C]/50 hover:text-[#14120C]'
+                    ? 'bg-white text-gray-900 shadow-xs'
+                    : 'text-gray-500 hover:text-gray-900'
                 }`}
               >
                 Password
@@ -242,14 +242,14 @@ export default function AuthPage({
               <button
                 type="button"
                 onClick={() => setLoginMethod('otp')}
-                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   loginMethod === 'otp'
-                    ? 'bg-white text-[#14120C] shadow-xs'
-                    : 'text-[#14120C]/50 hover:text-[#14120C]'
+                    ? 'bg-white text-gray-900 shadow-xs'
+                    : 'text-gray-500 hover:text-gray-900'
                 }`}
               >
                 <span>Email Code (OTP)</span>
-                <span className="text-[9px] px-1.5 py-0.5 bg-[#FFD444] text-[#14120C] rounded-full font-bold">Fast</span>
+                <span className="text-[9px] px-1.5 py-0.5 bg-gray-200 text-gray-800 rounded-full font-bold">Fast</span>
               </button>
             </div>
           )}
@@ -337,14 +337,14 @@ export default function AuthPage({
             {currentView === 'login' && loginMethod === 'otp' && otpSent && (
               <div className="space-y-2 pt-1">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="otpCode" className="text-xs font-bold text-[#14120C]/75">
+                  <label htmlFor="otpCode" className="text-sm font-medium text-gray-900">
                     Enter 6-Digit Code
                   </label>
                   <button
                     type="button"
                     onClick={handleSendEmailOtp}
                     disabled={isSubmitting}
-                    className="text-xs font-bold text-[#14120C] hover:underline cursor-pointer disabled:opacity-50"
+                    className="text-xs font-semibold text-gray-900 hover:underline cursor-pointer disabled:opacity-50"
                   >
                     Resend Code
                   </button>
@@ -356,26 +356,26 @@ export default function AuthPage({
                   maxLength={6}
                   required
                   autoFocus
-                  placeholder="••••••"
+                  placeholder="000000"
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                  className="w-full h-12 text-center text-xl tracking-[10px] font-mono font-bold bg-[#FAFAF8]/60 focus:bg-white border border-[#14120C]/15 focus:border-[#14120C] focus:ring-4 focus:ring-[#FFD444]/25 rounded-2xl outline-none text-[#14120C] shadow-xs transition-all"
+                  className="w-full h-11 text-center text-xl tracking-[8px] font-mono font-semibold bg-white border border-gray-300 focus:border-black focus:ring-1 focus:ring-black rounded-lg outline-none text-gray-900 shadow-xs transition-all"
                 />
-                <p className="text-[11px] text-[#14120C]/50 text-center">
-                  We sent a code to <span className="font-bold text-[#14120C]">{email}</span>
+                <p className="text-xs text-gray-500 text-center">
+                  We sent a code to <span className="font-semibold text-gray-800">{email}</span>
                 </p>
               </div>
             )}
 
-            {/* Submit CTA Button */}
+            {/* Submit CTA Button: White Background Button with Black Text */}
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full h-12 mt-2 rounded-2xl bg-[#14120C] hover:bg-black active:scale-[0.99] text-white font-bold text-sm sm:text-[15px] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed group"
+              className="w-full h-11 mt-2 rounded-lg bg-white hover:bg-gray-50 active:scale-[0.99] text-black border border-gray-300 hover:border-black font-semibold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed group"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 size={17} className="animate-spin text-white" />
+                  <Loader2 size={16} className="animate-spin text-black" />
                   <span>Please wait...</span>
                 </>
               ) : (

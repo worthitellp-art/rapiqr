@@ -1,6 +1,7 @@
 const ChatSession = require('./schemas/ChatSession');
 const ChatMessage = require('./schemas/ChatMessage');
 const Sticker = require('./schemas/Sticker');
+const { logger } = require('../middleware/loggerMiddleware');
 
 function sessionToApi(doc) {
   if (!doc) return null;
@@ -92,6 +93,7 @@ class ChatModel {
       return { session: sessionToApi(result.value), isNew };
     } catch (err) {
       console.error('ChatModel.findOrCreateOpenSession Error:', err);
+      logger.error('DB_CHAT', 'ChatModel.findOrCreateOpenSession failed', err);
       throw err;
     }
   }
@@ -113,6 +115,7 @@ class ChatModel {
       return sessionToApi(doc);
     } catch (err) {
       console.error(`ChatModel.getSessionById (${sessionId}) Error:`, err);
+      logger.error('DB_CHAT', `ChatModel.getSessionById failed (${sessionId})`, err);
       return null;
     }
   }
@@ -135,6 +138,7 @@ class ChatModel {
       return docs.map(sessionToApi);
     } catch (err) {
       console.error(`ChatModel.listSessionsForOwner (${ownerId}) Error:`, err);
+      logger.error('DB_CHAT', `ChatModel.listSessionsForOwner failed (${ownerId})`, err);
       return [];
     }
   }
@@ -145,6 +149,7 @@ class ChatModel {
       return docs.map(messageToApi);
     } catch (err) {
       console.error(`ChatModel.listMessages (${sessionId}) Error:`, err);
+      logger.error('DB_CHAT', `ChatModel.listMessages failed (${sessionId})`, err);
       return [];
     }
   }
@@ -180,7 +185,10 @@ class ChatModel {
     ChatSession.findByIdAndUpdate(sessionId, {
       $set: { last_message_at: message.created_at, last_message_preview: preview },
       $inc: { [bumpUnreadKey]: 1 },
-    }).catch((err) => console.warn('ChatModel.insertMessage session bump warning:', err.message));
+    }).catch((err) => {
+      console.warn('ChatModel.insertMessage session bump warning:', err.message);
+      logger.warn('DB_CHAT', 'ChatModel.insertMessage session bump failed', err);
+    });
 
     return messageToApi(message);
   }
@@ -189,7 +197,10 @@ class ChatModel {
   static async markDelivered(messageId) {
     const at = new Date();
     ChatMessage.findByIdAndUpdate(messageId, { $set: { delivered_at: at } })
-      .catch((err) => console.warn('ChatModel.markDelivered warning:', err.message));
+      .catch((err) => {
+        console.warn('ChatModel.markDelivered warning:', err.message);
+        logger.warn('DB_CHAT', 'ChatModel.markDelivered failed', err);
+      });
     return at;
   }
 
@@ -214,6 +225,7 @@ class ChatModel {
       return true;
     } catch (err) {
       console.error(`ChatModel.markRead (${sessionId}) Error:`, err);
+      logger.error('DB_CHAT', `ChatModel.markRead failed (${sessionId})`, err);
       return false;
     }
   }
@@ -224,6 +236,7 @@ class ChatModel {
       return sessionToApi(doc);
     } catch (err) {
       console.error(`ChatModel.closeSession (${sessionId}) Error:`, err);
+      logger.error('DB_CHAT', `ChatModel.closeSession failed (${sessionId})`, err);
       return null;
     }
   }
@@ -234,6 +247,7 @@ class ChatModel {
       await ChatSession.findByIdAndDelete(sessionId);
     } catch (err) {
       console.error(`ChatModel.deleteSession (${sessionId}) Error:`, err);
+      logger.error('DB_CHAT', `ChatModel.deleteSession failed (${sessionId})`, err);
     }
     return true;
   }

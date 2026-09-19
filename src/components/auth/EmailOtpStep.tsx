@@ -52,22 +52,22 @@ export default function EmailOtpStep({
 
       {!otpSent ? (
         <form onSubmit={onSendCode} className="space-y-4 pt-2">
-          <p className="text-xs text-slate-500 font-medium leading-relaxed">
+          <p className="text-xs text-gray-500 font-medium leading-relaxed">
             No password needed — we'll email you a 6-digit code.
           </p>
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+            <label className="block text-sm font-medium text-gray-900 mb-1.5">
               Email Address
             </label>
             <div className="relative">
-              <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="email"
                 required
                 placeholder="name@example.com"
                 value={email}
                 onChange={handleEmailInputChange}
-                className="w-full pl-10 pr-4 py-3.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl outline-none focus:bg-white focus:border-[#111111] focus:ring-2 focus:ring-[#111111]/25 transition-all text-slate-900 font-medium placeholder:text-slate-400"
+                className="w-full pl-10 pr-4 h-11 text-sm bg-white border border-gray-300 rounded-lg outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-gray-900 font-normal placeholder:text-gray-400"
               />
             </div>
           </div>
@@ -75,22 +75,22 @@ export default function EmailOtpStep({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-4 rounded-2xl font-bold text-[#FFFFFF] text-sm bg-[#111111] hover:bg-[#000000] active:scale-[0.99] transition-all duration-200 cursor-pointer disabled:opacity-60 mt-2 flex items-center justify-center gap-2"
+            className="w-full h-11 rounded-lg font-semibold text-black text-sm bg-white hover:bg-gray-50 border border-gray-300 hover:border-black active:scale-[0.99] transition-all cursor-pointer disabled:opacity-60 mt-2 flex items-center justify-center gap-2 shadow-xs"
           >
-            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Send Code</span>}
+            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin text-black" /> : <span>Send Code</span>}
           </button>
         </form>
       ) : (
         <form onSubmit={onVerifyCode} className="space-y-4 pt-2">
           <div className="flex items-center justify-between">
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <label className="block text-sm font-medium text-gray-900">
               Enter 6-Digit Code
             </label>
             <button
               type="button"
               onClick={onSendCode}
               disabled={isSubmitting}
-              className="text-xs text-[#111111] hover:underline font-bold cursor-pointer disabled:opacity-60"
+              className="text-xs text-gray-700 hover:underline font-semibold cursor-pointer disabled:opacity-60"
             >
               Resend
             </button>
@@ -101,22 +101,22 @@ export default function EmailOtpStep({
             maxLength={6}
             required
             autoFocus
-            placeholder="0 0 0 0 0 0"
+            placeholder="000000"
             value={otpCode}
             onChange={handleOtpInputChange}
-            className="w-full h-14 text-center text-2xl tracking-[10px] font-mono font-semibold bg-slate-50 border-2 border-[#111111] focus:border-[#000000] focus:ring-4 focus:ring-[#111111]/20 rounded-2xl outline-none text-slate-900 transition-all placeholder:text-slate-300"
+            className="w-full h-12 text-center text-xl tracking-[8px] font-mono font-semibold bg-white border border-gray-300 focus:border-black focus:ring-1 focus:ring-black rounded-lg outline-none text-gray-900 transition-all placeholder:text-gray-300"
           />
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-4 rounded-2xl font-bold text-[#FFFFFF] text-sm bg-[#111111] hover:bg-[#000000] active:scale-[0.99] transition-all duration-200 cursor-pointer disabled:opacity-60 mt-2 flex items-center justify-center gap-2"
+            className="w-full h-11 rounded-lg font-semibold text-black text-sm bg-white hover:bg-gray-50 border border-gray-300 hover:border-black active:scale-[0.99] transition-all cursor-pointer disabled:opacity-60 mt-2 flex items-center justify-center gap-2 shadow-xs"
           >
             {isSubmitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin text-black" />
             ) : (
               <>
-                <ShieldCheck size={18} />
+                <ShieldCheck size={18} className="text-black" />
                 <span>Verify &amp; Sign In</span>
               </>
             )}

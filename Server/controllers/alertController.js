@@ -5,10 +5,6 @@ const { notifyOwner, notifyEmergencyContacts } = require('../services/notificati
 const { getIo } = require('../sockets/chatSocket');
 const { logger } = require('../middleware/loggerMiddleware');
 
-// Same origin ChatController uses, so the owner lands on the dashboard inbox
-// that already holds this visitor's thread.
-const APP_URL = process.env.APP_URL || 'https://rapiqr.worthitellp.workers.dev';
-
 const URL_RE = /(https?:\/\/\S+)/;
 
 /**
@@ -104,9 +100,11 @@ class AlertController {
         // The owner's copy carries a deep link into the dashboard inbox — when a
         // chat thread exists for this alert, straight into that thread, not just
         // the generic inbox the owner would otherwise have to search through.
-        const chatLink = chatSessionId
-          ? `${APP_URL}/#/dashboard?tab=chat&session=${chatSessionId}`
-          : `${APP_URL}/#/dashboard?tab=chat`;
+        // Now a WhatsApp button's dynamic URL suffix rather than body text (see
+        // msg91Templates.js QR_SCAN_ALERT / LOCATION_SHARED `buttons`), so only
+        // the session id itself travels through — the static base URL lives in
+        // the approved template.
+        const dashboardButtonValue = chatSessionId || '';
 
         // Send WhatsApp alert to the owner using the approved Meta templates
         if (ownerPhone) {
@@ -115,15 +113,19 @@ class AlertController {
           const isLocationShare = alertPayload.type === 'location_share' || String(alertPayload.message || '').includes('EMERGENCY GPS LOCATION');
 
           let alertType = 'QR_SCAN_ALERT';
-          let alertData = { label, message: alertPayload.message || 'an issue was reported', link: chatLink };
+          let alertData = { label, message: alertPayload.message || 'an issue was reported', button_1: dashboardButtonValue };
 
           if (hasGps && isLocationShare) {
             alertType = 'LOCATION_SHARED';
-            const mapsUrl = `https://maps.google.com/?q=${alertPayload.latitude},${alertPayload.longitude}`;
-            alertData = { label, maps_url: mapsUrl, link: chatLink };
+            // button_1 = "View Location" (Google Maps), button_2 = "Open Dashboard".
+            alertData = { label, button_1: `${alertPayload.latitude},${alertPayload.longitude}`, button_2: dashboardButtonValue };
           } else if (isEmergency) {
             alertType = 'EMERGENCY_ALERT';
-            alertData = { label, message: alertPayload.message || 'an urgent alert was reported', link: chatLink };
+            // EMERGENCY_ALERT's dashboard link is a WhatsApp button now, not
+            // body text — button_1 is just the dynamic suffix (the chat
+            // session id), appended to the button's static base URL
+            // registered with Meta (see msg91Templates.js EMERGENCY_ALERT.buttons).
+            alertData = { label, message: alertPayload.message || 'an urgent alert was reported', button_1: dashboardButtonValue };
           }
 
           const result = await notifyOwner({
