@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+
+  <!-- 1. Homepage / Main Landing Page -->
+  <url>
+    <loc>https://rapiqr.com/</loc>
+    <lastmod>2026-09-18</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://rapiqr.com/mockup.png</image:loc>
+      <image:title>RapiQR Smart Safety Vehicle QR Tags</image:title>
+      <image:caption>RapiQR vehicle privacy shield and emergency notification tag</image:caption>
+    </image:image>
+  </url>
+
+  <!-- 2. Product Order / Purchase Checkout -->
+  <url>
+    <loc>https://rapiqr.com/checkout</loc>
+    <lastmod>2026-09-18</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- 3. Join as Partner / Service Network -->
+  <url>
+    <loc>https://rapiqr.com/join</loc>
+    <lastmod>2026-09-18</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- 4. Login Portal -->
+  <url>
+    <loc>https://rapiqr.com/login</loc>
+    <lastmod>2026-09-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 5. Register Portal -->
+  <url>
+    <loc>https://rapiqr.com/register</loc>
+    <lastmod>2026-09-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 6. Legal / Privacy Policy -->
+  <url>
+    <loc>https://rapiqr.com/privacy</loc>
+    <lastmod>2026-09-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+</urlset>

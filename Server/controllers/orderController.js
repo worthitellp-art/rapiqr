@@ -277,6 +277,46 @@ class OrderController {
     }
   }
 
+  /**
+   * POST /api/orders/track-by-phone — phone-only lookup, no Order ID needed.
+   * A phone can have several orders, so this returns every match (newest
+   * first) rather than a single one; each is masked the same way the
+   * Order-ID+contact lookup already is.
+   */
+  static async trackByPhone(req, res) {
+    try {
+      const { phone } = req.body || {};
+      const digits = String(phone || '').replace(/\D/g, '');
+      if (digits.length < 10) {
+        return res.status(400).json({ success: false, error: 'Enter a valid 10-digit phone number.' });
+      }
+
+      const orders = await OrderModel.getAllByPhone(phone);
+      if (orders.length === 0) {
+        return res.status(404).json({ success: false, error: 'No orders found for this phone number.' });
+      }
+
+      const refreshed = await Promise.all(
+        orders.map(async (order) => {
+          if (order.shiprocket?.shipmentId) {
+            try {
+              return (await ShiprocketController.refreshTracking(order)) || order;
+            } catch (err) {
+              logger.warn('ORDER_TRACK_BY_PHONE', `Live tracking refresh failed for ${order.id}: ${err.message}`);
+              return order;
+            }
+          }
+          return order;
+        })
+      );
+
+      return res.json({ success: true, data: refreshed.map(sanitizeOrderDetailsForPublicTracking) });
+    } catch (err) {
+      logger.error('ORDER_TRACK_BY_PHONE', 'Failed to lookup orders by phone', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
   /** GET /api/orders — admin: every order */
   static async list(req, res) {
     try {

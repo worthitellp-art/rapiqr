@@ -2,7 +2,7 @@ const User = require('./schemas/User');
 const { ADMIN_EMAIL } = require('../middleware/authMiddleware');
 const { normalizePhone, isSamePhone } = require('../utils/phone');
 
-const PUBLIC_FIELDS = 'email full_name phone_number avatar_url role subscription_plan is_subscribed metadata created_at';
+const PUBLIC_FIELDS = 'email full_name phone_number avatar_url role subscription_plan is_subscribed metadata email_verified created_at';
 
 function toApi(doc) {
   if (!doc) return null;
@@ -16,6 +16,7 @@ function toApi(doc) {
     subscription_plan: doc.subscription_plan,
     is_subscribed: doc.is_subscribed,
     metadata: doc.metadata || {},
+    email_verified: doc.email_verified || false,
     created_at: doc.created_at,
   };
 }

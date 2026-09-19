@@ -763,6 +763,39 @@ export const apiClient = {
       });
     },
 
+    /**
+     * Phone-only tracking lookup — every order placed with this number,
+     * newest first (a phone can have more than one).
+     */
+    async trackByPhone(phone: string) {
+      return request<{
+        success: boolean;
+        error?: string;
+        data?: Array<{
+          id: string;
+          status: 'placed' | 'shipped' | 'delivered' | 'cancelled';
+          payment?: any;
+          paymentStatus?: string;
+          deliveryMethod?: string;
+          total?: number;
+          createdAt?: string;
+          items?: Array<{ name: string; qty: number; price: number }>;
+          maskedBuyer?: {
+            firstName: string;
+            email: string;
+            phone: string;
+            city: string;
+            state: string;
+            pincode: string;
+          };
+          shiprocket?: OrderTracking | null;
+        }>;
+      }>('/orders/track-by-phone', {
+        method: 'POST',
+        body: JSON.stringify({ phone }),
+      });
+    },
+
     // Admin: every order placed via checkout
     async list() {
       return request<{ success: boolean; data: any[] }>('/orders', {

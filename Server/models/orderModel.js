@@ -255,6 +255,39 @@ class OrderModel {
       .flatMap((o) => (Array.isArray(o.stickers) ? o.stickers.map((s) => s.id) : []))
       .filter(Boolean);
   }
+
+  /**
+   * Every order (full docs, not just sticker ids) placed with this phone
+   * number — the phone-only "Track Order" lookup, newest first. Sibling of
+   * getStickerIdsByPhone; same last-10-digit match since phone numbers are
+   * stored in whatever shape the checkout form produced.
+   */
+  static async getAllByPhone(phone) {
+    const digits = String(phone || '').replace(/\D/g, '');
+    if (digits.length < 10) return [];
+    const last10 = digits.slice(-10);
+    const docs = await Order.find({ phone: { $regex: last10 + '$' } })
+      .sort({ created_at: -1 })
+      .limit(20)
+      .lean();
+    return docs.map(toApi);
+  }
+
+  /**
+   * Sibling of getStickerIdsByPhone, for email. Same trust boundary applies:
+   * a typed-but-unverified email must never be trusted to move sticker
+   * ownership, so only call this after the caller has independently proven
+   * they control that inbox (Google OAuth or email-OTP sign-in) — never from
+   * a plain password sign-in/sign-up, where the email is only asserted.
+   */
+  static async getStickerIdsByEmail(email) {
+    const normalized = String(email || '').trim().toLowerCase();
+    if (!normalized) return [];
+    const orders = await Order.find({ email: normalized }).select('stickers').lean();
+    return orders
+      .flatMap((o) => (Array.isArray(o.stickers) ? o.stickers.map((s) => s.id) : []))
+      .filter(Boolean);
+  }
 }
 
 module.exports = OrderModel;

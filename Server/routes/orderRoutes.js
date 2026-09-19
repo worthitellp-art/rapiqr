@@ -9,6 +9,7 @@ router.get('/mine', verifyToken, OrderController.mine);
 // Secure buyer delivery tracking (accessible by logged-in owner or guest with phone/email verification)
 router.get('/:id/track', optionalAuth, OrderController.track);
 router.post('/track', optionalAuth, OrderController.trackByLookup);
+router.post('/track-by-phone', optionalAuth, OrderController.trackByPhone);
 
 router.get('/', verifyToken, verifyAdmin, OrderController.list);
 router.patch('/:id/status', verifyToken, verifyAdmin, OrderController.updateStatus);

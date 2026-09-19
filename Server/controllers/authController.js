@@ -471,6 +471,23 @@ class AuthController {
         logger.warn('AUTH_GOOGLE', `Non-blocking error linking guest orders: ${linkErr.message}`);
       });
 
+      // Connect the exact sticker(s) any order placed with this email is owed
+      // (auto-minted at checkout — see OrderModel.generateStickersForOrder)
+      // straight to this account. Safe here specifically because Google just
+      // proved this caller actually controls this inbox — see the trust-
+      // boundary note on OrderModel.getStickerIdsByEmail.
+      try {
+        const orderStickerIds = await OrderModel.getStickerIdsByEmail(profile.email);
+        if (orderStickerIds.length > 0) {
+          const claimedByOrder = await ProductModel.claimStickersByIds(profile.id, profile.full_name, orderStickerIds);
+          if (claimedByOrder.length > 0) {
+            logger.rowUpdated('products', 'auto-claim-by-order-email', { userId: profile.id, count: claimedByOrder.length });
+          }
+        }
+      } catch (err) {
+        logger.error('ORDER_STICKER_CLAIM', 'Failed to claim order-linked stickers after Google sign-in', err);
+      }
+
       const token = jwt.sign(
         { id: profile.id, email: profile.email, role: profile.role },
         JWT_SECRET,
@@ -574,6 +591,23 @@ class AuthController {
       await OrderModel.linkGuestOrdersToUser(profile.id, profile.email, profile.phoneNumber).catch((linkErr) => {
         logger.warn('AUTH_EMAIL_OTP', `Non-blocking error linking guest orders: ${linkErr.message}`);
       });
+
+      // Connect the exact sticker(s) any order placed with this email is owed
+      // (auto-minted at checkout — see OrderModel.generateStickersForOrder)
+      // straight to this account. Safe here specifically because the OTP
+      // above just proved this caller actually controls this inbox — see the
+      // trust-boundary note on OrderModel.getStickerIdsByEmail.
+      try {
+        const orderStickerIds = await OrderModel.getStickerIdsByEmail(profile.email);
+        if (orderStickerIds.length > 0) {
+          const claimedByOrder = await ProductModel.claimStickersByIds(profile.id, profile.full_name, orderStickerIds);
+          if (claimedByOrder.length > 0) {
+            logger.rowUpdated('products', 'auto-claim-by-order-email', { userId: profile.id, count: claimedByOrder.length });
+          }
+        }
+      } catch (err) {
+        logger.error('ORDER_STICKER_CLAIM', 'Failed to claim order-linked stickers after email OTP sign-in', err);
+      }
 
       const token = jwt.sign(
         { id: profile.id, email: profile.email, role: profile.role },

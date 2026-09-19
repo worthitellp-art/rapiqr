@@ -487,6 +487,95 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   const [activeSubMenu, setActiveSubMenu] = useState<"none" | "emergency-main" | "mechanical" | "towing" | "family" | "parking" | "headlights" | "theft" | "flat-tire">("none");
   const [flatTireImage, setFlatTireImage] = useState<string | null>(null);
 
+  // Re-verification state for stickers recovered after deletion
+  const [isReverified, setIsReverified] = useState(false);
+  const [reverifyOwnerName, setReverifyOwnerName] = useState("");
+  const [reverifyOwnerPhone, setReverifyOwnerPhone] = useState("");
+  const [reverifyEmergencyName, setReverifyEmergencyName] = useState("");
+  const [reverifyEmergencyPhone, setReverifyEmergencyPhone] = useState("");
+  const [reverifyVehicleNumber, setReverifyVehicleNumber] = useState("");
+  const [reverifyConfirmed, setReverifyConfirmed] = useState(false);
+  const [reverifySubmitting, setReverifySubmitting] = useState(false);
+  const [reverifyError, setReverifyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (qrData?.id) {
+      if (localStorage.getItem(`repiqr-reverified-${qrData.id}`) === "true") {
+        setIsReverified(true);
+      }
+      if (qrData.vehicleName && !reverifyOwnerName) {
+        setReverifyOwnerName(qrData.vehicleName.replace(/\s*\([A-Z0-9_-]+\)$/i, ""));
+      }
+      if (qrData.vehicleNumber && !reverifyVehicleNumber) {
+        setReverifyVehicleNumber(qrData.vehicleNumber);
+      }
+    }
+  }, [qrData?.id, qrData?.vehicleName, qrData?.vehicleNumber]);
+
+  const handleReverifySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reverifyOwnerName.trim()) {
+      setReverifyError("Please enter the owner's full name.");
+      return;
+    }
+    if (!reverifyOwnerPhone.trim() || reverifyOwnerPhone.replace(/\D/g, "").length < 7) {
+      setReverifyError("Please enter a valid owner mobile number.");
+      return;
+    }
+    if (!reverifyEmergencyPhone.trim() || reverifyEmergencyPhone.replace(/\D/g, "").length < 7) {
+      setReverifyError("Please enter a valid emergency contact number.");
+      return;
+    }
+    if (!reverifyConfirmed) {
+      setReverifyError("Please check the confirmation box to verify ownership.");
+      return;
+    }
+
+    setReverifySubmitting(true);
+    setReverifyError(null);
+
+    try {
+      if (qrData) {
+        const cleanQrId = qrData.id.trim().toUpperCase();
+        const stored = localStorage.getItem("repiqr-qrlist") || localStorage.getItem("namoqr-qrlist");
+        if (stored) {
+          try {
+            const list = JSON.parse(stored);
+            const idx = list.findIndex((q: any) => q.id?.toUpperCase() === cleanQrId || q.clientId?.toUpperCase() === cleanQrId);
+            if (idx !== -1) {
+              list[idx].recovered_at = null;
+              list[idx].recoveredAt = null;
+              list[idx].vehicleName = reverifyOwnerName.trim();
+              list[idx].vehicleNumber = reverifyVehicleNumber.trim() || list[idx].vehicleNumber;
+              localStorage.setItem("repiqr-qrlist", JSON.stringify(list));
+            }
+          } catch (err) {
+            console.error(err);
+          }
+        }
+
+        localStorage.setItem(`repiqr-reverified-${qrData.id}`, "true");
+
+        setQrData((prev) =>
+          prev
+            ? {
+                ...prev,
+                vehicleName: reverifyOwnerName.trim(),
+                vehicleNumber: reverifyVehicleNumber.trim() || prev.vehicleNumber,
+                recoveredAt: null,
+              }
+            : null
+        );
+      }
+
+      setIsReverified(true);
+    } catch (err: any) {
+      setReverifyError(err?.message || "Failed to confirm details. Please try again.");
+    } finally {
+      setReverifySubmitting(false);
+    }
+  };
+
   // Quick-issue SMS dispatch (Parking / Headlights / Theft) — fired automatically
   // the moment the visitor taps the quick-action tile, using the real backend alert route
   // (same one the "Message Vehicle Owner" box uses) so the owner is actually notified,
@@ -1807,14 +1896,154 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                 on that path, see QrModel._restoreDeletedSticker. The details
                 below survived the delete, but flag them for re-verification
                 rather than silently trusting stale data. */}
-            {qrData.recoveredAt && (
-              <div className="flex items-start gap-2.5 bg-[#FFFBEB] border border-[#FCD34D] rounded-2xl px-3.5 py-3">
-                <ShieldAlert size={16} className="text-[#B45309] flex-shrink-0 mt-0.5" />
-                <p className="text-[11.5px] leading-snug text-[#92400E] font-semibold">
-                  Re-verification needed — this sticker's record was recovered after being deleted. Please confirm the owner and emergency details are still correct.
-                </p>
+            {qrData.recoveredAt && !isReverified ? (
+              <div className="bg-white rounded-[28px] p-5 sm:p-6 border border-amber-200/90 shadow-xl shadow-amber-950/5 space-y-4 text-left">
+                {/* Header */}
+                <div className="flex items-start gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-600 flex-shrink-0 shadow-xs">
+                    <ShieldAlert size={26} className="text-amber-600" />
+                  </div>
+                  <div>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold uppercase tracking-wider bg-amber-100 text-amber-900 mb-1">
+                      Safety Verification
+                    </span>
+                    <h2 className="text-lg font-black text-slate-900 leading-tight">
+                      Re-verification Needed
+                    </h2>
+                  </div>
+                </div>
+
+                {/* Exact user requirement notice banner */}
+                <div className="rounded-2xl bg-[#FFFBEB] border border-[#FCD34D] p-3.5 flex items-start gap-2.5">
+                  <AlertTriangle size={18} className="text-[#B45309] flex-shrink-0 mt-0.5" />
+                  <p className="text-[12px] leading-snug text-[#92400E] font-semibold">
+                    Re-verification needed — this sticker's record was recovered after being deleted. Please confirm the owner and emergency details are still correct.
+                  </p>
+                </div>
+
+                {reverifyError && (
+                  <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 font-semibold">
+                    {reverifyError}
+                  </div>
+                )}
+
+                {/* Form to confirm owner and emergency details */}
+                <form onSubmit={handleReverifySubmit} className="space-y-3.5 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Owner Name <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        required
+                        placeholder="Owner full name"
+                        value={reverifyOwnerName}
+                        onChange={(e) => setReverifyOwnerName(e.target.value)}
+                        className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#14120C] focus:ring-2 focus:ring-[#FFD444]/40 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Owner Phone Number <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="tel"
+                        required
+                        placeholder="e.g. +91 98765 43210"
+                        value={reverifyOwnerPhone}
+                        onChange={(e) => setReverifyOwnerPhone(e.target.value)}
+                        className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#14120C] focus:ring-2 focus:ring-[#FFD444]/40 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                        Emergency Contact Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Spouse / Brother"
+                        value={reverifyEmergencyName}
+                        onChange={(e) => setReverifyEmergencyName(e.target.value)}
+                        className="w-full h-11 px-3.5 rounded-xl border border-slate-200 focus:border-[#14120C] focus:ring-2 focus:ring-[#FFD444]/40 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                        Emergency Phone <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <PhoneCall size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="tel"
+                          required
+                          placeholder="e.g. +91 91234 56789"
+                          value={reverifyEmergencyPhone}
+                          onChange={(e) => setReverifyEmergencyPhone(e.target.value)}
+                          className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#14120C] focus:ring-2 focus:ring-[#FFD444]/40 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Vehicle / Tag Identifier
+                    </label>
+                    <div className="relative">
+                      <Car size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="e.g. MH 12 AB 1234"
+                        value={reverifyVehicleNumber}
+                        onChange={(e) => setReverifyVehicleNumber(e.target.value)}
+                        className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#14120C] focus:ring-2 focus:ring-[#FFD444]/40 text-sm font-mono font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all uppercase"
+                      />
+                    </div>
+                  </div>
+
+                  <label className="flex items-start gap-2.5 cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      required
+                      checked={reverifyConfirmed}
+                      onChange={(e) => setReverifyConfirmed(e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-[#14120C] focus:ring-[#FFD444]"
+                    />
+                    <span className="text-xs text-slate-600 leading-snug font-medium">
+                      I confirm the owner identity and emergency details are accurate and current for this sticker.
+                    </span>
+                  </label>
+
+                  <button
+                    type="submit"
+                    disabled={reverifySubmitting}
+                    className="w-full h-12 rounded-xl bg-[#14120C] text-white font-bold text-sm tracking-wide shadow-lg shadow-black/10 hover:bg-[#2A2826] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
+                  >
+                    {reverifySubmitting ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin text-[#FFD444]" />
+                        <span>Confirming Details...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck size={18} className="text-[#FFD444]" />
+                        <span>Confirm & Access Sticker</span>
+                      </>
+                    )}
+                  </button>
+                </form>
               </div>
-            )}
+            ) : (
+              <>
 
             {/* ============ CATEGORY SCAN PAGE ============
                 Every category the admin can mint a sticker for except car and
@@ -2799,6 +3028,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                   );
                 })()}
               </div>
+            )}
+              </>
             )}
           </div>
         )}

@@ -39,23 +39,6 @@ import {
   Star,
   Truck,
   LayoutDashboard,
-  Shield,
-  ShieldCheck,
-  Phone,
-  Signal,
-  Wifi,
-  BatteryFull,
-  Send,
-  MessageCircle,
-  AlertTriangle,
-  Siren,
-  PhoneCall,
-  Stethoscope,
-  Wrench,
-  Disc,
-  ShieldAlert,
-  MessageSquare,
-  ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -103,8 +86,6 @@ export interface LandingPageMasterProps {
   onLogin?: () => void;
   onOpenDashboard?: () => void;
   onOpenDistributorDashboard?: () => void;
-  onOpenDistributorApply?: () => void;
-  onOpenPricing?: () => void;
   onOpenCheckout?: () => void;
   onOpenJoinUs?: (serviceType?: string) => void;
   onOpenTrackOrder?: () => void;
@@ -555,277 +536,33 @@ function useBodyScrollLock(locked: boolean) {
 }
 
 /**
- * Ultra-realistic mobile phone frame (iPhone 16/15 Pro titanium chassis)
- * displaying the live scan-proxy page mockup.
+ * The hero's one concrete visual: a single, plainly aligned card holding the
+ * real sticker photo (cropped tight, since the source frame is a captioned
+ * tutorial slide). Desktop only (`hidden lg:block`): at hero-text width on a
+ * phone there's no room for it beside the centred headline without crowding
+ * it.
  */
-function HeroScanPhoneMock({ reduced }: { reduced: boolean | null }) {
+function HeroStickerCard({ reduced }: { reduced: boolean | null }) {
   return (
     <motion.div
-      className="relative mx-auto w-full max-w-[310px] select-none sm:max-w-[335px]"
-      initial={{ opacity: 0, y: 24 }}
+      className="pointer-events-none relative mx-auto w-full max-w-[380px]"
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.9, delay: 0.4, ease: EASE }}
+      transition={{ duration: 0.9, ease: EASE }}
+      aria-hidden="true"
     >
-      {/* Floating active status pill with #FFD444 highlight */}
-      <motion.div
-        animate={reduced ? undefined : { y: [0, -6, 0] }}
-        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute -top-4 -right-3 z-30 flex items-center gap-2 rounded-full border border-[#14120C]/10 bg-white/95 px-3.5 py-1.5 text-xs font-bold tracking-wide text-[#14120C] shadow-[0_12px_28px_-6px_rgba(20,18,12,0.18)] backdrop-blur-md"
-      >
-        <span className="relative flex h-2.5 w-2.5">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#16A34A] opacity-75" />
-          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#16A34A]" />
-        </span>
-        <span className="font-mono text-[10.5px] uppercase tracking-wider">RepiQR · Active</span>
-        <span className="h-1.5 w-1.5 rounded-full bg-[#FFD444]" />
-      </motion.div>
-
-      {/* ── Realistic Smartphone Body (Natural Titanium Edge) ── */}
-      <div className="relative rounded-[50px] p-[2.5px] bg-gradient-to-b from-[#524E4A] via-[#2A2826] to-[#45423E] shadow-[0_50px_100px_-20px_rgba(20,18,12,0.42),0_20px_40px_-15px_rgba(20,18,12,0.25)] border border-white/20">
-        {/* Antenna bands */}
-        <div className="absolute -left-[1px] top-24 w-[2.5px] h-1.5 bg-[#1C1A18] z-20" />
-        <div className="absolute -left-[1px] bottom-24 w-[2.5px] h-1.5 bg-[#1C1A18] z-20" />
-        <div className="absolute -right-[1px] top-24 w-[2.5px] h-1.5 bg-[#1C1A18] z-20" />
-        <div className="absolute -right-[1px] bottom-24 w-[2.5px] h-1.5 bg-[#1C1A18] z-20" />
-
-        {/* Physical side buttons */}
-        {/* Action Button */}
-        <div className="absolute -left-[4.5px] top-[92px] h-7 w-[3px] rounded-l-sm bg-gradient-to-r from-[#2F2C2A] to-[#45423E] shadow-xs" />
-        {/* Volume Up */}
-        <div className="absolute -left-[4.5px] top-[132px] h-12 w-[3px] rounded-l-sm bg-gradient-to-r from-[#2F2C2A] to-[#45423E] shadow-xs" />
-        {/* Volume Down */}
-        <div className="absolute -left-[4.5px] top-[192px] h-12 w-[3px] rounded-l-sm bg-gradient-to-r from-[#2F2C2A] to-[#45423E] shadow-xs" />
-        {/* Power / Siri Button */}
-        <div className="absolute -right-[4.5px] top-[148px] h-18 w-[3px] rounded-r-sm bg-gradient-to-l from-[#2F2C2A] to-[#45423E] shadow-xs" />
-
-        {/* Inner black bezel */}
-        <div className="relative rounded-[47px] bg-[#0E0D0C] p-[9px] overflow-hidden">
-          {/* Top Speaker Ear-piece Slit */}
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 h-[3.5px] w-12 rounded-full bg-[#181615]" />
-
-          {/* Screen Shell */}
-          <div className="relative overflow-hidden rounded-[39px] bg-[#FFFFFF] border border-black/5">
-            {/* Specular Diagonal Glass Reflection */}
-            <div className="pointer-events-none absolute inset-0 z-20 bg-gradient-to-tr from-transparent via-white/[0.03] to-white/[0.12]" />
-
-            {/* iOS Status Bar */}
-            <div className="relative z-10 flex items-center justify-between px-6 pt-3 pb-1 text-[11px] font-bold text-[#14120C]">
-              <span className="tracking-tight">9:41</span>
-
-              {/* Dynamic Island with Real Camera Lens Glint */}
-              <div className="absolute left-1/2 top-2 z-30 flex items-center justify-between px-2.5 h-[24px] w-[86px] -translate-x-1/2 rounded-full bg-black shadow-md">
-                <div className="flex items-center gap-1">
-                  <div className="relative h-2.5 w-2.5 rounded-full bg-[#080B14] border border-blue-900/40">
-                    <span className="absolute top-0.5 left-0.5 h-1 w-1 rounded-full bg-blue-400/40" />
-                  </div>
-                </div>
-                {/* Proximity sensor */}
-                <div className="h-1.5 w-1.5 rounded-full bg-[#161616]" />
-              </div>
-
-              <div className="flex items-center gap-1.5 text-[#14120C]">
-                <Signal size={12} strokeWidth={2.5} />
-                <Wifi size={12} strokeWidth={2.5} />
-                <BatteryFull size={14} strokeWidth={2} />
-              </div>
-            </div>
-
-            {/* Screen Content (Matches Requested Mockup Exactly) */}
-            <div className="max-h-[585px] overflow-y-auto p-3 space-y-2.5 bg-[#F4F6F9] scrollbar-none">
-              {/* 1. TOP EMERGENCY CARD */}
-              <div className="relative overflow-hidden rounded-[26px] bg-gradient-to-b from-[#E01414] via-[#D31313] to-[#8F0808] p-4 text-white shadow-md">
-                {/* Subtle Concentric Rings Top Right */}
-                <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full border border-white/15" />
-                <div className="pointer-events-none absolute -right-5 -top-5 h-32 w-32 rounded-full border border-white/15" />
-                <div className="pointer-events-none absolute top-0 right-0 h-20 w-20 rounded-full border border-white/10" />
-
-                {/* Top Row: Warning Icon & Siren with Radiation Lines */}
-                <div className="flex items-start justify-between relative z-10">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 backdrop-blur-xs text-white shadow-xs">
-                    <AlertTriangle size={18} strokeWidth={2.4} />
-                  </div>
-
-                  {/* Radiating Siren Graphic */}
-                  <div className="relative flex items-center justify-center w-10 h-10">
-                    <div className="absolute -top-1 w-1 h-1.5 bg-white/90 rounded-full" />
-                    <div className="absolute top-0.5 -left-1 w-1.5 h-1 bg-white/90 rounded-full rotate-45" />
-                    <div className="absolute top-0.5 -right-1 w-1.5 h-1 bg-white/90 rounded-full -rotate-45" />
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 backdrop-blur-xs shadow-xs">
-                      <Siren size={17} className="text-white animate-pulse" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Headlines */}
-                <div className="mt-2.5 relative z-10">
-                  <h3 className="text-[16px] font-black leading-tight tracking-tight text-white">
-                    This Is Emergency or an accident
-                  </h3>
-                  <p className="mt-0.5 text-[11px] font-medium text-white/85">
-                    We've detected an emergency or accident
-                  </p>
-                </div>
-
-                {/* 3 Column Quick Actions Status Bar with Dividers */}
-                <div className="mt-3.5 flex items-center justify-between border-t border-white/15 pt-3 text-center relative z-10">
-                  <div className="flex-1 flex flex-col items-center">
-                    <MapPin size={13} className="text-white mb-0.5" />
-                    <span className="text-[10px] font-bold leading-tight">Share Live</span>
-                    <span className="text-[8.5px] text-white/80">Location</span>
-                  </div>
-                  <div className="h-6 w-px bg-white/20" />
-                  <div className="flex-1 flex flex-col items-center">
-                    <PhoneCall size={13} className="text-white mb-0.5" />
-                    <span className="text-[10px] font-bold leading-tight">Notify</span>
-                    <span className="text-[8.5px] text-white/80">Contacts</span>
-                  </div>
-                  <div className="h-6 w-px bg-white/20" />
-                  <div className="flex-1 flex flex-col items-center">
-                    <Stethoscope size={13} className="text-white mb-0.5" />
-                    <span className="text-[10px] font-bold leading-tight">Request</span>
-                    <span className="text-[8.5px] text-white/80">Ambulance</span>
-                  </div>
-                </div>
-
-                {/* Get Help Pill Button */}
-                <button
-                  type="button"
-                  className="mt-3.5 flex w-full items-center justify-center gap-2 rounded-full bg-white py-2.5 font-bold text-[#C81010] shadow-md hover:bg-slate-50 transition-transform active:scale-98 relative z-10"
-                >
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#C81010] text-white">
-                    <Phone size={11} className="fill-white" />
-                  </span>
-                  <span className="text-[12.5px] font-bold tracking-tight">Get Help</span>
-                </button>
-              </div>
-
-              {/* 2. QUICK ACTIONS CARD (2x3 GRID) */}
-              <div className="rounded-[22px] border border-black/5 bg-white p-3 shadow-xs">
-                <div className="mb-2.5 flex items-center justify-between">
-                  <h4 className="text-[12px] font-bold text-slate-900">Quick Actions</h4>
-                  <span className="text-[9.5px] font-medium text-slate-400">Tap on any service</span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-1.5">
-                  {/* Tow Truck */}
-                  <div className="relative flex flex-col items-center rounded-xl border border-slate-100 bg-white p-2 text-center shadow-2xs transition-transform hover:scale-[1.03]">
-                    <ChevronRight size={10} className="absolute right-1 top-1 text-slate-300" />
-                    <div className="mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-rose-50 text-rose-500">
-                      <Truck size={15} />
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-900 leading-tight">Tow Truck</span>
-                    <span className="mt-0.5 text-[8px] text-slate-400">Roadside recovery</span>
-                  </div>
-
-                  {/* Mechanic */}
-                  <div className="relative flex flex-col items-center rounded-xl border border-slate-100 bg-white p-2 text-center shadow-2xs transition-transform hover:scale-[1.03]">
-                    <ChevronRight size={10} className="absolute right-1 top-1 text-slate-300" />
-                    <div className="mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700">
-                      <Wrench size={15} />
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-900 leading-tight">Mechanic</span>
-                    <span className="mt-0.5 text-[8px] text-slate-400">On-site repair</span>
-                  </div>
-
-                  {/* Parking Issue */}
-                  <div className="relative flex flex-col items-center rounded-xl border border-slate-100 bg-white p-2 text-center shadow-2xs transition-transform hover:scale-[1.03]">
-                    <ChevronRight size={10} className="absolute right-1 top-1 text-slate-300" />
-                    <div className="mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-[#2563EB] text-white font-black text-[11px]">
-                      P
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-900 leading-tight">Parking Issue</span>
-                    <span className="mt-0.5 text-[8px] text-slate-400">Blocking path</span>
-                  </div>
-
-                  {/* Flat Tyre */}
-                  <div className="relative flex flex-col items-center rounded-xl border border-slate-100 bg-white p-2 text-center shadow-2xs transition-transform hover:scale-[1.03]">
-                    <ChevronRight size={10} className="absolute right-1 top-1 text-slate-300" />
-                    <div className="mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-purple-700">
-                      <Disc size={15} />
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-900 leading-tight">Flat Tyre</span>
-                    <span className="mt-0.5 text-[8px] text-slate-400">Tyre assistance</span>
-                  </div>
-
-                  {/* Theft Alert */}
-                  <div className="relative flex flex-col items-center rounded-xl border border-slate-100 bg-white p-2 text-center shadow-2xs transition-transform hover:scale-[1.03]">
-                    <ChevronRight size={10} className="absolute right-1 top-1 text-slate-300" />
-                    <div className="mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-rose-50 text-rose-600">
-                      <ShieldAlert size={15} />
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-900 leading-tight">Theft Alert</span>
-                    <span className="mt-0.5 text-[8px] text-slate-400">Report and alert</span>
-                  </div>
-
-                  {/* Headlights */}
-                  <div className="relative flex flex-col items-center rounded-xl border border-slate-100 bg-white p-2 text-center shadow-2xs transition-transform hover:scale-[1.03]">
-                    <ChevronRight size={10} className="absolute right-1 top-1 text-slate-300" />
-                    <div className="mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-700">
-                      <Key size={14} />
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-900 leading-tight">Headlights</span>
-                    <span className="mt-0.5 text-[8px] text-slate-400">are on</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. MESSAGE VEHICLE OWNER CARD */}
-              <div className="rounded-[22px] border border-black/5 bg-white p-3 shadow-xs space-y-2.5">
-                <div className="flex items-start gap-2.5">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-[#4F39F6]">
-                    <MessageSquare size={16} />
-                  </div>
-                  <div>
-                    <h4 className="text-[11.5px] font-bold text-slate-900 leading-tight">Message Vehicle Owner</h4>
-                    <p className="mt-0.5 text-[9.5px] text-slate-500 leading-snug">
-                      Start a private chat. The owner receives a WhatsApp alert automatically.
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#4F39F6] py-2.5 font-bold text-white shadow-md shadow-indigo-500/20 hover:bg-[#432EE0] transition-transform active:scale-98"
-                >
-                  <MessageCircle size={14} />
-                  <span className="text-[11.5px] font-bold tracking-wide">Message Owner</span>
-                </button>
-              </div>
-
-              {/* 4. BOTTOM SPLIT CARD (You're Protected + 24/7 Support) */}
-              <div className="rounded-2xl border border-black/5 bg-white p-2 shadow-xs flex items-center justify-between">
-                {/* Left: You're Protected */}
-                <div className="flex items-center gap-2 pr-2 flex-1 border-r border-slate-100">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 flex-shrink-0">
-                    <ShieldCheck size={14} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold text-slate-900 leading-tight truncate">You're Protected</p>
-                    <p className="text-[8px] text-slate-400 truncate">We care about your safety</p>
-                  </div>
-                </div>
-
-                {/* Right: 24/7 Support */}
-                <div className="flex items-center justify-between pl-2 flex-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-blue-600 flex-shrink-0">
-                      <Phone size={12} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-bold text-slate-900 leading-tight truncate">24/7 Support</p>
-                      <p className="text-[8px] text-slate-400 truncate">Always here to help</p>
-                    </div>
-                  </div>
-                  <ChevronRight size={11} className="text-slate-300 flex-shrink-0" />
-                </div>
-              </div>
-            </div>
-
-            {/* iOS Bottom Home Indicator Bar */}
-            <div className="flex justify-center pb-2 pt-1.5">
-              <div className="h-1 w-32 rounded-full bg-[#14120C]/80" />
-            </div>
-          </div>
+      <div className="overflow-hidden rounded-[22px] border border-[#14120C]/10 bg-[#FFFFFF] shadow-[0_24px_50px_-24px_rgba(20,18,12,0.3)]">
+        <div className="relative aspect-[4/3] overflow-hidden">
+          <img
+            src={stepImg2}
+            alt="A RapiQR safety sticker applied to a car window"
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ objectPosition: '50% 38%', transform: 'scale(1.55)' }}
+          />
+        </div>
+        <div className="flex items-center justify-between border-t border-[#14120C]/8 px-4 py-3">
+          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#14120C]/45">RapiQR · Active</span>
+          <span className="h-2 w-2 rounded-full" style={{ background: '#C9A227' }} />
         </div>
       </div>
     </motion.div>
@@ -900,8 +637,6 @@ export default function LandingPageMaster({
   onLogin,
   onOpenDashboard,
   onOpenDistributorDashboard,
-  onOpenDistributorApply,
-  onOpenPricing,
   onOpenCheckout,
   onOpenJoinUs,
   onOpenTrackOrder,
@@ -1281,6 +1016,7 @@ export default function LandingPageMaster({
     { id: 'hiw-section', label: t.navLinks.hiw },
     { id: 'trust-section', label: t.navLinks.trust },
     { id: 'products-section', label: t.navLinks.products },
+    { id: 'distributor-section', label: t.navLinks.distributor },
     { id: 'faq-section', label: t.navLinks.faq },
   ];
 
@@ -1299,35 +1035,34 @@ export default function LandingPageMaster({
         aria-hidden="true"
       />
 
-      {/* ── 1. NAVBAR — modern visible frosted glass bar with prominent links ── */}
+      {/* ── 1. NAVBAR — paper on the white hero, a touch of blur once you move ── */}
       <header
-        className={`fixed inset-x-0 top-0 z-[70] transition-all duration-300 ${
-          isScrolled
-            ? 'bg-[#FEFDF9]/95 backdrop-blur-xl border-b border-[#14120C]/10 shadow-[0_4px_24px_rgba(20,18,12,0.06)] py-3 sm:py-3.5'
-            : 'bg-[#FEFDF9]/85 backdrop-blur-md border-b border-[#14120C]/8 shadow-[0_2px_12px_rgba(20,18,12,0.03)] py-4'
+        className={`fixed inset-x-0 top-0 z-[70] transition-all duration-500 ${
+          isScrolled ? 'bg-[#FEFDF9]/90 backdrop-blur-xl border-b border-[#14120C]/10' : 'bg-transparent'
         }`}
       >
-        <div className="mx-auto flex max-w-[1400px] items-center justify-between px-5 sm:px-8 lg:px-12">
+        <div className="mx-auto flex max-w-[1400px] items-center justify-between px-5 py-4 sm:px-8 lg:px-12">
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="flex cursor-pointer items-center focus:outline-hidden group"
+            className="flex cursor-pointer items-center focus:outline-hidden"
             aria-label="RepiQR home"
           >
-            <img src={lightBgLogo} alt="RepiQR" className="h-8 w-auto object-contain sm:h-9 transition-transform duration-200 group-hover:scale-[1.02]" />
+            <img src={lightBgLogo} alt="RepiQR" className="h-7 w-auto object-contain sm:h-8" />
           </button>
 
-          <nav className="hidden items-center gap-1.5 lg:flex">
+          <nav className="hidden items-center gap-8 text-[13px] font-medium text-[#14120C]/70 lg:flex">
             {NAV_LINKS.map((link) => (
               <button
                 key={link.id}
                 onClick={() => handleSmoothScroll(link.id)}
-                className="cursor-pointer px-3.5 py-2 rounded-full text-[15px] font-semibold text-[#14120C]/75 hover:text-[#14120C] hover:bg-[#14120C]/[0.05] active:scale-95 transition-all duration-150"
+                className="cursor-pointer transition-colors hover:text-[#14120C]"
               >
                 {link.label}
               </button>
             ))}
 
-            {/* Join Us dropdown */}
+            {/* Join Us — the full service catalogue, so a provider can pick
+                what they do before the form even loads. */}
             <div
               className="relative"
               onMouseEnter={() => setIsJoinMenuOpen(true)}
@@ -1337,34 +1072,34 @@ export default function LandingPageMaster({
                 onClick={() => setIsJoinMenuOpen((open) => !open)}
                 aria-haspopup="true"
                 aria-expanded={isJoinMenuOpen}
-                className="flex cursor-pointer items-center gap-1.5 px-3.5 py-2 rounded-full text-[15px] font-semibold text-[#14120C]/75 hover:text-[#14120C] hover:bg-[#14120C]/[0.05] active:scale-95 transition-all duration-150"
+                className="flex cursor-pointer items-center gap-1.5 transition-colors hover:text-[#14120C]"
               >
-                <span>{t.joinUs}</span>
+                {t.joinUs}
                 <ChevronDown
-                  size={15}
-                  className={`transition-transform duration-300 ${isJoinMenuOpen ? 'rotate-180 text-[#14120C]' : 'text-[#14120C]/60'}`}
+                  size={13}
+                  className={`transition-transform duration-300 ${isJoinMenuOpen ? 'rotate-180' : ''}`}
                 />
               </button>
 
               <AnimatePresence>
                 {isJoinMenuOpen && (
                   <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                    transition={{ duration: 0.2, ease: EASE }}
-                    className="absolute left-1/2 top-full z-50 w-60 -translate-x-1/2 pt-2.5"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    transition={{ duration: 0.25, ease: EASE }}
+                    className="absolute left-1/2 top-full z-50 w-56 -translate-x-1/2 pt-4"
                   >
-                    <div className="overflow-hidden rounded-2xl border border-[#14120C]/10 bg-white/95 backdrop-blur-xl p-2.5 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.2)]">
-                      <p className="px-3 pb-2 pt-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#14120C]/45">
+                    <div className="overflow-hidden rounded-2xl border border-[#14120C]/10 bg-[#FFFFFF] p-2 shadow-[0_20px_45px_-18px_rgba(0,0,0,0.25)]">
+                      <p className="px-3 pb-2 pt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[#14120C]/50">
                         {t.chooseYourService}
                       </p>
-                      <div className="grid max-h-72 overflow-y-auto space-y-0.5">
+                      <div className="grid max-h-72 overflow-y-auto">
                         {SERVICE_TYPES.filter((type) => type.slug !== 'police').map((type) => (
                           <button
                             key={type.slug}
                             onClick={() => handleJoinSelect(type.slug)}
-                            className="cursor-pointer rounded-xl px-3 py-2.5 text-left text-[14px] font-medium text-[#14120C]/80 transition-colors hover:bg-[#14120C]/5 hover:text-[#14120C]"
+                            className="cursor-pointer rounded-xl px-3 py-2.5 text-left text-[13px] font-light text-[#14120C]/70 transition-colors hover:bg-[#14120C]/5 hover:text-[#14120C]"
                           >
                             {type.label}
                           </button>
@@ -1377,29 +1112,28 @@ export default function LandingPageMaster({
             </div>
           </nav>
 
-          <div className="hidden items-center gap-4 lg:flex">
+          <div className="hidden items-center gap-5 lg:flex">
             <LanguageSwitcher />
 
             {onOpenTrackOrder && (
               <button
                 onClick={onOpenTrackOrder}
-                className="cursor-pointer px-3.5 py-2 rounded-full text-[14px] font-semibold text-[#14120C]/80 hover:text-[#14120C] hover:bg-[#14120C]/[0.05] transition-all flex items-center gap-2"
+                className="cursor-pointer text-[13px] font-medium text-[#14120C]/70 transition-colors hover:text-[#14120C] flex items-center gap-1.5"
                 title="Track order delivery"
               >
-                <Truck size={16} className="text-[#14120C]/70" />
-                <span>Track Order</span>
+
               </button>
             )}
 
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative cursor-pointer p-2.5 rounded-full text-[#14120C]/80 hover:text-[#14120C] hover:bg-[#14120C]/[0.05] transition-colors"
+              className="relative cursor-pointer p-2 text-[#14120C]/70 transition-colors hover:text-[#14120C]"
               aria-label="Open cart"
             >
-              <ShoppingBag size={19} />
+              <ShoppingBag size={18} />
               {cartCount > 0 && (
                 <span
-                  className="absolute right-1 top-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-xs"
+                  className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-[#FFFFFF]"
                   style={{ background: '#14120C' }}
                 >
                   {cartCount}
@@ -1410,7 +1144,7 @@ export default function LandingPageMaster({
             {isLoggedIn ? (
               <button
                 onClick={onOpenDashboard || onLogin}
-                className="cursor-pointer flex items-center gap-2 rounded-full bg-[#14120C] hover:bg-black px-5 py-2.5 text-[14px] font-semibold text-white shadow-sm hover:shadow-md transition-all hover:scale-[1.02] active:scale-95"
+                className="cursor-pointer flex items-center gap-2 rounded-full bg-[#14120C] px-5 py-2.5 text-[13px] font-semibold text-[#FFFFFF] shadow-sm transition-transform hover:scale-[1.03] active:scale-95"
               >
                 <LayoutDashboard size={15} />
                 <span>{t.dashboard}</span>
@@ -1418,25 +1152,25 @@ export default function LandingPageMaster({
             ) : isEmbeddedInDashboard ? (
               <button
                 onClick={onOpenCheckout}
-                className="cursor-pointer rounded-full bg-[#14120C] hover:bg-black px-6 py-2.5 text-[14px] font-semibold text-white transition-all hover:scale-[1.02] active:scale-95"
+                className="cursor-pointer rounded-full bg-[#14120C] px-6 py-2.5 text-[13px] font-semibold text-[#FFFFFF] transition-transform hover:scale-[1.03] active:scale-95"
               >
                 {t.orderNewTags}
               </button>
             ) : (
-              <div className="flex items-center gap-2">
+              <>
                 <button
                   onClick={onLogin}
-                  className="cursor-pointer px-4 py-2 rounded-full text-[14px] font-bold text-[#14120C] hover:text-black hover:bg-[#14120C]/[0.05] transition-all"
+                  className="cursor-pointer text-[13px] font-medium text-[#14120C]/70 transition-colors hover:text-[#14120C]"
                 >
                   {t.logIn}
                 </button>
                 <button
                   onClick={() => handleSmoothScroll('products-section')}
-                  className="cursor-pointer rounded-full bg-[#14120C] hover:bg-black px-6 py-2.5 text-[14px] font-bold text-white shadow-[0_4px_16px_rgba(20,18,12,0.18)] hover:shadow-[0_6px_20px_rgba(20,18,12,0.28)] transition-all hover:scale-[1.02] active:scale-95"
+                  className="cursor-pointer rounded-full bg-[#14120C] px-6 py-2.5 text-[13px] font-semibold text-[#FFFFFF] transition-transform hover:scale-[1.03] active:scale-95"
                 >
                   {t.chooseTag}
                 </button>
-              </div>
+              </>
             )}
           </div>
 
@@ -1572,13 +1306,13 @@ export default function LandingPageMaster({
               transition={{ duration: 0.8, ease: EASE }}
               className="mb-6 flex items-center gap-2.5 text-[10px] font-medium uppercase tracking-[0.2em] text-[#14120C]/60"
             >
-              <span className="h-px w-8 bg-[#FFD444]" />
+              <span className="h-px w-8 bg-[#C9A227]" />
               {t.heroKicker}
             </motion.div>
 
             <h1 className="max-w-2xl text-[clamp(2.6rem,5.6vw,4.6rem)] font-medium leading-[0.98] tracking-[-0.045em] text-[#14120C]">
               <SplitWords text={t.heroHeadingLine1} delay={0.1} animateOnLoad />{' '}
-              <span className="text-[#FFD444]">
+              <span className="text-[#C9A227]">
                 <SplitWords text={t.heroHeadingHighlight} delay={0.22} animateOnLoad />
               </span>
               <br />
@@ -1606,9 +1340,9 @@ export default function LandingPageMaster({
                   whileHover={reduced ? undefined : { y: -3 }}
                   whileTap={reduced ? undefined : { scale: 0.97 }}
                   transition={{ duration: 0.25, ease: EASE }}
-                  className="group flex cursor-pointer items-center gap-4 rounded-full bg-[#14120C] px-8 py-4 text-[15px] font-bold text-[#FFFFFF] shadow-[0_16px_40px_-18px_rgba(20,18,12,0.35)] transition-all hover:bg-black active:scale-95 sm:gap-6 sm:px-10 sm:py-5"
+                  className="group flex cursor-pointer items-center gap-4 bg-[#14120C] px-8 py-4 text-[15px] font-bold text-[#FFFFFF] shadow-[0_16px_40px_-18px_rgba(20,18,12,0.35)] sm:gap-6 sm:px-10 sm:py-5"
                 >
-                  <span>Get your tag</span>
+                  Get your tag
                   <ArrowRight
                     size={18}
                     className="transition-transform duration-300 group-hover:translate-x-1.5 text-[#FFFFFF]"
@@ -1616,35 +1350,50 @@ export default function LandingPageMaster({
                 </motion.button>
                 <button
                   onClick={() => handleSmoothScroll('hiw-section')}
-                  className="cursor-pointer rounded-full border border-[#14120C]/20 bg-white px-6 py-4 text-[13px] font-semibold text-[#14120C] shadow-xs transition-colors hover:border-[#14120C]/50 hover:bg-[#F7F6F2]"
+                  className="cursor-pointer border border-[#14120C]/20 px-6 py-4 text-[13px] font-medium text-[#14120C] transition-colors hover:border-[#14120C]/50"
                 >
                   See how it works
                 </button>
               </div>
 
-              {/* Trust list — rounded pills avoiding square edges */}
-              <div className="flex flex-wrap items-center gap-2 border-t border-[#14120C]/10 pt-5">
+              {/* Trust list — a row of plain facts, not badges, matching the
+                  flat/list design language rather than pill decorations. */}
+              <ul className="flex flex-col gap-2 border-t border-[#14120C]/10 pt-5">
                 {['Ships in 2–3 days', 'Zero subscriptions', 'Lifetime tag validity'].map((fact) => (
-                  <span
-                    key={fact}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[#14120C]/10 bg-white px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-wider text-[#14120C]/75 shadow-xs"
-                  >
-                    <Check size={13} className="text-[#16A34A]" />
+                  <li key={fact} className="flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-wider text-[#14120C]/55">
+                    <Check size={13} className="text-[#C9A227]" />
                     {fact}
-                  </span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </motion.div>
           </div>
 
-          {/* Right: realistic mobile phone frame with scan page mock */}
+          {/* Right: a single, plainly aligned card with the real sticker photo. */}
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.9, delay: 0.4, ease: EASE }}
-            className="flex justify-center lg:justify-end"
+            className="hidden lg:block"
           >
-            <HeroScanPhoneMock reduced={reduced} />
+            <HeroStickerCard reduced={reduced} />
+          </motion.div>
+        </motion.div>
+
+        {/* Scroll cue */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.6, duration: 1 }}
+          className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2"
+          aria-hidden="true"
+        >
+          <motion.div
+            animate={reduced ? undefined : { y: [0, 9, 0] }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+            className="flex h-9 w-[22px] items-start justify-center rounded-full border border-[#14120C]/20 pt-2"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-[#14120C]/50" />
           </motion.div>
         </motion.div>
       </section>
@@ -1694,11 +1443,11 @@ export default function LandingPageMaster({
                     </span>
                   </div>
 
-                  <div className="w-full shrink-0 overflow-hidden rounded-2xl sm:w-40">
+                  <div className="w-full shrink-0 overflow-hidden sm:w-40">
                     <img
                       src={step.img}
                       alt={step.title}
-                      className="aspect-4/3 w-full rounded-2xl object-cover transition-transform duration-500 group-hover:scale-105"
+                      className="aspect-4/3 w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   </div>
 
@@ -1731,13 +1480,14 @@ export default function LandingPageMaster({
             </p>
           </Reveal>
 
-          {/* 4 Feature Trust rows */}
+          {/* 4 Feature Trust rows — list, not cards, matching the app-wide
+              flat/list design language. */}
           <div className="mt-14 divide-y divide-[#FFFFFF]/10 border-y border-[#FFFFFF]/10 sm:grid sm:grid-cols-2 sm:divide-y-0 sm:gap-x-10 sm:border-none">
             {FEATURE_CARDS.map((card, i) => (
               <Reveal key={card.id} delay={i * 0.08} className="border-[#FFFFFF]/10 sm:border-t sm:py-8">
                 <div className="flex items-start gap-5 py-7 sm:py-0">
-                  <div className="h-20 w-28 shrink-0 overflow-hidden rounded-2xl bg-[#14120C]/40 shadow-sm">
-                    <img src={card.img} alt={card.title} className="h-full w-full rounded-2xl object-cover opacity-80" />
+                  <div className="h-20 w-28 shrink-0 overflow-hidden bg-[#14120C]/40">
+                    <img src={card.img} alt={card.title} className="h-full w-full object-cover opacity-80" />
                   </div>
                   <div>
                     <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#FFFFFF]">
@@ -1753,11 +1503,11 @@ export default function LandingPageMaster({
             ))}
           </div>
 
-          {/* Trust Guarantees Bar with smooth rounded corners */}
-          <Reveal delay={0.2} className="mt-12 rounded-3xl border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.03] p-6 shadow-sm sm:p-8">
+          {/* Trust Guarantees Bar */}
+          <Reveal delay={0.2} className="mt-12 border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.02] p-6 sm:p-8">
             <div className="grid grid-cols-1 gap-6 text-center sm:grid-cols-2 sm:text-left lg:grid-cols-4">
-              <div className="flex items-center gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#FFFFFF]/30 bg-[#FFFFFF]/10 text-[#FFFFFF] shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-[#FFFFFF]/30 bg-[#FFFFFF]/10 text-[#FFFFFF]">
                   <Lock size={18} />
                 </div>
                 <div>
@@ -1765,8 +1515,8 @@ export default function LandingPageMaster({
                   <p className="text-[11px] text-[#FFFFFF]/50">Callers never see your number</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
                   <Zap size={18} />
                 </div>
                 <div>
@@ -1774,8 +1524,8 @@ export default function LandingPageMaster({
                   <p className="text-[11px] text-[#FFFFFF]/50">WhatsApp &amp; SMS ping within 2s</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-blue-500/30 bg-blue-500/10 text-blue-400 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-blue-500/30 bg-blue-500/10 text-blue-400">
                   <CheckCircle2 size={18} />
                 </div>
                 <div>
@@ -1783,8 +1533,8 @@ export default function LandingPageMaster({
                   <p className="text-[11px] text-[#FFFFFF]/50">Pay once, protected for life</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#FFFFFF]/20 bg-[#FFFFFF]/10 text-[#FFFFFF] shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-[#FFFFFF]/20 bg-[#FFFFFF]/10 text-[#FFFFFF]">
                   <Truck size={18} />
                 </div>
                 <div>

@@ -1,4 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap');
 @import "tailwindcss";
+
+/* ── Brand Color Tokens ───────────────────────────────────────────────────── */
+:root {
+  --repiqr-yellow: #FFD444;
+}
 
 /* ── Pinterest Sans Font Family ───────────────────────────────────────────────
    Bespoke typography matching Pinterest's clean geometric aesthetic.
@@ -95,9 +101,10 @@
 }
 
 @theme {
-  --font-sans: "Pinterest Sans", "Pin Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-inter: "Pinterest Sans", "Pin Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Pinterest Sans", "Plus Jakarta Sans", "Inter", "Pin Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-inter: "Plus Jakarta Sans", "Inter", "Pinterest Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-serif: "Pinterest Sans", "Pin Sans", Georgia, serif;
+  --color-repiqr-yellow: #FFD444;
 
   /* One theme, one accent — same neutral/monochrome palette the admin
      dashboard (.fx-shell) already used, now the single source of truth for
@@ -130,10 +137,6 @@
 
 * { box-sizing: border-box; }
 
-/* Universal square baseline: exempts functional circles, explicit rounded classes, and auth interfaces */
-*:not(.fx-dot):not(.fx-pill-dot):not([class*="rounded-full"]):not([class*="rounded-"]):not(.auth-scope):not(.auth-scope *) {
-  border-radius: 0 !important;
-}
 html {
   height: 100%;
   font-family: 'Pinterest Sans', 'Pin Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -292,13 +295,14 @@ button, input, select, textarea {
 }
 
 .btn-primary {
-  background: linear-gradient(180deg, #E8C860 0%, #C9A227 100%);
+  background: #FFD444;
   color: #12100A;
 }
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 10px 26px rgba(201, 162, 39, 0.35);
+  box-shadow: 0 10px 26px rgba(255, 212, 68, 0.35);
+  background: #FFE066;
 }
 
 .btn-ghost {
@@ -308,8 +312,8 @@ button, input, select, textarea {
 }
 
 .btn-ghost:hover:not(:disabled) {
-  border-color: #C9A227;
-  color: #E8C860;
+  border-color: #FFD444;
+  color: #FFD444;
 }
 
 .btn-alert {

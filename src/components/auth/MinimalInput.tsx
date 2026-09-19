@@ -46,15 +46,15 @@ export default function MinimalInput({
     <div className="w-full space-y-1.5 text-left">
       <label
         htmlFor={id}
-        className="block text-xs font-semibold text-[#14120C]/70 tracking-tight"
+        className="block text-xs font-bold text-[#14120C]/75 tracking-tight"
       >
         {label}
       </label>
 
-      <div className="relative">
+      <div className="relative group">
         {LeadingIcon && (
-          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#14120C]/40 pointer-events-none flex items-center justify-center">
-            <LeadingIcon size={17} />
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#14120C]/40 group-focus-within:text-[#14120C] pointer-events-none flex items-center justify-center transition-colors">
+            <LeadingIcon size={18} />
           </div>
         )}
 
@@ -68,12 +68,12 @@ export default function MinimalInput({
           autoComplete={autoComplete}
           disabled={disabled}
           autoFocus={autoFocus}
-          className={`w-full h-11 rounded-xl border bg-white text-[#14120C] text-sm font-medium transition-all outline-none placeholder:text-[#14120C]/35 placeholder:font-normal disabled:opacity-50 disabled:cursor-not-allowed shadow-xs ${
-            LeadingIcon ? 'pl-10 pr-3.5' : 'px-3.5'
-          } ${isPasswordField ? 'pr-11' : ''} ${
+          className={`w-full h-12 rounded-2xl border text-[#14120C] text-sm font-medium transition-all outline-none placeholder:text-[#14120C]/35 placeholder:font-normal disabled:opacity-50 disabled:cursor-not-allowed shadow-xs ${
+            LeadingIcon ? 'pl-11 pr-4' : 'px-4'
+          } ${isPasswordField ? 'pr-12' : ''} ${
             error
-              ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
-              : 'border-[#14120C]/15 hover:border-[#14120C]/30 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/20'
+              ? 'bg-red-50/50 border-red-400 focus:border-red-500 focus:ring-4 focus:ring-red-500/15'
+              : 'bg-white sm:bg-[#FAFAF8]/70 focus:bg-white border-[#14120C]/12 hover:border-[#14120C]/25 focus:border-[#14120C] focus:ring-4 focus:ring-[#FFD444]/25'
           }`}
         />
 
@@ -83,14 +83,14 @@ export default function MinimalInput({
             onClick={handleTogglePasswordVisibility}
             tabIndex={-1}
             aria-label={isPasswordRevealed ? 'Hide password' : 'Show password'}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#14120C]/40 hover:text-[#14120C] transition-colors cursor-pointer select-none rounded-lg"
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-[#14120C]/40 hover:text-[#14120C] hover:bg-[#14120C]/[0.05] transition-colors cursor-pointer select-none rounded-xl"
           >
-            {isPasswordRevealed ? <EyeOff size={16} /> : <Eye size={16} />}
+            {isPasswordRevealed ? <EyeOff size={17} /> : <Eye size={17} />}
           </button>
         )}
       </div>
 
-      {error && <p className="text-xs font-medium text-red-500 mt-1">{error}</p>}
+      {error && <p className="text-xs font-semibold text-red-600 mt-1">{error}</p>}
     </div>
   );
 }

@@ -51,7 +51,9 @@ export interface TrackedOrderData {
 export interface TrackOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Only used to auto-select the right order once results come back — search itself is phone-only now. */
   initialOrderId?: string;
+  /** Phone number to prefill and auto-search with, if provided. */
   initialContact?: string;
   onOpenDashboard?: () => void;
 }
@@ -64,15 +66,6 @@ const ORDER_STEPS = [
 ];
 
 /* ── Pure Helper Functions ─────────────────────────────────────────────────── */
-
-function normalizeOrderIdInput(input: string): string {
-  const trimmed = input.trim();
-  if (!trimmed) return '';
-  if (trimmed.startsWith('#')) return trimmed;
-  if (/^NQ-\d+$/i.test(trimmed)) return `#${trimmed.toUpperCase()}`;
-  if (/^\d{6,}$/.test(trimmed)) return `#NQ-${trimmed}`;
-  return trimmed;
-}
 
 function determineActiveStepIndex(order: TrackedOrderData): number {
   if (order.status === 'delivered') return 3;
@@ -272,6 +265,35 @@ function TrackingMilestones({ timeline }: MilestonesProps) {
   );
 }
 
+/* ── Sub-component: Order Result Row (phone lookup can match more than one) ── */
+
+const STATUS_PILL: Record<TrackedOrderData['status'], string> = {
+  placed: 'bg-slate-100 text-slate-700',
+  shipped: 'bg-blue-50 text-blue-700',
+  delivered: 'bg-emerald-50 text-emerald-700',
+  cancelled: 'bg-red-50 text-red-700',
+};
+
+const OrderResultRow: React.FC<{ order: TrackedOrderData; onSelect: () => void }> = ({ order, onSelect }) => {
+  return (
+    <button
+      onClick={onSelect}
+      className="w-full rounded-xl border border-slate-200 bg-white p-3.5 text-left transition-colors hover:border-slate-300 hover:bg-slate-50 cursor-pointer"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-sm font-black text-slate-900">{order.id}</span>
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${STATUS_PILL[order.status]}`}>
+          {order.status}
+        </span>
+      </div>
+      <div className="mt-1.5 flex items-center justify-between text-xs text-slate-500">
+        <span>{order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-IN') : 'Recent'}</span>
+        <span className="font-bold text-slate-900">₹{(order.total || 0).toLocaleString('en-IN')}</span>
+      </div>
+    </button>
+  );
+};
+
 /* ── Main Component ────────────────────────────────────────────────────────── */
 
 export default function TrackOrderModal({
@@ -281,20 +303,21 @@ export default function TrackOrderModal({
   initialContact = '',
   onOpenDashboard,
 }: TrackOrderModalProps) {
-  const [orderId, setOrderId] = useState(initialOrderId);
-  const [contact, setContact] = useState(initialContact);
+  const [phone, setPhone] = useState(initialContact);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [trackedOrder, setTrackedOrder] = useState<TrackedOrderData | null>(null);
+  const [orders, setOrders] = useState<TrackedOrderData[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<TrackedOrderData | null>(null);
 
-  // Sync initial values when modal opens
+  // Sync initial phone when modal opens; clear any stale search from last time it was open
   useEffect(() => {
     if (isOpen) {
-      if (initialOrderId) setOrderId(initialOrderId);
-      if (initialContact) setContact(initialContact);
+      if (initialContact) setPhone(initialContact);
       setErrorMessage('');
+      setOrders([]);
+      setSelectedOrder(null);
     }
-  }, [isOpen, initialOrderId, initialContact]);
+  }, [isOpen, initialContact]);
 
   // Handle ESC key dismiss
   useEffect(() => {
@@ -306,44 +329,49 @@ export default function TrackOrderModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  const handleSearch = useCallback(async () => {
-    const cleanId = normalizeOrderIdInput(orderId);
-    const cleanContact = contact.trim();
+  const handleSearch = useCallback(async (overridePhone?: string) => {
+    const raw = (overridePhone ?? phone).trim();
+    const digits = raw.replace(/\D/g, '');
 
-    if (!cleanId) {
-      setErrorMessage('Please enter your Order ID (e.g. #NQ-123456).');
-      return;
-    }
-    if (!cleanContact) {
-      setErrorMessage('Please enter the phone number or email used during order placement.');
+    if (digits.length < 10) {
+      setErrorMessage('Please enter a valid 10-digit phone number.');
       return;
     }
 
     setLoading(true);
     setErrorMessage('');
+    setSelectedOrder(null);
 
     try {
-      const response = await apiClient.orders.trackByLookup(cleanId, cleanContact);
-      if (response.success && response.data) {
-        setTrackedOrder(response.data as TrackedOrderData);
+      const response = await apiClient.orders.trackByPhone(raw);
+      if (response.success && response.data && response.data.length > 0) {
+        const results = response.data as TrackedOrderData[];
+        setOrders(results);
+        const normalizedInitialId = initialOrderId ? `#${initialOrderId.replace(/^#/, '').toUpperCase()}` : '';
+        const preselect = normalizedInitialId ? results.find((o) => o.id === normalizedInitialId) : undefined;
+        setSelectedOrder(preselect || (results.length === 1 ? results[0] : null));
       } else {
-        setErrorMessage(response.error || 'No matching order found with provided details.');
-        setTrackedOrder(null);
+        setOrders([]);
+        setErrorMessage(response.error || 'No orders found for this phone number.');
       }
     } catch (error: any) {
+      setOrders([]);
       setErrorMessage(error?.message || 'Unable to connect to order tracking service.');
-      setTrackedOrder(null);
     } finally {
       setLoading(false);
     }
-  }, [orderId, contact]);
+  }, [phone, initialOrderId]);
 
-  // Auto-fetch if both initialOrderId and initialContact are present on open
+  // Auto-search once if we already know the phone number when the modal opens
   useEffect(() => {
-    if (isOpen && initialOrderId && initialContact) {
-      handleSearch();
+    if (isOpen && initialContact) {
+      handleSearch(initialContact);
     }
-  }, [isOpen, initialOrderId, initialContact, handleSearch]);
+    // Deliberately excludes handleSearch: it closes over `phone` state, which the sibling
+    // effect above sets asynchronously — re-running on every handleSearch identity change
+    // would search on each keystroke instead of once on open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialContact]);
 
   if (!isOpen) return null;
 
@@ -370,39 +398,24 @@ export default function TrackOrderModal({
           </button>
         </div>
 
-        {/* Input Form */}
+        {/* Input Form — phone number only */}
         <div className="mt-5 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                Order ID
-              </label>
-              <input
-                type="text"
-                placeholder="#NQ-123456"
-                value={orderId}
-                onChange={(e) => setOrderId(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono font-bold text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#111111] focus:outline-none transition-colors"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                Phone or Email
-              </label>
-              <input
-                type="text"
-                placeholder="Mobile number or email"
-                value={contact}
-                onChange={(e) => setContact(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#111111] focus:outline-none transition-colors"
-              />
-            </div>
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+              Phone Number
+            </label>
+            <input
+              type="tel"
+              placeholder="10-digit mobile number used at checkout"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#111111] focus:outline-none transition-colors"
+            />
           </div>
 
           <button
-            onClick={handleSearch}
+            onClick={() => handleSearch()}
             disabled={loading}
             className="w-full py-2.5 rounded-xl bg-slate-950 hover:bg-slate-900 text-white font-extrabold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm"
           >
@@ -428,17 +441,38 @@ export default function TrackOrderModal({
           </div>
         )}
 
+        {/* Multiple matches: pick one */}
+        {orders.length > 1 && !selectedOrder && (
+          <div className="mt-5 space-y-2 animate-fade-in">
+            <p className="text-xs font-bold text-slate-600">
+              Found {orders.length} orders for this number — select one:
+            </p>
+            {orders.map((order) => (
+              <OrderResultRow key={order.id} order={order} onSelect={() => setSelectedOrder(order)} />
+            ))}
+          </div>
+        )}
+
         {/* Order Details Body */}
-        {trackedOrder && (
+        {selectedOrder && (
           <div className="mt-6 space-y-5 animate-fade-in">
+            {orders.length > 1 && (
+              <button
+                onClick={() => setSelectedOrder(null)}
+                className="text-[11px] font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
+              >
+                ← Back to all {orders.length} orders
+              </button>
+            )}
+
             {/* Stepper */}
-            <TrackingProgressStepper order={trackedOrder} />
+            <TrackingProgressStepper order={selectedOrder} />
 
             {/* Order Card */}
-            <TrackingOrderSummary order={trackedOrder} />
+            <TrackingOrderSummary order={selectedOrder} />
 
             {/* Milestones */}
-            <TrackingMilestones timeline={trackedOrder.shiprocket?.timeline} />
+            <TrackingMilestones timeline={selectedOrder.shiprocket?.timeline} />
 
             {/* Account linking banner if user wants to claim stickers */}
             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs space-y-2">
@@ -447,7 +481,7 @@ export default function TrackOrderModal({
                 <span>Activate Tag Telephony & Emergency Contacts</span>
               </div>
               <p className="text-gray-700 leading-relaxed text-[11px]">
-                Sign in with the email used for this order to program your vehicle plate, link emergency responders, and manage private masked calls.
+                Sign in with the phone number used for this order to program your vehicle plate, link emergency responders, and manage private masked calls.
               </p>
               {onOpenDashboard && (
                 <button

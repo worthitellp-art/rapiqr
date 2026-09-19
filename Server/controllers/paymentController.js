@@ -1,7 +1,29 @@
 const crypto = require('crypto');
 const razorpay = require('../config/razorpay');
 const OrderModel = require('../models/orderModel');
+const ProductModel = require('../models/productModel');
 const { logger } = require('../middleware/loggerMiddleware');
+
+/**
+ * Claim the sticker(s) an order just minted straight onto the account that
+ * placed it — the strongest possible signal, since the buyer was already
+ * authenticated when they paid (Order.user_id, set from req.user.id at
+ * checkout), no email/phone re-verification needed. Runs right after
+ * generateStickersForOrder in both /verify and the webhook, so a logged-in
+ * buyer's dashboard shows the tag immediately, not only once their phone or
+ * email happens to get verified later.
+ */
+async function claimStickersForLoggedInBuyer(order, stickerIds) {
+  if (!order?.userId || !Array.isArray(stickerIds) || stickerIds.length === 0) return;
+  try {
+    const claimed = await ProductModel.claimStickersByIds(order.userId, order.name, stickerIds);
+    if (claimed.length > 0) {
+      logger.rowUpdated('products', 'auto-claim-on-purchase', { userId: order.userId, orderId: order.id, count: claimed.length });
+    }
+  } catch (err) {
+    logger.error('ORDER_STICKER_CLAIM', `Failed to claim newly-minted stickers for order ${order.id}`, err);
+  }
+}
 
 const MINIMUM_PAYMENT_AMOUNT_PAISE = 100;
 const DEFAULT_PAYMENT_CURRENCY = 'INR';
@@ -211,6 +233,7 @@ class PaymentController {
           try {
             const stickers = await OrderModel.generateStickersForOrder(matchedOrder.id);
             matchedOrder = { ...matchedOrder, stickers };
+            await claimStickersForLoggedInBuyer(matchedOrder, stickers.map((s) => s.id));
           } catch (err) {
             logger.error('ORDER_STICKER_AUTOGEN', `Failed to auto-generate stickers for order ${matchedOrder.id}`, err);
           }
@@ -308,9 +331,11 @@ class PaymentController {
         logger.event('PAYMENT', '✅', `Payment captured via webhook for order ${order.id} (${entity.id})`);
         // Mint the physical sticker(s) this order paid for right away —
         // no admin has to open "Generate tag" for a checkout sale.
-        OrderModel.generateStickersForOrder(order.id).catch((err) => {
-          logger.error('ORDER_STICKER_AUTOGEN', `Failed to auto-generate stickers for order ${order.id}`, err);
-        });
+        OrderModel.generateStickersForOrder(order.id)
+          .then((stickers) => claimStickersForLoggedInBuyer(order, (stickers || []).map((s) => s.id)))
+          .catch((err) => {
+            logger.error('ORDER_STICKER_AUTOGEN', `Failed to auto-generate stickers for order ${order.id}`, err);
+          });
       } else if (event === 'payment.failed') {
         // Never downgrade a paid order — a customer whose first attempt failed
         // and second succeeded can have the events arrive out of order.

@@ -7,6 +7,8 @@ import AuthCallback from './pages/AuthCallback';
 const LandingPageMaster = lazy(() => import('./components/landing/LandingPageMaster'));
 const CheckoutPage = lazy(() => import('./components/landing/CheckoutPage'));
 const JoinUsPage = lazy(() => import('./components/landing/JoinUsPage'));
+const DistributorPage = lazy(() => import('./components/landing/DistributorPage'));
+const PricingPage = lazy(() => import('./components/landing/PricingPage'));
 const QRFleetDashboard = lazy(() => import('./components/dashboard/admin'));
 const ClientDashboard = lazy(() => import('./components/ClientDashboard'));
 const ScanPage = lazy(() => import('./components/scan/ScanPage'));
@@ -22,6 +24,8 @@ export type AppPage =
   | 'distributor'
   | 'checkout'
   | 'join'
+  | 'become-partner'
+  | 'pricing'
   | 'login'
   | 'register'
   | 'privacy';
@@ -126,6 +130,8 @@ function MainAppContent() {
       if (saved === 'distributor') return 'distributor';
       if (saved === 'checkout') return 'checkout';
       if (saved === 'join') return 'join';
+      if (saved === 'become-partner') return 'become-partner';
+      if (saved === 'pricing') return 'pricing';
       if (saved === 'login') return 'login';
       if (saved === 'register') return 'register';
     } catch { /* ignore */ }
@@ -337,7 +343,10 @@ function MainAppContent() {
           onViewDashboard={() => navigateTo('dashboard')}
           onTrackOrder={(orderId, contact) => handleOpenTrackOrder(orderId, contact)}
           onOrderComplete={() => {
-            try { localStorage.removeItem('namoqr-cart'); } catch { /* ignore */ }
+            try {
+              localStorage.removeItem('repiqr-cart');
+              localStorage.removeItem('namoqr-cart');
+            } catch { /* ignore */ }
           }}
           onRegisterSticker={(stickerId) => {
             window.history.pushState({}, '', `/?sticker=${encodeURIComponent(stickerId)}`);
@@ -366,6 +375,22 @@ function MainAppContent() {
     );
   }
 
+  if (page === 'become-partner') {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <DistributorPage onBack={() => navigateTo('landing')} />
+      </Suspense>
+    );
+  }
+
+  if (page === 'pricing') {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <PricingPage onBack={() => navigateTo('landing')} onOrderNow={() => navigateTo('checkout')} />
+      </Suspense>
+    );
+  }
+
   if (page === 'privacy') {
     return (
       <Suspense fallback={<PageLoader />}>
@@ -376,12 +401,14 @@ function MainAppContent() {
 
   return (
     <Suspense fallback={<PageLoader />}>
-      <div className="min-h-screen bg-[#FAFAFC] text-[#0A0D14]">
+      <div>
         <LandingPageMaster
           onStart={() => navigateTo('checkout')}
           onLogin={() => handleOpenAuth('login')}
           onOpenDashboard={() => navigateTo('dashboard')}
           onOpenDistributorDashboard={() => navigateTo('distributor')}
+          onOpenDistributorApply={() => navigateTo('become-partner')}
+          onOpenPricing={() => navigateTo('pricing')}
           onOpenCheckout={() => navigateTo('checkout')}
           onOpenTrackOrder={() => handleOpenTrackOrder()}
           onOpenPrivacy={() => navigateTo('privacy')}
