@@ -20,15 +20,19 @@ lock instantly without waiting. The backend code already supports this name.
 ====================================
 TEMPLATE: qr_scan_alert
 ====================================
-STATUS: ALREADY APPROVED - DO NOT RESUBMIT
+STATUS: APPROVED
 
 Category: Utility
 Language: en
-Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{label}} with "Variables parameters must be whole numbers..."
+Variable Type: Name
 Header: None
 
 Body:
-RepiQR alert: someone just scanned your registered tag "{{label}}" and reported the following: "{{message}}". Open your RepiQR dashboard here: {{link}} to view details and respond securely.
+*🔔 QR Scan Alert*
+Your tag *{{label}}* was just scanned.
+Message: *{{message}}*
+Check details and reply here: *{{link}}*
+— RepiQR
 
 Sample values:
 label = Demo Tag 1234
@@ -42,13 +46,15 @@ Buttons: None
 ====================================
 TEMPLATE: emergency_alert
 ====================================
+STATUS: APPROVED
+
 Category: Utility
 Language: en
-Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{label}} with "Variables parameters must be whole numbers..."
+Variable Type: Name
 Header: None
 
 Body:
-RepiQR EMERGENCY: an urgent alert has been raised for "{{label}}". The person who scanned your tag reports: "{{message}}". Open your dashboard here: {{link}} to view visitor details and take action.
+an *urgent *alert has been raised for "{{label}}". The person who scanned your tag reports: "{{message}}". Open your dashboard here: {{link}} to view visitor details and take action.
 
 Sample values:
 label = Car GJ 01 XX 0000
@@ -62,12 +68,11 @@ Buttons: None
 ====================================
 TEMPLATE: emergency_contact_alert_v2
 ====================================
-NOTE: Named "emergency_contact_alert_v2" to bypass Meta's temporary deletion lock.
-Enter "emergency_contact_alert_v2" in the "Enter Template Name" field in MSG91.
+STATUS: APPROVED
 
 Category: Utility
 Language: en
-Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{label}} with "Variables parameters must be whole numbers..."
+Variable Type: Name
 Header: None
 
 Body:
@@ -86,7 +91,7 @@ TEMPLATE: emergency_contact_added
 ====================================
 Category: Utility
 Language: en
-Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{contact_name}} with "Variables parameters must be whole numbers..."
+Variable Type: Name
 Header: None
 
 Body:
@@ -103,13 +108,19 @@ Buttons: None
 ====================================
 TEMPLATE: location_shared
 ====================================
+STATUS: APPROVED
+
 Category: Utility
 Language: en
-Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{label}} with "Variables parameters must be whole numbers..."
+Variable Type: Name
 Header: None
 
 Body:
-RepiQR location alert: someone shared their live GPS location for your tag "{{label}}". View the exact location on the map here: {{maps_url}}. Open your dashboard here: {{link}} to view full details and respond.
+*📍 Location Shared*
+Someone has shared their live location for *{{label}}*.
+View the location: *{{maps_url}}*
+Check details and reply here: *{{link}}*
+— RepiQR Safety
 
 Sample values:
 label = Car GJ 01 XX 0000
@@ -123,9 +134,11 @@ Buttons: None
 ====================================
 TEMPLATE: chat_started
 ====================================
+STATUS: APPROVED
+
 Category: Utility
 Language: en
-Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{label}} with "Variables parameters must be whole numbers..."
+Variable Type: Name
 Header: None
 
 Body:
@@ -142,17 +155,22 @@ Buttons: None
 ====================================
 TEMPLATE: chat_message
 ====================================
+STATUS: APPROVED
+
 Category: Utility
 Language: en
-Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{label}} with "Variables parameters must be whole numbers..."
+Variable Type: Name
 Header: None
 
 Body:
-RepiQR new message: you have a new message from a visitor regarding your tag "{{label}}". The message reads: "{{message}}". Open your dashboard here: {{link}} to read and respond.
+*💬 RepiChat – New Message*
+Someone has sent you a message about your RepiQR tag *{{label}}*.
+Tap the link below to view and reply:
+*{{link}}* 
+— RepiQR Safety
 
 Sample values:
 label = Car GJ 01 XX 0000
-message = Hi, I found your bag near the gate
 link = https://repiqr.com/dashboard?tab=chat
 
 Footer: None
@@ -162,17 +180,20 @@ Buttons: None
 ====================================
 TEMPLATE: safe_status
 ====================================
+STATUS: APPROVED
+
 Category: Utility
 Language: en
-Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{label}} with "Variables parameters must be whole numbers..."
+Variable Type: Name
 Header: None
 
 Body:
-RepiQR resolved: the emergency situation on the registered tag "{{label}}" has been marked as SAFE and resolved by the registered user. Time of resolution: {{time}}. No further action is needed.
+*✅ RepiQR – SAFE*
+Your tag *{{label}}* has been marked as *SAFE*.
+The emergency situation is resolved. No action is needed.
 
 Sample values:
 label = Car GJ 01 XX 0000
-time = 6:45 PM, 11 Sep 2026
 
 Footer: None
 Buttons: None
@@ -181,16 +202,24 @@ Buttons: None
 ====================================
 TEMPLATE: qr_activated
 ====================================
+STATUS: APPROVED
+
 Category: Utility
 Language: en
-Variable Type: Name   <-- SET THIS DROPDOWN TO "Name" BEFORE TYPING BODY. If left on "Number", MSG91 will reject {{label}} with "Variables parameters must be whole numbers..."
+Variable Type: Name
 Header: None
 
 Body:
-RepiQR activation: congratulations! Your registered tag "{{label}}" is now active and protecting you. Your tag is live and ready to receive alerts from anyone who scans it.
+*🎉 RepiQR Activated!*
+Your tag *{{label}}* is now active.
+You will receive an alert when someone scans your tag.
+Thank you for choosing RepiQR.
 
 Sample values:
 label = Car GJ 01 XX 0000
+
+Footer: None
+Buttons: None
 
 Footer: None
 Buttons: None

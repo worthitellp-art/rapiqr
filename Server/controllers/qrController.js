@@ -1,7 +1,6 @@
 const QrModel = require('../models/qrModel');
 const { logger } = require('../middleware/loggerMiddleware');
-const { verifyMsg91WidgetAccessToken } = require('../services/msg91Client');
-const { notifyContactsAdded } = require('../services/notificationService');
+const { notifyContactsAdded, notifyOwner } = require('../services/notificationService');
 
 class QrController {
   /**
@@ -141,6 +140,20 @@ class QrController {
       const activationData = req.body;
       const { newlyAddedContacts, ...activated } = await QrModel.activate(id, activationData);
       logger.rowUpdated('qr_codes', id, { action: 'activated', status: 'active' });
+
+      // Notify the owner that their tag is activated
+      const ownerPhone = activationData.ownerPhone || activationData.phoneNumber;
+      if (ownerPhone) {
+        const label = activationData.vehicleNumber || activationData.vehicleName || 'your RepiQR tag';
+        notifyOwner({
+          type: 'QR_ACTIVATED',
+          ownerPhone,
+          data: { label },
+          eventId: id,
+        }).catch((err) => {
+          logger.error('QR_ACTIVATED_NOTIFY', `Failed to notify owner for ${id}`, err);
+        });
+      }
 
       // Tell each newly-added emergency contact over WhatsApp that they've
       // been listed — fire-and-forget so a slow/failed send never blocks the

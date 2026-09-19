@@ -44,6 +44,7 @@ import {
   Hospital,
   IdCard,
   KeyRound,
+  Lock,
   Luggage,
   MapPin,
   MessageCircle,
@@ -332,12 +333,9 @@ export default function CategoryScanView({
                       <p className="text-xs font-bold text-[#211922] leading-tight truncate">{p.label}</p>
                       <p className="text-sm font-mono font-bold text-[#33332E] mt-0.5">{p.phone}</p>
                     </div>
-                    <a
-                      href={`tel:${String(p.phone).replace(/\s/g, "")}`}
-                      className="bg-[#111111] hover:bg-black text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 flex-shrink-0 transition-colors"
-                    >
-                      <Phone size={13} /> Call
-                    </a>
+                    <span className="bg-gray-100 text-gray-400 font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 flex-shrink-0">
+                      <Lock size={13} /> Coming Soon
+                    </span>
                   </div>
                 ))}
               </div>

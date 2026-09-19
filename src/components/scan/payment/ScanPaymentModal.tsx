@@ -356,9 +356,9 @@ export default function ScanPaymentModal({
                     <div className="md:col-span-2">
                       <input
                         type="text"
-                        value={message || vehicleNumber}
+                        value={message}
                         onChange={(e) => onMessageChange?.(e.target.value)}
-                        placeholder="e.g. MH 02 AB 1234 (optional)"
+                        placeholder={vehicleNumber ? `e.g. ${vehicleNumber}` : "e.g. MH 02 AB 1234 (optional)"}
                         className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none text-sm font-medium text-slate-900 placeholder:text-slate-400 transition-all"
                       />
                     </div>
@@ -540,7 +540,7 @@ export default function ScanPaymentModal({
                         <input
                           type="tel"
                           value={contact.phone}
-                          onChange={(e) => onUpdateEmergencyContact?.(contact.id, 'phone', e.target.value)}
+                          onChange={(e) => onUpdateEmergencyContact?.(contact.id, 'phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
                           placeholder="10-digit mobile number"
                           className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-900 outline-none focus:border-black focus:ring-1 focus:ring-black"
                         />

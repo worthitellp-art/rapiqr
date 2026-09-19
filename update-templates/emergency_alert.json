@@ -1,0 +1,64 @@
+{
+  "category": "UTILITY",
+  "name": "emergency_alert",
+  "namespace": "7bd4b8a8_2f6f_4e9d_b673_2673a3a16385",
+  "languages": [
+    {
+      "id": "1403639451962677",
+      "name": "emergency_alert",
+      "language": "en",
+      "parameter_format": "NAMED",
+      "status": "approved",
+      "rejection_reason": "NONE",
+      "default_variables": null,
+      "code": [
+        {
+          "text": "an *urgent *alert has been raised for \"{{label}}\". The person who scanned your tag reports: \"{{message}}\". Open your dashboard here: {{link}} to view visitor details and take action.",
+          "type": "BODY",
+          "example": {
+            "body_text_named_params": [
+              {
+                "example": "label = Car GJ 01 XX 0000",
+                "param_name": "label"
+              },
+              {
+                "example": "message = Found your car unlocked with lights on",
+                "param_name": "message"
+              },
+              {
+                "example": "link = https://repiqr.com/dashboard?tab=chat",
+                "param_name": "link"
+              }
+            ]
+          }
+        }
+      ],
+      "gtwy_thread_id": null,
+      "msg91_template_id": 536433,
+      "quality_score": "UNKNOWN",
+      "backup_templates": [],
+      "variables": [
+        "body_label",
+        "body_message",
+        "body_link"
+      ],
+      "variable_type": {
+        "body_label": {
+          "type": "text",
+          "parameter_name": "label"
+        },
+        "body_message": {
+          "type": "text",
+          "parameter_name": "message"
+        },
+        "body_link": {
+          "type": "text",
+          "parameter_name": "link"
+        }
+      }
+    }
+  ],
+  "is_disabled": 0,
+  "ttl_in_seconds": null,
+  "gtwy_thread_id": null
+}

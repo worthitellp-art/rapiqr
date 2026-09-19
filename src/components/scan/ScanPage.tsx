@@ -483,6 +483,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     timestamp: string;
   } | null>(null);
   const [activatingQr, setActivatingQr] = useState(false);
+  const [alertCooldown, setAlertCooldown] = useState(false);
+  const alertCooldownTimerRef = useRef<any>(null);
   const [activationError, setActivationError] = useState<string | null>(null);
   const [activeSubMenu, setActiveSubMenu] = useState<"none" | "emergency-main" | "mechanical" | "towing" | "family" | "parking" | "headlights" | "theft" | "flat-tire">("none");
   const [flatTireImage, setFlatTireImage] = useState<string | null>(null);
@@ -497,20 +499,28 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   const [reverifyConfirmed, setReverifyConfirmed] = useState(false);
   const [reverifySubmitting, setReverifySubmitting] = useState(false);
   const [reverifyError, setReverifyError] = useState<string | null>(null);
+  const reverifyInitRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (qrData?.id) {
+    if (qrData?.id && reverifyInitRef.current !== qrData.id) {
+      reverifyInitRef.current = qrData.id;
       if (localStorage.getItem(`repiqr-reverified-${qrData.id}`) === "true") {
         setIsReverified(true);
       }
-      if (qrData.vehicleName && !reverifyOwnerName) {
+      if (qrData.vehicleName) {
         setReverifyOwnerName(qrData.vehicleName.replace(/\s*\([A-Z0-9_-]+\)$/i, ""));
       }
-      if (qrData.vehicleNumber && !reverifyVehicleNumber) {
+      if (qrData.vehicleNumber) {
         setReverifyVehicleNumber(qrData.vehicleNumber);
       }
+      if (qrData.details?.ownerPhone || qrData.phoneNumber) {
+        setReverifyOwnerPhone(qrData.details?.ownerPhone || qrData.phoneNumber || "");
+      }
+      if (qrData.vehicleNumber && !regMessage) {
+        setRegMessage(qrData.vehicleNumber);
+      }
     }
-  }, [qrData?.id, qrData?.vehicleName, qrData?.vehicleNumber]);
+  }, [qrData?.id]);
 
   const handleReverifySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -698,6 +708,15 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   // in-app RepiChat thread. The visitor never sees the owner's number.
   const sendQuickIssueAlert = async (alertType: string, defaultMessage: string) => {
     if (!qrData) return;
+    if (alertCooldown) {
+      flashVariantBanner("Alert already sent — please wait a moment before sending another.");
+      setChatOpen(true);
+      return;
+    }
+    setAlertCooldown(true);
+    if (alertCooldownTimerRef.current) clearTimeout(alertCooldownTimerRef.current);
+    alertCooldownTimerRef.current = setTimeout(() => setAlertCooldown(false), 20000); // 20s cooldown
+
     const locationText = location ? `\n📍 Location: https://www.google.com/maps?q=${location.lat},${location.lng}` : "";
     const fullMessage = `🚨 RepiQR Emergency Alert: ${alertType}\n🏷️ Item/Vehicle: ${qrData.vehicleName} (${qrData.vehicleNumber})\n\n${defaultMessage}${locationText}`;
 
@@ -743,6 +762,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         message: fullMessage,
         vehicleName: qrData.vehicleName,
         vehicleNumber: qrData.vehicleNumber,
+        ownerPhone: qrData.details?.ownerPhone || qrData.phoneNumber || undefined,
         customerToken: getChatCustomerToken(),
         type: "emergency",
       });
@@ -3113,12 +3133,9 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                     <div className="rounded-xl border border-blue-100 bg-blue-50 py-3 text-center">
                       <p className="text-lg font-extrabold tracking-wide text-blue-700">{maskedCallDid}</p>
                     </div>
-                    <a
-                      href={`tel:${maskedCallDid}`}
-                      className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md transition-all active:scale-[0.99] cursor-pointer text-sm"
-                    >
-                      <PhoneCall size={16} /> Call Now
-                    </a>
+                    <div className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gray-200 text-gray-500 font-bold shadow-md text-sm">
+                      <Lock size={16} /> Coming Soon
+                    </div>
                   </div>
                 )}
               </div>

@@ -41,54 +41,51 @@ function clip(value, max = 120) {
  */
 const MSG91_TEMPLATES = {
   QR_SCAN_ALERT: {
-    name: 'qr_scan_alert',
+    name: process.env.MSG91_WHATSAPP_TEMPLATE_NAME || 'qr_scan_alert',
     audience: 'owner',
     variables: ['label', 'message', 'link'],
-    defaults: { label: 'your tag' },
-    body: 'RepiQR alert: someone just scanned your registered tag "{{label}}" and reported the following: "{{message}}". Open your RepiQR dashboard here: {{link}} to view details and respond securely.',
+    defaults: { label: 'your tag', message: 'an issue was reported', link: 'https://repiqr.com/dashboard?tab=chat' },
+    body: '*🔔 QR Scan Alert*\nYour tag *{{label}}* was just scanned.\nMessage: *{{message}}*\nCheck details and reply here: *{{link}}*\n— RepiQR',
   },
 
   EMERGENCY_ALERT: {
-    name: 'emergency_alert',
+    name: process.env.MSG91_WHATSAPP_EMERGENCY_TEMPLATE || 'emergency_alert',
     audience: 'owner',
     variables: ['label', 'message', 'link'],
-    defaults: { label: 'your tag' },
-    body: 'RepiQR EMERGENCY: an urgent alert has been raised for "{{label}}". The person who scanned your tag reports: "{{message}}". Open your dashboard here: {{link}} to view visitor details and take action.',
+    defaults: { label: 'your tag', message: 'an emergency alert was raised', link: 'https://repiqr.com/dashboard?tab=chat' },
+    body: 'an *urgent *alert has been raised for "{{label}}". The person who scanned your tag reports: "{{message}}". Open your dashboard here: {{link}} to view visitor details and take action.',
   },
 
   EMERGENCY_CONTACT_ALERT: {
     name: process.env.MSG91_WHATSAPP_EMERGENCY_CONTACT_TEMPLATE || 'emergency_contact_alert_v2',
     audience: 'emergency_contact',
     variables: ['label', 'message'],
-    defaults: { label: 'a registered tag' },
+    defaults: { label: 'a registered tag', message: 'an urgent alert was reported' },
     body: 'RepiQR EMERGENCY NOTIFICATION: an urgent alert was raised on the registered tag "{{label}}". The reporter states: "{{message}}". Please check on this situation immediately.',
   },
 
   LOCATION_SHARED: {
     name: 'location_shared',
     audience: 'owner',
-    // MSG91/Meta named parameters must be lowercase letters, digits and
-    // underscores only — mapsUrl (camelCase) is rejected at template-create
-    // time, hence maps_url here and in the body below.
     variables: ['label', 'maps_url', 'link'],
-    defaults: { label: 'your tag' },
-    body: 'RepiQR location alert: someone shared their live GPS location for your tag "{{label}}". View the exact location on the map here: {{maps_url}}. Open your dashboard here: {{link}} to view full details and respond.',
+    defaults: { label: 'your tag', maps_url: '', link: 'https://repiqr.com/dashboard?tab=chat' },
+    body: '*📍 Location Shared*\nSomeone has shared their live location for *{{label}}*.\nView the location: *{{maps_url}}*\nCheck details and reply here: *{{link}}*\n— RepiQR Safety',
   },
 
   CHAT_STARTED: {
     name: 'chat_started',
     audience: 'owner',
     variables: ['label', 'link'],
-    defaults: { label: 'your tag' },
+    defaults: { label: 'your tag', link: 'https://repiqr.com/dashboard?tab=chat' },
     body: 'RepiQR chat alert: a visitor has started a conversation about your tag "{{label}}". They are waiting for your response. Open your dashboard here: {{link}} to view the message and reply securely.',
   },
 
   CHAT_MESSAGE: {
     name: 'chat_message',
     audience: 'owner',
-    variables: ['label', 'message', 'link'],
-    defaults: { label: 'your tag' },
-    body: 'RepiQR new message: you have a new message from a visitor regarding your tag "{{label}}". The message reads: "{{message}}". Open your dashboard here: {{link}} to read and respond.',
+    variables: ['label', 'link'],
+    defaults: { label: 'your tag', link: 'https://repiqr.com/dashboard?tab=chat' },
+    body: '*💬 RepiChat – New Message*\nSomeone has sent you a message about your RepiQR tag *{{label}}*.\nTap the link below to view and reply:\n*{{link}}* \n— RepiQR Safety',
   },
 
   EMERGENCY_CONTACT_ADDED: {
@@ -102,17 +99,17 @@ const MSG91_TEMPLATES = {
   SAFE_STATUS: {
     name: 'safe_status',
     audience: 'emergency_contact',
-    variables: ['label', 'time'],
+    variables: ['label'],
     defaults: { label: 'a registered tag' },
-    body: 'RepiQR resolved: the emergency situation on the registered tag "{{label}}" has been marked as SAFE and resolved by the registered user. Time of resolution: {{time}}. No further action is needed.',
+    body: '*✅ RepiQR – SAFE*\nYour tag *{{label}}* has been marked as *SAFE*.\nThe emergency situation is resolved. No action is needed.',
   },
 
   QR_ACTIVATED: {
     name: 'qr_activated',
     audience: 'owner',
     variables: ['label'],
-    defaults: { label: '' },
-    body: 'RepiQR activation: congratulations! Your registered tag "{{label}}" is now active and protecting you. Your tag is live and ready to receive alerts from anyone who scans it.',
+    defaults: { label: 'your tag' },
+    body: '*🎉 RepiQR Activated!*\nYour tag *{{label}}* is now active.\nYou will receive an alert when someone scans your tag.\nThank you for choosing RepiQR.',
   },
 
   OTP: {

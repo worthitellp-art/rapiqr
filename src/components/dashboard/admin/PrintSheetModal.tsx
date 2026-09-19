@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { X, Printer, Download, Loader2, Grid3X3 } from "lucide-react";
 import { QrRecord, StickerPos } from "./types";
 import { usePrintSheetState } from "./print-sheet/usePrintSheetState";
@@ -41,6 +41,9 @@ export default function PrintSheetModal({
     handleSelectAll,
     handleSelectFirstNine,
     handleDeselectAll,
+    handleSelectCategory,
+    handleDeselectCategory,
+    handleSelectFirstNineOfCategory,
     handleNextPage,
     handlePreviousPage,
     handleDownloadSheet,
@@ -54,6 +57,18 @@ export default function PrintSheetModal({
     onShowToast,
   });
 
+  const categoryBreakdown = React.useMemo(() => {
+    if (!selectedStickerRecords.length) return "";
+    const counts: Record<string, number> = {};
+    for (const s of selectedStickerRecords) {
+      const cat = (s.category || "car").trim().toLowerCase();
+      counts[cat] = (counts[cat] || 0) + 1;
+    }
+    return Object.entries(counts)
+      .map(([cat, count]) => `${count} ${cat.charAt(0).toUpperCase() + cat.slice(1)}`)
+      .join(", ");
+  }, [selectedStickerRecords]);
+
   if (!isOpen) return null;
 
   const hasStickers = availableStickers.length > 0;
@@ -66,27 +81,27 @@ export default function PrintSheetModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden text-[var(--fx-ink)] border border-[var(--fx-border)] font-body"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden text-[var(--fx-ink)] border border-[var(--fx-border)] font-body"
         style={{ animation: "modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)" }}
         onClick={(clickEvent) => clickEvent.stopPropagation()}
       >
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--fx-border)] bg-[var(--fx-canvas)]">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center">
-              <Printer size={18} strokeWidth={2.4} />
+            <div className="w-10 h-10 rounded-xl bg-[#14120C] text-[#FFD444] flex items-center justify-center shadow-xs">
+              <Printer size={20} strokeWidth={2.4} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="font-display text-[17px] font-bold text-[var(--fx-ink)] leading-tight">
                   Print Sheet Generator (18×12″)
                 </h2>
-                <span className="text-[10px] font-bold uppercase tracking-wide bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span className="text-[10.5px] font-bold uppercase tracking-wide bg-[#FFD444]/20 border border-[#FFD444]/40 text-amber-900 px-2 py-0.5 rounded-full flex items-center gap-1">
                   <Grid3X3 size={11} /> 9 Unique Stickers / Sheet
                 </span>
               </div>
               <p className="text-[12px] text-[var(--fx-ink-2)] mt-0.5">
-                Every slot is a different unique sticker from your generated fleet · 300 DPI with cut lines
+                Category-wise fleet printing · 300 DPI high-resolution output with crop & cut guides
               </p>
             </div>
           </div>
@@ -101,7 +116,7 @@ export default function PrintSheetModal({
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
           {!hasStickers ? (
             <PrintSheetEmptyState onClose={onClose} />
           ) : (
@@ -114,6 +129,9 @@ export default function PrintSheetModal({
                 onSelectAll={handleSelectAll}
                 onSelectFirstNine={handleSelectFirstNine}
                 onDeselectAll={handleDeselectAll}
+                onSelectCategory={handleSelectCategory}
+                onDeselectCategory={handleDeselectCategory}
+                onSelectFirstNineOfCategory={handleSelectFirstNineOfCategory}
               />
 
               {/* Live Preview Viewport with Sheet Pagination */}
@@ -143,13 +161,19 @@ export default function PrintSheetModal({
             ) : !hasValidSelection ? (
               <span className="text-[#DC2626] font-medium">Please select stickers above</span>
             ) : (
-              <span>
-                Unique Stickers:{" "}
-                <strong className="text-[var(--fx-ink)]">{selectedCount} selected</strong>{" "}
-                <span className="text-[var(--fx-ink-2)]">
-                  ({totalSheets} sheet{totalSheets > 1 ? "s" : ""})
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span>
+                  Selected: <strong className="text-[var(--fx-ink)]">{selectedCount} stickers</strong>{" "}
+                  <span className="text-[var(--fx-ink-2)]">
+                    ({totalSheets} sheet{totalSheets > 1 ? "s" : ""})
+                  </span>
                 </span>
-              </span>
+                {categoryBreakdown && (
+                  <span className="text-slate-600 font-semibold bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md text-[11px]">
+                    {categoryBreakdown}
+                  </span>
+                )}
+              </div>
             )}
           </div>
 

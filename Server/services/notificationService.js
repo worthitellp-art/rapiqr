@@ -24,6 +24,10 @@ const { getTemplate, buildBody, buildVariables } = require('./notificationTempla
 /** Per (recipient, notification type) WhatsApp cap, resets every calendar month. */
 const MONTHLY_LIMIT_PER_TYPE = 10;
 
+// Anti-spam debounce: minimum 30 seconds between alerts of the same type to the same recipient
+const RECENT_SENDS = new Map();
+const ANTI_SPAM_COOLDOWN_MS = 30 * 1000;
+
 // OTP is a login/verification code, never subject to the notification quota —
 // capping it could lock a client out of their own account.
 const UNLIMITED_TYPES = new Set(['OTP']);
@@ -46,6 +50,24 @@ async function notify({ type, to, data = {}, eventId = null }) {
   }
 
   const event = `NOTIFY_${type}`;
+
+  // Short-term anti-spam cooldown: prevent rapid duplicate messages to the same phone
+  if (!UNLIMITED_TYPES.has(type)) {
+    const key = `${to}:${type}`;
+    const lastSent = RECENT_SENDS.get(key) || 0;
+    const now = Date.now();
+    if (now - lastSent < ANTI_SPAM_COOLDOWN_MS) {
+      const waitSec = Math.ceil((ANTI_SPAM_COOLDOWN_MS - (now - lastSent)) / 1000);
+      logger.warn('NOTIFY', `Anti-spam debounce active for ${to} (${type}) — wait ${waitSec}s.`);
+      return { sent: true, mock: false, status: 'cooldown_active', note: `Debounced to prevent spam. Please wait ${waitSec}s.` };
+    }
+    RECENT_SENDS.set(key, now);
+    if (RECENT_SENDS.size > 1000) {
+      for (const [k, time] of RECENT_SENDS.entries()) {
+        if (now - time > ANTI_SPAM_COOLDOWN_MS * 2) RECENT_SENDS.delete(k);
+      }
+    }
+  }
 
   if (!UNLIMITED_TYPES.has(type)) {
     const sentThisMonth = await MessageModel.countThisMonth({ to, event });

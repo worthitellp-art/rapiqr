@@ -78,9 +78,9 @@ class AlertController {
       // WhatsApp message to the owner on every one of those would spam them
       // once every 5 seconds. The one-time "Share My Location" action still
       // uses type "emergency" and notifies as normal.
-      if (product && alertPayload.type !== 'location_ping') {
-        const ownerPhone = product.details?.ownerPhone;
-        const label = alertPayload.vehicleName || alertPayload.vehicleNumber || product.name || 'your RapiQR item';
+      if ((product || alertPayload.ownerPhone) && alertPayload.type !== 'location_ping') {
+        const ownerPhone = product?.details?.ownerPhone || product?.phone_number || product?.details?.phone || product?.details?.phoneNumber || product?.profiles?.phone_number || alertPayload.ownerPhone;
+        const label = alertPayload.vehicleName || alertPayload.vehicleNumber || product?.name || 'your RapiQR item';
         const text = buildAlertChatText(label, alertPayload.message);
 
         // Seed/continue the visitor's RepiChat thread with this alert first, so
@@ -91,8 +91,8 @@ class AlertController {
             qrCodeId: qrId,
             customerToken: alertPayload.customerToken,
             customerName: alertPayload.customerName || 'Visitor',
-            ownerId: product.user_id || null,
-            vehicleLabel: `${product.name || 'Vehicle'}${product.vehicle_number ? ` (${product.vehicle_number})` : ''}`,
+            ownerId: product?.user_id || null,
+            vehicleLabel: `${product?.name || 'Vehicle'}${product?.vehicle_number ? ` (${product.vehicle_number})` : ''}`,
           });
           if (session) {
             chatSessionId = session.id;
@@ -108,14 +108,28 @@ class AlertController {
           ? `${APP_URL}/#/dashboard?tab=chat&session=${chatSessionId}`
           : `${APP_URL}/#/dashboard?tab=chat`;
 
-        // An alert that fans out to the family contact list is an emergency; one
-        // that goes to the owner alone is a scan report. Same distinction the
-        // notifyContacts flag already draws, now reflected in the template used.
+        // Send WhatsApp alert to the owner using the approved Meta templates
         if (ownerPhone) {
+          const isEmergency = alertPayload.type === 'emergency' || alertPayload.type === 'sos';
+          const hasGps = Boolean(alertPayload.latitude && alertPayload.longitude);
+          const isLocationShare = alertPayload.type === 'location_share' || String(alertPayload.message || '').includes('EMERGENCY GPS LOCATION');
+
+          let alertType = 'QR_SCAN_ALERT';
+          let alertData = { label, message: alertPayload.message || 'an issue was reported', link: chatLink };
+
+          if (hasGps && isLocationShare) {
+            alertType = 'LOCATION_SHARED';
+            const mapsUrl = `https://maps.google.com/?q=${alertPayload.latitude},${alertPayload.longitude}`;
+            alertData = { label, maps_url: mapsUrl, link: chatLink };
+          } else if (isEmergency) {
+            alertType = 'EMERGENCY_ALERT';
+            alertData = { label, message: alertPayload.message || 'an urgent alert was reported', link: chatLink };
+          }
+
           const result = await notifyOwner({
-            type: notifyContacts ? 'EMERGENCY_ALERT' : 'QR_SCAN_ALERT',
+            type: alertType,
             ownerPhone,
-            data: { label, message: alertPayload.message || 'an issue was reported', link: chatLink },
+            data: alertData,
             eventId: alertPayload.productId || qrId,
           });
           // The scan page renders this receipt; `simulated` covers both the mock

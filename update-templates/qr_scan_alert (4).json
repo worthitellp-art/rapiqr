@@ -1,0 +1,64 @@
+{
+  "category": "UTILITY",
+  "name": "qr_scan_alert",
+  "namespace": "7bd4b8a8_2f6f_4e9d_b673_2673a3a16385",
+  "languages": [
+    {
+      "id": "2303938730405045",
+      "name": "qr_scan_alert",
+      "language": "en",
+      "parameter_format": "NAMED",
+      "status": "approved",
+      "rejection_reason": "NONE",
+      "default_variables": null,
+      "code": [
+        {
+          "text": "*🔔 QR Scan Alert*\nYour tag *{{label}}* was just scanned.\nMessage: *{{message}}*\nCheck details and reply here: *{{link}}*\n— RepiQR",
+          "type": "BODY",
+          "example": {
+            "body_text_named_params": [
+              {
+                "example": "{{label}} = Demo Tag 1234",
+                "param_name": "label"
+              },
+              {
+                "example": "{{message}} = A visitor sent a test alert.",
+                "param_name": "message"
+              },
+              {
+                "example": "{{link}} = https://example.com/dashboard",
+                "param_name": "link"
+              }
+            ]
+          }
+        }
+      ],
+      "gtwy_thread_id": null,
+      "msg91_template_id": 534660,
+      "quality_score": "UNKNOWN",
+      "backup_templates": [],
+      "variables": [
+        "body_label",
+        "body_message",
+        "body_link"
+      ],
+      "variable_type": {
+        "body_label": {
+          "type": "text",
+          "parameter_name": "label"
+        },
+        "body_message": {
+          "type": "text",
+          "parameter_name": "message"
+        },
+        "body_link": {
+          "type": "text",
+          "parameter_name": "link"
+        }
+      }
+    }
+  ],
+  "is_disabled": 0,
+  "ttl_in_seconds": 600,
+  "gtwy_thread_id": null
+}

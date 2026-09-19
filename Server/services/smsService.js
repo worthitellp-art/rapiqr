@@ -242,7 +242,7 @@ async function sendWhatsApp({
 }) {
   if (!to) return { sent: false, simulated: false, reason: 'no_recipient' };
 
-  const isLiveEligible = LIVE_WHATSAPP_EVENTS.has(event);
+  const isLiveEligible = LIVE_WHATSAPP_EVENTS.has(event) || event.startsWith('NOTIFY_') || !process.env.WHATSAPP_LIVE_EVENTS;
   const provider = resolveWhatsAppProvider();
 
   // If not eligible for live send or no provider credentials configured
