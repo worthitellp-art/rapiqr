@@ -209,6 +209,49 @@ class ProductModel {
   }
 
   /**
+   * Link specific stickers (by id) to a user account — the exact tag(s) a
+   * paid order is owed (Order.stickers, auto-minted at checkout — see
+   * OrderModel.generateStickersForOrder), claimed once that order's phone
+   * number is verified (see AuthController.verifyPhoneOtp). Unlike
+   * autoClaimByPhone this never scans/guesses by phone string — the order
+   * itself already proves which sticker(s) belong to this purchase — but it
+   * keeps the same one-way ownership-transfer safety: only an unowned or
+   * admin-held sticker moves, so a sticker some other real account already
+   * claimed (or self-activated) is never silently reassigned.
+   */
+  static async claimStickersByIds(userId, userName, stickerIds) {
+    if (!userId || !Array.isArray(stickerIds) || stickerIds.length === 0) return [];
+
+    try {
+      const docs = await Sticker.find({ _id: { $in: stickerIds }, deleted_at: null })
+        .populate('user_id', 'role')
+        .lean();
+
+      const claimed = [];
+      for (const p of docs) {
+        const ownerId = p.user_id?._id || p.user_id;
+        if (ownerId && String(ownerId) === String(userId)) continue;
+
+        const isUnowned = !p.user_id;
+        const isCurrentOwnerAdmin = p.user_id?.role === 'admin';
+        if (!isUnowned && !isCurrentOwnerAdmin) continue;
+
+        const newAssigned = (userName && userName !== 'Self') ? userName : (p.assigned_to && p.assigned_to !== 'Self' ? p.assigned_to : 'Self');
+        const updated = await Sticker.findByIdAndUpdate(
+          p._id,
+          { $set: { user_id: userId, assigned_to: newAssigned } },
+          { new: true }
+        ).lean();
+        if (updated) claimed.push(toApi(updated));
+      }
+      return claimed;
+    } catch (err) {
+      console.error('ProductModel.claimStickersByIds Error:', err);
+      return [];
+    }
+  }
+
+  /**
    * Admin support view: which stickers register this phone as their owner phone,
    * and who (if anyone) currently holds them.
    */
@@ -310,15 +353,28 @@ class ProductModel {
   /**
    * Replace the emergency contacts list for a sticker.
    * contacts: [{ name, phone }, ...]
+   *
+   * Returns `newlyAddedContacts` alongside the API row — the ones present in
+   * this call but not in the sticker's PRIOR list — so a caller can WhatsApp
+   * just the people who are actually new, not re-notify everyone already on
+   * the list every time this dashboard panel re-saves it (see
+   * ProductController.updateContacts / notificationService.notifyContactsAdded).
    */
   static async updateContacts(productId, contacts) {
     try {
       const current = await Sticker.findById(productId).select('details').lean();
       if (!current) return null;
 
+      const priorPhones = new Set(
+        (Array.isArray(current.details?.emergencyContacts) ? current.details.emergencyContacts : [])
+          .map((c) => normalizePhone(c?.phone))
+          .filter(Boolean)
+      );
+      const newlyAddedContacts = contacts.filter((c) => c?.phone && !priorPhones.has(normalizePhone(c.phone)));
+
       const mergedDetails = { ...(current.details || {}), emergencyContacts: contacts };
       const doc = await Sticker.findByIdAndUpdate(productId, { $set: { details: mergedDetails } }, { new: true }).lean();
-      return toApi(doc);
+      return { ...toApi(doc), newlyAddedContacts };
     } catch (err) {
       console.error(`ProductModel.updateContacts (${productId}) Error:`, err);
       return null;

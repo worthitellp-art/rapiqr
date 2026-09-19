@@ -791,6 +791,22 @@ class AuthController {
         logger.error('PRODUCT_AUTO_CLAIM', 'Failed to auto-claim products after verified phone update', err);
       }
 
+      // Connect the exact sticker(s) any order placed with this NOW-VERIFIED
+      // phone number is owed (auto-minted at checkout — see
+      // OrderModel.generateStickersForOrder) straight to this account. A
+      // checkout-minted sticker has no owner phone of its own yet, so
+      // autoClaimByPhone above can't find it by scanning sticker fields —
+      // this goes through the order instead, which already proves the link.
+      try {
+        const orderStickerIds = await OrderModel.getStickerIdsByPhone(phoneNumber);
+        if (orderStickerIds.length > 0) {
+          const claimedByOrder = await ProductModel.claimStickersByIds(req.user.id, finalProfile.full_name, orderStickerIds);
+          claimedCount += claimedByOrder.length;
+        }
+      } catch (err) {
+        logger.error('ORDER_STICKER_CLAIM', 'Failed to claim order-linked stickers after verified phone update', err);
+      }
+
       // Link any prior guest orders placed with this verified phone or email
       await OrderModel.linkGuestOrdersToUser(req.user.id, finalProfile.email, phoneNumber).catch((linkErr) => {
         logger.warn('PHONE_OTP_VERIFY', `Non-blocking error linking guest orders: ${linkErr.message}`);

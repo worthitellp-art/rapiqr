@@ -234,6 +234,27 @@ class OrderModel {
     const updateResult = await Order.updateMany(query, { $set: { user_id: String(userId) } });
     return updateResult.modifiedCount || 0;
   }
+
+  /**
+   * Every sticker id owed by an order placed with this phone number —
+   * regardless of whether that order is still a guest order or already
+   * linked to some account — so a just-VERIFIED phone (AuthController
+   * verifyPhoneOtp) can connect straight to the exact tag(s) it paid for
+   * (see OrderModel.generateStickersForOrder) rather than relying only on
+   * the broader phone-string match autoClaimByPhone does across all stickers.
+   * Deliberately phone-only: order email is never verified at signup, so it
+   * must never be trusted to move sticker ownership (see the comment on
+   * ProductController.getMyProducts).
+   */
+  static async getStickerIdsByPhone(phone) {
+    const digits = String(phone || '').replace(/\D/g, '');
+    if (digits.length < 10) return [];
+    const last10 = digits.slice(-10);
+    const orders = await Order.find({ phone: { $regex: last10 + '$' } }).select('stickers').lean();
+    return orders
+      .flatMap((o) => (Array.isArray(o.stickers) ? o.stickers.map((s) => s.id) : []))
+      .filter(Boolean);
+  }
 }
 
 module.exports = OrderModel;

@@ -4,7 +4,9 @@ WE need to test 100 live users active users in this web how much load coming on 
 Check api load and server load 
 
 
-add this template 
+add this template
+
+ Emergency Contacts add from anywhere when clicnet ad that famuly meebr will notuufy in whasapp
 
 ====================================
 TEMPLATE: emergency_contact_added
@@ -25,3 +27,8 @@ owner_name = Rohan Mehta
 
 Footer: None
 Buttons: None
+
+
+Emergency Contacts add from anywhere when clicnet ad that famuly meebr will
+                          notuufy in whasapp , client dashboard must be fully responssive , and after
+                          purhcase sticekr direct open access client dashboard no purhcase

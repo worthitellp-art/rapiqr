@@ -1,7 +1,9 @@
 const ProductModel = require('../models/productModel');
 const QrModel = require('../models/qrModel');
 const UserModel = require('../models/userModel');
+const OrderModel = require('../models/orderModel');
 const { logger } = require('../middleware/loggerMiddleware');
+const { notifyContactsAdded } = require('../services/notificationService');
 
 /**
  * Loads the product and verifies the authenticated user owns it (or is admin).
@@ -55,6 +57,28 @@ class ProductController {
         }
       }
 
+      // Also connect any checkout-minted sticker(s) (Order.stickers — see
+      // OrderModel.generateStickersForOrder) a newer order paid for with this
+      // phone — covers an already-verified user buying another tag: nothing
+      // re-verifies their phone on that purchase, so this dashboard load is
+      // what picks it up. Requires the ACTUAL verified flag, not just a
+      // phone_number being present — that field alone can be typed unverified
+      // at signup (see AuthController.signUp), and claiming by order is a
+      // stronger, order-proven action than the fuzzy phone-string match above.
+      if (userPhone && profile?.metadata?.phone_verified) {
+        try {
+          const orderStickerIds = await OrderModel.getStickerIdsByPhone(userPhone);
+          if (orderStickerIds.length > 0) {
+            const claimedByOrder = await ProductModel.claimStickersByIds(req.user.id, profile?.full_name, orderStickerIds);
+            if (claimedByOrder.length > 0) {
+              logger.rowUpdated('products', 'auto-claim-by-order', { userId: req.user.id, count: claimedByOrder.length });
+            }
+          }
+        } catch (err) {
+          logger.error('ORDER_STICKER_CLAIM', 'Failed to claim order-linked stickers on dashboard load', err);
+        }
+      }
+
       const data = await ProductModel.getAllByUser(req.user.id);
       return res.json({ success: true, data });
     } catch (err) {
@@ -101,9 +125,25 @@ class ProductController {
         .filter(c => c && (c.name || c.phone))
         .map(c => ({ name: String(c.name || '').trim(), phone: String(c.phone || '').trim() }));
 
-      const updated = await ProductModel.updateContacts(product.id, cleaned);
-      if (!updated) return res.status(500).json({ success: false, error: 'Failed to update emergency contacts' });
+      const result = await ProductModel.updateContacts(product.id, cleaned);
+      if (!result) return res.status(500).json({ success: false, error: 'Failed to update emergency contacts' });
+      const { newlyAddedContacts, ...updated } = result;
       logger.rowUpdated('products', product.id, { action: 'contacts_updated', count: cleaned.length });
+
+      // Emergency contacts can be added from anywhere a sticker is managed —
+      // not just first-time ScanPage registration — so this WhatsApps the
+      // same "you've been added" message from here too (see
+      // QrController.activateQrCode for the other trigger point).
+      if (Array.isArray(newlyAddedContacts) && newlyAddedContacts.length > 0) {
+        notifyContactsAdded({
+          contacts: newlyAddedContacts,
+          ownerName: updated.name || 'A RapiQR user',
+          eventId: product.id,
+        }).catch((err) => {
+          logger.error('EMERGENCY_CONTACT_NOTIFY', `Failed to notify emergency contacts for ${product.id}`, err);
+        });
+      }
+
       return res.json({ success: true, data: updated });
     } catch (err) {
       logger.error('PRODUCT_CONTACTS_UPDATE', `Failed to update contacts: ${req.params.id}`, err);

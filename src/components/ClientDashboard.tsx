@@ -589,12 +589,17 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   const [allHistoryLoading, setAllHistoryLoading] = useState(false);
 
   // ─── PRODUCTS TAB: PURCHASE / ORDER HISTORY (checkout orders, not stickers) ───
+  // Fetched as soon as the profile is known (not just when the Products tab is
+  // opened): the pre-purchase gate below needs to know about a paid order
+  // BEFORE it decides whether to show the "buy a sticker" screen — a customer
+  // who already paid at checkout must never be told to purchase again just
+  // because their sticker hasn't been claimed to their account yet.
   const [myOrders, setMyOrders] = useState<any[]>([]);
-  const [myOrdersLoading, setMyOrdersLoading] = useState(false);
+  const [myOrdersLoading, setMyOrdersLoading] = useState(true);
   const [myOrdersError, setMyOrdersError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (activeTab !== 'products') return;
+    if (!profile?.id) return;
     let cancelled = false;
     (async () => {
       setMyOrdersLoading(true);
@@ -609,7 +614,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
       }
     })();
     return () => { cancelled = true; };
-  }, [activeTab]);
+  }, [profile?.id]);
 
   // ─── DELIVERY TRACKING (per order, fetched on demand) ───
   // Expanding a card asks the server for live courier tracking; the server folds
@@ -819,13 +824,22 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   }
 
   // ─── PRE-PURCHASE GATE ───
-  // A signed-in user with zero stickers has nothing for the dashboard to
-  // manage yet. Rather than build/show the full sidebar+tabs dashboard shell
-  // around an empty state, show only a minimal "you're logged in" header and
-  // a full-page shop — the real dashboard is created the moment they own a
-  // sticker (loadProducts() finding one flips products.length > 0). Admin
-  // accounts previewing the client dashboard skip this gate entirely.
-  if (!isAdminAccount && !productsLoading && products.length === 0 && !skipPurchaseGate) {
+  // A signed-in user with zero stickers AND no order on record has nothing
+  // for the dashboard to manage yet. Rather than build/show the full
+  // sidebar+tabs dashboard shell around an empty state, show only a minimal
+  // "you're logged in" header and a full-page shop — the real dashboard is
+  // created the moment they own a sticker (loadProducts() finding one flips
+  // products.length > 0). Admin accounts previewing the client dashboard skip
+  // this gate entirely.
+  //
+  // A PAID order also skips the gate even with zero claimed stickers yet —
+  // the sticker was auto-minted at checkout (see
+  // OrderModel.generateStickersForOrder) but only gets claimed onto this
+  // account once its phone is OTP-verified (see ProductController.getMyProducts);
+  // a buyer who just paid must never be told to "purchase a sticker" again in
+  // the gap before that verification happens.
+  const hasPaidOrder = myOrders.some((o) => o?.payment?.status === 'paid');
+  if (!isAdminAccount && !productsLoading && !myOrdersLoading && products.length === 0 && !hasPaidOrder && !skipPurchaseGate) {
     return (
       <div className="fx-shell min-h-screen w-full bg-[var(--fx-canvas)] text-[var(--fx-ink)] font-body">
         <header className="flex items-center justify-between border-b border-[var(--fx-border)] bg-white px-5 py-4 sm:px-8">
