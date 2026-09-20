@@ -122,9 +122,9 @@ class AlertController {
             alertData = { label, maps_url: buildMapsLink(alertPayload.latitude, alertPayload.longitude), link: dashboardLink };
           } else if (isEmergency) {
             alertType = 'EMERGENCY_ALERT';
-            // No approved no-button template for this one yet — still uses the
-            // button_1 path (see msg91Templates.js EMERGENCY_ALERT).
-            alertData = { label, message: alertPayload.message || 'an urgent alert was reported', button_1: chatSessionId || 'inbox' };
+            // Reuses the approved emergency_contact_alert_v2 template (no
+            // button component) — see msg91Templates.js EMERGENCY_ALERT.
+            alertData = { label, message: alertPayload.message || 'an urgent alert was reported' };
           }
 
           const result = await notifyOwner({

@@ -66,19 +66,18 @@ const MSG91_TEMPLATES = {
     body: '*🔔 QR Scan Alert*\nYour tag *{{label}}* was just scanned.\nMessage: *{{message}}*\nCheck details and reply here: *{{link}}*\n— RepiQR',
   },
 
-  // No approved no-button template on file yet for this one — left as-is
-  // (still uses the button_1 path in alertController.js). msg91Client.js's
-  // buildMsg91WhatsAppComponents guards against an empty button value in the
-  // meantime, but this template should be swapped the same way once approved.
+  // No separate owner/button template is approved — reuses the approved
+  // emergency_contact_alert_v2 template (see
+  // old-templates-whaspp-usethis/emergency_contact_alert_v2.json), same as
+  // EMERGENCY_CONTACT_ALERT below. `audience` is documentation only (see
+  // notificationTemplates.js), so sending the owner's copy through the same
+  // approved template name/body is safe.
   EMERGENCY_ALERT: {
-    name: process.env.MSG91_WHATSAPP_EMERGENCY_TEMPLATE || 'emergency_alert_v2',
+    name: process.env.MSG91_WHATSAPP_EMERGENCY_TEMPLATE || 'emergency_contact_alert_v2',
     audience: 'owner',
-    variables: ['label', 'message', 'button_1'],
-    defaults: { label: 'your tag', message: 'an emergency alert was raised', button_1: '' },
-    body: '🚨 *URGENT — ACCIDENT ALERT*\n\nPossible accident involving {{label}}.\nMessage: {{message}}\n\n— *RepiQR Safety*',
-    buttons: [
-      { type: 'URL', urlType: 'dynamic', text: 'View & Take Action', baseUrl: 'https://repiqr.com/#/dashboard?tab=chat&session=' },
-    ],
+    variables: ['label', 'message'],
+    defaults: { label: 'your tag', message: 'an emergency alert was raised' },
+    body: 'RepiQR EMERGENCY NOTIFICATION: an urgent alert was raised on the registered tag "{{label}}". The reporter states: "{{message}}". Please check on this situation immediately.',
   },
 
   EMERGENCY_CONTACT_ALERT: {
