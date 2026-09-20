@@ -293,9 +293,23 @@ function buildMsg91WhatsAppComponents({ variables = {}, components = {}, body = 
     }
   }
 
-  // 2. Variables map to named MSG91 body components and positional aliases (body_1, body_2)
+  // 2. Variables map to named MSG91 body components (body_label, body_message, ...).
+  //
+  // This used to ALSO emit a positional alias (body_1, body_2, ...) per
+  // variable "in case template is numbered {{1}}, {{2}}" — but every
+  // approved template (see old-templates-whaspp-usethis/*.json) uses NAMED
+  // parameters exclusively, so those aliases were pure noise: Meta counts
+  // every submitted component against the template's placeholder count, so
+  // sending 4 components (2 named + 2 positional duplicates) for a
+  // 2-placeholder template got the whole send rejected —
+  // "number of localizable_params (0) does not match the expected number of
+  // params (2)" — for EVERY template type, not just one. The one template
+  // that genuinely needs a positional component (otp_verification, an
+  // Authentication-category template) already builds its own explicit
+  // `components: { body_1: ... }` directly in smsService.sendWhatsAppOtp,
+  // bypassing this `variables` path entirely — so no caller actually needs
+  // the alias.
   if (variables && typeof variables === 'object' && Object.keys(variables).length > 0) {
-    let bodyIndex = 1;
     for (const [key, val] of Object.entries(variables)) {
       if (key.startsWith('button_') || key.startsWith('header_')) {
         const parameterName = deriveParamName(key);
@@ -309,17 +323,9 @@ function buildMsg91WhatsAppComponents({ variables = {}, components = {}, body = 
       } else {
         const formattedKey = key.startsWith('body_') ? key : `body_${key}`;
         const parameterName = deriveParamName(formattedKey);
-
         if (!result[formattedKey]) {
           result[formattedKey] = { type: 'text', value: stripNewlines(val), ...(parameterName ? { parameter_name: parameterName } : {}) };
         }
-
-        // Also add positional alias body_1, body_2... in case template is numbered {{1}}, {{2}}
-        const positionalKey = `body_${bodyIndex}`;
-        if (!result[positionalKey]) {
-          result[positionalKey] = { type: 'text', value: stripNewlines(val) };
-        }
-        bodyIndex++;
       }
     }
   }
