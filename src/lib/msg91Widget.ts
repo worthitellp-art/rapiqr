@@ -155,8 +155,13 @@ export async function verifyMsg91Otp(otp: string): Promise<string> {
   });
 }
 
-/** Resends the OTP, optionally over a different channel ('text' | 'voice' | 'whatsapp'). */
-export async function retryMsg91Otp(channel?: 'text' | 'voice' | 'whatsapp'): Promise<void> {
+/**
+ * Resends the OTP, optionally over a different channel. MSG91's widget throws
+ * "Channel not provided in retryOtp() method" if this is left undefined, so
+ * every caller gets a real channel here even when it doesn't pass one — 'text'
+ * (SMS) matches this project's default send channel.
+ */
+export async function retryMsg91Otp(channel: 'text' | 'voice' | 'whatsapp' = 'text'): Promise<void> {
   return new Promise((resolve, reject) => {
     if (typeof window.retryOtp !== 'function') {
       reject(new Error('OTP widget is not ready — request a new code.'));

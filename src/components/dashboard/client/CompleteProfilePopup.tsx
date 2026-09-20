@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ShieldCheck, Loader2, Check, X, Mail, Smartphone } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
-import { sendMsg91Otp, verifyMsg91Otp, toMsg91Identifier } from '../../../lib/msg91Widget';
+import { sendMsg91Otp, verifyMsg91Otp, retryMsg91Otp, toMsg91Identifier } from '../../../lib/msg91Widget';
 
 const inputCls = 'w-full px-3.5 py-2.5 text-sm bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-xl outline-none focus:border-[var(--fx-ink)]';
 
@@ -33,6 +33,13 @@ export default function CompleteProfilePopup({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const [done, setDone] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(0);
+
+  useEffect(() => {
+    if (resendCountdown <= 0) return;
+    const timer = setInterval(() => setResendCountdown((c) => (c > 1 ? c - 1 : 0)), 1000);
+    return () => clearInterval(timer);
+  }, [resendCountdown]);
 
   const handleSendOtp = async () => {
     if (!phoneDraft.trim()) {
@@ -52,11 +59,24 @@ export default function CompleteProfilePopup({
       await sendMsg91Otp(toMsg91Identifier(phoneDraft));
       setOtpCode('');
       setOtpStep(true);
+      setResendCountdown(30);
       setMsg({ tone: 'success', text: 'Code sent! Enter it below.' });
     } catch (err: any) {
       setMsg({ tone: 'error', text: err?.message || 'Failed to send the verification code.' });
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCountdown > 0 || busy) return;
+    setMsg(null);
+    try {
+      await retryMsg91Otp();
+      setResendCountdown(30);
+      setMsg({ tone: 'success', text: 'Code resent.' });
+    } catch (err: any) {
+      setMsg({ tone: 'error', text: err?.message || 'Failed to resend the code.' });
     }
   };
 
@@ -181,6 +201,15 @@ export default function CompleteProfilePopup({
                       {busy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Confirm
                     </button>
                   </div>
+                )}
+                {otpStep && (
+                  <button
+                    onClick={handleResendOtp}
+                    disabled={resendCountdown > 0 || busy}
+                    className="text-xs font-bold text-[var(--fx-accent)] hover:underline disabled:opacity-50 disabled:no-underline cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    {resendCountdown > 0 ? `Resend code in ${resendCountdown}s` : 'Resend code'}
+                  </button>
                 )}
               </div>
             )}

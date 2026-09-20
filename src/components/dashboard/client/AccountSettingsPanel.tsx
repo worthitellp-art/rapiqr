@@ -4,7 +4,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { apiClient, isApiBackendConfigured } from '../../../lib/apiClient';
 import { isPushSupported, getExistingSubscription, subscribeToPush, unsubscribeFromPush } from '../../../lib/push';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
-import { sendMsg91Otp, verifyMsg91Otp, toMsg91Identifier } from '../../../lib/msg91Widget';
+import { sendMsg91Otp, verifyMsg91Otp, retryMsg91Otp, toMsg91Identifier } from '../../../lib/msg91Widget';
 
 const inputCls = 'w-full px-3.5 py-2.5 text-sm bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-xl outline-none focus:border-[var(--fx-ink)]';
 const labelCls = 'block text-xs font-bold text-[var(--fx-ink-2)] mb-1';
@@ -141,6 +141,13 @@ function ProfileForm({ profile, refreshProfile, showToast, onProductsLinked }: a
   const [phoneBusy, setPhoneBusy] = useState(false);
   const [phoneMsg, setPhoneMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const [loadingStickers, setLoadingStickers] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(0);
+
+  useEffect(() => {
+    if (resendCountdown <= 0) return;
+    const timer = setInterval(() => setResendCountdown((c) => (c > 1 ? c - 1 : 0)), 1000);
+    return () => clearInterval(timer);
+  }, [resendCountdown]);
 
   const handleLoadStickers = async () => {
     setLoadingStickers(true);
@@ -167,11 +174,24 @@ function ProfileForm({ profile, refreshProfile, showToast, onProductsLinked }: a
       await sendMsg91Otp(toMsg91Identifier(phoneDraft));
       setOtpCode('');
       setOtpStep(true);
+      setResendCountdown(30);
       setPhoneMsg({ tone: 'success', text: 'Code sent! Enter the verification code below.' });
     } catch (err: any) {
       setPhoneMsg({ tone: 'error', text: err?.message || 'Failed to send the verification code.' });
     } finally {
       setPhoneBusy(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCountdown > 0 || phoneBusy) return;
+    setPhoneMsg(null);
+    try {
+      await retryMsg91Otp();
+      setResendCountdown(30);
+      setPhoneMsg({ tone: 'success', text: 'Code resent.' });
+    } catch (err: any) {
+      setPhoneMsg({ tone: 'error', text: err?.message || 'Failed to resend the code.' });
     }
   };
 
@@ -307,6 +327,15 @@ function ProfileForm({ profile, refreshProfile, showToast, onProductsLinked }: a
               Cancel
             </button>
           </div>
+        )}
+        {otpStep && (
+          <button
+            onClick={handleResendOtp}
+            disabled={resendCountdown > 0 || phoneBusy}
+            className="text-xs font-bold text-[var(--fx-accent)] hover:underline disabled:opacity-50 disabled:no-underline cursor-pointer disabled:cursor-not-allowed"
+          >
+            {resendCountdown > 0 ? `Resend code in ${resendCountdown}s` : 'Resend code'}
+          </button>
         )}
         {phoneMsg && <Banner tone={phoneMsg.tone} message={phoneMsg.text} />}
       </div>

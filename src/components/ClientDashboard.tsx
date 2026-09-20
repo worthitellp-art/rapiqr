@@ -329,8 +329,11 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   const missingPhone = false;
   const missingEmail = false;
 
-  // No re-verification prompt on dashboard opening
-  const [profilePopupDismissed, setProfilePopupDismissed] = useState(true);
+  // Shows the "MANDATORY PHONE VERIFICATION" banner below until the account
+  // actually has a verified phone, or the visitor explicitly dismisses it —
+  // this used to default to true (dismissed), which let anyone open the
+  // dashboard with an unverified phone and never see the prompt at all.
+  const [profilePopupDismissed, setProfilePopupDismissed] = useState(false);
 
   // Automatically remember when profile has phone number so it is never prompted again
   useEffect(() => {
@@ -1234,27 +1237,13 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
               <div className="space-y-6">
                 
                 {/* Hero Greeting Section */}
-                <div className="flex justify-between items-start pt-2 pb-4">
-                  <div className="flex gap-4 items-center">
-                    <div className="w-[73px] h-[62px] relative overflow-hidden shrink-0 rounded-2xl bg-gradient-to-tr from-[#624FE1] via-[#D55BEA] to-[#4B72DB] p-0.5 shadow-md flex items-center justify-center text-white font-bold text-xl">
-                      RQ
-                    </div>
-                    <div>
-                      <div className="text-xs text-[var(--fx-ink-2)] mb-1">
-                        {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-                      </div>
-                      <h1 className="text-2xl sm:text-[28px] font-bold text-[var(--fx-ink)] leading-tight tracking-tight">
-                        Good morning, {profile?.fullName?.split(' ')[0] || 'Client'}
-                      </h1>
-                      <p className="text-xs sm:text-sm text-[var(--fx-ink-2)] mt-0.5">
-                        Pajama bottoms? No one has to know. Your vehicle safety protection is active.
-                      </p>
-                    </div>
+                <div className="pt-2 pb-4">
+                  <div className="text-xs text-[var(--fx-ink-2)] mb-1">
+                    {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                   </div>
-                  <div className="text-right text-xs text-[var(--fx-ink-2)] hidden sm:block">
-                    <span className="font-semibold text-[var(--fx-ink)]">RapiQR Pro Plan</span><br />
-                    <span className="text-[#43818D] font-semibold">Active Protection Enabled</span>
-                  </div>
+                  <h1 className="text-2xl sm:text-[28px] font-bold text-[var(--fx-ink)] leading-tight tracking-tight">
+                    Welcome back, {profile?.fullName?.split(' ')[0] || 'Client'}
+                  </h1>
                 </div>
 
                 {/* ─── STICKER PURCHASE REQUIRED HERO CARD (When 0 stickers) ─── */}
@@ -1303,19 +1292,19 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                 {/* HoneyBook Stats Bar (4 columns) */}
                 <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.04)] grid grid-cols-2 lg:grid-cols-4 rounded-lg overflow-hidden divide-x divide-y lg:divide-y-0 divide-[var(--fx-border)]">
                   <div className="p-6">
-                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">Active Stickers <small className="text-[var(--fx-faint)]">ⓘ</small></div>
+                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">Active Stickers</div>
                     <div className="text-3xl font-light tracking-tight text-[var(--fx-ink)]">{activeCount}</div>
                   </div>
                   <div className="p-6">
-                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">Total Scans <small className="text-[var(--fx-faint)]">ⓘ</small></div>
+                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">Total Scans</div>
                     <div className="text-3xl font-light tracking-tight text-[var(--fx-ink)]">{totalScans}</div>
                   </div>
                   <div className="p-6">
-                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">Emergency Contacts <small className="text-[var(--fx-faint)]">ⓘ</small></div>
+                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">Emergency Contacts</div>
                     <div className="text-3xl font-light tracking-tight text-[var(--fx-ink)]">{totalContacts}</div>
                   </div>
                   <div className="p-6">
-                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">Security Status <small className="text-[var(--fx-faint)]">ⓘ</small></div>
+                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">Security Status</div>
                     <div className="text-2xl font-semibold text-[#4FC47A] tracking-tight mt-1">Protected</div>
                   </div>
                 </div>
@@ -1332,13 +1321,13 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                           onClick={() => setActiveTab('chat')}
                           className="w-full h-11 border border-[var(--fx-border)] bg-[var(--fx-canvas)] rounded hover:border-[var(--fx-accent)] flex items-center px-3 gap-2.5 text-xs text-[var(--fx-ink)] font-bold hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
                         >
-                          <span className="text-[var(--fx-accent)] font-bold text-sm">💬</span> Open Live Visitor Chat
+                          <MessageCircle size={15} className="text-[var(--fx-accent)]" /> Open Live Visitor Chat
                         </button>
                         <button
                           onClick={() => setActiveTab('contacts')}
                           className="w-full h-11 border border-[var(--fx-border)] rounded hover:border-[var(--fx-accent)] flex items-center px-3 gap-2.5 text-xs text-[var(--fx-ink)] font-medium hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
                         >
-                          <span className="text-[var(--fx-accent)] font-bold text-sm">♙</span> Add Emergency Contact
+                          <Users size={15} className="text-[var(--fx-accent)]" /> Add Emergency Contact
                         </button>
                         <button
                           onClick={async () => {
@@ -1347,20 +1336,20 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                           }}
                           className="w-full h-11 border border-[var(--fx-border)] rounded hover:border-[var(--fx-accent)] flex items-center px-3 gap-2.5 text-xs text-[var(--fx-ink)] font-medium hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
                         >
-                          <span className="text-[var(--fx-accent)] font-bold text-sm">▣</span> Sync Safety Stickers
+                          <RefreshCcw size={15} className="text-[var(--fx-accent)]" /> Sync Safety Stickers
                         </button>
                         <button
                           onClick={() => setModal({ type: 'qrCode', sticker: products[0] })}
                           disabled={!products[0]}
                           className="w-full h-11 border border-[var(--fx-border)] rounded hover:border-[var(--fx-accent)] flex items-center px-3 gap-2.5 text-xs text-[var(--fx-ink)] font-medium hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer disabled:opacity-50"
                         >
-                          <span className="text-[var(--fx-accent)] font-bold text-sm">⚡</span> View QR Plate Code
+                          <QrCode size={15} className="text-[var(--fx-accent)]" /> View QR Plate Code
                         </button>
                         <button
                           onClick={() => setActiveTab('history')}
                           className="w-full h-11 border border-[var(--fx-border)] rounded hover:border-[var(--fx-accent)] flex items-center px-3 gap-2.5 text-xs text-[var(--fx-ink)] font-medium hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
                         >
-                          <span className="text-[var(--fx-accent)] font-bold text-sm">▤</span> Scan Logs & Alerts
+                          <History size={15} className="text-[var(--fx-accent)]" /> Scan Logs & Alerts
                         </button>
                       </div>
                     </div>
@@ -1491,11 +1480,11 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
 
                 </div>
 
-                {/* Lower Grid (2 Columns: Scans & Activity Log) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+                {/* Recent Scans Log */}
+                <div className="pt-2">
                   <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4">
                     <div className="flex justify-between items-center mb-3">
-                      <h3 className="text-xs font-semibold text-[var(--fx-ink)]">Recent Scans Log ⓘ</h3>
+                      <h3 className="text-xs font-semibold text-[var(--fx-ink)]">Recent Scans Log</h3>
                       <button onClick={() => setActiveTab('history')} className="text-xs text-[var(--fx-accent)] hover:underline">Full Log</button>
                     </div>
                     <div className="space-y-2 mt-3">
@@ -1514,23 +1503,6 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                       {allHistory.length === 0 && (
                         <p className="text-xs text-[var(--fx-ink-2)] py-6 text-center">No scan events recorded recently.</p>
                       )}
-                    </div>
-                  </div>
-
-                  <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4">
-                    <div className="flex justify-between items-center mb-3">
-                      <h3 className="text-xs font-semibold text-[var(--fx-ink)]">Activity Stream ⓘ</h3>
-                      <button onClick={() => setActiveTab('history')} className="text-xs text-[var(--fx-accent)] hover:underline">View All</button>
-                    </div>
-                    <div className="space-y-2 mt-3 text-xs">
-                      <div className="p-2.5 bg-[var(--fx-canvas)] rounded border border-[var(--fx-border)] flex justify-between">
-                        <span>▱ &nbsp; Verified Protection Active</span>
-                        <span className="text-[var(--fx-ink-2)]">Live</span>
-                      </div>
-                      <div className="p-2.5 bg-[var(--fx-canvas)] rounded border border-[var(--fx-border)] flex justify-between">
-                        <span>♙ &nbsp; Responder SMS Notification Ready</span>
-                        <span className="text-[var(--fx-ink-2)]">Active</span>
-                      </div>
                     </div>
                   </div>
                 </div>

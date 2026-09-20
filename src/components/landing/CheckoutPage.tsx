@@ -24,7 +24,6 @@ import { INDIAN_STATES, INDIAN_CITIES, INDIAN_CITY_NAMES } from '../../data/loca
 import { OrderInvoice } from '../../types/invoice';
 import { buildOrderInvoice, printOrderInvoice } from '../../services/invoiceService';
 import OrderInvoiceModal from './OrderInvoiceModal';
-import OrderInvoiceCard from './OrderInvoiceCard';
 import DashboardAccessModal from './DashboardAccessModal';
 
 /**
@@ -647,22 +646,27 @@ export default function CheckoutPage({
           if (Array.isArray(verifyRes.data?.stickers)) {
             setPurchasedStickers(verifyRes.data.stickers);
           }
-          if (verifyRes.user) {
+          // PaymentController.verify auto-provisions (or matches) an account for
+          // the checkout phone number and hands back a token+user — but typing a
+          // phone number into a form proves nothing about who actually owns it.
+          // Only trust that session automatically when this buyer was ALREADY
+          // recognized/logged-in before paying (checked in handleSubmit, before
+          // Razorpay even opened); a genuine guest checkout must still prove
+          // phone ownership via DashboardAccessModal's OTP step before the
+          // success screen gives them a session or auto-redirects to the
+          // dashboard. Never store an auto-provisioned token/session for an
+          // unrecognized buyer — that would grant dashboard access to whoever
+          // typed the number, verified or not.
+          if (recognized && verifyRes.user) {
             localStorage.setItem('repiqr-auth-user', JSON.stringify(verifyRes.user));
             localStorage.setItem('namoqr-auth-user', JSON.stringify(verifyRes.user));
           }
           localStorage.setItem('rapiqr-phone-number-filled', 'true');
           localStorage.setItem('rapiqr-phone-asked-once', 'true');
-          if (verifyRes.token) {
+          if (recognized && verifyRes.token) {
             localStorage.setItem('repiqr-token', verifyRes.token);
             localStorage.setItem('namoqr-token', verifyRes.token);
-            // PaymentController.verify auto-provisions (or matches) an account for
-            // the checkout phone number and hands back a session — refresh the
-            // live auth state now, otherwise the app only "knows" it's logged in
-            // after a full reload and the success screen below would wrongly
-            // treat this buyer as a guest.
             await refreshProfile();
-            setRecognized(true);
           }
         } catch (err: any) {
           setStep('details');
@@ -1126,105 +1130,71 @@ export default function CheckoutPage({
               </p>
             </div>
 
-            {/* ── Tax Invoice Details & Action Card ── */}
             {invoice && (
-              <OrderInvoiceCard
-                invoice={invoice}
-                onViewInvoice={() => setIsInvoiceModalOpen(true)}
-                onPrintInvoice={() => printOrderInvoice(invoice)}
-              />
+              <button
+                onClick={() => setIsInvoiceModalOpen(true)}
+                className="text-xs font-semibold text-gray-600 hover:text-black underline underline-offset-2 cursor-pointer"
+              >
+                View Invoice
+              </button>
             )}
 
             {/* ── Register Your Sticker(s) ── */}
             {purchasedStickers.length > 0 && onRegisterSticker && (
-              <div className="p-5 rounded-xl border border-gray-200 bg-white text-left space-y-3 shadow-xs">
-                <div className="flex items-center gap-2 font-semibold text-gray-900 text-sm">
-                  <ShieldCheck size={16} className="text-gray-700" />
-                  <span>Register Your Sticker{purchasedStickers.length > 1 ? 's' : ''} Now</span>
-                </div>
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  Your tag{purchasedStickers.length > 1 ? 's are' : ' is'} ready to activate — add your details and
-                  emergency contacts now so protection is live before it even arrives in the post.
-                </p>
-                <div className="space-y-2">
-                  {purchasedStickers.map((s) => {
-                    const cleanName = (s.itemName || s.category || 'Safety').replace(/\s*tag\s*$/i, '');
-                    return (
-                      <button
-                        key={s.id}
-                        onClick={() => onRegisterSticker(s.id)}
-                        className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-between gap-2 cursor-pointer shadow-xs"
-                      >
-                        <span className="capitalize">Register {cleanName} Tag</span>
-                        <ArrowRight size={13} />
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="space-y-2 text-left">
+                {purchasedStickers.map((s) => {
+                  const cleanName = (s.itemName || s.category || 'Safety').replace(/\s*tag\s*$/i, '');
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => onRegisterSticker(s.id)}
+                      className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-between gap-2 cursor-pointer shadow-xs"
+                    >
+                      <span className="capitalize">Register {cleanName} Tag</span>
+                      <ArrowRight size={13} />
+                    </button>
+                  );
+                })}
               </div>
             )}
 
             {recognized ? (
-              <div className="p-5 rounded-xl border border-gray-200 bg-white text-left space-y-3 shadow-xs">
-                <div className="flex items-center gap-2 font-semibold text-gray-900 text-sm">
-                  <CheckCircle2 size={16} className="text-emerald-600" />
-                  <span>Order Linked to Your Account</span>
-                </div>
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  Your safety tags are provisioned in your Client Dashboard. You can assign contacts and configure alert routing now.
-                  {isLoggedIn && ' Taking you there now…'}
-                </p>
-                <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  onClick={onViewDashboard}
+                  className="flex-1 py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                >
+                  <span>Open Client Dashboard</span>
+                  <ArrowRight size={13} />
+                </button>
+                {onTrackOrder && (
                   <button
-                    onClick={onViewDashboard}
-                    className="flex-1 py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                    onClick={() => onTrackOrder(orderId, phone.trim())}
+                    className="py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black font-semibold text-xs border border-gray-300 hover:border-black transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                   >
-                    <span>Open Client Dashboard</span>
-                    <ArrowRight size={13} />
+                    <Truck size={13} />
+                    <span>Track Order</span>
                   </button>
-                  {onTrackOrder && (
-                    <button
-                      onClick={() => onTrackOrder(orderId, phone.trim())}
-                      className="py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black font-semibold text-xs border border-gray-300 hover:border-black transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                    >
-                      <Truck size={13} />
-                      <span>Track Order</span>
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
             ) : (
-              <div className="p-5 rounded-xl border border-gray-200 bg-white text-left space-y-3 shadow-xs">
-                <div className="font-semibold text-gray-900 text-sm">
-                  Activate &amp; Manage Your Safety Tag
-                </div>
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  Your tag is already linked to <span className="font-semibold text-gray-900">{phone.trim()}</span> — verify that number to open your free Client Dashboard and track live scan events.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  onClick={() => setDashboardAccessOpen(true)}
+                  className="flex-1 py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                >
+                  <span>Access Dashboard</span>
+                  <ArrowRight size={13} />
+                </button>
+                {onTrackOrder && (
                   <button
-                    onClick={() => setDashboardAccessOpen(true)}
-                    className="flex-1 py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                    onClick={() => onTrackOrder(orderId, phone.trim())}
+                    className="py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                   >
-                    <span>Access Dashboard</span>
-                    <ArrowRight size={13} />
+                    <Truck size={13} />
+                    <span>Track Order</span>
                   </button>
-                  {onTrackOrder && (
-                    <button
-                      onClick={() => onTrackOrder(orderId, phone.trim())}
-                      className="py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                    >
-                      <Truck size={13} />
-                      <span>Track Order</span>
-                    </button>
-                  )}
-                  <button
-                    onClick={onBack}
-                    className="py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black font-semibold text-xs border border-gray-300 hover:border-black transition-colors cursor-pointer shadow-xs"
-                  >
-                    Home
-                  </button>
-                </div>
+                )}
               </div>
             )}
 

@@ -2,7 +2,7 @@ import type React from "react";
 import { useEffect, useState, useCallback } from "react";
 import { Send, CheckCircle2, XCircle, FlaskConical, MessageSquareText, RefreshCcw, Trash2, AlertTriangle, PhoneCall, ShieldCheck } from "lucide-react";
 import { apiClient } from "../../../lib/apiClient";
-import { sendMsg91Otp, verifyMsg91Otp, toMsg91Identifier } from "../../../lib/msg91Widget";
+import { sendMsg91Otp, verifyMsg91Otp, retryMsg91Otp, toMsg91Identifier } from "../../../lib/msg91Widget";
 
 type MessageStats = { total: number; sent: number; failed: number; simulated: number; sms: number; whatsapp: number; last24h: number };
 
@@ -61,6 +61,13 @@ export default function MessageManagerPage() {
   const [testVerifying, setTestVerifying] = useState(false);
   const [testError, setTestError] = useState<string | null>(null);
   const [testToken, setTestToken] = useState<string | null>(null);
+  const [testResendCountdown, setTestResendCountdown] = useState(0);
+
+  useEffect(() => {
+    if (testResendCountdown <= 0) return;
+    const timer = setInterval(() => setTestResendCountdown((c) => (c > 1 ? c - 1 : 0)), 1000);
+    return () => clearInterval(timer);
+  }, [testResendCountdown]);
 
   function isValidTestPhone(phone: string) {
     return /^\d{10}$/.test(phone.replace(/\D/g, ""));
@@ -79,10 +86,22 @@ export default function MessageManagerPage() {
       setTestOtp("");
       setTestToken(null);
       setTestStep("sent");
+      setTestResendCountdown(30);
     } catch (err: any) {
       setTestError(err?.message || "Failed to send the test OTP.");
     } finally {
       setTestSending(false);
+    }
+  };
+
+  const handleTestResendOtp = async () => {
+    if (testResendCountdown > 0 || testSending) return;
+    setTestError(null);
+    try {
+      await retryMsg91Otp();
+      setTestResendCountdown(30);
+    } catch (err: any) {
+      setTestError(err?.message || "Failed to resend the test OTP.");
     }
   };
 
@@ -284,14 +303,24 @@ export default function MessageManagerPage() {
                 className="w-full sm:w-36 px-3.5 py-2.5 rounded-xl border border-[var(--fx-border)] text-sm font-medium disabled:bg-[var(--fx-canvas)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--fx-accent)]/30"
               />
               {testStep === "sent" && (
-                <button
-                  type="button"
-                  onClick={handleTestVerifyOtp}
-                  disabled={testVerifying}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--fx-ink)] text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50"
-                >
-                  <ShieldCheck size={13} /> {testVerifying ? "Verifying…" : "Verify"}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleTestVerifyOtp}
+                    disabled={testVerifying}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--fx-ink)] text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    <ShieldCheck size={13} /> {testVerifying ? "Verifying…" : "Verify"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleTestResendOtp}
+                    disabled={testResendCountdown > 0 || testSending}
+                    className="text-xs font-bold text-[var(--fx-accent)] hover:underline disabled:opacity-50 disabled:no-underline cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    {testResendCountdown > 0 ? `Resend in ${testResendCountdown}s` : "Resend"}
+                  </button>
+                </>
               )}
             </>
           )}

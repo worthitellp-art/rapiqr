@@ -887,60 +887,15 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     }
 
     const fullPhone = `${regCountry}${regPhone.trim().replace(/\s+/g, "")}`;
-    const effectiveVehicleNumber = isVehicle ? regVehicleNumber.trim().toUpperCase() : "";
-    const effectiveName = regName.trim() || (isVehicle ? "Vehicle Owner" : "Tag Owner");
-    const effectiveVehicleName = isVehicle
-      ? (effectiveVehicleNumber ? `Vehicle (${effectiveVehicleNumber})` : effectiveName)
-      : effectiveName;
-    const effectiveNotes = regMessage.trim();
 
     setOtpSending(true);
     try {
-      // 1. Immediately register and link the phone number & name to the sticker in MongoDB
-      const activationRes = await apiClient.qr.activateQrCode(qrData.id, {
-        category: qrData.category || (isVehicle ? "car" : "home"),
-        ownerName: effectiveName,
-        ownerPhone: fullPhone,
-        vehicleNumber: effectiveVehicleNumber || undefined,
-        vehicleName: effectiveVehicleName,
-        notes: effectiveNotes,
-        userId: profile?.id,
-      });
-
-      if (activationRes?.data) {
-        setQrData((prev) => (prev ? {
-          ...prev,
-          status: "active",
-          vehicleName: effectiveVehicleName,
-          vehicleNumber: effectiveVehicleNumber,
-        } : null));
-      }
-
-      // Update local storage backup
-      const stored = localStorage.getItem("repiqr-qrlist") || localStorage.getItem("namoqr-qrlist");
-      const list: any[] = stored ? JSON.parse(stored) : [];
-      const idx = list.findIndex((q: any) => q.id === qrData.id);
-      if (idx >= 0) {
-        list[idx].status = "active";
-        list[idx].ownerName = effectiveName;
-        list[idx].ownerPhone = fullPhone;
-        list[idx].notes = effectiveNotes;
-        if (isVehicle) {
-          list[idx].vehicleNumber = effectiveVehicleNumber;
-          list[idx].vehicleName = effectiveVehicleName;
-        } else {
-          list[idx].vehicleNumber = "";
-          list[idx].vehicleName = effectiveName;
-        }
-        localStorage.setItem("repiqr-qrlist", JSON.stringify(list));
-        localStorage.setItem("namoqr-qrlist", JSON.stringify(list));
-      }
-
-      // 2. Send the activation OTP. Verification is mandatory from here on —
-      // no phone-match shortcut and no fail-open fallback: any failure blocks
-      // progress and asks the visitor to retry instead of silently treating
-      // an unverified identity as verified.
-      // 2. Send the activation OTP
+      // Activation itself only happens once the OTP below is verified (see
+      // handleVerifyOtpAndActivate) — entering a phone number here proves
+      // nothing on its own, so nothing gets written to the sticker record
+      // yet. This used to call activateQrCode right here, which activated
+      // the tag under whatever phone number was typed regardless of whether
+      // the OTP step was ever completed.
       const res = await apiClient.qr.sendActivationOtp(qrData.id, fullPhone);
       if (!res?.success) {
         setActivationError(res?.error || "Couldn't send verification code — please try again.");
@@ -956,7 +911,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       setActivationError(null);
       setOtpStep(true);
     } catch (err: any) {
-      setActivationError(err?.message || "Couldn't register sticker — please try again.");
+      setActivationError(err?.message || "Couldn't send verification code — please try again.");
     } finally {
       setOtpSending(false);
     }

@@ -450,15 +450,6 @@ export default function ScanPaymentModal({
                   )}
                 </button>
                 <div className="flex items-center justify-center gap-4 mt-3">
-                  {onViewTag && (
-                    <button
-                      type="button"
-                      onClick={onViewTag}
-                      className="text-xs text-black font-semibold hover:underline cursor-pointer"
-                    >
-                      Access Sticker Directly →
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={handleOpenExitConfirm}
@@ -719,12 +710,15 @@ export default function ScanPaymentModal({
         </main>
       </div>
 
-      {/* Exit Confirmation Dialog */}
+      {/* Exit Confirmation Dialog — "Access Sticker Directly" only offered once
+          phone verification has actually succeeded (phase reaches "register"
+          or later); exiting from Owner Details or the OTP step itself must
+          never hand over the tag view unverified. */}
       <ScanExitConfirmModal
         isOpen={showExitModal}
         onContinuePayment={handleCloseExitConfirm}
         onConfirmExit={handleConfirmExit}
-        onViewTag={onViewTag}
+        onViewTag={activeStepIndex >= 2 ? onViewTag : undefined}
       />
     </div>
   );
