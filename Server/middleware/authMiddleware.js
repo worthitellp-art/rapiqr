@@ -10,7 +10,7 @@ const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'worthitellp@gmail.com').trim().
 // The single phone number allowed to sign into the /admin route (via OTP —
 // see AuthController.sendAdminPhoneOtp/verifyAdminPhoneOtp). Overridable via
 // Server/.env for other deployments; the fallback is this deployment's number.
-const ADMIN_PHONE = normalizePhone(process.env.ADMIN_PHONE) || normalizePhone('9313719720');
+const ADMIN_PHONE = normalizePhone(process.env.ADMIN_PHONE) || normalizePhone('9023668558');
 
 /**
  * Verify our own JWT. There is no external auth provider anymore — the

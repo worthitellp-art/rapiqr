@@ -140,7 +140,7 @@ export default function PhoneVerificationCard({
                 maxLength={6}
                 value={otpCode}
                 onChange={handleOtpInputChange}
-                placeholder="000000"
+                placeholder="Enter code"
                 className="w-full h-12 text-center text-xl tracking-[8px] font-mono font-semibold bg-white border border-gray-300 focus:border-black focus:ring-1 focus:ring-black rounded-lg outline-none text-gray-900 shadow-xs transition-all placeholder:text-gray-300"
               />
             </div>

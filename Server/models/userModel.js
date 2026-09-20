@@ -195,7 +195,7 @@ class UserModel {
    * Create a new local account. The profile document IS the auth record now
    * (no separate auth.users table), so this is the only place a user is minted.
    */
-  static async createUser({ email, passwordHash = null, fullName = null, phoneNumber = null, googleId = null, role = 'user', emailVerified = false }) {
+  static async createUser({ email, passwordHash = null, fullName = null, phoneNumber = null, googleId = null, role = 'user', emailVerified = false, isPhoneVerified = false }) {
     const doc = await User.create({
       email: String(email).trim().toLowerCase(),
       password_hash: passwordHash,
@@ -204,6 +204,10 @@ class UserModel {
       google_id: googleId,
       role,
       email_verified: emailVerified,
+      // Callers that already proved phone ownership before creating the account
+      // (checkout auto-provisioning, phone-OTP login) pass this so the new
+      // profile doesn't immediately re-prompt "verify your phone" on first load.
+      metadata: (phoneNumber && isPhoneVerified) ? { phone_verified: true, phone_verified_at: new Date().toISOString() } : undefined,
     });
     return toApi(doc);
   }
