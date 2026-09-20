@@ -1,11 +1,13 @@
 const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const dotenv = require('dotenv');
 const path = require('path');
 const http = require('http');
 const { requestLogger, logger } = require('./middleware/loggerMiddleware');
 const { connectDB } = require('./config/db');
+const { rateLimit } = require('./middleware/rateLimiter');
 
 // Single project-wide env file lives at the repo root (shared with Vite) —
 // also check Server/.env for standalone backend setups.
@@ -37,6 +39,30 @@ const { initChatSocket } = require('./sockets/chatSocket');
 const app = express();
 const PORT = process.env.PORT || 5000;
 const FRONTEND_ORIGIN = process.env.FRONTEND_URL || 'https://rapiqr.worthitellp.workers.dev';
+
+// This runs behind a reverse proxy (Render) — without this, req.ip is always
+// the proxy's own address for every request, so the per-IP rate limiters
+// (rateLimiter.js) would key every anonymous caller into one shared bucket:
+// one attacker spamming /api/auth/login would lock out every real user's
+// login attempts too. `1` trusts exactly one hop (the platform's edge proxy),
+// not an arbitrary X-Forwarded-For chain a client could spoof itself.
+app.set('trust proxy', 1);
+
+// Security headers (CSP, X-Frame-Options, X-Content-Type-Options, HSTS, ...).
+// crossOriginResourcePolicy is relaxed to cross-origin because /uploads (chat
+// attachments, sticker assets) and every JSON response are fetched by the
+// frontend from a different origin — helmet's same-origin default would
+// otherwise let the browser block those loads.
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false, // this origin serves JSON + static images, never HTML pages a CSP would protect
+}));
+
+// Baseline defense-in-depth rate limit applied to every API route, on top of
+// the tighter per-endpoint limiters in each routes file (auth, OTP, calls,
+// alerts) — this one exists to blunt a generic flood/scrape rather than
+// target a specific abuse pattern.
+app.use('/api', rateLimit({ windowMs: 5 * 60 * 1000, max: 300, message: 'Too many requests, please slow down.' }));
 
 // Enable CORS & Request Parsing — configured frontend plus local dev origins.
 // The custom domain is listed explicitly (not just via FRONTEND_URL) so a
@@ -131,12 +157,20 @@ app.use((req, res) => {
   res.status(404).json({ success: false, error: `Route ${req.method} ${req.url} not found` });
 });
 
-// Global Error Handling Middleware
+// Global Error Handling Middleware — a last-resort catch-all for whatever
+// slips past every route's own try/catch (those already return their own
+// safe, specific error JSON and never reach here). Full detail is always
+// logged server-side; in production the client gets a generic message only,
+// since an unexpected error's `.message` was never written with "safe to
+// show a stranger" in mind (it can echo a DB error, a file path, a third-
+// party API response, ...). Non-production keeps the real message for
+// local/staging debugging.
 app.use((err, req, res, next) => {
   logger.error('SERVER_ERROR', 'Global error caught in middleware', err);
-  res.status(500).json({
+  const isProd = process.env.NODE_ENV === 'production';
+  res.status(err.statusCode || 500).json({
     success: false,
-    error: err.message || 'Internal Server Error'
+    error: isProd ? 'Internal Server Error' : (err.message || 'Internal Server Error'),
   });
 });
 
