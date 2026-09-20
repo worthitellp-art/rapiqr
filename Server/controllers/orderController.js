@@ -176,10 +176,35 @@ class OrderController {
   /** GET /api/orders/mine — the logged-in user's own order history */
   static async mine(req, res) {
     try {
-      const data = await OrderModel.getAllByUser(req.user.id);
-      return res.json({ success: true, data });
+      const UserModel = require('../models/userModel');
+      const profile = await UserModel.ensureProfile(req.user.id);
+      const ordersByUser = await OrderModel.getAllByUser(req.user.id);
+      const allOrders = [...ordersByUser];
+      const seenIds = new Set(allOrders.map((o) => String(o.id)));
+
+      if (profile?.email) {
+        const emailOrders = await OrderModel.getAllByEmail(profile.email);
+        for (const o of emailOrders) {
+          if (!seenIds.has(String(o.id))) {
+            allOrders.push(o);
+            seenIds.add(String(o.id));
+          }
+        }
+      }
+
+      if (profile?.phone_number) {
+        const phoneOrders = await OrderModel.getAllByPhone(profile.phone_number);
+        for (const o of phoneOrders) {
+          if (!seenIds.has(String(o.id))) {
+            allOrders.push(o);
+            seenIds.add(String(o.id));
+          }
+        }
+      }
+
+      return res.json({ success: true, data: allOrders });
     } catch (err) {
-      logger.error('ORDER_MINE', 'Failed to fetch order history', err);
+      logger.error('ORDER_MINE', 'Failed to list user orders', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

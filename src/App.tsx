@@ -66,7 +66,8 @@ function isScanUrl(): boolean {
 /**
  * Secret Admin Fleet entry point: only reachable by visiting /admin (or #/admin) directly.
  * There is no visible link/button to this route anywhere in the app — admin access is
- * gated purely behind the dedicated AdminAuthModal (secret email + password).
+ * gated purely behind the dedicated AdminAuthModal (OTP verification, restricted
+ * server-side to the single ADMIN_PHONE number in Server/.env).
  */
 function isAdminUrl(): boolean {
   if (typeof window === 'undefined') return false;
@@ -237,8 +238,9 @@ function MainAppContent() {
     return <PageLoader />;
   }
 
-  // Secret Admin Fleet entry (/admin) — requires the dedicated admin email + password.
-  // Normal sign in/sign up never lands here; this is the only path into the admin dashboard.
+  // Secret Admin Fleet entry (/admin) — requires OTP verification on the dedicated
+  // admin phone number. Normal sign in/sign up never lands here; this is the only
+  // path into the admin dashboard.
   if (adminModalOpen) {
     return (
       <div className="min-h-screen bg-zinc-950">

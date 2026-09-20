@@ -1,6 +1,9 @@
 const QrModel = require('../models/qrModel');
 const { logger } = require('../middleware/loggerMiddleware');
 const { notifyContactsAdded, notifyOwner } = require('../services/notificationService');
+const { sendWhatsAppOtp, sendSmsOtp } = require('../services/smsService');
+const { createOtp, verifyOtp } = require('../services/phoneVerificationService');
+const { verifyMsg91WidgetAccessToken } = require('../services/msg91Client');
 
 class QrController {
   /**
@@ -196,57 +199,129 @@ class QrController {
    * activation happens before any account exists — anonymous like /activate
    * itself.
    */
+  /**
+   * Activation identity check — step 1: send OTP to phone via WhatsApp / SMS
+   */
   static async sendActivationOtp(req, res) {
     try {
+      const { id } = req.params;
       const { phoneNumber } = req.body || {};
       const digits = String(phoneNumber || '').replace(/\D/g, '');
       if (!digits || digits.length < 7) {
         return res.status(400).json({ success: false, error: 'Enter a valid phone number.' });
       }
 
-      return res.json({ success: true });
+      const fullPhone = String(phoneNumber).trim().startsWith('+') ? String(phoneNumber).trim() : `+${digits}`;
+      const otpKey = `activation_${id}`;
+      const code = createOtp(otpKey, fullPhone);
+
+      let dispatched = false;
+      let via = null;
+
+      try {
+        const waResult = await sendWhatsAppOtp({ to: fullPhone, code, event: 'ACTIVATION_OTP_WHATSAPP' });
+        if (waResult.sent) {
+          dispatched = true;
+          via = 'whatsapp';
+        } else {
+          logger.warn('QR_ACTIVATION_OTP', `WhatsApp OTP not delivered (${waResult.error || waResult.reason || 'simulated'}). Falling back to SMS.`);
+        }
+      } catch (waErr) {
+        logger.warn('QR_ACTIVATION_OTP', `WhatsApp OTP delivery failed: ${waErr.message}. Falling back to SMS.`);
+      }
+
+      if (!dispatched) {
+        try {
+          const smsResult = await sendSmsOtp({
+            to: fullPhone,
+            code,
+            body: `Your RapiQR activation code is ${code}.`,
+            event: 'ACTIVATION_OTP_SMS'
+          });
+          if (smsResult.sent) {
+            dispatched = true;
+            via = 'sms';
+          } else {
+            logger.error('QR_ACTIVATION_OTP', `SMS OTP delivery failed: ${smsResult.error || smsResult.reason || 'simulated'}`);
+          }
+        } catch (smsErr) {
+          logger.error('QR_ACTIVATION_OTP', `SMS OTP delivery also failed: ${smsErr.message}`);
+        }
+      }
+
+      const deliveryNote = dispatched ? ` via ${via}` : ' — NOT delivered (all channels simulated or failed)';
+      logger.info('QR_ACTIVATION_OTP', `OTP generated for QR ${id} phone ${fullPhone} (dispatched: ${dispatched}${deliveryNote})`);
+
+      return res.json({
+        success: true,
+        message: dispatched ? 'Verification code sent to your phone number.' : 'Verification code generated.',
+        delivered: dispatched,
+        ...(process.env.NODE_ENV === 'development' ? { debugCode: code } : {})
+      });
     } catch (err) {
-      logger.error('QR_ACTIVATION_OTP', `Failed to run activation OTP pre-check for QR: ${req.params.id}`, err);
+      logger.error('QR_ACTIVATION_OTP', `Failed to send activation OTP for QR: ${req.params.id}`, err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }
 
   /**
-   * Activation identity check — step 2: the browser already ran the OTP
-   * exchange with MSG91's widget and got back an access token; this verifies
-   * that token with MSG91 server-to-server and confirms it verified the SAME
-   * number the client claims (never trusting the frontend's own "success").
+   * Activation identity check — step 2: verify 6-digit OTP code or MSG91 widget token
    */
   static async verifyActivationOtp(req, res) {
     try {
       const { id } = req.params;
-      const { accessToken, phoneNumber } = req.body || {};
-      if (!accessToken) return res.status(400).json({ success: false, error: 'Missing verification token — please retry.' });
+      const { code, accessToken, phoneNumber } = req.body || {};
+      const inputCode = String(code || accessToken || '').trim();
+
+      if (!inputCode) {
+        return res.status(400).json({ success: false, error: 'Verification code is required.' });
+      }
+
       const digits = String(phoneNumber || '').replace(/\D/g, '');
       if (!digits || digits.length < 7) {
         return res.status(400).json({ success: false, error: 'Enter a valid phone number.' });
       }
 
-      const verification = await verifyMsg91WidgetAccessToken({ accessToken });
-      if (!verification.success) {
-        logger.security('QR_ACTIVATION_OTP_VERIFY_FAILED', `MSG91 widget token rejected for QR ${id}: ${verification.error || verification.reason}`);
-        return res.status(400).json({ success: false, error: verification.error || 'Invalid or expired verification code.' });
-      }
-
-      // Compare on the last 10 digits when there are that many (India's national
-      // significant number, same convention as Server/utils/phone.js), otherwise
-      // fall back to the full digit string — this endpoint accepts numbers as
-      // short as 7 digits, so a hard "must have 10" check would reject every
-      // legitimately-verified short number.
-      const verifiedDigits = String(verification.verifiedIdentifier || '').replace(/\D/g, '');
-      const significantDigits = digits.length >= 10 ? digits.slice(-10) : digits;
-      if (!verifiedDigits || !verifiedDigits.endsWith(significantDigits)) {
-        logger.security('QR_ACTIVATION_OTP_MISMATCH', `Verified identifier didn't match claimed number for QR ${id}`);
-        return res.status(400).json({ success: false, error: 'Verified number does not match — please retry.' });
-      }
-
       const fullPhone = String(phoneNumber).trim().startsWith('+') ? String(phoneNumber).trim() : `+${digits}`;
-      return res.json({ success: true, phone: fullPhone });
+
+      // 1. Direct local OTP verification (for 6-digit codes)
+      const otpKey = `activation_${id}`;
+      const localResult = verifyOtp(otpKey, inputCode);
+
+      if (localResult.ok) {
+        logger.info('QR_ACTIVATION_OTP_VERIFIED', `Activation code verified successfully for QR ${id}`);
+        return res.json({ success: true, phone: fullPhone });
+      }
+
+      // If it failed locally with remaining attempts on a valid pending OTP
+      if (localResult.reason && localResult.reason !== 'no_pending_otp') {
+        const messages = {
+          expired: 'This code has expired — please request a new one.',
+          too_many_attempts: 'Too many incorrect attempts — please request a new code.',
+          invalid_code: `Incorrect code.${localResult.attemptsLeft ? ` ${localResult.attemptsLeft} attempt(s) left.` : ''}`,
+        };
+        return res.status(400).json({ success: false, error: messages[localResult.reason] || 'Invalid code.' });
+      }
+
+      // 2. Fallback to MSG91 widget access token if provided and local OTP had no pending record
+      if (accessToken && accessToken.length > 10) {
+        try {
+          const verification = await verifyMsg91WidgetAccessToken({ accessToken });
+          if (verification.success) {
+            const verifiedDigits = String(verification.verifiedIdentifier || '').replace(/\D/g, '');
+            const significantDigits = digits.length >= 10 ? digits.slice(-10) : digits;
+            if (!verifiedDigits || !verifiedDigits.endsWith(significantDigits)) {
+              logger.security('QR_ACTIVATION_OTP_MISMATCH', `Verified identifier didn't match claimed number for QR ${id}`);
+              return res.status(400).json({ success: false, error: 'Verified number does not match — please retry.' });
+            }
+            return res.json({ success: true, phone: fullPhone });
+          }
+        } catch (widgetErr) {
+          logger.warn('QR_ACTIVATION_OTP_WIDGET_ERROR', `Widget token verification failed: ${widgetErr.message}`);
+        }
+      }
+
+      return res.status(400).json({ success: false, error: 'Invalid or expired verification code — please request a new code.' });
     } catch (err) {
       logger.error('QR_ACTIVATION_OTP_VERIFY', `Failed to verify activation OTP for QR: ${req.params.id}`, err);
       return res.status(500).json({ success: false, error: err.message });

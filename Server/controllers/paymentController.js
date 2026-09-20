@@ -1,7 +1,11 @@
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const razorpay = require('../config/razorpay');
 const OrderModel = require('../models/orderModel');
 const ProductModel = require('../models/productModel');
+const UserModel = require('../models/userModel');
+const { JWT_SECRET } = require('../middleware/authMiddleware');
+const { normalizePhone } = require('../utils/phone');
 const { logger } = require('../middleware/loggerMiddleware');
 
 /**
@@ -202,6 +206,13 @@ class PaymentController {
 
       // Reconcile with database order if database is connected
       let matchedOrder = null;
+      // Declared here (not inside the try block below) because the response at
+      // the bottom of this method reads them after that block has closed —
+      // `let` inside the try scoped them to it, so every successful payment hit
+      // a "ReferenceError: authToken is not defined" once it reached the
+      // response, turning a captured payment into a 500 for the customer.
+      let authUser = null;
+      let authToken = null;
       try {
         if (orderId) {
           matchedOrder = await OrderModel.getById(orderId);
@@ -233,7 +244,45 @@ class PaymentController {
           try {
             const stickers = await OrderModel.generateStickersForOrder(matchedOrder.id);
             matchedOrder = { ...matchedOrder, stickers };
-            await claimStickersForLoggedInBuyer(matchedOrder, stickers.map((s) => s.id));
+
+            // Auto-provision user account using checkout phone number if not already logged in
+            const checkoutPhone = matchedOrder.phone ? String(matchedOrder.phone).trim() : '';
+            const normalizedPhone = normalizePhone(checkoutPhone);
+
+            if (checkoutPhone && normalizedPhone) {
+              let buyer = await UserModel.findByPhone(checkoutPhone);
+              if (!buyer) {
+                buyer = await UserModel.createUser({
+                  fullName: matchedOrder.name || `User ${normalizedPhone.slice(-4)}`,
+                  phoneNumber: checkoutPhone,
+                  email: matchedOrder.email || `${normalizedPhone}@repiqr.local`,
+                  role: 'user',
+                  isPhoneVerified: true,
+                });
+              } else {
+                await UserModel.mergeMetadata(buyer.id, {
+                  phone_verified: true,
+                  phone_verified_at: new Date().toISOString(),
+                });
+                buyer.isPhoneVerified = true;
+              }
+
+              matchedOrder.userId = buyer.id;
+              await OrderModel.linkGuestOrdersToUser(buyer.id, buyer.email, buyer.phoneNumber);
+
+              if (Array.isArray(stickers) && stickers.length > 0) {
+                await ProductModel.claimStickersByIds(buyer.id, buyer.fullName || matchedOrder.name, stickers.map((s) => s.id));
+              }
+
+              authToken = jwt.sign(
+                { id: buyer.id, email: buyer.email, role: buyer.role, phoneNumber: buyer.phoneNumber },
+                JWT_SECRET,
+                { expiresIn: '30d' }
+              );
+              authUser = buyer;
+            } else {
+              await claimStickersForLoggedInBuyer(matchedOrder, stickers.map((s) => s.id));
+            }
           } catch (err) {
             logger.error('ORDER_STICKER_AUTOGEN', `Failed to auto-generate stickers for order ${matchedOrder.id}`, err);
           }
@@ -250,6 +299,8 @@ class PaymentController {
         message: 'Payment verified successfully',
         order_id: targetOrderId,
         payment_id: targetPaymentId,
+        token: authToken,
+        user: authUser,
         data: matchedOrder || {
           order_id: targetOrderId,
           payment_id: targetPaymentId,

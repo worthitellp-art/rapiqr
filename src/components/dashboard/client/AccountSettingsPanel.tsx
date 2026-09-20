@@ -290,7 +290,7 @@ function ProfileForm({ profile, refreshProfile, showToast, onProductsLinked }: a
               autoFocus
               value={otpCode}
               onChange={(e) => { setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setPhoneMsg(null); }}
-              placeholder="6-digit code"
+              placeholder="Enter code"
               className={`${inputCls} font-mono tracking-widest`}
             />
             <button

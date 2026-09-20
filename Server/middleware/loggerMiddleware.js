@@ -497,6 +497,7 @@ module.exports = {
   sanitize,
   generateRequestId,
   getRequestId,
+  getUserId,
   setUserId,
   CATEGORIES,
   LEVELS

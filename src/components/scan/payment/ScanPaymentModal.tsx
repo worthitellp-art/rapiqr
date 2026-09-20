@@ -13,6 +13,7 @@ import {
   Trash2,
   Plus,
   Info,
+  X,
 } from 'lucide-react';
 import ScanExitConfirmModal from './ScanExitConfirmModal';
 import { isVehicleCategory } from '../../../stickerModules';
@@ -352,17 +353,44 @@ export default function ScanPaymentModal({
                   {/* Field: Vehicle Number (Vehicle Categories Only: Car, Truck, Auto, Bike) */}
                   {isVehicle && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-2">
-                        Vehicle number <span className="text-rose-500 font-bold">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={vehicleNumber}
-                        onChange={(e) => onVehicleNumberChange?.(e.target.value.toUpperCase())}
-                        placeholder="e.g. MH 02 AB 1234"
-                        required
-                        className="w-full h-11 px-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none text-sm font-mono font-medium text-gray-900 placeholder:text-gray-400 uppercase transition-all"
-                      />
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-900">
+                          Vehicle number <span className="text-rose-500 font-bold">*</span>
+                        </label>
+                        {vehicleNumber && (
+                          <button
+                            type="button"
+                            onClick={() => onVehicleNumberChange?.('')}
+                            className="text-xs text-gray-400 hover:text-gray-700 font-medium cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={vehicleNumber || ''}
+                          onChange={(e) => onVehicleNumberChange?.(e.target.value.toUpperCase())}
+                          placeholder="e.g. MH 02 AB 1234"
+                          required
+                          autoCapitalize="characters"
+                          autoCorrect="off"
+                          autoComplete="off"
+                          spellCheck={false}
+                          className="w-full h-11 px-3.5 pr-9 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none text-sm font-mono font-medium text-gray-900 placeholder:text-gray-400 uppercase transition-all"
+                        />
+                        {vehicleNumber && (
+                          <button
+                            type="button"
+                            onClick={() => onVehicleNumberChange?.('')}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700 rounded-full transition-colors cursor-pointer"
+                            title="Clear vehicle number"
+                          >
+                            <X size={15} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -421,13 +449,24 @@ export default function ScanPaymentModal({
                     <span>Continue</span>
                   )}
                 </button>
-                <button
-                  type="button"
-                  onClick={handleOpenExitConfirm}
-                  className="mt-3 text-sm text-gray-500 hover:text-gray-900 font-medium transition-colors cursor-pointer"
-                >
-                  Skip for now
-                </button>
+                <div className="flex items-center justify-center gap-4 mt-3">
+                  {onViewTag && (
+                    <button
+                      type="button"
+                      onClick={onViewTag}
+                      className="text-xs text-black font-semibold hover:underline cursor-pointer"
+                    >
+                      Access Sticker Directly →
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleOpenExitConfirm}
+                    className="text-xs text-gray-500 hover:text-gray-900 font-medium transition-colors cursor-pointer"
+                  >
+                    Skip for now
+                  </button>
+                </div>
               </div>
             </form>
           )}
@@ -441,7 +480,7 @@ export default function ScanPaymentModal({
                     Verify phone number
                   </h2>
                   <p className="text-sm text-gray-500 mt-1">
-                    Enter the 6-digit code sent to <span className="font-semibold text-gray-800">{country} {phone}</span>
+                    Enter the code sent to <span className="font-semibold text-gray-800">{country} {phone}</span>
                   </p>
                 </div>
 
@@ -685,6 +724,7 @@ export default function ScanPaymentModal({
         isOpen={showExitModal}
         onContinuePayment={handleCloseExitConfirm}
         onConfirmExit={handleConfirmExit}
+        onViewTag={onViewTag}
       />
     </div>
   );

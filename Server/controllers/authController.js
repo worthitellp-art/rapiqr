@@ -3,7 +3,7 @@ const { OAuth2Client } = require('google-auth-library');
 const UserModel = require('../models/userModel');
 const ProductModel = require('../models/productModel');
 const OrderModel = require('../models/orderModel');
-const { JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD } = require('../middleware/authMiddleware');
+const { JWT_SECRET, ADMIN_EMAIL, ADMIN_PHONE } = require('../middleware/authMiddleware');
 const { logger } = require('../middleware/loggerMiddleware');
 const { generateSecret, verifyTOTP, buildOtpauthUrl } = require('../utils/totp');
 const { sendWhatsAppOtp } = require('../services/smsService');
@@ -145,12 +145,6 @@ class AuthController {
       const userAgent = getUserAgent(req);
       const rawIdentifier = String(email || '').trim();
       const normalizedEmail = rawIdentifier.toLowerCase().replace(/^["']|["']$/g, '');
-      const inputPassword = String(password || '').trim();
-      const configuredAdminEmail = ADMIN_EMAIL.trim().toLowerCase().replace(/^["']|["']$/g, '');
-      const configuredAdminPassword = ADMIN_PASSWORD ? ADMIN_PASSWORD.trim().replace(/^["']|["']$/g, '') : null;
-
-      const isDesignatedAdmin = normalizedEmail === configuredAdminEmail;
-      const isAdminPasswordMatch = isDesignatedAdmin && configuredAdminPassword && inputPassword === configuredAdminPassword;
 
       let authUser = await UserModel.findAuthByEmail(normalizedEmail);
       if (!authUser && !rawIdentifier.includes('@')) {
@@ -166,35 +160,10 @@ class AuthController {
         }
       }
 
-      // If user row doesn't exist yet but credentials match configured admin credentials, auto-provision
-      if (!authUser && isDesignatedAdmin && isAdminPasswordMatch) {
-        let adminProfile = await UserModel.findByEmail(configuredAdminEmail);
-        if (!adminProfile) {
-          adminProfile = await UserModel.createUser({
-            email: ADMIN_EMAIL,
-            fullName: 'Fleet Admin',
-            role: 'admin',
-            emailVerified: true,
-          });
-        }
-
-        const token = jwt.sign(
-          { id: adminProfile.id, email: adminProfile.email, role: 'admin' },
-          JWT_SECRET,
-          { expiresIn: '7d' }
-        );
-        await UserModel.recordLogin(adminProfile.id, { ip, userAgent });
-        logger.success('AUTH_SIGNIN', `Admin signed in successfully via signin: ${ADMIN_EMAIL}`, { ip, userAgent }, { userId: adminProfile.id });
-        return res.json({ success: true, token, user: { ...adminProfile, role: 'admin' } });
-      }
-
       const hashToCheck = authUser?.password_hash || DUMMY_HASH;
-      let passwordOk = await verifyPassword(password, hashToCheck);
-      if (!passwordOk && isAdminPasswordMatch) {
-        passwordOk = true;
-      }
+      const passwordOk = await verifyPassword(password, hashToCheck);
 
-      if (!authUser || (!authUser.password_hash && !isAdminPasswordMatch) || !passwordOk) {
+      if (!authUser || !authUser.password_hash || !passwordOk) {
         const failCount = loginAttemptTracker.recordFailure(normalizedEmail);
         logger.warn('AUTH_SIGNIN', `Authentication failed for ${email}`, { ip, failCount });
         if (failCount >= loginAttemptTracker.SUSPICIOUS_THRESHOLD) {
@@ -259,68 +228,103 @@ class AuthController {
   }
 
   /**
-   * Admin Fleet Panel Sign In — the ONLY way to obtain an admin-role token.
-   * Validated purely against ADMIN_EMAIL / ADMIN_PASSWORD in Server/.env (never against
-   * a regular user's password), so admin access can't be gained through the normal
-   * signup/signin flow no matter what a user's account role looks like.
+   * Admin Fleet Panel Sign In — Step 1: pre-flight. The ADMIN_EMAIL/ADMIN_PASSWORD
+   * sign-in has been retired; the only way to obtain an admin-role token now is
+   * OTP verification on the single number in ADMIN_PHONE (Server/.env). Rejecting
+   * every other number here means the OTP is never even sent to anyone else. The
+   * actual send happens client-side via the MSG91 OTP Widget
+   * (src/lib/msg91Widget.ts), same as every other OTP flow in this app.
    */
-  static async adminSignIn(req, res) {
+  static async sendAdminPhoneOtp(req, res) {
     try {
-      const { email, password } = req.body;
-
-      if (!email || !password) {
-        logger.warn('AUTH_ADMIN_SIGNIN', 'Admin sign-in attempt missing credentials');
-        return res.status(400).json({ success: false, error: 'Email and password are required' });
-      }
-
-      if (!ADMIN_PASSWORD) {
-        logger.error('AUTH_ADMIN_SIGNIN', 'ADMIN_PASSWORD is not configured on the server');
-        return res.status(500).json({ success: false, error: 'Admin login is not configured.' });
-      }
-
+      const { phoneNumber } = req.body || {};
+      const normalized = normalizePhone(phoneNumber);
       const ip = getClientIp(req);
       const userAgent = getUserAgent(req);
-      const inputEmail = String(email || '').trim().toLowerCase().replace(/^["']|["']$/g, '');
-      const inputPassword = String(password || '').trim();
-      const configuredAdminEmail = (process.env.ADMIN_EMAIL || ADMIN_EMAIL || 'worthitellp@gmail.com').trim().toLowerCase().replace(/^["']|["']$/g, '');
-      const configuredAdminPassword = (process.env.ADMIN_PASSWORD || ADMIN_PASSWORD || 'Kp9#mX2$vW7!jR4&tQ8*zL5^yB').trim().replace(/^["']|["']$/g, '');
-      const trackerKey = `admin:${configuredAdminEmail}`;
 
-      if (inputEmail !== configuredAdminEmail || inputPassword !== configuredAdminPassword) {
-        const failCount = loginAttemptTracker.recordFailure(trackerKey);
-        logger.warn('AUTH_ADMIN_SIGNIN', `Admin login failed for ${email}`, { ip, failCount });
-        // The admin account is the highest-value target in the system — any
-        // repeated failure here (not just past the suspicious threshold) is
-        // worth a SECURITY-category entry, not just a WARN one.
-        logger.security('ADMIN_LOGIN_FAILED', `Failed admin sign-in attempt using email ${email}`, { attemptedEmail: email, ip, userAgent, failCount });
+      if (!normalized) {
+        return res.status(400).json({ success: false, error: 'Enter a valid 10-digit mobile number.' });
+      }
+
+      if (normalized !== ADMIN_PHONE) {
+        const failCount = loginAttemptTracker.recordFailure(`admin-phone:${ip}`);
+        logger.warn('AUTH_ADMIN_SIGNIN', 'Admin phone login pre-flight rejected an unauthorized number', { ip, failCount });
+        logger.security('ADMIN_LOGIN_FAILED', 'Admin phone login attempted from an unauthorized number', { ip, userAgent, failCount });
 
         await logAuditEvent({
           eventType: SecurityEventTypes.AUTH_LOGIN_FAILED,
           actorType: 'ANONYMOUS',
           req,
-          userEmail: inputEmail,
-          statusCode: 401,
-          reason: 'Invalid admin credentials',
+          statusCode: 403,
+          reason: 'Unauthorized admin phone number',
           metadata: { target: 'admin', failCount },
         });
 
-        return res.status(401).json({ success: false, error: 'Invalid admin credentials.' });
+        // Same error either way — never confirm/deny which number is the admin number.
+        return res.status(403).json({ success: false, error: 'This number is not authorized for admin access.' });
       }
 
-      loginAttemptTracker.clear(trackerKey);
+      logger.user('ADMIN_PHONE_OTP_SEND', 'Admin phone login pre-flight passed — widget will send the OTP');
+      return res.json({ success: true });
+    } catch (err) {
+      logger.error('ADMIN_PHONE_OTP_SEND', 'Failed to run admin phone login pre-flight', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
 
-      // The admin identity is authenticated purely via ADMIN_EMAIL/ADMIN_PASSWORD above,
-      // never a stored password — reuse/create the profile row just for name/avatar/id.
-      let profile = await UserModel.findByEmail(configuredAdminEmail);
+  /**
+   * Admin Fleet Panel Sign In — Step 2: verify the MSG91 widget access token
+   * server-to-server (never trusting the browser's own "verified" claim),
+   * confirm it verified the ONE authorized admin number, then mint an
+   * admin-role JWT.
+   */
+  static async verifyAdminPhoneOtp(req, res) {
+    try {
+      const { phoneNumber, accessToken } = req.body || {};
+      const normalized = normalizePhone(phoneNumber);
+      const ip = getClientIp(req);
+      const userAgent = getUserAgent(req);
+
+      if (!normalized || !accessToken) {
+        return res.status(400).json({ success: false, error: 'Phone number and verification code are required.' });
+      }
+
+      if (normalized !== ADMIN_PHONE) {
+        const failCount = loginAttemptTracker.recordFailure(`admin-phone:${ip}`);
+        logger.security('ADMIN_LOGIN_FAILED', 'Admin phone verify attempted for an unauthorized number', { ip, userAgent, failCount });
+        return res.status(403).json({ success: false, error: 'This number is not authorized for admin access.' });
+      }
+
+      const verification = await verifyMsg91WidgetAccessToken({ accessToken });
+      if (!verification.success) {
+        logger.security('ADMIN_LOGIN_FAILED', `MSG91 widget token rejected for admin phone login: ${verification.error || verification.reason}`, { ip });
+        return res.status(400).json({ success: false, error: verification.error || 'Invalid or expired verification code.' });
+      }
+      if (normalizePhone(verification.verifiedIdentifier) !== normalized) {
+        logger.security('ADMIN_LOGIN_FAILED', 'Verified identifier did not match the claimed admin number', { ip });
+        return res.status(400).json({ success: false, error: 'Verified number does not match — please retry.' });
+      }
+
+      loginAttemptTracker.clear(`admin-phone:${ip}`);
+
+      // The admin identity is still the ADMIN_EMAIL profile row — verifyAdmin,
+      // security-alert recipients, etc. all key off it. The phone number is only
+      // the gate that decides who is allowed to sign into that identity now.
+      let profile = await UserModel.findByEmail(ADMIN_EMAIL);
       if (!profile) {
         profile = await UserModel.createUser({
           email: ADMIN_EMAIL,
           fullName: 'Fleet Admin',
           role: 'admin',
           emailVerified: true,
+          phoneNumber: normalized,
         });
-      } else if (profile.role !== 'admin') {
-        profile = await UserModel.reconcileAdminRole(profile);
+      } else {
+        if (profile.role !== 'admin') profile = await UserModel.reconcileAdminRole(profile);
+        if (profile.phone_number !== normalized) {
+          await UserModel.updateProfile(profile.id, { phoneNumber: normalized }).catch(() => {});
+          profile.phone_number = normalized;
+        }
       }
 
       const securityMeta = await UserModel.getSecurityMeta(profile.id);
@@ -335,16 +339,16 @@ class AuthController {
         { expiresIn: '7d' }
       );
 
-      logger.success('AUTH_ADMIN_SIGNIN', `Admin signed in: ${ADMIN_EMAIL}`, { ip, userAgent }, { userId: profile.id });
+      logger.success('AUTH_ADMIN_SIGNIN', `Admin signed in via phone OTP: ${ADMIN_EMAIL}`, { ip, userAgent }, { userId: profile.id });
 
       await logAuditEvent({
         eventType: SecurityEventTypes.ADMIN_ACCESS,
         actorType: 'ADMIN',
         req,
         userId: profile.id,
-        userEmail: configuredAdminEmail,
+        userEmail: ADMIN_EMAIL,
         statusCode: 200,
-        metadata: { action: 'ADMIN_SIGNIN' },
+        metadata: { action: 'ADMIN_SIGNIN', method: 'phone_otp' },
       });
 
       return res.json({
@@ -353,7 +357,7 @@ class AuthController {
         user: { ...profile, role: 'admin' }
       });
     } catch (err) {
-      logger.error('AUTH_ADMIN_SIGNIN', 'Admin sign in internal failure', err);
+      logger.error('ADMIN_PHONE_OTP_VERIFY', 'Failed to verify admin phone OTP', err);
       return res.status(500).json({ success: false, error: err.message || 'Admin sign in failed' });
     }
   }
@@ -1047,8 +1051,8 @@ class AuthController {
    * Account Settings — change the account email.
    *
    * Regular accounts re-enter their current password. The admin account does not:
-   * it authenticates against ADMIN_EMAIL/ADMIN_PASSWORD in Server/.env rather than
-   * a stored password, so there is nothing to re-verify. See adminSignIn.
+   * it authenticates via phone OTP against ADMIN_PHONE in Server/.env rather than
+   * a stored password, so there is nothing to re-verify. See verifyAdminPhoneOtp.
    */
   static async changeEmail(req, res) {
     try {
@@ -1094,9 +1098,9 @@ class AuthController {
         { expiresIn: '7d' }
       );
 
-      // ADMIN_EMAIL in Server/.env is what adminSignIn checks the login against, and
+      // ADMIN_EMAIL in Server/.env is still the admin identity's profile row, and
       // this endpoint cannot rewrite the server's environment. Say so plainly rather
-      // than letting the next admin login fail for no visible reason.
+      // than letting the next admin login look broken for no visible reason.
       const warning = String(req.user.email).toLowerCase() === ADMIN_EMAIL.toLowerCase()
         ? `Admin login still uses ${ADMIN_EMAIL}. Update ADMIN_EMAIL in Server/.env and restart the server to sign in with ${normalizedNewEmail}.`
         : undefined;
@@ -1181,6 +1185,126 @@ class AuthController {
       return res.json({ success: true, message: '2FA disabled' });
     } catch (err) {
       logger.error('2FA_DISABLE', 'Failed to disable 2FA', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Phone Login - Step 1: Pre-flight check. The actual OTP send (MS entry) no
+   * longer happens here — the MSG91 OTP Widget sends it in-browser (see
+   * src/lib/msg91Widget.ts), same as the phone-verification flow.
+   */
+  static async sendPhoneLoginOtp(req, res) {
+    try {
+      const { phoneNumber } = req.body || {};
+      const normalized = normalizePhone(phoneNumber);
+      if (!normalized) {
+        return res.status(400).json({ success: false, error: 'Enter a valid 10-digit mobile number.' });
+      }
+
+      logger.user('PHONE_LOGIN_OTP', `Phone login pre-flight passed for ${normalized} — widget will send the OTP`);
+      return res.json({ success: true, message: 'Verification code sent to your phone number.' });
+    } catch (err) {
+      logger.error('PHONE_LOGIN_OTP', 'Failed to run phone login pre-flight', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Phone Login - Step 2: Verify OTP and log in / create user
+   */
+  static async verifyPhoneLoginOtp(req, res) {
+    try {
+      const { phoneNumber, accessToken } = req.body || {};
+      const normalized = normalizePhone(phoneNumber);
+      if (!normalized || !accessToken) {
+        return res.status(400).json({ success: false, error: 'Phone number and verification token are required.' });
+      }
+
+      // The browser ran the OTP exchange with MSG91's widget and got back an
+      // access token; verify it server-to-server rather than trusting the
+      // frontend's own "success" claim, then confirm it verified THIS number.
+      const verification = await verifyMsg91WidgetAccessToken({ accessToken });
+      if (!verification.success) {
+        logger.security('PHONE_LOGIN_OTP', `MSG91 widget token rejected for phone login: ${verification.error || verification.reason}`);
+        return res.status(400).json({ success: false, error: verification.error || 'Invalid or expired verification code.' });
+      }
+      if (normalizePhone(verification.verifiedIdentifier) !== normalized) {
+        logger.security('PHONE_LOGIN_OTP', `Verified identifier didn't match claimed number for phone login`);
+        return res.status(400).json({ success: false, error: 'Verified number does not match — please retry.' });
+      }
+
+      // Find or create user
+      let profile = await UserModel.findByPhone(phoneNumber);
+      const fallbackEmail = `${normalized}@repiqr.local`;
+
+      if (!profile) {
+        profile = await UserModel.findByEmail(fallbackEmail);
+      }
+
+      if (!profile) {
+        profile = await UserModel.createUser({
+          email: fallbackEmail,
+          fullName: `User ${normalized.slice(-4)}`,
+          phoneNumber: normalized,
+          isPhoneVerified: true,
+          role: 'user',
+        });
+      } else {
+        if (!profile.phoneNumber || !profile.isPhoneVerified) {
+          await UserModel.updateProfile(profile.id, {
+            phoneNumber: normalized,
+            isPhoneVerified: true,
+          }).catch(err => logger.warn('PHONE_LOGIN', `Failed to mark phone verified: ${err.message}`));
+          profile.phoneNumber = normalized;
+          profile.isPhoneVerified = true;
+        }
+      }
+
+      const ip = getClientIp(req);
+      const userAgent = getUserAgent(req);
+      await UserModel.recordLogin(profile.id, { ip, userAgent }).catch(() => {});
+
+      // Link any guest orders placed with this phone number or email
+      await OrderModel.linkGuestOrdersToUser(profile.id, profile.email, profile.phoneNumber).catch((linkErr) => {
+        logger.warn('PHONE_LOGIN', `Non-blocking error linking guest orders: ${linkErr.message}`);
+      });
+
+      // Claim stickers matching phone
+      try {
+        const orderStickerIds = await OrderModel.getStickerIdsByPhone(normalized);
+        if (orderStickerIds.length > 0) {
+          const claimedByOrder = await ProductModel.claimStickersByIds(profile.id, profile.full_name || profile.fullName, orderStickerIds);
+          if (claimedByOrder.length > 0) {
+            logger.rowUpdated('products', 'auto-claim-by-order-phone', { userId: profile.id, count: claimedByOrder.length });
+          }
+        }
+      } catch (err) {
+        logger.error('ORDER_STICKER_CLAIM', 'Failed to claim order-linked stickers after phone OTP sign-in', err);
+      }
+
+      const token = jwt.sign(
+        { id: profile.id, email: profile.email, role: profile.role },
+        JWT_SECRET,
+        { expiresIn: '30d' }
+      );
+
+      const userDto = {
+        id: profile.id,
+        email: profile.email,
+        fullName: profile.full_name || profile.fullName,
+        phoneNumber: profile.phoneNumber || profile.phone_number || normalized,
+        isPhoneVerified: true,
+        role: profile.role,
+      };
+
+      return res.json({
+        success: true,
+        token,
+        user: userDto,
+      });
+    } catch (err) {
+      logger.error('PHONE_LOGIN_VERIFY', 'Failed to verify phone login OTP', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

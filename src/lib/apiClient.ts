@@ -101,6 +101,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
           '/auth/google',
           '/auth/email-otp/send',
           '/auth/email-otp/verify',
+          '/auth/phone-login/send',
+          '/auth/phone-login/verify',
         ].some(path => endpoint.includes(path));
 
         if (!isAuthLifecycleEndpoint) {
@@ -214,10 +216,22 @@ export const apiClient = {
       });
     },
 
-    async adminSignIn(email: string, password: string) {
-      return request<{ success: boolean; token?: string; user?: any }>('/auth/admin-signin', {
+    // Admin (/admin route) sign-in — OTP only, restricted server-side to the
+    // single ADMIN_PHONE number. Step 1: pre-flight (rejects any other number
+    // before the MSG91 widget even sends a code).
+    async sendAdminPhoneOtp(phoneNumber: string) {
+      return request<{ success: boolean; error?: string }>('/auth/admin-phone-login/send', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ phoneNumber }),
+      });
+    },
+
+    // Step 2: `accessToken` comes from the MSG91 OTP Widget's verifyOtp()
+    // (src/lib/msg91Widget.ts) — verifying it here is the actual admin login.
+    async verifyAdminPhoneOtp(phoneNumber: string, accessToken: string) {
+      return request<{ success: boolean; token?: string; user?: any; error?: string }>('/auth/admin-phone-login/verify', {
+        method: 'POST',
+        body: JSON.stringify({ phoneNumber, accessToken }),
       });
     },
 
@@ -241,6 +255,25 @@ export const apiClient = {
       return request<{ success: boolean; token?: string; user?: any; error?: string }>('/auth/email-otp/verify', {
         method: 'POST',
         body: JSON.stringify({ email, code }),
+      });
+    },
+
+    // Passwordless phone login: pre-flight check only — the MSG91 widget sends
+    // the actual OTP client-side (its length is whatever the widget is
+    // configured for in the MSG91 dashboard, not fixed here).
+    async sendPhoneLoginOtp(phoneNumber: string) {
+      return request<{ success: boolean; simulated?: boolean; error?: string; message?: string; debugCode?: string }>('/auth/phone-login/send', {
+        method: 'POST',
+        body: JSON.stringify({ phoneNumber }),
+      });
+    },
+
+    // Verifying the OTP signs into (or creates) the account for that phone number.
+    // `accessToken` comes from the MSG91 OTP Widget's verifyOtp() (src/lib/msg91Widget.ts).
+    async verifyPhoneLoginOtp(phoneNumber: string, accessToken: string) {
+      return request<{ success: boolean; token?: string; user?: any; error?: string }>('/auth/phone-login/verify', {
+        method: 'POST',
+        body: JSON.stringify({ phoneNumber, accessToken }),
       });
     },
 
@@ -433,10 +466,10 @@ export const apiClient = {
       });
     },
 
-    async verifyActivationOtp(qrId: string, accessToken: string, phoneNumber: string) {
+    async verifyActivationOtp(qrId: string, codeOrAccessToken: string, phoneNumber: string) {
       return request<{ success: boolean; phone?: string; error?: string }>(`/qr/${qrId}/verify-activation-otp`, {
         method: 'POST',
-        body: JSON.stringify({ accessToken, phoneNumber }),
+        body: JSON.stringify({ code: codeOrAccessToken, accessToken: codeOrAccessToken, phoneNumber }),
       });
     },
   },
@@ -1156,6 +1189,11 @@ export const apiClient = {
       city?: string;
       country?: string;
       notes?: string;
+      whatsapp?: string;
+      yearsExperience?: string;
+      radiusKm?: number;
+      serviceAreas?: { name: string; radiusKm: number }[];
+      availability?: { type: 'available_24_7' | 'daytime' | 'night' | 'custom'; hours?: Record<string, { open: string; close: string } | null> };
     }) {
       return request<{ success: boolean; data: any }>('/helplines/apply', {
         method: 'POST',

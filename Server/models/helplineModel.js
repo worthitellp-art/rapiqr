@@ -26,6 +26,11 @@ function toApi(doc) {
     city: doc.city || null,
     country: doc.country || null,
     notes: doc.notes || null,
+    whatsapp: doc.whatsapp || null,
+    years_experience: doc.years_experience || null,
+    radius_km: doc.radius_km ?? null,
+    service_areas: Array.isArray(doc.service_areas) ? doc.service_areas : [],
+    availability: doc.availability || null,
     created_at: doc.created_at,
   };
 }
@@ -95,7 +100,7 @@ class HelplineModel {
     }
   }
 
-  static async create({ category, serviceType, categories, label, phone, active = true, email, city, country, notes }) {
+  static async create({ category, serviceType, categories, label, phone, active = true, email, city, country, notes, whatsapp, yearsExperience, radiusKm, serviceAreas, availability }) {
     const doc = await Communication.create({
       category,
       label,
@@ -107,6 +112,13 @@ class HelplineModel {
       city: city || null,
       country: country || null,
       notes: notes || null,
+      whatsapp: whatsapp || null,
+      years_experience: yearsExperience || null,
+      radius_km: typeof radiusKm === 'number' ? radiusKm : null,
+      service_areas: Array.isArray(serviceAreas)
+        ? serviceAreas.filter((a) => a && a.name).map((a) => ({ name: String(a.name), radius_km: Number(a.radiusKm) || null }))
+        : [],
+      availability: availability || null,
     });
     return toApi(doc);
   }
@@ -123,6 +135,15 @@ class HelplineModel {
     if (updates.city !== undefined) payload.city = updates.city;
     if (updates.country !== undefined) payload.country = updates.country;
     if (updates.notes !== undefined) payload.notes = updates.notes;
+    if (updates.whatsapp !== undefined) payload.whatsapp = updates.whatsapp;
+    if (updates.yearsExperience !== undefined) payload.years_experience = updates.yearsExperience;
+    if (updates.radiusKm !== undefined) payload.radius_km = updates.radiusKm;
+    if (updates.serviceAreas !== undefined) {
+      payload.service_areas = Array.isArray(updates.serviceAreas)
+        ? updates.serviceAreas.filter((a) => a && a.name).map((a) => ({ name: String(a.name), radius_km: Number(a.radiusKm) || null }))
+        : [];
+    }
+    if (updates.availability !== undefined) payload.availability = updates.availability;
 
     const doc = await Communication.findByIdAndUpdate(id, { $set: payload }, { new: true }).lean();
     return toApi(doc);

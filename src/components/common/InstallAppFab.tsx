@@ -1,5 +1,6 @@
 import { Download } from "lucide-react";
 import { useInstallPrompt } from "../../lib/pwaInstall";
+import PwaInstallModal from "./PwaInstallModal";
 
 /**
  * Floating "Install App" button — same position/sizing as the floating
@@ -8,16 +9,11 @@ import { useInstallPrompt } from "../../lib/pwaInstall";
  * see useInstallPrompt for why visibility isn't gated on any single event.
  */
 export default function InstallAppFab() {
-  const { installed, installing, hint, install } = useInstallPrompt();
+  const { installed, installing, install, showGuide, setShowGuide } = useInstallPrompt();
   if (installed) return null;
 
   return (
     <>
-      {hint && (
-        <div className="fixed bottom-[calc(max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))+4rem)] right-5 z-40 max-w-[220px] bg-slate-900 text-white text-xs font-semibold rounded-2xl px-3.5 py-2.5 shadow-2xl animate-fade-in">
-          {hint}
-        </div>
-      )}
       <button
         onClick={install}
         disabled={installing}
@@ -27,6 +23,11 @@ export default function InstallAppFab() {
         <Download size={17} />
         <span>{installing ? "Installing…" : "Install App"}</span>
       </button>
+
+      <PwaInstallModal
+        isOpen={showGuide}
+        onClose={() => setShowGuide(false)}
+      />
     </>
   );
 }

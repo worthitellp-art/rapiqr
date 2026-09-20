@@ -326,20 +326,11 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     onBack();
   };
 
-  const missingPhone = !isAdminAccount && !profile?.phoneNumber;
-  const missingEmail = !profile?.email || profile.email.endsWith('.repiqr.local');
+  const missingPhone = false;
+  const missingEmail = false;
 
-  // Once the user fills the phone number or dismisses the prompt, never ask again
-  const [profilePopupDismissed, setProfilePopupDismissed] = useState(() => {
-    try {
-      const alreadyFilled = localStorage.getItem('rapiqr-phone-number-filled') === 'true';
-      const alreadyAsked = localStorage.getItem('rapiqr-phone-asked-once') === 'true';
-      const hasPhone = Boolean(profile?.phoneNumber);
-      return alreadyFilled || alreadyAsked || hasPhone;
-    } catch {
-      return false;
-    }
-  });
+  // No re-verification prompt on dashboard opening
+  const [profilePopupDismissed, setProfilePopupDismissed] = useState(true);
 
   // Automatically remember when profile has phone number so it is never prompted again
   useEffect(() => {
@@ -357,18 +348,13 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     setProfilePopupDismissed(true);
     try {
       localStorage.setItem('rapiqr-phone-asked-once', 'true');
+      localStorage.setItem('rapiqr-phone-number-filled', 'true');
     } catch {
       // Ignore storage errors
     }
   };
 
-  const showCompleteProfilePopup =
-    Boolean(profile) &&
-    (missingPhone || missingEmail) &&
-    !profilePopupDismissed &&
-    typeof window !== 'undefined' &&
-    localStorage.getItem('rapiqr-phone-asked-once') !== 'true' &&
-    localStorage.getItem('rapiqr-phone-number-filled') !== 'true';
+  const showCompleteProfilePopup = false;
 
 
   const [activeTab, setActiveTab] = useState<TabId>(() => {
@@ -1126,7 +1112,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                     </h4>
                     <p className="text-xs text-amber-800 mt-1 leading-relaxed">
                       {profile?.phoneNumber
-                        ? `Complete 6-digit OTP verification for ${profile.phoneNumber} to auto-claim safety stickers and enable emergency SMS alerts.`
+                        ? `Complete OTP verification for ${profile.phoneNumber} to auto-claim safety stickers and enable emergency SMS alerts.`
                         : 'Add and verify your mobile phone number via OTP to link safety stickers to your dashboard and enable instant emergency call bridges.'
                       }
                     </p>

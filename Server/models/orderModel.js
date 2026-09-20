@@ -288,6 +288,27 @@ class OrderModel {
       .flatMap((o) => (Array.isArray(o.stickers) ? o.stickers.map((s) => s.id) : []))
       .filter(Boolean);
   }
+
+  /**
+   * Return all sticker IDs associated with orders made by this user ID.
+   */
+  static async getStickerIdsByUserId(userId) {
+    if (!userId) return [];
+    const orders = await Order.find({ user_id: String(userId) }).select('stickers').lean();
+    return orders
+      .flatMap((o) => (Array.isArray(o.stickers) ? o.stickers.map((s) => s.id) : []))
+      .filter(Boolean);
+  }
+
+  /**
+   * All orders placed with this email address, newest first.
+   */
+  static async getAllByEmail(email) {
+    const normalized = String(email || '').trim().toLowerCase();
+    if (!normalized) return [];
+    const docs = await Order.find({ email: normalized }).sort({ created_at: -1 }).lean();
+    return docs.map(toApi);
+  }
 }
 
 module.exports = OrderModel;

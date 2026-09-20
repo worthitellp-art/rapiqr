@@ -6,12 +6,14 @@ interface ScanExitConfirmModalProps {
   isOpen: boolean;
   onContinuePayment: () => void;
   onConfirmExit: () => void;
+  onViewTag?: () => void;
 }
 
 export default function ScanExitConfirmModal({
   isOpen,
   onContinuePayment,
   onConfirmExit,
+  onViewTag,
 }: ScanExitConfirmModalProps) {
   if (!isOpen) return null;
 
@@ -51,12 +53,22 @@ export default function ScanExitConfirmModal({
             Are you sure you want to exit?
           </h3>
           <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-xs mx-auto">
-            You will be taken back to RapiQR Safety Protection website
+            You can access the smart sticker tag directly or return to RapiQR home.
           </p>
         </div>
 
         {/* Stacked Action Buttons */}
         <div className="space-y-2.5">
+          {onViewTag && (
+            <button
+              type="button"
+              onClick={onViewTag}
+              className="w-full py-3.5 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 active:scale-[0.99] text-black font-semibold text-sm transition-colors cursor-pointer"
+            >
+              Access Sticker Directly →
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onContinuePayment}

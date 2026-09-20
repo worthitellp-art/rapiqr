@@ -79,13 +79,24 @@ class ProductController {
         }
       }
 
-      // Same as above, by email — only trusted when Google/email-OTP sign-in
-      // already proved this account controls that inbox (see the
-      // trust-boundary note on OrderModel.getStickerIdsByEmail). This is the
-      // lazy catch-all: a purchase placed with this email AFTER the account
-      // last logged in still surfaces here on the next dashboard load,
-      // without waiting for another sign-in event.
-      if (req.user.role !== 'admin' && profile?.email && profile?.email_verified) {
+      // Claim any checkout-minted sticker(s) by account user_id
+      if (req.user.role !== 'admin' && req.user.id) {
+        try {
+          const userOrderStickerIds = await OrderModel.getStickerIdsByUserId(req.user.id);
+          if (userOrderStickerIds.length > 0) {
+            const claimedByUser = await ProductModel.claimStickersByIds(req.user.id, profile?.full_name, userOrderStickerIds);
+            if (claimedByUser.length > 0) {
+              logger.rowUpdated('products', 'auto-claim-by-order-user', { userId: req.user.id, count: claimedByUser.length });
+            }
+          }
+        } catch (err) {
+          logger.error('ORDER_STICKER_CLAIM_USER', 'Failed to claim order-linked stickers by userId', err);
+        }
+      }
+
+      // Also claim by email — enables users who ordered without a phone or have not yet
+      // verified phone to access their stickers directly.
+      if (req.user.role !== 'admin' && profile?.email) {
         try {
           const orderStickerIds = await OrderModel.getStickerIdsByEmail(profile.email);
           if (orderStickerIds.length > 0) {

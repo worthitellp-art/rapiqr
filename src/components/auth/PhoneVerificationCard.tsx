@@ -124,7 +124,7 @@ export default function PhoneVerificationCard({
             <div>
               <div className="flex justify-between items-center mb-2">
                 <label className="block text-sm font-medium text-gray-900">
-                  Enter 6-Digit OTP Code
+                  Enter OTP Code
                 </label>
                 <button
                   type="button"

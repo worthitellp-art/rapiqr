@@ -25,6 +25,7 @@ import { OrderInvoice } from '../../types/invoice';
 import { buildOrderInvoice, printOrderInvoice } from '../../services/invoiceService';
 import OrderInvoiceModal from './OrderInvoiceModal';
 import OrderInvoiceCard from './OrderInvoiceCard';
+import DashboardAccessModal from './DashboardAccessModal';
 
 /**
  * Last-resort local receipt when the backend order API is unreachable —
@@ -100,13 +101,14 @@ export default function CheckoutPage({
   onTrackOrder,
   onRegisterSticker,
 }: CheckoutPageProps) {
-  const { isLoggedIn, profile } = useAuth();
+  const { isLoggedIn, profile, refreshProfile } = useAuth();
 
   // Checkout steps: 'details' → 'processing' → 'success'
   const [step, setStep] = useState<'details' | 'processing' | 'success'>('details');
   const [orderId, setOrderId] = useState('');
   const [confirmedTotal, setConfirmedTotal] = useState(0);
   const [recognized, setRecognized] = useState(false);
+  const [dashboardAccessOpen, setDashboardAccessOpen] = useState(false);
   const [invoice, setInvoice] = useState<OrderInvoice | null>(null);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   // The QR tag(s) auto-minted for this order the moment payment cleared (see
@@ -372,19 +374,18 @@ export default function CheckoutPage({
     delivery,
   ]);
 
-  // Auto-redirect a signed-in buyer straight into the Client Dashboard once
-  // the purchase confirms — the sticker was already claimed onto their
-  // account server-side (see PaymentController.verify), so there's nothing
-  // left for them to do on this success screen. A short delay lets them
-  // actually see the "Order Confirmed" state first instead of it flashing by.
-  // Guest checkouts (not isLoggedIn) are deliberately left alone here — there
-  // is no session to send into a dashboard, and the recognized/unrecognized
-  // panels below already guide them to create an account or track the order.
+  // Auto-redirect a signed-in/recognized buyer straight into the Client
+  // Dashboard once the purchase confirms — the sticker was already claimed
+  // onto their account server-side (see PaymentController.verify), so
+  // there's nothing left for them to do here. A short delay lets them
+  // actually see the "Order Confirmed" state first instead of it flashing
+  // by. A buyer we couldn't recognize/log in gets left on this screen so
+  // they can verify their phone via the DashboardAccessModal below instead.
   useEffect(() => {
-    if (step !== 'success' || !isLoggedIn || !recognized) return;
-    const timer = setTimeout(() => onViewDashboard(), 2500);
+    if (step !== 'success' || !recognized) return;
+    const timer = setTimeout(() => onViewDashboard(), 1800);
     return () => clearTimeout(timer);
-  }, [step, isLoggedIn, recognized, onViewDashboard]);
+  }, [step, recognized, onViewDashboard]);
 
   const finalizeLocalRecords = (
     id: string,
@@ -513,10 +514,11 @@ export default function CheckoutPage({
     }));
 
     let newOrderId: string = '';
+    const effectiveEmail = email.trim() || `${cleanDigits(phone)}@repiqr.local`;
     try {
       const res = await apiClient.orders.create({
         name: name.trim(),
-        email: email.trim(),
+        email: effectiveEmail,
         phone: phone.trim(),
         items,
         subtotal,
@@ -543,7 +545,7 @@ export default function CheckoutPage({
       );
       const fallbackRes = createLocalOrderFallback({
         name: name.trim(),
-        email: email.trim(),
+        email: effectiveEmail,
         phone: phone.trim(),
         items,
         subtotal,
@@ -627,13 +629,14 @@ export default function CheckoutPage({
       // customer picks there, not on this page.
       prefill: {
         name: name.trim(),
-        email: email.trim(),
+        email: effectiveEmail,
         contact: phone.trim(),
       },
       theme: { color: '#111111' },
       handler: async (response: any) => {
+        let verifyRes: any = null;
         try {
-          const verifyRes = await apiClient.payments.verify({
+          verifyRes = await apiClient.payments.verify({
             orderId: newOrderId,
             razorpay_order_id: response.razorpay_order_id,
             razorpay_payment_id: response.razorpay_payment_id,
@@ -643,6 +646,23 @@ export default function CheckoutPage({
             throw new Error(verifyRes?.error || 'Payment verification failed');
           if (Array.isArray(verifyRes.data?.stickers)) {
             setPurchasedStickers(verifyRes.data.stickers);
+          }
+          if (verifyRes.user) {
+            localStorage.setItem('repiqr-auth-user', JSON.stringify(verifyRes.user));
+            localStorage.setItem('namoqr-auth-user', JSON.stringify(verifyRes.user));
+          }
+          localStorage.setItem('rapiqr-phone-number-filled', 'true');
+          localStorage.setItem('rapiqr-phone-asked-once', 'true');
+          if (verifyRes.token) {
+            localStorage.setItem('repiqr-token', verifyRes.token);
+            localStorage.setItem('namoqr-token', verifyRes.token);
+            // PaymentController.verify auto-provisions (or matches) an account for
+            // the checkout phone number and hands back a session — refresh the
+            // live auth state now, otherwise the app only "knows" it's logged in
+            // after a full reload and the success screen below would wrongly
+            // treat this buyer as a guest.
+            await refreshProfile();
+            setRecognized(true);
           }
         } catch (err: any) {
           setStep('details');
@@ -657,7 +677,7 @@ export default function CheckoutPage({
         const completedInvoice = buildOrderInvoice({
           orderId: newOrderId,
           customerName: name.trim(),
-          customerEmail: email.trim(),
+          customerEmail: effectiveEmail,
           customerPhone: phone.trim(),
           shippingAddress: {
             address: address.trim(),
@@ -682,9 +702,13 @@ export default function CheckoutPage({
         setInvoice(completedInvoice);
         setOrderId(newOrderId);
         setConfirmedTotal(total);
-        finalizeLocalRecords(newOrderId, isRecognized, completedInvoice);
-        setStep('success');
+        finalizeLocalRecords(newOrderId, true, completedInvoice);
         if (onOrderComplete) onOrderComplete();
+
+        // Show the confirmation screen — a recognized/now-logged-in buyer is
+        // auto-redirected from there (see the effect above); everyone else
+        // stays here and can verify their phone via DashboardAccessModal.
+        setStep('success');
       },
       modal: {
         ondismiss: () => {
@@ -713,7 +737,6 @@ export default function CheckoutPage({
     setError('');
     if (
       !name.trim() ||
-      !email.trim() ||
       !phone.trim() ||
       !address.trim() ||
       !city.trim() ||
@@ -722,12 +745,12 @@ export default function CheckoutPage({
       setError('Please fill in all required fields.');
       return;
     }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
+    if (email.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
       setError('Please enter a valid email address.');
       return;
     }
     if (cleanDigits(phone).length < 10) {
-      setError('Please enter a valid phone number.');
+      setError('Please enter a valid 10-digit phone number.');
       return;
     }
 
@@ -857,13 +880,13 @@ export default function CheckoutPage({
 
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-1.5">
-                      Email Address (for receipts &amp; tag proxy activation) *
+                      Email Address (Optional)
                     </label>
                     <div className="relative">
                       <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input
                         type="email"
-                        placeholder="rahul@example.com"
+                        placeholder="e.g. rahul@example.com (optional)"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="w-full h-11 pl-10 pr-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
@@ -1176,18 +1199,14 @@ export default function CheckoutPage({
                   Activate &amp; Manage Your Safety Tag
                 </div>
                 <p className="text-xs text-gray-600 leading-relaxed">
-                  Create a free account with your purchase email to track live scan events, set private phone numbers, and manage masked telephony.
+                  Your tag is already linked to <span className="font-semibold text-gray-900">{phone.trim()}</span> — verify that number to open your free Client Dashboard and track live scan events.
                 </p>
-                <div className="h-11 px-3.5 rounded-lg bg-white border border-gray-300 text-xs font-mono text-gray-700 flex items-center gap-2">
-                  <Mail size={14} className="text-gray-400" />
-                  <span>{email.trim()}</span>
-                </div>
                 <div className="flex flex-col sm:flex-row gap-2 pt-1">
                   <button
-                    onClick={() => onOpenSignup(email.trim())}
+                    onClick={() => setDashboardAccessOpen(true)}
                     className="flex-1 py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                   >
-                    <span>Create Free Account</span>
+                    <span>Access Dashboard</span>
                     <ArrowRight size={13} />
                   </button>
                   {onTrackOrder && (
@@ -1223,6 +1242,16 @@ export default function CheckoutPage({
           if (invoice) {
             printOrderInvoice(invoice);
           }
+        }}
+      />
+
+      <DashboardAccessModal
+        isOpen={dashboardAccessOpen}
+        initialPhone={phone}
+        onClose={() => setDashboardAccessOpen(false)}
+        onSuccess={() => {
+          setRecognized(true);
+          onViewDashboard();
         }}
       />
 

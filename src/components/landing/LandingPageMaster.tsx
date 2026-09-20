@@ -2171,7 +2171,7 @@ export default function LandingPageMaster({
                         onChange={(e) => setJoinForm({ ...joinForm, serviceType: e.target.value })}
                         className="w-full cursor-pointer rounded-xl border border-[#14120C]/12 bg-[#FFFFFF] px-4 py-3 text-[16px] font-light outline-hidden transition-colors focus:border-[#14120C] sm:text-[14px]"
                       >
-                        {SERVICE_TYPES.map((t) => (
+                        {SERVICE_TYPES.filter((t) => t.slug !== 'police').map((t) => (
                           <option key={t.slug} value={t.slug}>
                             {t.label}
                           </option>

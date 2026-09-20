@@ -79,6 +79,7 @@ export function useInstallPrompt() {
   const [canPrompt, setCanPrompt] = useState(isInstallPromptAvailable());
   const [installing, setInstalling] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
   const ios = isIOS();
 
   useEffect(() => onInstallPromptChange(() => setCanPrompt(true)), []);
@@ -88,6 +89,7 @@ export function useInstallPrompt() {
       ? 'Tap Share, then "Add to Home Screen" to install.'
       : 'Open your browser menu and choose "Install app" or "Add to Home screen".';
     setHint(text);
+    setShowGuide(true);
     setTimeout(() => setHint(null), 4500);
   };
 
@@ -108,5 +110,5 @@ export function useInstallPrompt() {
     }
   };
 
-  return { installed, installing, hint, install };
+  return { installed, installing, hint, install, showGuide, setShowGuide, isIOS: ios };
 }

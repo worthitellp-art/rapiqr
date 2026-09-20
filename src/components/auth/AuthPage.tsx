@@ -2,17 +2,17 @@ import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   Loader2,
-  Mail,
-  Lock,
-  User,
+  Phone,
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
   ArrowRight,
+  RotateCcw,
 } from 'lucide-react';
 import AppLogo from '../common/AppLogo';
-import MinimalInput from './MinimalInput';
-import { useAuthForm } from './hooks/useAuthForm';
+import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
+import { useAuth } from '../../context/AuthContext';
+import { sendMsg91Otp, verifyMsg91Otp, retryMsg91Otp, toMsg91Identifier } from '../../lib/msg91Widget';
 
 interface AuthPageProps {
   initialMode?: 'login' | 'signup';
@@ -23,91 +23,104 @@ interface AuthPageProps {
 }
 
 export default function AuthPage({
-  initialMode = 'login',
-  prefillEmail = '',
-  onModeChange,
   onBackHome,
   onSuccess,
 }: AuthPageProps) {
-  const [currentView, setCurrentView] = useState<'login' | 'signup' | 'forgot'>(initialMode);
-  const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password');
+  const { sendPhoneLoginOtp, verifyPhoneLoginOtp } = useAuth();
 
-  const {
-    email,
-    password,
-    fullName,
-    isSubmitting,
-    errorMessage,
-    successMessage,
-    otpCode,
-    otpSent,
-    setEmail,
-    setPassword,
-    setFullName,
-    setOtpCode,
-    switchAuthMode,
-    handleEmailSubmit,
-    handlePasswordResetSubmit,
-    handleGoogleAuthentication,
-    handleSendEmailOtp,
-    handleVerifyEmailOtp,
-  } = useAuthForm({
-    isOpen: true,
-    initialMode: currentView === 'forgot' ? 'login' : currentView,
-    prefillEmail,
-    onClose: onBackHome,
-    onSuccess,
-  });
+  const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneDigits, setPhoneDigits] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [countdown, setCountdown] = useState(0);
 
-  // Keep state synchronized with external routing or mode changes
+  // Countdown timer for resending OTP
   useEffect(() => {
-    if (initialMode) {
-      setCurrentView(initialMode);
-      switchAuthMode(initialMode);
-    }
-  }, [initialMode, switchAuthMode]);
+    if (countdown <= 0) return;
+    const timer = setInterval(() => {
+      setCountdown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [countdown]);
 
-  const handleSwitchToLogin = () => {
-    setCurrentView('login');
-    switchAuthMode('login');
-    onModeChange?.('login');
-    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-      window.history.replaceState({}, '', '/login');
-    }
-  };
+  const handleSendOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setErrorMessage('');
+    setSuccessMessage('');
 
-  const handleSwitchToSignup = () => {
-    setCurrentView('signup');
-    switchAuthMode('signup');
-    onModeChange?.('signup');
-    if (typeof window !== 'undefined' && window.location.pathname !== '/register') {
-      window.history.replaceState({}, '', '/register');
-    }
-  };
-
-  const handleSwitchToForgot = () => {
-    setCurrentView('forgot');
-  };
-
-  const handleFormSubmission = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (currentView === 'forgot') {
-      await handlePasswordResetSubmit(event);
+    const clean = phoneDigits.replace(/\D/g, '');
+    if (clean.length < 10) {
+      setErrorMessage('Please enter a valid 10-digit mobile number.');
       return;
     }
-    if (currentView === 'login' && loginMethod === 'otp') {
-      if (otpSent) {
-        await handleVerifyEmailOtp(event);
-      } else {
-        await handleSendEmailOtp(event);
+
+    setIsSubmitting(true);
+    try {
+      const finalPhone = phoneNumber || clean;
+      // Backend pre-flight (format/ownership checks) first, THEN actually ask
+      // MSG91's widget to send the code — the pre-flight alone never sends
+      // anything, it only clears the way for the widget call below.
+      const res = await sendPhoneLoginOtp(finalPhone);
+      if (!res.success) {
+        setErrorMessage(res.error || 'Failed to send verification code. Please try again.');
+        return;
       }
+      await sendMsg91Otp(toMsg91Identifier(finalPhone));
+      setSuccessMessage(res.message || 'Verification code sent to your phone.');
+      setStep('otp');
+      setCountdown(30);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Network error while sending verification code.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    const trimmedOtp = otpCode.trim();
+    if (!trimmedOtp || trimmedOtp.length < 4) {
+      setErrorMessage('Please enter the verification code.');
       return;
     }
-    await handleEmailSubmit(event);
+
+    setIsSubmitting(true);
+    try {
+      // The widget verifies the code with MSG91 directly and hands back an
+      // access token; the backend re-verifies that token server-to-server —
+      // this app never checks the OTP itself.
+      const accessToken = await verifyMsg91Otp(trimmedOtp);
+      const res = await verifyPhoneLoginOtp(phoneNumber, accessToken);
+      if (res.success) {
+        setSuccessMessage('Verified successfully! Loading dashboard…');
+        localStorage.setItem('rapiqr-phone-number-filled', 'true');
+        localStorage.setItem('rapiqr-phone-asked-once', 'true');
+        setTimeout(() => {
+          onSuccess();
+        }, 400);
+      } else {
+        setErrorMessage(res.error || 'Invalid verification code. Please try again.');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Verification failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (countdown > 0 || isSubmitting) return;
+    await handleSendOtp();
   };
 
   return (
-    <div className="auth-scope min-h-screen w-full flex flex-col justify-between bg-slate-50 text-[#14120C] selection:bg-slate-200 selection:text-[#14120C] font-sans antialiased">
+    <div className="min-h-screen w-full flex flex-col justify-between bg-slate-50 text-[#14120C] font-sans antialiased">
       {/* ── Top Bar ── */}
       <header className="w-full max-w-5xl mx-auto px-5 py-6 flex items-center justify-between">
         <button
@@ -119,15 +132,12 @@ export default function AuthPage({
           <span>Back to home</span>
         </button>
 
-        <a
-          href="mailto:support@repiqr.com"
-          className="text-xs sm:text-sm font-semibold text-[#14120C]/50 hover:text-[#14120C] transition-colors"
-        >
-          Need help?
-        </a>
+        <span className="text-xs font-medium text-gray-500">
+          Instant Phone Access
+        </span>
       </header>
 
-      {/* ── Centered Clean Auth Card ── */}
+      {/* ── Centered Auth Card ── */}
       <main className="w-full my-auto flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-[420px] mx-auto bg-white rounded-2xl border border-gray-200 p-7 sm:p-9 shadow-sm">
           {/* Logo */}
@@ -135,315 +145,155 @@ export default function AuthPage({
             <button
               onClick={onBackHome}
               className="cursor-pointer focus:outline-hidden"
-              aria-label="RepiQR home"
+              aria-label="RapiQR home"
             >
               <AppLogo variant="light" className="h-8 w-auto object-contain" />
             </button>
           </div>
 
-          {/* Mode Switcher (Sign In vs Create Account) */}
-          {currentView !== 'forgot' && (
-            <div className="mb-6 p-1 rounded-lg bg-gray-100 border border-gray-200 flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handleSwitchToLogin}
-                className={`flex-1 py-1.5 text-xs sm:text-[13px] font-semibold rounded-md transition-all cursor-pointer ${
-                  currentView === 'login'
-                    ? 'bg-white text-gray-900 shadow-xs'
-                    : 'text-gray-500 hover:text-gray-900'
-                }`}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                onClick={handleSwitchToSignup}
-                className={`flex-1 py-1.5 text-xs sm:text-[13px] font-semibold rounded-md transition-all cursor-pointer ${
-                  currentView === 'signup'
-                    ? 'bg-white text-gray-900 shadow-xs'
-                    : 'text-gray-500 hover:text-gray-900'
-                }`}
-              >
-                Create Account
-              </button>
-            </div>
-          )}
-
-          {/* Header Titles */}
+          {/* Heading */}
           <div className="mb-6 text-center">
             <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-              {currentView === 'login' && 'Welcome back'}
-              {currentView === 'signup' && 'Create your account'}
-              {currentView === 'forgot' && 'Reset your password'}
+              {step === 'phone' ? 'Sign In with Phone' : 'Enter Verification Code'}
             </h1>
             <p className="text-xs sm:text-sm text-gray-500 mt-1.5">
-              {currentView === 'login' && 'Sign in to access your tags and dashboard'}
-              {currentView === 'signup' && 'Protect your vehicle and assets with private QR tags'}
-              {currentView === 'forgot' && "Enter your email and we'll send a recovery link"}
+              {step === 'phone'
+                ? 'Enter your mobile number to access your dashboard & stickers'
+                : `We sent a verification code to ${phoneNumber}`}
             </p>
           </div>
 
-          {/* Google Quick Sign-In */}
-          {currentView !== 'forgot' && (
-            <div className="space-y-5 mb-6">
-              <button
-                type="button"
-                onClick={handleGoogleAuthentication}
-                disabled={isSubmitting}
-                className="w-full h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 hover:border-black active:scale-[0.99] transition-all flex items-center justify-center cursor-pointer shadow-xs disabled:opacity-50 group"
-              >
-                <svg className="w-4 h-4 shrink-0 transition-transform group-hover:scale-105" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                  />
-                </svg>
-                <span className="text-xs sm:text-sm ml-3 font-semibold text-gray-900">
-                  Continue with Google
-                </span>
-              </button>
-
-              {/* Minimal Divider */}
-              <div className="relative flex items-center justify-center">
-                <div className="w-full border-t border-gray-200" />
-                <span className="bg-white px-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 absolute">
-                  or
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Sign-in Method Tabs (Password vs OTP) */}
-          {currentView === 'login' && (
-            <div className="flex items-center justify-between mb-4 p-1 rounded-lg bg-gray-100 border border-gray-200">
-              <button
-                type="button"
-                onClick={() => setLoginMethod('password')}
-                className={`flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                  loginMethod === 'password'
-                    ? 'bg-white text-gray-900 shadow-xs'
-                    : 'text-gray-500 hover:text-gray-900'
-                }`}
-              >
-                Password
-              </button>
-              <button
-                type="button"
-                onClick={() => setLoginMethod('otp')}
-                className={`flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  loginMethod === 'otp'
-                    ? 'bg-white text-gray-900 shadow-xs'
-                    : 'text-gray-500 hover:text-gray-900'
-                }`}
-              >
-                <span>Email Code (OTP)</span>
-                <span className="text-[9px] px-1.5 py-0.5 bg-gray-200 text-gray-800 rounded-full font-bold">Fast</span>
-              </button>
-            </div>
-          )}
-
-          {/* Error / Success Feedback Banners */}
+          {/* Error Message */}
           {errorMessage && (
-            <div className="mb-4 p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-700 text-xs font-semibold flex items-start gap-2.5 text-left">
+            <div className="mb-5 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium flex items-start gap-2">
               <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-600" />
               <span>{errorMessage}</span>
             </div>
           )}
 
+          {/* Success Message */}
           {successMessage && (
-            <div className="mb-4 p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 text-xs font-semibold flex items-start gap-2.5 text-left">
-              <CheckCircle2 size={16} className="shrink-0 mt-0.5 text-emerald-600" />
+            <div className="mb-5 p-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-xs font-medium flex items-start gap-2">
+              <CheckCircle2 size={16} className="shrink-0 mt-0.5 text-green-600" />
               <span>{successMessage}</span>
             </div>
           )}
 
-          {/* Primary Form */}
-          <form onSubmit={handleFormSubmission} className="space-y-4 text-left">
-            {/* Full Name (Sign Up only) */}
-            {currentView === 'signup' && (
-              <MinimalInput
-                id="fullName"
-                label="Full Name"
-                type="text"
-                icon={User}
-                value={fullName}
-                onChange={setFullName}
-                placeholder="Rahul Sharma"
-                required
-                autoComplete="name"
-                disabled={isSubmitting}
-                autoFocus
-              />
-            )}
-
-            {/* Email Address */}
-            <MinimalInput
-              id="email"
-              label="Email Address"
-              type="email"
-              icon={Mail}
-              value={email}
-              onChange={setEmail}
-              placeholder="name@example.com"
-              required
-              autoComplete="email"
-              disabled={isSubmitting}
-              autoFocus={currentView !== 'signup'}
-            />
-
-            {/* Password Field (Sign Up OR Login with Password) */}
-            {((currentView === 'login' && loginMethod === 'password') || currentView === 'signup') && (
-              <div className="space-y-1">
-                <MinimalInput
-                  id="password"
-                  label="Password"
-                  type="password"
-                  icon={Lock}
-                  value={password}
-                  onChange={setPassword}
-                  placeholder="••••••••"
+          {step === 'phone' ? (
+            /* ── Step 1: Phone Number Input ── */
+            <form onSubmit={handleSendOtp} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1.5">
+                  Mobile Number
+                </label>
+                <PhoneInputWithCountry
+                  value={phoneNumber}
+                  onChange={(full, digits) => {
+                    setPhoneNumber(full);
+                    setPhoneDigits(digits);
+                  }}
+                  placeholder="10-digit mobile number"
                   required
-                  autoComplete={currentView === 'login' ? 'current-password' : 'new-password'}
-                  disabled={isSubmitting}
                 />
-
-                {currentView === 'login' && (
-                  <div className="flex justify-end pt-1">
-                    <button
-                      type="button"
-                      onClick={handleSwitchToForgot}
-                      className="text-xs font-semibold text-[#14120C]/60 hover:text-[#14120C] transition-colors cursor-pointer"
-                    >
-                      Forgot password?
-                    </button>
-                  </div>
-                )}
               </div>
-            )}
 
-            {/* OTP Code Input (When Login with OTP and OTP is sent) */}
-            {currentView === 'login' && loginMethod === 'otp' && otpSent && (
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between">
-                  <label htmlFor="otpCode" className="text-sm font-medium text-gray-900">
-                    Enter 6-Digit Code
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleSendEmailOtp}
-                    disabled={isSubmitting}
-                    className="text-xs font-semibold text-gray-900 hover:underline cursor-pointer disabled:opacity-50"
-                  >
-                    Resend Code
-                  </button>
-                </div>
-                <input
-                  id="otpCode"
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  required
-                  autoFocus
-                  placeholder="000000"
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                  className="w-full h-11 text-center text-xl tracking-[8px] font-mono font-semibold bg-white border border-gray-300 focus:border-black focus:ring-1 focus:ring-black rounded-lg outline-none text-gray-900 shadow-xs transition-all"
-                />
-                <p className="text-xs text-gray-500 text-center">
-                  We sent a code to <span className="font-semibold text-gray-800">{email}</span>
-                </p>
-              </div>
-            )}
-
-            {/* Submit CTA Button: White Background Button with Black Text */}
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full h-11 mt-2 rounded-lg bg-white hover:bg-gray-50 active:scale-[0.99] text-black border border-gray-300 hover:border-black font-semibold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed group"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 size={16} className="animate-spin text-black" />
-                  <span>Please wait...</span>
-                </>
-              ) : (
-                <>
-                  <span>
-                    {currentView === 'login' && loginMethod === 'password' && 'Sign In with Email'}
-                    {currentView === 'login' && loginMethod === 'otp' && !otpSent && 'Send Sign-in Code'}
-                    {currentView === 'login' && loginMethod === 'otp' && otpSent && 'Verify & Sign In'}
-                    {currentView === 'signup' && 'Create Account'}
-                    {currentView === 'forgot' && 'Send Recovery Link'}
-                  </span>
-                  <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Bottom Footer Switches */}
-          <div className="mt-6 text-center text-xs text-[#14120C]/60">
-            {currentView === 'forgot' ? (
               <button
-                type="button"
-                onClick={handleSwitchToLogin}
-                className="font-bold text-[#14120C] hover:underline transition-colors cursor-pointer"
+                type="submit"
+                disabled={isSubmitting || phoneDigits.length < 10}
+                className="w-full py-3 px-4 rounded-xl bg-white text-black border border-gray-300 hover:border-black font-semibold text-sm transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 active:scale-[0.99]"
               >
-                ← Back to Sign In
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin text-black" />
+                    <span>Sending Code…</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Send Verification Code</span>
+                    <ArrowRight size={16} />
+                  </>
+                )}
               </button>
-            ) : currentView === 'login' ? (
-              <p>
-                Don&apos;t have an account?{' '}
-                <button
-                  type="button"
-                  onClick={handleSwitchToSignup}
-                  className="font-bold text-[#14120C] hover:underline transition-colors cursor-pointer"
-                >
-                  Sign up
-                </button>
-              </p>
-            ) : (
-              <p>
-                Already have an account?{' '}
-                <button
-                  type="button"
-                  onClick={handleSwitchToLogin}
-                  className="font-bold text-[#14120C] hover:underline transition-colors cursor-pointer"
-                >
-                  Sign in
-                </button>
-              </p>
-            )}
-          </div>
+            </form>
+          ) : (
+            /* ── Step 2: OTP Verification ── */
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1.5">
+                  Verification Code
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Enter code"
+                    autoFocus
+                    className="w-full text-center tracking-[0.4em] font-mono text-xl py-3 px-4 rounded-xl bg-white border border-gray-300 focus:border-black focus:ring-1 focus:ring-black outline-none transition-all text-gray-900 placeholder:text-gray-300"
+                  />
+                </div>
+              </div>
 
-          {/* Trust Footer */}
-          <div className="mt-6 pt-4 border-t border-[#14120C]/8 flex items-center justify-center gap-2 text-[11px] text-[#14120C]/45">
-            <ShieldCheck size={14} className="text-[#16A34A]" />
-            <span>256-bit SSL encrypted • 100% Number Privacy</span>
+              <button
+                type="submit"
+                disabled={isSubmitting || otpCode.trim().length < 4}
+                className="w-full py-3 px-4 rounded-xl bg-white text-black border border-gray-300 hover:border-black font-semibold text-sm transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 active:scale-[0.99]"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin text-black" />
+                    <span>Verifying Code…</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck size={16} />
+                    <span>Verify &amp; Enter Dashboard</span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center justify-between pt-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep('phone');
+                    setOtpCode('');
+                    setErrorMessage('');
+                    setSuccessMessage('');
+                  }}
+                  className="text-gray-500 hover:text-black font-medium transition-colors cursor-pointer"
+                >
+                  Change phone number
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={countdown > 0 || isSubmitting}
+                  className="text-gray-700 hover:text-black font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                >
+                  <RotateCcw size={12} />
+                  <span>{countdown > 0 ? `Resend in ${countdown}s` : 'Resend Code'}</span>
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Privacy Note */}
+          <div className="mt-8 pt-5 border-t border-gray-100 text-center">
+            <p className="text-[11px] text-gray-400">
+              By continuing, you agree to RapiQR’s Terms of Service &amp; Privacy Policy.
+            </p>
           </div>
         </div>
       </main>
 
       {/* ── Footer ── */}
-      <footer className="w-full max-w-5xl mx-auto px-5 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[12px] text-[#14120C]/40">
-        <span>&copy; {new Date().getFullYear()} RapiQR Technologies. All rights reserved.</span>
-        <div className="flex items-center gap-4">
-          <a href="/privacy" className="hover:text-[#14120C] transition-colors">Privacy Policy</a>
-          <span>•</span>
-          <a href="/terms" className="hover:text-[#14120C] transition-colors">Terms of Service</a>
-        </div>
+      <footer className="w-full py-4 text-center text-xs text-gray-400">
+        &copy; {new Date().getFullYear()} RapiQR. Secure phone verification.
       </footer>
     </div>
   );

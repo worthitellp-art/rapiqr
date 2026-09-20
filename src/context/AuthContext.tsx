@@ -37,12 +37,19 @@ interface AuthContextType {
   isAdmin: boolean;
   signUp: (email: string, password: string, fullName: string, phoneNumber?: string) => Promise<{ success: boolean; error?: string }>;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  adminSignIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  // Admin (/admin route) sign-in: OTP-only, restricted server-side to the single
+  // ADMIN_PHONE number. `accessToken` comes from the MSG91 OTP Widget's verifyOtp().
+  sendAdminPhoneOtp: (phoneNumber: string) => Promise<{ success: boolean; error?: string }>;
+  verifyAdminPhoneOtp: (phoneNumber: string, accessToken: string) => Promise<{ success: boolean; error?: string }>;
   signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   // Passwordless email login: request a 6-digit code, then verify it — verifying
   // IS the login, no password anywhere in this path.
   sendEmailOtp: (email: string) => Promise<{ success: boolean; simulated?: boolean; error?: string }>;
   verifyEmailOtp: (email: string, code: string) => Promise<{ success: boolean; error?: string }>;
+  // Passwordless phone login: pre-flight check, then send the OTP via the MSG91
+  // widget and verify it (verifying IS the login) to log in or create an account.
+  sendPhoneLoginOtp: (phoneNumber: string) => Promise<{ success: boolean; simulated?: boolean; message?: string; debugCode?: string; error?: string }>;
+  verifyPhoneLoginOtp: (phoneNumber: string, accessToken: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<{ success: boolean; error?: string }>;
   resetPassword: (email: string) => Promise<{ success: boolean; message?: string; error?: string }>;
@@ -109,11 +116,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const token = localStorage.getItem('repiqr-token') || localStorage.getItem('namoqr-token');
 
-    // adminSignIn()'s local-only fallback (used when the Render API was NOT yet
-    // configured) stamps this exact id with role:'admin' and never obtains any
-    // token — no backend JWT. If that cached profile is still around now that
-    // the API IS configured, every apiClient call (Orders, Alerts, ...) will
-    // 401 forever since there was never a real token to restore. Force a clean
+    // Legacy guard: an older build's local-only admin fallback (removed — admin
+    // login is now OTP-only via verifyAdminPhoneOtp) used to stamp this exact id
+    // with role:'admin' and never obtain any token — no backend JWT. If that
+    // cached profile is still around from before this change, every apiClient
+    // call (Orders, Alerts, ...) will 401 forever since there was never a real
+    // token to restore. Force a clean
     // re-login instead of leaving a permanently-broken "logged in" state.
     if (!token && profile?.id === 'admin-101') {
       setProfile(null);
@@ -191,8 +199,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Standard login: assigns role = 'user' for everyone EXCEPT the designated admin
-  // email, which unlocks the Admin Fleet Dashboard. Admin access can also be gained
-  // through adminSignIn() in the AdminAuthModal (secret /admin route).
+  // email, which unlocks the Admin Fleet Dashboard. Admin access is otherwise gated
+  // behind verifyAdminPhoneOtp() in AdminAuthModal (secret /admin route).
   const signIn = async (identifier: string, password?: string) => {
     try {
       const cleanId = identifier.trim();
@@ -236,68 +244,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Dedicated Admin Panel login: validated purely against configured admin credentials
-  // (never against a regular user's account), so admin access can only ever be gained
-  // here — not through the normal signup/signin flow.
-  const adminSignIn = async (email: string, password: string) => {
+  // Dedicated Admin Panel login (/admin route): OTP-only, restricted server-side
+  // to the single ADMIN_PHONE number in Server/.env — never against a regular
+  // user's account or a password, so admin access can only ever be gained here.
+  // Requires the Express backend; there is no local-only demo fallback for this
+  // one, since a fake "admin" bypass in dev defeats the point of the number gate.
+  const sendAdminPhoneOtp = async (phoneNumber: string) => {
+    if (!isApiBackendConfigured) {
+      return { success: false, error: 'Admin login requires the backend to be configured.' };
+    }
     try {
-      const cleanEmail = email.trim().toLowerCase();
-      const cleanPassword = password.trim();
-
-      // Validate email format
-      if (!cleanEmail.includes('@')) {
-        return { success: false, error: 'Invalid admin email address.' };
-      }
-
-      // Backend-first: validated server-side against Server/.env ADMIN_EMAIL/ADMIN_PASSWORD.
-      if (isApiBackendConfigured) {
-        try {
-          const res = await apiClient.auth.adminSignIn(cleanEmail, cleanPassword);
-          if (!res?.user || !res?.token) {
-            return { success: false, error: 'Admin authentication failed.' };
-          }
-          const p = backendUserToProfile(res.user);
-          p.role = 'admin';
-          localStorage.setItem('repiqr-token', res.token);
-          localStorage.setItem('namoqr-token', res.token);
-          setProfile(p);
-          localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
-          localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
-          return { success: true };
-        } catch (err: any) {
-          return { success: false, error: err.message || 'Invalid admin credentials.' };
-        }
-      }
-
-      // No Express backend configured (e.g. local Vite-only dev): validate against
-      // VITE_ADMIN_EMAIL / VITE_ADMIN_PASSWORD instead. Note these are bundled into the
-      // client JS and are not secret in that build — the backend path above is authoritative.
-      const envAdminEmail = (import.meta.env.VITE_ADMIN_EMAIL as string | undefined)?.trim() || 'worthitellp@gmail.com';
-      const envAdminPassword = (import.meta.env.VITE_ADMIN_PASSWORD as string | undefined)?.trim();
-
-      if (envAdminEmail && envAdminPassword) {
-        if (cleanEmail !== envAdminEmail.toLowerCase() || cleanPassword !== envAdminPassword) {
-          return { success: false, error: 'Invalid admin credentials.' };
-        }
-      } else if (cleanPassword.length < 4) {
-        // No admin credentials configured anywhere — lenient local-only fallback.
-        return { success: false, error: 'Invalid admin password.' };
-      }
-
-      const adminUser: UserProfileData = {
-        id: 'admin-101',
-        email: cleanEmail,
-        fullName: 'System Fleet Admin',
-        role: 'admin',
-        subscriptionPlan: 'enterprise',
-        isSubscribed: true,
-      };
-      setProfile(adminUser);
-      localStorage.setItem('repiqr-auth-user', JSON.stringify(adminUser));
-      localStorage.setItem('namoqr-auth-user', JSON.stringify(adminUser));
+      await apiClient.auth.sendAdminPhoneOtp(phoneNumber.trim());
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Admin authentication failed.' };
+      return { success: false, error: err.message || 'Failed to send verification code.' };
+    }
+  };
+
+  // `accessToken` comes from the MSG91 OTP Widget's verifyOtp() (src/lib/msg91Widget.ts) —
+  // the widget runs the actual code exchange with MSG91; this hands the resulting
+  // token to the backend, which re-verifies it and confirms it verified ADMIN_PHONE.
+  const verifyAdminPhoneOtp = async (phoneNumber: string, accessToken: string) => {
+    if (!isApiBackendConfigured) {
+      return { success: false, error: 'Admin login requires the backend to be configured.' };
+    }
+    try {
+      const res = await apiClient.auth.verifyAdminPhoneOtp(phoneNumber.trim(), accessToken);
+      if (!res?.user || !res?.token) {
+        return { success: false, error: 'Admin authentication failed.' };
+      }
+      const p = backendUserToProfile(res.user);
+      p.role = 'admin';
+      localStorage.setItem('repiqr-token', res.token);
+      localStorage.setItem('namoqr-token', res.token);
+      setProfile(p);
+      localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
+      localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Invalid or expired verification code.' };
     }
   };
 
@@ -522,6 +507,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Passwordless phone login — step 1
+  const sendPhoneLoginOtp = async (phoneNumber: string) => {
+    const cleanPhone = phoneNumber.trim();
+    localStorage.setItem('repiqr-pending-phone-login', cleanPhone);
+    if (!isApiBackendConfigured) {
+      return { success: true, simulated: true };
+    }
+    try {
+      const res = await apiClient.auth.sendPhoneLoginOtp(cleanPhone);
+      return { success: true, simulated: res.simulated, message: res.message, debugCode: res.debugCode };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to send OTP to phone.' };
+    }
+  };
+
+  // Passwordless phone login — step 2: verify OTP and log in / create user.
+  // `accessToken` comes from the MSG91 OTP Widget's verifyOtp() (src/lib/msg91Widget.ts) —
+  // the widget runs the actual code exchange with MSG91; this hands the resulting
+  // token to the backend to confirm and finalize.
+  const verifyPhoneLoginOtp = async (phoneNumber: string, accessToken: string) => {
+    const cleanPhone = phoneNumber.trim();
+    if (!isApiBackendConfigured) {
+      const demoUser: UserProfileData = {
+        id: 'user-' + Date.now(),
+        email: `${cleanPhone.replace(/[^0-9]/g, '')}@repiqr.local`,
+        fullName: `User ${cleanPhone.slice(-4)}`,
+        phoneNumber: cleanPhone,
+        role: 'user',
+        subscriptionPlan: 'free',
+        isPhoneVerified: true,
+      };
+      setProfile(demoUser);
+      localStorage.setItem('repiqr-auth-user', JSON.stringify(demoUser));
+      localStorage.setItem('namoqr-auth-user', JSON.stringify(demoUser));
+      localStorage.setItem('rapiqr-phone-number-filled', 'true');
+      localStorage.setItem('rapiqr-phone-asked-once', 'true');
+      return { success: true };
+    }
+
+    try {
+      const res = await apiClient.auth.verifyPhoneLoginOtp(cleanPhone, accessToken);
+      if (res?.token) {
+        localStorage.setItem('repiqr-token', res.token);
+        localStorage.setItem('namoqr-token', res.token);
+      }
+      if (res?.user) {
+        const userProfile = backendUserToProfile(res.user);
+        userProfile.isPhoneVerified = true;
+        setProfile(userProfile);
+        localStorage.setItem('repiqr-auth-user', JSON.stringify(userProfile));
+        localStorage.setItem('namoqr-auth-user', JSON.stringify(userProfile));
+        localStorage.setItem('rapiqr-phone-number-filled', 'true');
+        localStorage.setItem('rapiqr-phone-asked-once', 'true');
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Verification failed.' };
+    }
+  };
+
   // Used only as demo fallback when explicitly triggered — ALWAYS a regular user.
   const demoLogin = () => {
     const demoUser: UserProfileData = {
@@ -656,7 +701,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isLoggedIn = Boolean(profile);
-  // isAdmin is purely role-based — only adminSignIn() produces role='admin'
+  // isAdmin is purely role-based — verifyAdminPhoneOtp() is the dedicated way to obtain role='admin'
   const isAdmin = profile?.role === 'admin';
 
   return (
@@ -668,10 +713,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAdmin,
         signUp,
         signIn,
-        adminSignIn,
+        sendAdminPhoneOtp,
+        verifyAdminPhoneOtp,
         signInWithGoogle,
         sendEmailOtp,
         verifyEmailOtp,
+        sendPhoneLoginOtp,
+        verifyPhoneLoginOtp,
         updatePhoneNumber,
         sendPhoneOtp,
         verifyPhoneOtp,

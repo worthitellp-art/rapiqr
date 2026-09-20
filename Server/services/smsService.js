@@ -13,7 +13,7 @@ const MessageModel = require('../models/messageModel');
 // While validating live delivery, only these event types are allowed to hit
 // external networks. Override with SMS_LIVE_EVENTS / WHATSAPP_LIVE_EVENTS in Server/.env (comma-separated).
 const LIVE_SMS_EVENTS = new Set(
-  (process.env.SMS_LIVE_EVENTS || 'CHAT_START_SMS,ALERT_SMS,ALERT_SMS_CONTACT,PHONE_VERIFY_SMS,ACTIVATION_OTP_SMS')
+  (process.env.SMS_LIVE_EVENTS || 'CHAT_START_SMS,ALERT_SMS,ALERT_SMS_CONTACT,PHONE_VERIFY_SMS,ACTIVATION_OTP_SMS,SMS_OTP,PHONE_LOGIN_OTP')
     .split(',')
     .map((e) => e.trim())
     .filter(Boolean)
@@ -23,7 +23,7 @@ const LIVE_WHATSAPP_EVENTS = new Set(
   (
     process.env.WHATSAPP_LIVE_EVENTS ||
     process.env.SMS_LIVE_EVENTS ||
-    'CHAT_START_WHATSAPP,ALERT_WHATSAPP,ALERT_WHATSAPP_CONTACT,PHONE_VERIFY_WHATSAPP,ACTIVATION_OTP_WHATSAPP,WHATSAPP_SEND'
+    'CHAT_START_WHATSAPP,ALERT_WHATSAPP,ALERT_WHATSAPP_CONTACT,PHONE_VERIFY_WHATSAPP,ACTIVATION_OTP_WHATSAPP,WHATSAPP_SEND,PASSWORD_RESET_WHATSAPP,PHONE_LOGIN_OTP'
   )
     .split(',')
     .map((e) => e.trim())

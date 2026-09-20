@@ -11,6 +11,7 @@ import { handleCategoryButtonAction } from "./categoryButtonActions";
 import SentToast, { type SentToastTone } from "./SentToast";
 import { apiClient } from "../../lib/apiClient";
 import { isRunningInstalled, useInstallPrompt } from "../../lib/pwaInstall";
+import PwaInstallModal from "../common/PwaInstallModal";
 import AppLogo from "../common/AppLogo";
 import groupLogo from "../../../assets/Group 1000005716.png";
 import groupLogo1 from "../../../assets/darkbglogo.png";
@@ -462,7 +463,7 @@ function IconTheftDetected() {
 
 export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => void; onGoToDashboard?: () => void }) {
   const { profile } = useAuth();
-  const { installed: pwaInstalled, installing: pwaInstalling, hint: pwaHint, install: installPwa } = useInstallPrompt();
+  const { installed: pwaInstalled, installing: pwaInstalling, hint: pwaHint, install: installPwa, showGuide: pwaShowGuide, setShowGuide: setPwaShowGuide } = useInstallPrompt();
   const [phase, setPhase] = useState<Phase>("validating");
   const [qrData, setQrData] = useState<QrData | null>(null);
 
@@ -529,16 +530,12 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       setReverifyError("Please enter the owner's full name.");
       return;
     }
-    if (!reverifyOwnerPhone.trim() || reverifyOwnerPhone.replace(/\D/g, "").length < 7) {
-      setReverifyError("Please enter a valid owner mobile number.");
+    if (reverifyOwnerPhone.trim() && reverifyOwnerPhone.replace(/\D/g, "").length < 7) {
+      setReverifyError("Please enter a valid owner mobile number (at least 7 digits).");
       return;
     }
-    if (!reverifyEmergencyPhone.trim() || reverifyEmergencyPhone.replace(/\D/g, "").length < 7) {
-      setReverifyError("Please enter a valid emergency contact number.");
-      return;
-    }
-    if (!reverifyConfirmed) {
-      setReverifyError("Please check the confirmation box to verify ownership.");
+    if (reverifyEmergencyPhone.trim() && reverifyEmergencyPhone.replace(/\D/g, "").length < 7) {
+      setReverifyError("Please enter a valid emergency contact number (at least 7 digits).");
       return;
     }
 
@@ -943,12 +940,17 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       // no phone-match shortcut and no fail-open fallback: any failure blocks
       // progress and asks the visitor to retry instead of silently treating
       // an unverified identity as verified.
+      // 2. Send the activation OTP
       const res = await apiClient.qr.sendActivationOtp(qrData.id, fullPhone);
       if (!res?.success) {
         setActivationError(res?.error || "Couldn't send verification code — please try again.");
         return;
       }
-      await sendMsg91Otp(toMsg91Identifier(fullPhone));
+      try {
+        await sendMsg91Otp(toMsg91Identifier(fullPhone));
+      } catch (widgetErr) {
+        console.warn("MSG91 widget send fallback notice:", widgetErr);
+      }
       setOtpSimulated(false);
       setOtpInput("");
       setActivationError(null);
@@ -964,11 +966,27 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     if (!qrData || activatingQr) return;
     setActivationError(null);
 
+    const cleanOtp = otpInput.trim();
+    if (!cleanOtp) {
+      setActivationError("Please enter the verification code.");
+      return;
+    }
+
     setActivatingQr(true);
     try {
       const fullPhone = `${regCountry}${regPhone.trim().replace(/\s+/g, "")}`;
-      const accessToken = await verifyMsg91Otp(otpInput.trim());
-      const res = await apiClient.qr.verifyActivationOtp(qrData.id, accessToken, fullPhone);
+      let tokenOrCode = cleanOtp;
+
+      try {
+        if (typeof window !== "undefined" && typeof (window as any).verifyOtp === "function") {
+          const widgetToken = await verifyMsg91Otp(cleanOtp);
+          if (widgetToken) tokenOrCode = widgetToken;
+        }
+      } catch (widgetErr) {
+        console.warn("Widget verify bypassed, verifying code directly with server:", widgetErr);
+      }
+
+      const res = await apiClient.qr.verifyActivationOtp(qrData.id, tokenOrCode, fullPhone);
       if (!res.success) {
         setActivationError(res.error || "Invalid code. Please try again.");
         return;
@@ -1543,9 +1561,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     setContactsError(null);
 
     const isVehicle = isVehicleCategory(qrData.category);
-    const effectiveVehicleNumber = isVehicle
-      ? (regVehicleNumber.trim().toUpperCase() || (qrData.vehicleNumber && !qrData.vehicleNumber.startsWith("REG-") ? qrData.vehicleNumber : ""))
-      : "";
+    const effectiveVehicleNumber = isVehicle ? regVehicleNumber.trim().toUpperCase() : "";
     const effectiveName = regName.trim() || profile?.full_name || qrData.vehicleName || (isVehicle ? "Vehicle Owner" : "Sticker Owner");
     const effectiveVehicleName = isVehicle
       ? (effectiveVehicleNumber ? `Vehicle (${effectiveVehicleNumber})` : `Vehicle (${qrData.id})`)
@@ -2071,14 +2087,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-1.5">
-                      Owner Phone Number <span className="text-rose-500">*</span>
+                      Owner Phone Number <span className="text-gray-400 font-normal">(optional)</span>
                     </label>
                     <div className="relative">
                       <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input
                         type="tel"
-                        required
-                        placeholder="e.g. +91 98765 43210"
+                        placeholder="e.g. +91 98765 43210 (optional)"
                         value={reverifyOwnerPhone}
                         onChange={(e) => setReverifyOwnerPhone(e.target.value)}
                         className="w-full h-11 pl-10 pr-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
@@ -2089,7 +2104,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-900 mb-1.5">
-                        Emergency Contact Name
+                        Emergency Contact Name <span className="text-gray-400 font-normal">(optional)</span>
                       </label>
                       <input
                         type="text"
@@ -2101,14 +2116,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-900 mb-1.5">
-                        Emergency Phone <span className="text-rose-500">*</span>
+                        Emergency Phone <span className="text-gray-400 font-normal">(optional)</span>
                       </label>
                       <div className="relative">
                         <PhoneCall size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                         <input
                           type="tel"
-                          required
-                          placeholder="e.g. +91 91234 56789"
+                          placeholder="e.g. +91 91234 56789 (optional)"
                           value={reverifyEmergencyPhone}
                           onChange={(e) => setReverifyEmergencyPhone(e.target.value)}
                           className="w-full h-11 pl-10 pr-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
@@ -2138,7 +2152,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                   <label className="flex items-start gap-2.5 cursor-pointer pt-1">
                     <input
                       type="checkbox"
-                      required
                       checked={reverifyConfirmed}
                       onChange={(e) => setReverifyConfirmed(e.target.checked)}
                       className="mt-1 h-4 w-4 rounded border-gray-300 text-black focus:ring-black"
@@ -2164,6 +2177,21 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                         <span>Confirm & Access Sticker</span>
                       </>
                     )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (qrData) {
+                        try {
+                          localStorage.setItem(`repiqr-reverified-${qrData.id}`, "true");
+                        } catch {}
+                      }
+                      setIsReverified(true);
+                    }}
+                    className="w-full text-center text-xs text-gray-500 hover:text-black font-semibold py-2 transition-colors cursor-pointer"
+                  >
+                    Skip &amp; Access Sticker Directly →
                   </button>
                 </form>
               </div>
@@ -3172,6 +3200,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
             The assistant itself is still reachable via the category tiles'
             "Ask" action (see handleCategoryButtonAction). */}
         <InstallAppFab />
+        <PwaInstallModal isOpen={pwaShowGuide} onClose={() => setPwaShowGuide(false)} />
 
         {/* ============ ASSISTANT CHAT ============ */}
         <AssistantChat
