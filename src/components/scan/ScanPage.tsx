@@ -823,6 +823,17 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   // Activation country (limited list with dial codes)
   const [regCountry, setRegCountry] = useState("+91");
 
+  // Convenience only, not a verification shortcut: a signed-in visitor whose
+  // phone is already verified account-wide still has to OTP-verify before
+  // THIS tag activates (see handleSendOtp/handleVerifyOtpAndActivate) — this
+  // just saves them re-typing a name and number we already know.
+  useEffect(() => {
+    if (!regName && !regPhone && profile?.isPhoneVerified && profile?.phoneNumber) {
+      if (profile.fullName) setRegName(profile.fullName);
+      setRegPhone(profile.phoneNumber.replace(/\D/g, "").slice(-10));
+    }
+  }, [profile, regName, regPhone]);
+
   // AI Chat Assistant — the conversation itself lives in <AssistantChat/>, which
   // seeds its greeting and suggested questions from the scanned tag's category.
   const [aiChatOpen, setAiChatOpen] = useState(false);

@@ -25,6 +25,7 @@ const phoneOtpVerifyLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, mes
 const adminPhoneOtpSendLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, message: 'Too many code requests, please try again later.' });
 const adminPhoneOtpVerifyLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many attempts, please try again later.' });
 
+router.get('/msg91-widget-config', AuthController.getMsg91WidgetConfig);
 router.post('/phone-login/send', phoneOtpSendLimiter, AuthController.sendPhoneLoginOtp);
 router.post('/phone-login/verify', phoneOtpVerifyLimiter, AuthController.verifyPhoneLoginOtp);
 router.post('/admin-phone-login/send', adminPhoneOtpSendLimiter, AuthController.sendAdminPhoneOtp);

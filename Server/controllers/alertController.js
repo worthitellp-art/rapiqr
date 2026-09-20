@@ -103,8 +103,12 @@ class AlertController {
         // Now a WhatsApp button's dynamic URL suffix rather than body text (see
         // msg91Templates.js QR_SCAN_ALERT / LOCATION_SHARED `buttons`), so only
         // the session id itself travels through — the static base URL lives in
-        // the approved template.
-        const dashboardButtonValue = chatSessionId || '';
+        // the approved template. Meta rejects an empty text parameter on a
+        // dynamic URL button outright, which silently failed the WHOLE WhatsApp
+        // send for any alert with no chat session (e.g. a quick-issue alert with
+        // no attached chat) — 'inbox' keeps the button parameter non-empty; the
+        // frontend doesn't currently read this suffix to select a thread anyway.
+        const dashboardButtonValue = chatSessionId || 'inbox';
 
         // Send WhatsApp alert to the owner using the approved Meta templates
         if (ownerPhone) {

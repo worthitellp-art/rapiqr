@@ -39,8 +39,31 @@ declare global {
   }
 }
 
-const WIDGET_ID = (import.meta.env.VITE_MSG91_WIDGET_ID as string | undefined)?.trim() || '';
-const TOKEN_AUTH = (import.meta.env.VITE_MSG91_WIDGET_TOKEN_AUTH as string | undefined)?.trim() || '';
+import { API_BASE_URL } from './apiClient';
+
+let cachedWidgetId = (import.meta.env.VITE_MSG91_WIDGET_ID as string | undefined)?.trim() || '';
+let cachedTokenAuth = (import.meta.env.VITE_MSG91_WIDGET_TOKEN_AUTH as string | undefined)?.trim() || '';
+
+export async function getWidgetConfig(): Promise<{ widgetId: string; tokenAuth: string }> {
+  if (cachedWidgetId && cachedTokenAuth) {
+    return { widgetId: cachedWidgetId, tokenAuth: cachedTokenAuth };
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/msg91-widget-config`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.widgetId && data?.tokenAuth) {
+        cachedWidgetId = String(data.widgetId).trim();
+        cachedTokenAuth = String(data.tokenAuth).trim();
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load MSG91 widget configuration from backend API:', err);
+  }
+
+  return { widgetId: cachedWidgetId, tokenAuth: cachedTokenAuth };
+}
 
 const SCRIPT_URLS = [
   'https://verify.msg91.com/otp-provider.js',
@@ -88,10 +111,12 @@ function waitForWidgetMethods(timeoutMs = 8000): Promise<void> {
 }
 
 /** Loads the widget script (once) and initializes it with exposeMethods so this app can drive it with its own UI instead of MSG91's default popup. */
-export function initMsg91Widget(): Promise<void> {
+export async function initMsg91Widget(): Promise<void> {
   if (initPromise) return initPromise;
 
-  if (!WIDGET_ID || !TOKEN_AUTH) {
+  const { widgetId, tokenAuth } = await getWidgetConfig();
+
+  if (!widgetId || !tokenAuth) {
     return Promise.reject(
       new Error('MSG91 widget is not configured — set VITE_MSG91_WIDGET_ID and VITE_MSG91_WIDGET_TOKEN_AUTH.')
     );
@@ -102,8 +127,8 @@ export function initMsg91Widget(): Promise<void> {
       throw new Error('MSG91 widget script loaded but initSendOTP is unavailable.');
     }
     window.initSendOTP({
-      widgetId: WIDGET_ID,
-      tokenAuth: TOKEN_AUTH,
+      widgetId,
+      tokenAuth,
       exposeMethods: true,
       success: () => {},
       failure: () => {},

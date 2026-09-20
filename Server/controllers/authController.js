@@ -41,6 +41,23 @@ const DUMMY_HASH = '$2a$10$CwTycUXWue0Thq9StjUM0uJ8Vp1G3XLxaR7dyx7NcgCkJ6RxYWMKa
 
 class AuthController {
   /**
+   * Public client configuration for the MSG91 OTP Widget.
+   * Enables frontend to retrieve widget credentials dynamically from
+   * backend environment variables (e.g. on Render) without a frontend rebuild.
+   */
+  static getMsg91WidgetConfig(req, res) {
+    const widgetId = (process.env.VITE_MSG91_WIDGET_ID || process.env.MSG91_WIDGET_ID || '').trim();
+    const tokenAuth = (process.env.VITE_MSG91_WIDGET_TOKEN_AUTH || process.env.MSG91_WIDGET_TOKEN_AUTH || '').trim();
+
+    return res.json({
+      success: true,
+      widgetId,
+      tokenAuth,
+      isConfigured: Boolean(widgetId && tokenAuth),
+    });
+  }
+
+  /**
    * User Registration (Sign Up)
    */
   static async signUp(req, res) {

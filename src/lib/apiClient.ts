@@ -11,7 +11,7 @@ const RAW_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').trim().re
  * that were set without the trailing /api suffix — otherwise every request
  * (e.g. admin-signin) hits a route-not-found 404.
  */
-const API_BASE_URL = (() => {
+export const API_BASE_URL = (() => {
   if (!RAW_API_BASE_URL || RAW_API_BASE_URL === '/') return '/api';
   if (RAW_API_BASE_URL.endsWith('/api')) return RAW_API_BASE_URL;
   return `${RAW_API_BASE_URL}/api`;

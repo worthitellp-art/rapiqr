@@ -299,7 +299,13 @@ function buildMsg91WhatsAppComponents({ variables = {}, components = {}, body = 
     for (const [key, val] of Object.entries(variables)) {
       if (key.startsWith('button_') || key.startsWith('header_')) {
         const parameterName = deriveParamName(key);
-        result[key] = { type: 'text', value: stripNewlines(val), ...(parameterName ? { parameter_name: parameterName } : {}) };
+        // Meta rejects a dynamic URL button whose text parameter is empty,
+        // which fails the ENTIRE WhatsApp send outright — not just that
+        // button. Every caller is expected to supply a real value, but this
+        // is the one place that failure mode can be caught before it ever
+        // reaches the API.
+        const safeVal = (val === undefined || val === null || String(val).trim() === '') ? 'na' : val;
+        result[key] = { type: 'text', value: stripNewlines(safeVal), ...(parameterName ? { parameter_name: parameterName } : {}) };
       } else {
         const formattedKey = key.startsWith('body_') ? key : `body_${key}`;
         const parameterName = deriveParamName(formattedKey);
