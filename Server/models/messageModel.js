@@ -1,4 +1,5 @@
 const SmsMessage = require('./schemas/SmsMessage');
+const { logger } = require('../middleware/loggerMiddleware');
 
 /**
  * Tracks every outbound SMS/WhatsApp send attempt (Twilio) so the admin
@@ -9,7 +10,12 @@ class MessageModel {
   /**
    * Best-effort insert — never throws, never awaited by the caller for
    * correctness (a tracking failure must not affect whether the SMS itself
-   * was sent).
+   * was sent). A dropped write here is silent-but-logged on purpose: a Mongo
+   * blip at the exact moment of this call previously made a message that
+   * genuinely sent (real MSG91 sid, no error) look like it never happened —
+   * the admin Message Manager showed nothing at all for it, not even
+   * "failed" — with no trace of why. logger.warn gives that a paper trail
+   * without making the actual send depend on this insert succeeding.
    */
   static async record({ channel, to, event, status, sid = null, error = null, body = null }) {
     try {
@@ -22,8 +28,8 @@ class MessageModel {
         error: error || null,
         body_preview: body ? String(body).slice(0, 160) : null,
       });
-    } catch {
-      // Non-blocking — tracking must never break a send.
+    } catch (err) {
+      logger.warn('DB_MESSAGE_LOG', `MessageModel.record failed to persist a "${status}" ${channel} log for ${to} (${event}) — the send itself was unaffected`, { error: err.message });
     }
   }
 
