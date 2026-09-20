@@ -1,8 +1,7 @@
 const QrModel = require('../models/qrModel');
 const { logger } = require('../middleware/loggerMiddleware');
 const { notifyContactsAdded, notifyOwner } = require('../services/notificationService');
-const { sendWhatsAppOtp, sendSmsOtp } = require('../services/smsService');
-const { createOtp, verifyOtp } = require('../services/phoneVerificationService');
+const { verifyOtp } = require('../services/phoneVerificationService');
 const { verifyMsg91WidgetAccessToken } = require('../services/msg91Client');
 
 class QrController {
@@ -193,73 +192,27 @@ class QrController {
 
   /**
    * Activation identity check — step 1: validate the phone the visitor is
-   * registering with. The actual OTP send now happens entirely in the browser
-   * via the MSG91 OTP Widget (see src/lib/msg91Widget.ts) — this endpoint is
-   * just the pre-flight format check. Public (no verifyToken) because
-   * activation happens before any account exists — anonymous like /activate
-   * itself.
-   */
-  /**
-   * Activation identity check — step 1: send OTP to phone via WhatsApp / SMS
+   * registering with. The actual OTP send happens entirely in the browser via
+   * the MSG91 OTP Widget (see src/lib/msg91Widget.ts) — this endpoint is just
+   * the pre-flight format check, so the widget stays the single source of
+   * truth for the code (previously this also minted and sent its own
+   * competing 6-digit code here, which left a pending local OTP that made
+   * verifyActivationOtp reject the widget's real access token below before
+   * ever reaching the widget-verification fallback).
+   * Public (no verifyToken) because activation happens before any account
+   * exists — anonymous like /activate itself.
    */
   static async sendActivationOtp(req, res) {
     try {
-      const { id } = req.params;
       const { phoneNumber } = req.body || {};
       const digits = String(phoneNumber || '').replace(/\D/g, '');
       if (!digits || digits.length < 7) {
         return res.status(400).json({ success: false, error: 'Enter a valid phone number.' });
       }
 
-      const fullPhone = String(phoneNumber).trim().startsWith('+') ? String(phoneNumber).trim() : `+${digits}`;
-      const otpKey = `activation_${id}`;
-      const code = createOtp(otpKey, fullPhone);
-
-      let dispatched = false;
-      let via = null;
-
-      try {
-        const waResult = await sendWhatsAppOtp({ to: fullPhone, code, event: 'ACTIVATION_OTP_WHATSAPP' });
-        if (waResult.sent) {
-          dispatched = true;
-          via = 'whatsapp';
-        } else {
-          logger.warn('QR_ACTIVATION_OTP', `WhatsApp OTP not delivered (${waResult.error || waResult.reason || 'simulated'}). Falling back to SMS.`);
-        }
-      } catch (waErr) {
-        logger.warn('QR_ACTIVATION_OTP', `WhatsApp OTP delivery failed: ${waErr.message}. Falling back to SMS.`);
-      }
-
-      if (!dispatched) {
-        try {
-          const smsResult = await sendSmsOtp({
-            to: fullPhone,
-            code,
-            body: `Your RapiQR activation code is ${code}.`,
-            event: 'ACTIVATION_OTP_SMS'
-          });
-          if (smsResult.sent) {
-            dispatched = true;
-            via = 'sms';
-          } else {
-            logger.error('QR_ACTIVATION_OTP', `SMS OTP delivery failed: ${smsResult.error || smsResult.reason || 'simulated'}`);
-          }
-        } catch (smsErr) {
-          logger.error('QR_ACTIVATION_OTP', `SMS OTP delivery also failed: ${smsErr.message}`);
-        }
-      }
-
-      const deliveryNote = dispatched ? ` via ${via}` : ' — NOT delivered (all channels simulated or failed)';
-      logger.info('QR_ACTIVATION_OTP', `OTP generated for QR ${id} phone ${fullPhone} (dispatched: ${dispatched}${deliveryNote})`);
-
-      return res.json({
-        success: true,
-        message: dispatched ? 'Verification code sent to your phone number.' : 'Verification code generated.',
-        delivered: dispatched,
-        ...(process.env.NODE_ENV === 'development' ? { debugCode: code } : {})
-      });
+      return res.json({ success: true, message: 'Phone number accepted.' });
     } catch (err) {
-      logger.error('QR_ACTIVATION_OTP', `Failed to send activation OTP for QR: ${req.params.id}`, err);
+      logger.error('QR_ACTIVATION_OTP', `Failed to validate activation phone for QR: ${req.params.id}`, err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

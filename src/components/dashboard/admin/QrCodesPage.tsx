@@ -1,21 +1,60 @@
-﻿import type React from "react";
+import type React from "react";
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Download, Trash2, RefreshCw, ChevronLeft, ChevronRight, Printer, Eye, EyeOff, Search, QrCode, Loader2, AlertTriangle } from "lucide-react";
+import {
+  Plus,
+  Download,
+  Trash2,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  Printer,
+  Eye,
+  EyeOff,
+  Search,
+  QrCode,
+  Loader2,
+  AlertTriangle,
+  LayoutGrid,
+  Table as TableIcon,
+  List,
+  Copy,
+  Check,
+  Phone,
+  Sparkles,
+  ExternalLink,
+  Shield,
+  Layers,
+  Activity,
+} from "lucide-react";
 import { QrRecord, Template, StickerPos } from "./types";
 import { qrFullUrl, fmtDate, dispatchActivationToUserDashboard, generateSheetBlobs } from "./helpers";
 import { apiClient } from "../../../lib/apiClient";
-import { STICKER_CATEGORIES, getCategoryLabel } from "../../../stickerModules";
+import { STICKER_CATEGORIES, getCategoryLabel, getCategoryIcon } from "../../../stickerModules";
 import QrRowActions from "./QrRowActions";
 import PrintSheetModal from "./PrintSheetModal";
 import GenerateTagModal from "./GenerateTagModal";
-import QrCodeImage from "./QrCodeImage";
+import StickerThumb from "./StickerThumb";
+import StickerMockupView from "./StickerMockupView";
+
+type ViewMode = "table" | "cards" | "compact";
 
 export default function QrCodesPage({
-  qrList, setQrList, templates, setToast, openQuickLook, openRestore, stickerPos, openPrintSheet, searchQuery,
+  qrList,
+  setQrList,
+  templates,
+  setToast,
+  openQuickLook,
+  openRestore,
+  stickerPos,
+  openPrintSheet,
+  searchQuery,
 }: {
-  qrList: QrRecord[]; setQrList: React.Dispatch<React.SetStateAction<QrRecord[]>>;
-  templates: Template[]; setToast: (msg: string | null) => void;
-  openQuickLook: (q: QrRecord) => void; openRestore: () => void;
+  qrList: QrRecord[];
+  setQrList: React.Dispatch<React.SetStateAction<QrRecord[]>>;
+  templates: Template[];
+  setToast: (msg: string | null) => void;
+  openQuickLook: (q: QrRecord) => void;
+  openRestore: () => void;
   stickerPos: StickerPos;
   openPrintSheet?: (targetSticker?: QrRecord, selectedBatchStickers?: QrRecord[]) => void;
   searchQuery: string;
@@ -28,7 +67,11 @@ export default function QrCodesPage({
   const [deleteTarget, setDeleteTarget] = useState<QrRecord | null>(null);
   const [clearAllOpen, setClearAllOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 25;
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [revealedCodes, setRevealedCodes] = useState(false);
+
+  const PAGE_SIZE = viewMode === "cards" ? 18 : 25;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [revealedRowIds, setRevealedRowIds] = useState<Set<string>>(new Set());
   const [sheetGenerating, setSheetGenerating] = useState(false);
@@ -36,41 +79,54 @@ export default function QrCodesPage({
   const [searchText, setSearchText] = useState(searchQuery);
   const [openActionMenu, setOpenActionMenu] = useState<string | null>(null);
 
-  // The desktop table and mobile card list used to both render for every row,
-  // merely CSS-hidden (`hidden lg:block` / `lg:hidden`) below the `lg` breakpoint.
-  // QrRowActions' "More actions" menu portals to document.body, which escapes
-  // that display:none ancestor entirely — so opening a row's menu made BOTH the
-  // desktop and mobile copies of that row's dropdown portal in at once, showing
-  // two overlapping popups. Rendering only the layout actually in view fixes it.
-  const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches
-  );
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
+    setSearchText(searchQuery);
+  }, [searchQuery]);
 
-  useEffect(() => { setSearchText(searchQuery); }, [searchQuery]);
+  // Metrics computation
+  const metrics = useMemo(() => {
+    const total = qrList.length;
+    let active = 0;
+    let totalScans = 0;
+    qrList.forEach((q) => {
+      const phone = q.ownerPhone || q.phoneNumber || (q as any).phone;
+      if (phone && phone.trim()) active += 1;
+      else if (q.status === "active") active += 1;
+      totalScans += q.scans || 0;
+    });
+    return {
+      total,
+      active,
+      pending: total - active,
+      scans: totalScans,
+    };
+  }, [qrList]);
 
+  // Filtered fleet list
   const filtered = useMemo(() => {
     let result = qrList.filter((q) => categoryFilter === "all" || (q.category || "car") === categoryFilter);
     if (searchText.trim()) {
       const needle = searchText.toLowerCase().trim();
-      result = result.filter((r) =>
-        (r.id || "").toLowerCase().includes(needle) ||
-        (r.ownerPhone || r.phoneNumber || (r as any).phone || "").toLowerCase().includes(needle) ||
-        (r.category || "").toLowerCase().includes(needle) ||
-        (r.clientId || "").toLowerCase().includes(needle)
+      result = result.filter(
+        (r) =>
+          (r.id || "").toLowerCase().includes(needle) ||
+          (r.ownerPhone || r.phoneNumber || (r as any).phone || "").toLowerCase().includes(needle) ||
+          (r.category || "").toLowerCase().includes(needle) ||
+          (r.clientId || "").toLowerCase().includes(needle) ||
+          (r.recoveryCode || "").toLowerCase().includes(needle)
       );
     }
     return result;
   }, [qrList, categoryFilter, searchText]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
-  useEffect(() => { setPage(1); }, [categoryFilter, searchText]);
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+  useEffect(() => {
+    setPage(1);
+  }, [categoryFilter, searchText, viewMode]);
+
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   useEffect(() => {
@@ -81,7 +137,9 @@ export default function QrCodesPage({
     });
   }, [qrList]);
 
-  useEffect(() => { setOpenActionMenu(null); }, [page, categoryFilter, searchText]);
+  useEffect(() => {
+    setOpenActionMenu(null);
+  }, [page, categoryFilter, searchText, viewMode]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -96,10 +154,12 @@ export default function QrCodesPage({
   function toggleSelected(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
+
   const allPageSelected = paginated.length > 0 && paginated.every((q) => selectedIds.has(q.id));
   function toggleSelectAllPage() {
     setSelectedIds((prev) => {
@@ -110,34 +170,36 @@ export default function QrCodesPage({
     });
   }
 
-  function toggleRowCodeVisibility(targetId: string) {
-    setRevealedRowIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(targetId)) next.delete(targetId); else next.add(targetId);
-      return next;
-    });
-  }
-  const areAllFilteredCodesRevealed = filtered.length > 0 && filtered.every((q) => revealedRowIds.has(q.id));
-  function toggleAllFilteredCodesVisibility() {
-    setRevealedRowIds((prev) => {
-      const next = new Set(prev);
-      if (areAllFilteredCodesRevealed) filtered.forEach((q) => next.delete(q.id));
-      else filtered.forEach((q) => next.add(q.id));
-      return next;
-    });
+  function handleCopyId(id: string) {
+    navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setToast(`Copied ${id} to clipboard`);
+    setTimeout(() => {
+      setCopiedId(null);
+      setToast(null);
+    }, 2000);
   }
 
   const [isLocalPrintModalOpen, setIsLocalPrintModalOpen] = useState(false);
   const [localPrintTargetSticker, setLocalPrintTargetSticker] = useState<QrRecord | null>(null);
+  const [localPrintBatch, setLocalPrintBatch] = useState<QrRecord[] | undefined>(undefined);
+
   function handleTriggerPrintSheet(targetSticker?: QrRecord, selectedBatchStickers?: QrRecord[]) {
-    if (openPrintSheet) { openPrintSheet(targetSticker, selectedBatchStickers); return; }
+    if (openPrintSheet) {
+      openPrintSheet(targetSticker, selectedBatchStickers);
+      return;
+    }
     setLocalPrintTargetSticker(targetSticker || null);
+    setLocalPrintBatch(selectedBatchStickers);
     setIsLocalPrintModalOpen(true);
   }
 
   async function handlePrintSheet() {
     const selected = filtered.filter((q) => selectedIds.has(q.id));
-    if (selected.length === 0) { handleTriggerPrintSheet(filtered[0]); return; }
+    if (selected.length === 0) {
+      handleTriggerPrintSheet(filtered[0], filtered);
+      return;
+    }
     if (sheetGenerating) return;
     setSheetGenerating(true);
     try {
@@ -150,7 +212,11 @@ export default function QrCodesPage({
         a.click();
         URL.revokeObjectURL(a.href);
       });
-      setToast(`Generated ${blobs.length} print sheet${blobs.length > 1 ? "s" : ""} for ${selected.length} sticker${selected.length > 1 ? "s" : ""}`);
+      setToast(
+        `Generated ${blobs.length} print sheet${blobs.length > 1 ? "s" : ""} for ${selected.length} sticker${
+          selected.length > 1 ? "s" : ""
+        }`
+      );
     } catch (err) {
       console.error("Failed to generate print sheet:", err);
       setToast("Failed to generate print sheet — please try again");
@@ -160,7 +226,6 @@ export default function QrCodesPage({
     }
   }
 
-  /** Maps the id-scheme v2 server response (QrModel.saveV2) into a QrRecord. */
   function recordFromV2Response(data: any, fallbackCategory: string): QrRecord {
     return {
       id: data.id,
@@ -181,15 +246,10 @@ export default function QrCodesPage({
     const count = Math.min(Math.max(1, bulkCount), 200);
     setBulkProgress(0);
 
-    // Each tag only enters the fleet list (and only gets a "pending
-    // activation" entry dispatched) once the server confirms it was actually
-    // persisted — id-scheme v2 also means the id itself isn't known until
-    // that response arrives (see QrModel.saveV2), so there's nothing to
-    // optimistically prepend beforehand the way v1's client-generated ids
-    // used to allow.
     const recoveryRows: [string, string][] = [];
     let failedCount = 0;
-    const CHUNK = 50;
+    const CHUNK = 20;
+
     for (let i = 0; i < count; i++) {
       try {
         const res = await apiClient.qr.saveQrCodeV2({ category: selectedCategory });
@@ -211,7 +271,9 @@ export default function QrCodesPage({
 
     const savedCount = count - failedCount;
     if (failedCount > 0) {
-      setToast(`${savedCount} of ${count} QR codes generated — ${failedCount} failed to save and were not created. Try again for the rest.`);
+      setToast(
+        `${savedCount} of ${count} QR codes generated — ${failedCount} failed to save. Try again for the rest.`
+      );
     } else if (recoveryRows.length > 0) {
       downloadRecoveryCodesCsv(recoveryRows);
       setToast(`${count} QR codes generated — recovery codes downloaded, keep them safe`);
@@ -245,370 +307,708 @@ export default function QrCodesPage({
     const blob = new Blob([csv], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "tagyard-fleet-export.csv";
+    a.download = "rapiqr-fleet-export.csv";
     a.click();
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-14" style={{ background: "var(--fx-canvas)" }}>
-      {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="mb-5">
-        <h1 className="font-semibold tracking-[-0.02em]" style={{ fontSize: 28, lineHeight: 1.15 }}>
-          Tag generator
-        </h1>
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 pb-16 space-y-6 text-gray-900 font-body bg-[#F8FAFC] min-h-screen">
+      {/* ── Page Header & Fleet Metrics Bar ────────────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold font-display text-gray-900 tracking-tight">QR Code Fleet Management</h1>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              {metrics.total} Stickers
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">
+            Generate, print, and monitor scannable smart asset stickers across all categories.
+          </p>
+        </div>
+
+        {/* Fleet Quick Stats */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 flex items-center gap-2.5 shadow-xs">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+            <div className="text-left">
+              <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">Active</span>
+              <span className="text-xs font-extrabold text-gray-800">{metrics.active}</span>
+            </div>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 flex items-center gap-2.5 shadow-xs">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+            <div className="text-left">
+              <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">Pending</span>
+              <span className="text-xs font-extrabold text-gray-800">{metrics.pending}</span>
+            </div>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 flex items-center gap-2.5 shadow-xs">
+            <Activity size={14} className="text-indigo-600" />
+            <div className="text-left">
+              <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">Scans</span>
+              <span className="text-xs font-extrabold text-gray-800">{metrics.scans}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* ── Generator Toolbar ─────────────────────────────────── */}
-      <div className="fx-toolbar" style={{ marginBottom: 22 }}>
-        <div className="fx-toolbar-field">
-          <span className="fx-toolbar-label">Mode</span>
-          <div className="fx-seg">
-            <button type="button" className={tab === "single" ? "fx-seg-active" : ""} onClick={() => setTab("single")}>Single tag</button>
-            <button type="button" className={tab === "bulk" ? "fx-seg-active" : ""} onClick={() => setTab("bulk")}>Bulk sheet</button>
+      {/* ── Generator Console Card (Classic Clean Style) ───────────────────────────────── */}
+      <div className="bg-white border border-gray-200 rounded-2xl shadow-xs p-5 sm:p-6 transition-all">
+        <div className="flex flex-wrap items-end gap-4 sm:gap-6">
+          {/* Mode Switcher */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Generation Mode</label>
+            <div className="inline-flex bg-gray-100 p-1 rounded-xl border border-gray-200">
+              <button
+                type="button"
+                onClick={() => setTab("single")}
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  tab === "single" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-900"
+                }`}
+              >
+                Single Tag
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("bulk")}
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  tab === "bulk" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-900"
+                }`}
+              >
+                Bulk Sheet
+              </button>
+            </div>
+          </div>
+
+          {/* Category Dropdown */}
+          <div className="flex-1 min-w-[200px] flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Sticker Category</label>
+            <div className="relative">
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full pl-3 pr-8 py-2 text-xs font-semibold rounded-xl border border-gray-300 bg-white text-gray-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20 transition-all cursor-pointer"
+              >
+                {STICKER_CATEGORIES.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Bulk Quantity Input */}
+          {tab === "bulk" && (
+            <div className="w-[120px] flex flex-col gap-1.5">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Quantity</label>
+              <input
+                type="number"
+                min={1}
+                max={200}
+                value={bulkCount}
+                onChange={(e) => setBulkCount(parseInt(e.target.value, 10) || 1)}
+                className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20"
+              />
+            </div>
+          )}
+
+          {/* Action CTA */}
+          <div className="ml-auto sm:ml-0">
+            {tab === "single" ? (
+              <button
+                type="button"
+                onClick={() => setGenerateModalOpen(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 active:scale-95 transition-all shadow-xs cursor-pointer"
+              >
+                <Plus size={15} strokeWidth={2.4} />
+                <span>Generate Tag</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => doGenerateBulk()}
+                disabled={bulkProgress !== null}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 active:scale-95 disabled:opacity-50 transition-all shadow-xs cursor-pointer"
+              >
+                {bulkProgress !== null ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <Sparkles size={15} strokeWidth={2.4} />
+                )}
+                <span>Generate {bulkCount} Tags</span>
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="fx-toolbar-field" style={{ minWidth: 190 }}>
-          <span className="fx-toolbar-label">Sticker category</span>
-          <select className="fx-select" style={{ width: 190 }} value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
-            {STICKER_CATEGORIES.map((cat) => (
-              <option key={cat.value} value={cat.value}>{cat.label}</option>
-            ))}
-          </select>
-        </div>
-
-        {tab === "bulk" && (
-          <div className="fx-toolbar-field" style={{ width: 110 }}>
-            <span className="fx-toolbar-label">Count</span>
-            <input
-              type="number" min={1} max={200}
-              className="fx-input"
-              style={{ width: 110 }}
-              value={bulkCount}
-              onChange={(e) => setBulkCount(parseInt(e.target.value, 10) || 1)}
-            />
+        {/* Bulk Progress Bar */}
+        {bulkProgress !== null && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+              <div
+                className="h-full bg-indigo-600 transition-all duration-200"
+                style={{ width: `${bulkProgress}%` }}
+              />
+            </div>
+            <div className="flex justify-between items-center text-[11px] text-gray-500 font-semibold mt-1.5">
+              <span>Generating stickers and storing recovery records...</span>
+              <span className="font-mono text-indigo-600">{bulkProgress}%</span>
+            </div>
           </div>
         )}
-
-        <div className="fx-toolbar-field" style={{ marginLeft: "auto" }}>
-          {tab === "single" ? (
-            <button className="fx-btn fx-btn-primary" onClick={() => setGenerateModalOpen(true)}>
-              <Plus size={15} strokeWidth={2.4} /> Generate tag
-            </button>
-          ) : (
-            <button className="fx-btn fx-btn-primary" disabled={bulkProgress !== null} onClick={() => doGenerateBulk()}>
-              {bulkProgress !== null ? <Loader2 size={15} className="fx-spin-inline" /> : <Plus size={15} strokeWidth={2.4} />}
-              Generate {bulkCount}
-            </button>
-          )}
-        </div>
       </div>
-      <style>{`.fx-spin-inline { animation: fx-spin-inline .8s linear infinite; } @keyframes fx-spin-inline { to { transform: rotate(360deg); } }`}</style>
 
-      {/* ── Bulk Progress ─────────────────────────────────────── */}
-      {bulkProgress !== null && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-          <div style={{ flex: 1, height: 6, borderRadius: 999, background: "var(--fx-border)", overflow: "hidden" }}>
-            <div style={{ height: "100%", background: "var(--fx-accent)", transition: "width .25s ease", width: `${bulkProgress}%` }} />
-          </div>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fx-ink-2)", whiteSpace: "nowrap" }}>{bulkProgress}% synced</span>
-        </div>
-      )}
-
-      {/* ── Table Toolbar ─────────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em" }}>All tags</h2>
-          <span style={{ fontSize: 13, color: "var(--fx-ink-2)" }}>{filtered.length}</span>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <div style={{ position: "relative" }}>
-            <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--fx-faint)" }} />
+      {/* ── Toolbar: Search, Filters, View Modes & Bulk Actions ───────────────────────── */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        {/* Left Side: Search & Filter */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="relative min-w-[220px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
-              type="text" className="fx-input" placeholder="Search ID or phone…"
-              style={{ width: 200, paddingLeft: 30 }}
+              type="text"
+              placeholder="Search sticker ID, phone..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-gray-300 bg-white text-gray-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20 shadow-2xs"
             />
           </div>
 
-          <select className="fx-select" style={{ width: 150 }} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-            <option value="all">All categories</option>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="px-3 py-2 text-xs font-semibold rounded-xl border border-gray-300 bg-white text-gray-700 outline-none cursor-pointer focus:border-indigo-600 shadow-2xs"
+          >
+            <option value="all">All Categories ({qrList.length})</option>
             {STICKER_CATEGORIES.map((cat) => (
-              <option key={cat.value} value={cat.value}>{cat.label}</option>
+              <option key={cat.value} value={cat.value}>
+                {cat.label}
+              </option>
             ))}
           </select>
+        </div>
 
-          <button className="fx-btn fx-btn-secondary fx-btn-sm" onClick={openRestore} title="Restore a deleted sticker by recovery code">
-            <RefreshCw size={13} /> Restore
-          </button>
-          <button className="fx-btn fx-btn-secondary fx-btn-sm" onClick={toggleAllFilteredCodesVisibility} title="Show or hide recovery codes">
-            {areAllFilteredCodesRevealed ? <EyeOff size={13} /> : <Eye size={13} />} See codes
-          </button>
+        {/* Right Side: View Mode Switcher + Action Buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* View Mode Toggle: Table, Cards, Compact */}
+          <div className="inline-flex bg-gray-200/80 p-0.5 rounded-xl border border-gray-200 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                viewMode === "table" ? "bg-white text-indigo-600 shadow-xs" : "text-gray-600 hover:text-gray-900"
+              }`}
+              title="Table View"
+            >
+              <TableIcon size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("cards")}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                viewMode === "cards" ? "bg-white text-indigo-600 shadow-xs" : "text-gray-600 hover:text-gray-900"
+              }`}
+              title="Sticker Cards View (Visual Previews)"
+            >
+              <LayoutGrid size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("compact")}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                viewMode === "compact" ? "bg-white text-indigo-600 shadow-xs" : "text-gray-600 hover:text-gray-900"
+              }`}
+              title="Compact List View"
+            >
+              <List size={14} />
+            </button>
+          </div>
+
           <button
-            className="fx-btn fx-btn-secondary fx-btn-sm" onClick={handlePrintSheet}
-            disabled={filtered.length === 0 || sheetGenerating} title="Print selected stickers as a sheet"
+            type="button"
+            onClick={openRestore}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+            title="Restore a deleted sticker with recovery code"
           >
-            <Printer size={13} /> {sheetGenerating ? "Preparing…" : "Print"}
+            <RefreshCw size={12} />
+            <span>Restore</span>
           </button>
-          <button className="fx-btn fx-btn-secondary fx-btn-sm" onClick={downloadCsv} disabled={qrList.length === 0}>
-            <Download size={13} /> Export CSV
+
+          <button
+            type="button"
+            onClick={() => setRevealedCodes((prev) => !prev)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+            title="Toggle recovery code visibility"
+          >
+            {revealedCodes ? <EyeOff size={12} /> : <Eye size={12} />}
+            <span>{revealedCodes ? "Hide Codes" : "See Codes"}</span>
           </button>
-          <button className="fx-btn fx-btn-danger fx-btn-sm" onClick={() => setClearAllOpen(true)} disabled={qrList.length === 0}>
-            <Trash2 size={13} /> Clear all
+
+          <button
+            type="button"
+            onClick={handlePrintSheet}
+            disabled={filtered.length === 0 || sheetGenerating}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
+            title="Generate 18×12″ print sheet"
+          >
+            <Printer size={13} />
+            <span>Print Sheet{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={downloadCsv}
+            disabled={qrList.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs disabled:opacity-40 cursor-pointer"
+          >
+            <Download size={12} />
+            <span>Export CSV</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setClearAllOpen(true)}
+            disabled={qrList.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-red-200 text-red-600 bg-red-50/50 hover:bg-red-100 transition-colors shadow-2xs disabled:opacity-40 cursor-pointer"
+          >
+            <Trash2 size={12} />
+            <span>Clear All</span>
           </button>
         </div>
       </div>
 
-      {/* ── Empty ─────────────────────────────────────────────── */}
+      {/* ── Empty State ────────────────────────────────────────────── */}
       {filtered.length === 0 ? (
-        <div className="fx-empty">
-          <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--fx-canvas)", border: "1px solid var(--fx-border)", color: "var(--fx-faint)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+        <div className="bg-white border border-gray-200 rounded-2xl p-14 text-center shadow-xs">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-3.5 border border-indigo-100">
             <QrCode size={22} />
           </div>
-          <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
-            {categoryFilter !== "all" || searchText.trim() ? "No tags match that filter." : "No tags yet"}
-          </p>
-          <p style={{ fontSize: 13, color: "var(--fx-ink-2)", marginBottom: 16, maxWidth: 340 }}>
+          <h3 className="font-bold text-gray-900 text-base">
+            {categoryFilter !== "all" || searchText.trim() ? "No tags match that filter." : "No QR codes yet"}
+          </h3>
+          <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
             {categoryFilter !== "all" || searchText.trim()
-              ? "Try changing the category or clearing your search."
-              : "Generate your first tag to get a scannable QR code and a printed sticker sheet."}
+              ? "Try clearing your search query or selecting another sticker category."
+              : "Generate a new sticker using the console above to begin managing your fleet."}
           </p>
-          {categoryFilter !== "all" || searchText.trim() ? (
-            <button className="fx-btn fx-btn-secondary fx-btn-sm" onClick={() => { setCategoryFilter("all"); setSearchText(""); }}>
-              <RefreshCw size={13} /> Clear filters
-            </button>
-          ) : (
-            <button className="fx-btn fx-btn-primary" onClick={() => setGenerateModalOpen(true)}>
-              <Plus size={15} strokeWidth={2.4} /> Generate tag
+          {(categoryFilter !== "all" || searchText.trim()) && (
+            <button
+              onClick={() => {
+                setCategoryFilter("all");
+                setSearchText("");
+              }}
+              className="mt-4 inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer"
+            >
+              <RefreshCw size={12} /> Clear Filters
             </button>
           )}
         </div>
       ) : (
         <>
-          {/* ── Desktop table ─────────────────────────────────── */}
-          {isDesktop && (
-          <div className="fx-table-wrap">
-            <table className="fx-table">
-              <thead>
-                <tr>
-                  <th className="fx-th" style={{ width: 40 }}>
-                    <input type="checkbox" className="fx-check" checked={allPageSelected} onChange={toggleSelectAllPage} />
-                  </th>
-                  <th className="fx-th" style={{ width: 52 }}>QR</th>
-                  <th className="fx-th">Unique ID</th>
-                  <th className="fx-th">Recovery</th>
-                  <th className="fx-th">Phone</th>
-                  <th className="fx-th">Category</th>
-                  <th className="fx-th">Created</th>
-                  <th className="fx-th">Status</th>
-                  <th className="fx-th fx-th-right" style={{ width: 138 }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.map((q) => {
-                  const catKey = (q.category || "car") as any;
-                  const label = getCategoryLabel(catKey);
-                  const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
-                  const isActivated = Boolean(phoneNum && phoneNum.trim());
-                  const computedStatus = isActivated ? "active" : q.status;
-                  const isCodeRevealed = revealedRowIds.has(q.id);
-                  const isSelected = selectedIds.has(q.id);
-
-                  return (
-                    <tr key={q.id} className={`fx-tr ${isSelected ? "fx-selected" : ""}`}>
-                      <td className="fx-td">
-                        <input type="checkbox" className="fx-check" checked={isSelected} onChange={() => toggleSelected(q.id)} />
-                      </td>
-                      <td className="fx-td">
-                        <button type="button" onClick={() => openQuickLook(q)} style={{ display: "flex", alignItems: "center", background: "none", border: "none", cursor: "pointer", padding: 0 }} title="Preview">
-                          <QrCodeImage data={qrFullUrl(q.id)} fg={q.fg || "000000"} bg={q.bg || "FFFFFF"} size={32} style={{ width: 32, height: 32, border: "1px solid var(--fx-border)", borderRadius: 6 }} />
-                        </button>
-                      </td>
-                      <td className="fx-td">
-                        <span className="fx-mono" style={{ color: isCodeRevealed ? "var(--fx-ink)" : "var(--fx-ink-2)", userSelect: isCodeRevealed ? "text" : "none" }}>
-                          {isCodeRevealed ? q.id : "••••••••"}
-                        </span>
-                      </td>
-                      <td className="fx-td">
-                        <span className="fx-mono" style={{ color: isCodeRevealed ? "var(--fx-ink)" : "var(--fx-ink-2)", userSelect: isCodeRevealed ? "text" : "none" }}>
-                          {isCodeRevealed ? (q.recoveryCode || "—") : "••••••••"}
-                        </span>
-                      </td>
-                      <td className="fx-td">
-                        {isActivated ? (
-                          <span style={{ fontSize: 13 }}>{phoneNum}</span>
-                        ) : (
-                          <span style={{ color: "var(--fx-faint)" }}>—</span>
-                        )}
-                      </td>
-                      <td className="fx-td">
-                        <span className="fx-badge" style={{ background: "var(--fx-canvas)", color: "#4B5563" }}>{label}</span>
-                      </td>
-                      <td className="fx-td" style={{ whiteSpace: "nowrap", color: "var(--fx-ink-2)", fontSize: 12.5 }}>{fmtDate(q.createdAt)}</td>
-                      <td className="fx-td">
-                        <span className="fx-status">
-                          <span className={`fx-dot ${computedStatus === "active" ? "fx-dot-green" : "fx-dot-amber"}`} />
-                          {computedStatus === "active" ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td className="fx-td">
-                        <QrRowActions
-                          qr={q}
-                          openQuickLook={openQuickLook}
-                          setDeleteTarget={setDeleteTarget}
-                          openPrintSheet={(target) => handleTriggerPrintSheet(target, [target])}
-                          onMoreReveal={() => toggleRowCodeVisibility(q.id)}
-                          menuOpen={openActionMenu === q.id}
-                          onMenuToggle={() => setOpenActionMenu((prev) => (prev === q.id ? null : q.id))}
+          {/* ══════════════════════════════════════════════════════════
+              VIEW MODE 1: TABLE VIEW (High density, clean data)
+             ══════════════════════════════════════════════════════════ */}
+          {viewMode === "table" && (
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-gray-800">
+                  <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-bold uppercase tracking-wider text-[11px]">
+                    <tr>
+                      <th className="px-4 py-3 w-10">
+                        <input
+                          type="checkbox"
+                          checked={allPageSelected}
+                          onChange={toggleSelectAllPage}
+                          className="w-4 h-4 rounded-md border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                         />
-                      </td>
+                      </th>
+                      <th className="px-4 py-3 w-16">Sticker</th>
+                      <th className="px-4 py-3">Sticker ID</th>
+                      <th className="px-4 py-3">Recovery Code</th>
+                      <th className="px-4 py-3">Linked Phone</th>
+                      <th className="px-4 py-3">Category</th>
+                      <th className="px-4 py-3">Created</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 font-medium">
+                    {paginated.map((q) => {
+                      const catKey = (q.category || "car") as any;
+                      const label = getCategoryLabel(catKey);
+                      const icon = getCategoryIcon(catKey);
+                      const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
+                      const isActivated = Boolean(phoneNum && phoneNum.trim());
+                      const computedStatus = isActivated ? "active" : q.status;
+                      const isSelected = selectedIds.has(q.id);
 
-            {totalPages > 1 && (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 14px", borderTop: "1px solid var(--fx-border)" }}>
-                <p style={{ fontSize: 12, color: "var(--fx-ink-2)" }}>
-                  Showing <span style={{ fontWeight: 600, color: "var(--fx-ink)" }}>{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)}</span> of{" "}
-                  <span style={{ fontWeight: 600, color: "var(--fx-ink)" }}>{filtered.length}</span>
-                </p>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <button className="fx-btn fx-btn-secondary fx-btn-sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
-                    <ChevronLeft size={14} /> Prev
-                  </button>
-                  <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fx-ink-2)", padding: "0 4px" }}>{page} / {totalPages}</span>
-                  <button className="fx-btn fx-btn-secondary fx-btn-sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
-                    Next <ChevronRight size={14} />
-                  </button>
-                </div>
+                      return (
+                        <tr
+                          key={q.id}
+                          className={`hover:bg-gray-50/70 transition-colors ${
+                            isSelected ? "bg-indigo-50/30" : ""
+                          }`}
+                        >
+                          <td className="px-4 py-3">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelected(q.id)}
+                              className="w-4 h-4 rounded-md border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => openQuickLook(q)}
+                              className="block hover:scale-105 transition-transform cursor-pointer"
+                              title="Click to inspect sticker"
+                            >
+                              <StickerThumb qr={q} size={36} />
+                            </button>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-bold text-gray-900">{q.id}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyId(q.id)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                title="Copy ID"
+                              >
+                                {copiedId === q.id ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-mono text-gray-600">
+                              {revealedCodes ? q.recoveryCode || "—" : "••••••••"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {isActivated ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[11px] border border-emerald-200">
+                                <Phone size={11} />
+                                <span>{phoneNum}</span>
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 font-normal">Unassigned</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700 font-semibold text-[11px]">
+                              <span>{icon}</span>
+                              <span>{label}</span>
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-500">{fmtDate(q.createdAt)}</td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-wide ${
+                                computedStatus === "active"
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : "bg-amber-50 text-amber-700 border border-amber-200"
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  computedStatus === "active" ? "bg-emerald-500" : "bg-amber-500"
+                                }`}
+                              />
+                              <span>{computedStatus === "active" ? "Active" : "Inactive"}</span>
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <QrRowActions
+                              qr={q}
+                              openQuickLook={openQuickLook}
+                              setDeleteTarget={setDeleteTarget}
+                              openPrintSheet={(target) => handleTriggerPrintSheet(target, [target])}
+                              menuOpen={openActionMenu === q.id}
+                              onMenuToggle={() => setOpenActionMenu((prev) => (prev === q.id ? null : q.id))}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </div>
+            </div>
           )}
 
-          {/* ── Mobile / tablet card list ─────────────────────── */}
-          {!isDesktop && (
-          <div className="fx-table-wrap">
-            {paginated.map((q) => {
-              const catKey = (q.category || "car") as any;
-              const label = getCategoryLabel(catKey);
-              const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
-              const isActivated = Boolean(phoneNum && phoneNum.trim());
-              const computedStatus = isActivated ? "active" : q.status;
-              const isCodeRevealed = revealedRowIds.has(q.id);
+          {/* ══════════════════════════════════════════════════════════
+              VIEW MODE 2: STICKER CARDS GRID (Visual sticker showcase)
+             ══════════════════════════════════════════════════════════ */}
+          {viewMode === "cards" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {paginated.map((q) => {
+                const catKey = (q.category || "car") as any;
+                const label = getCategoryLabel(catKey);
+                const icon = getCategoryIcon(catKey);
+                const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
+                const isActivated = Boolean(phoneNum && phoneNum.trim());
+                const computedStatus = isActivated ? "active" : q.status;
+                const isSelected = selectedIds.has(q.id);
 
-              return (
-                <div key={q.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 14px", borderBottom: "1px solid var(--fx-border)" }}>
-                  <input type="checkbox" className="fx-check" checked={selectedIds.has(q.id)} onChange={() => toggleSelected(q.id)} />
-                  <button type="button" onClick={() => openQuickLook(q)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}>
-                    <QrCodeImage data={qrFullUrl(q.id)} fg={q.fg || "000000"} bg={q.bg || "FFFFFF"} size={36} style={{ width: 36, height: 36, border: "1px solid var(--fx-border)", borderRadius: 6 }} />
-                  </button>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-                      <span className="fx-mono" style={{ fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {isCodeRevealed ? q.id : `${q.id.slice(0, 6)}…`}
-                      </span>
-                      <span className="fx-status" style={{ fontSize: 12, marginLeft: "auto" }}>
-                        <span className={`fx-dot ${computedStatus === "active" ? "fx-dot-green" : "fx-dot-amber"}`} />
-                        {computedStatus === "active" ? "Active" : "Inactive"}
+                return (
+                  <div
+                    key={q.id}
+                    className={`bg-white rounded-2xl border transition-all duration-200 shadow-xs overflow-hidden flex flex-col justify-between hover:shadow-md ${
+                      isSelected ? "border-indigo-500 ring-2 ring-indigo-100" : "border-gray-200"
+                    }`}
+                  >
+                    {/* Card Header */}
+                    <div className="p-3.5 bg-gray-50/60 border-b border-gray-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelected(q.id)}
+                          className="w-4 h-4 rounded-md border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        />
+                        <span className="font-mono font-bold text-xs text-gray-900">{q.id}</span>
+                      </div>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${
+                          computedStatus === "active"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : "bg-amber-50 text-amber-700 border border-amber-200"
+                        }`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            computedStatus === "active" ? "bg-emerald-500" : "bg-amber-500"
+                          }`}
+                        />
+                        <span>{computedStatus === "active" ? "Active" : "Inactive"}</span>
                       </span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--fx-ink-2)" }}>
-                      <span className="fx-badge">{label}</span>
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {isActivated ? phoneNum : "No phone"}
-                      </span>
-                      <span style={{ marginLeft: "auto", color: "var(--fx-faint)", fontSize: 12 }}>{fmtDate(q.createdAt)}</span>
+
+                    {/* Sticker Graphic Preview */}
+                    <div className="p-4 flex flex-col items-center justify-center bg-gray-50/30">
+                      <button
+                        type="button"
+                        onClick={() => openQuickLook(q)}
+                        className="w-full max-w-[240px] cursor-pointer hover:scale-[1.03] transition-transform"
+                      >
+                        <StickerMockupView qr={q} mode="physical" />
+                      </button>
+                    </div>
+
+                    {/* Card Details & Actions */}
+                    <div className="p-3.5 border-t border-gray-100 space-y-2.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="inline-flex items-center gap-1.5 text-gray-700 font-semibold">
+                          <span>{icon}</span>
+                          <span>{label}</span>
+                        </span>
+                        <span className="text-[11px] text-gray-400">{fmtDate(q.createdAt)}</span>
+                      </div>
+
+                      {isActivated ? (
+                        <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                          <Phone size={12} />
+                          <span className="font-bold">{phoneNum}</span>
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg">
+                          No phone assigned yet
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => openQuickLook(q)}
+                          className="flex-1 py-1.5 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition-colors cursor-pointer text-center"
+                        >
+                          Inspect Sticker
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleTriggerPrintSheet(q, [q])}
+                          className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 text-gray-600 transition-colors cursor-pointer"
+                          title="Print Sticker Sheet"
+                        >
+                          <Printer size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(q)}
+                          className="p-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                          title="Delete Sticker"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <QrRowActions
-                    qr={q}
-                    openQuickLook={openQuickLook}
-                    setDeleteTarget={setDeleteTarget}
-                    openPrintSheet={(target) => handleTriggerPrintSheet(target, [target])}
-                    onMoreReveal={() => toggleRowCodeVisibility(q.id)}
-                    menuOpen={openActionMenu === q.id}
-                    onMenuToggle={() => setOpenActionMenu((prev) => (prev === q.id ? null : q.id))}
-                  />
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+          )}
 
-            {totalPages > 1 && (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "12px 14px", borderTop: "1px solid var(--fx-border)" }}>
-                <button className="fx-btn fx-btn-secondary fx-btn-sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
-                  <ChevronLeft size={14} /> Prev
+          {/* ══════════════════════════════════════════════════════════
+              VIEW MODE 3: COMPACT LIST VIEW (Quick scanning)
+             ══════════════════════════════════════════════════════════ */}
+          {viewMode === "compact" && (
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-xs divide-y divide-gray-100 overflow-hidden">
+              {paginated.map((q) => {
+                const catKey = (q.category || "car") as any;
+                const label = getCategoryLabel(catKey);
+                const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
+                const isActivated = Boolean(phoneNum && phoneNum.trim());
+                const computedStatus = isActivated ? "active" : q.status;
+
+                return (
+                  <div
+                    key={q.id}
+                    className="flex items-center gap-3 p-3.5 hover:bg-gray-50/70 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(q.id)}
+                      onChange={() => toggleSelected(q.id)}
+                      className="w-4 h-4 rounded-md border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => openQuickLook(q)}
+                      className="cursor-pointer hover:opacity-80"
+                    >
+                      <StickerThumb qr={q} size={30} />
+                    </button>
+                    <div className="flex-1 min-w-0 flex items-center gap-4">
+                      <span className="font-mono font-bold text-xs text-gray-900">{q.id}</span>
+                      <span className="text-xs text-gray-600 font-semibold">{label}</span>
+                      <span className="text-xs text-gray-500 truncate">{isActivated ? phoneNum : "—"}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                          computedStatus === "active"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {computedStatus}
+                      </span>
+                      <QrRowActions
+                        qr={q}
+                        openQuickLook={openQuickLook}
+                        setDeleteTarget={setDeleteTarget}
+                        openPrintSheet={(target) => handleTriggerPrintSheet(target, [target])}
+                        menuOpen={openActionMenu === q.id}
+                        onMenuToggle={() => setOpenActionMenu((prev) => (prev === q.id ? null : q.id))}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── Pagination Controls ────────────────────────────────────────── */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-4 pt-2">
+              <p className="text-xs text-gray-500">
+                Showing{" "}
+                <span className="font-bold text-gray-800">
+                  {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)}
+                </span>{" "}
+                of <span className="font-bold text-gray-800">{filtered.length}</span> tags
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors cursor-pointer"
+                >
+                  <ChevronLeft size={14} />
+                  <span>Prev</span>
                 </button>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fx-ink-2)" }}>{page} / {totalPages}</span>
-                <button className="fx-btn fx-btn-secondary fx-btn-sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
-                  Next <ChevronRight size={14} />
+                <span className="text-xs font-bold text-gray-600 px-2">
+                  {page} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors cursor-pointer"
+                >
+                  <span>Next</span>
+                  <ChevronRight size={14} />
                 </button>
               </div>
-            )}
-          </div>
+            </div>
           )}
         </>
       )}
 
-      {/* ── Delete confirmations (inline) ────────────────────── */}
+      {/* ── Modals: Delete Confirmation, Clear All, Generate Tag, Print Sheet ─── */}
       {deleteTarget && (
-        <div className="fx-modal-backdrop" onClick={() => setDeleteTarget(null)}>
-          <div className="fx-modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
-              <span style={{ width: 32, height: 32, borderRadius: 8, background: "var(--fx-red-soft)", color: "var(--fx-red)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Trash2 size={16} />
-              </span>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(16, 24, 40, 0.5)", backdropFilter: "blur(4px)" }}
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div
+            className="bg-white rounded-2xl border border-gray-200 p-6 max-w-sm w-full shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={20} />
+              </div>
               <div>
-                <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Delete QR sticker?</h3>
-                <p style={{ fontSize: 13, color: "var(--fx-ink-2)", lineHeight: 1.5 }}>
-                  <span className="fx-mono">{deleteTarget.id}</span> will disappear from the fleet list, but can be restored later with its recovery code.
+                <h3 className="text-base font-bold text-gray-900">Delete QR Sticker?</h3>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  Tag <span className="font-mono font-bold text-gray-800">{deleteTarget.id}</span> will be removed from
+                  the fleet list. You can restore it later with its recovery code.
                 </p>
               </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-              <button className="fx-btn fx-btn-secondary" onClick={() => setDeleteTarget(null)}>Cancel</button>
+            <div className="flex items-center justify-end gap-2.5 pt-2">
               <button
-                className="fx-btn fx-btn-primary"
-                style={{ background: "var(--fx-red)", color: "#FFF" }}
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="px-4 py-2 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
                 onClick={async () => {
                   const targetId = deleteTarget.id;
                   setDeleteTarget(null);
-
-                  const removeFromList = () => {
-                    setQrList((prev) => {
-                      const updated = prev.filter((x) => x.id !== targetId);
-                      try { localStorage.setItem("repiqr-qrlist", JSON.stringify(updated)); localStorage.setItem("namoqr-qrlist", JSON.stringify(updated)); } catch { /* ignore */ }
-                      return updated;
-                    });
-                  };
-
-                  try {
-                    const res = await apiClient.qr.deleteQrCode(targetId);
-                    if (!res?.success) throw new Error('Delete request did not succeed');
-                  } catch (err: any) {
-                    // A 404 here means the sticker is already gone (e.g. a prior click's
-                    // response never reached the UI) — that's the outcome we wanted, so
-                    // reflect it in the list instead of showing a scary false failure.
-                    if (err?.status === 404) {
-                      removeFromList();
-                      setToast("QR sticker was already removed");
-                      setTimeout(() => setToast(null), 1500);
-                      return;
-                    }
-                    setToast(err?.message || `Failed to delete ${targetId} — please try again.`);
+                  const deleted = await apiClient.qr
+                    .deleteQrCode(targetId)
+                    .then((res) => res?.success)
+                    .catch(() => false);
+                  if (!deleted) {
+                    setToast(`Failed to delete ${targetId}. Please try again.`);
                     setTimeout(() => setToast(null), 3000);
                     return;
                   }
-                  removeFromList();
-                  setToast("QR deleted from database");
-                  setTimeout(() => setToast(null), 1500);
+                  setQrList((prev) => {
+                    const updated = prev.filter((x) => x.id !== targetId);
+                    try {
+                      localStorage.setItem("repiqr-qrlist", JSON.stringify(updated));
+                      localStorage.setItem("namoqr-qrlist", JSON.stringify(updated));
+                    } catch {
+                      /* ignore */
+                    }
+                    return updated;
+                  });
+                  setToast("Sticker deleted from database");
+                  setTimeout(() => setToast(null), 2000);
                 }}
+                className="px-4 py-2 text-xs font-bold rounded-xl bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer"
               >
-                Delete
+                Delete Sticker
               </button>
             </div>
           </div>
@@ -616,35 +1016,61 @@ export default function QrCodesPage({
       )}
 
       {clearAllOpen && (
-        <div className="fx-modal-backdrop" onClick={() => setClearAllOpen(false)}>
-          <div className="fx-modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
-              <span style={{ width: 32, height: 32, borderRadius: 8, background: "var(--fx-red-soft)", color: "var(--fx-red)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <AlertTriangle size={16} />
-              </span>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(16, 24, 40, 0.5)", backdropFilter: "blur(4px)" }}
+          onClick={() => setClearAllOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl border border-gray-200 p-6 max-w-md w-full shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={20} />
+              </div>
               <div>
-                <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Clear all QR stickers?</h3>
-                <p style={{ fontSize: 13, color: "var(--fx-ink-2)", lineHeight: 1.5 }}>
-                  All <span style={{ fontWeight: 600, color: "var(--fx-ink)" }}>{qrList.length}</span> QR codes will be permanently deleted. This cannot be undone.
+                <h3 className="text-base font-bold text-gray-900">Clear All {qrList.length} Stickers?</h3>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  Are you sure you want to permanently delete all {qrList.length} QR codes? This action cannot be
+                  undone.
                 </p>
               </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-              <button className="fx-btn fx-btn-secondary" onClick={() => setClearAllOpen(false)}>Cancel</button>
+            <div className="flex items-center justify-end gap-2.5 pt-2">
               <button
-                className="fx-btn fx-btn-primary"
-                style={{ background: "var(--fx-red)", color: "#FFF" }}
+                type="button"
+                onClick={() => setClearAllOpen(false)}
+                className="px-4 py-2 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
                 onClick={async () => {
                   setClearAllOpen(false);
-                  const deleted = await apiClient.qr.deleteAllQrCodes().then((res) => res?.success).catch(() => false);
-                  if (!deleted) { setToast("Failed to clear QR codes from the database. Please try again."); setTimeout(() => setToast(null), 3000); return; }
+                  const deleted = await apiClient.qr
+                    .deleteAllQrCodes()
+                    .then((res) => res?.success)
+                    .catch(() => false);
+                  if (!deleted) {
+                    setToast("Failed to clear QR codes. Please try again.");
+                    setTimeout(() => setToast(null), 3000);
+                    return;
+                  }
                   setQrList([]);
-                  try { localStorage.removeItem("repiqr-qrlist"); localStorage.removeItem("namoqr-qrlist"); } catch { /* ignore */ }
+                  try {
+                    localStorage.removeItem("repiqr-qrlist");
+                    localStorage.removeItem("namoqr-qrlist");
+                  } catch {
+                    /* ignore */
+                  }
                   setToast("All QR codes cleared from database");
-                  setTimeout(() => setToast(null), 1500);
+                  setTimeout(() => setToast(null), 2000);
                 }}
+                className="px-4 py-2 text-xs font-bold rounded-xl bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer"
               >
-                Clear all
+                Clear All
               </button>
             </div>
           </div>
@@ -660,14 +1086,18 @@ export default function QrCodesPage({
         setToast={setToast}
         onPrint={(target, batch) => handleTriggerPrintSheet(target, batch)}
       />
+
       <PrintSheetModal
         isOpen={isLocalPrintModalOpen}
-        onClose={() => { setIsLocalPrintModalOpen(false); setLocalPrintTargetSticker(null); }}
+        onClose={() => setIsLocalPrintModalOpen(false)}
         availableStickers={filtered}
         initialSelectedSticker={localPrintTargetSticker}
-        initialBatchStickers={selectedIds.size > 0 ? filtered.filter((q) => selectedIds.has(q.id)) : undefined}
+        initialBatchStickers={localPrintBatch}
         stickerPos={stickerPos}
-        onShowToast={(msg) => { setToast(msg); setTimeout(() => setToast(null), 4000); }}
+        onShowToast={(msg) => {
+          setToast(msg);
+          setTimeout(() => setToast(null), 4000);
+        }}
       />
     </div>
   );

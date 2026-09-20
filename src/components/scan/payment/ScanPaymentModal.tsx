@@ -476,22 +476,18 @@ export default function ScanPaymentModal({
                 </div>
 
                 <div className="space-y-4 pt-1 max-w-md">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Verification code
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={6}
-                      value={otpInput}
-                      onChange={(e) => onOtpInputChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="000000"
-                      required
-                      autoFocus
-                      className="w-full h-12 tracking-[0.3em] text-center text-xl font-semibold rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none text-gray-900 transition-all"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={otpInput}
+                    onChange={(e) => onOtpInputChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Enter code"
+                    required
+                    autoFocus
+                    className="w-full h-12 text-center tracking-[0.4em] font-mono text-xl rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none text-gray-900 placeholder:text-gray-300 transition-all"
+                  />
 
                   <div className="flex items-center justify-between text-xs pt-1">
                     <button
@@ -499,7 +495,7 @@ export default function ScanPaymentModal({
                       onClick={onBackToPhone}
                       className="font-medium text-gray-500 hover:text-gray-900 cursor-pointer"
                     >
-                      ← Change number
+                      Change phone number
                     </button>
                     <button
                       type="button"
