@@ -1,0 +1,55 @@
+{
+  "category": "UTILITY",
+  "name": "emergency_contact_added",
+  "namespace": "7bd4b8a8_2f6f_4e9d_b673_2673a3a16385",
+  "languages": [
+    {
+      "id": "1085186207801654",
+      "name": "emergency_contact_added",
+      "language": "en",
+      "parameter_format": "NAMED",
+      "status": "approved",
+      "rejection_reason": "NONE",
+      "default_variables": null,
+      "code": [
+        {
+          "text": "Hi {{contact_name}}, {{owner_name}} has added you as an emergency contact on their RapiQR safety tag. If they are ever in an emergency, you\nmay be contacted to help. No action is needed right now.",
+          "type": "BODY",
+          "example": {
+            "body_text_named_params": [
+              {
+                "example": "contact_name = Priya Sharma",
+                "param_name": "contact_name"
+              },
+              {
+                "example": "owner_name = Rohan Mehta",
+                "param_name": "owner_name"
+              }
+            ]
+          }
+        }
+      ],
+      "gtwy_thread_id": null,
+      "msg91_template_id": 541808,
+      "quality_score": "UNKNOWN",
+      "backup_templates": [],
+      "variables": [
+        "body_contact_name",
+        "body_owner_name"
+      ],
+      "variable_type": {
+        "body_contact_name": {
+          "type": "text",
+          "parameter_name": "contact_name"
+        },
+        "body_owner_name": {
+          "type": "text",
+          "parameter_name": "owner_name"
+        }
+      }
+    }
+  ],
+  "is_disabled": 0,
+  "ttl_in_seconds": null,
+  "gtwy_thread_id": null
+}

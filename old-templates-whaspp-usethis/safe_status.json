@@ -1,0 +1,46 @@
+{
+  "category": "UTILITY",
+  "name": "safe_status",
+  "namespace": "7bd4b8a8_2f6f_4e9d_b673_2673a3a16385",
+  "languages": [
+    {
+      "id": "1582388066963053",
+      "name": "safe_status",
+      "language": "en",
+      "parameter_format": "NAMED",
+      "status": "approved",
+      "rejection_reason": "NONE",
+      "default_variables": null,
+      "code": [
+        {
+          "text": "*✅ RepiQR – SAFE*\nYour tag *{{label}}* has been marked as *SAFE*.\nThe emergency situation is resolved. No action is needed.",
+          "type": "BODY",
+          "example": {
+            "body_text_named_params": [
+              {
+                "example": "label = Car GJ 01 XX 0000",
+                "param_name": "label"
+              }
+            ]
+          }
+        }
+      ],
+      "gtwy_thread_id": null,
+      "msg91_template_id": 536776,
+      "quality_score": "UNKNOWN",
+      "backup_templates": [],
+      "variables": [
+        "body_label"
+      ],
+      "variable_type": {
+        "body_label": {
+          "type": "text",
+          "parameter_name": "label"
+        }
+      }
+    }
+  ],
+  "is_disabled": 0,
+  "ttl_in_seconds": 600,
+  "gtwy_thread_id": null
+}

@@ -5,6 +5,7 @@ const User = require('../models/schemas/User');
 const ProductModel = require('../models/productModel');
 const { uploadPublicFile } = require('../services/storageService');
 const { notifyOwner } = require('../services/notificationService');
+const { buildDashboardChatLink } = require('../services/msg91Templates');
 const pushService = require('../services/pushService');
 const { logger } = require('../middleware/loggerMiddleware');
 const { getIo, getOnlineOwners, markDeliveredIfPeerPresent } = require('../sockets/chatSocket');
@@ -64,9 +65,9 @@ async function fanOutMessage(session, message, isOwner, previewText) {
       notifyOwner({
         type: 'CHAT_MESSAGE',
         ownerPhone: product.details.ownerPhone,
-        // button_1 is the dynamic suffix of the "Open Dashboard" WhatsApp
-        // button's URL now, not body text (see msg91Templates.js CHAT_MESSAGE.buttons).
-        data: { label, message: previewText, button_1: session.id },
+        // The approved chat_message template only has label/link body
+        // variables — no button, no message preview (see msg91Templates.js).
+        data: { label, link: buildDashboardChatLink(session.id) },
         eventId: session.id,
       }).catch((err) => logger.error('CHAT_MESSAGE', 'Failed to notify owner', err));
     }
@@ -205,9 +206,7 @@ class ChatController {
         notifyOwner({
           type: 'CHAT_STARTED',
           ownerPhone,
-          // button_1 is the dynamic suffix of the "Open Dashboard" WhatsApp
-          // button's URL now, not body text (see msg91Templates.js CHAT_STARTED.buttons).
-          data: { label: vehicleLabel || 'your RapiQR item', button_1: session.id },
+          data: { label: vehicleLabel || 'your RapiQR item', link: buildDashboardChatLink(session.id) },
           eventId: session.id,
         }).catch((err) => logger.error('CHAT_STARTED', 'Failed to notify owner of new chat', err));
       }

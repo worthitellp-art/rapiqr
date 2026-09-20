@@ -2,6 +2,7 @@ const AlertModel = require('../models/alertModel');
 const ProductModel = require('../models/productModel');
 const ChatModel = require('../models/chatModel');
 const { notifyOwner, notifyEmergencyContacts } = require('../services/notificationService');
+const { buildDashboardChatLink, buildMapsLink } = require('../services/msg91Templates');
 const { getIo } = require('../sockets/chatSocket');
 const { logger } = require('../middleware/loggerMiddleware');
 
@@ -98,17 +99,14 @@ class AlertController {
         }
 
         // The owner's copy carries a deep link into the dashboard inbox — when a
-        // chat thread exists for this alert, straight into that thread, not just
-        // the generic inbox the owner would otherwise have to search through.
-        // Now a WhatsApp button's dynamic URL suffix rather than body text (see
-        // msg91Templates.js QR_SCAN_ALERT / LOCATION_SHARED `buttons`), so only
-        // the session id itself travels through — the static base URL lives in
-        // the approved template. Meta rejects an empty text parameter on a
-        // dynamic URL button outright, which silently failed the WHOLE WhatsApp
-        // send for any alert with no chat session (e.g. a quick-issue alert with
-        // no attached chat) — 'inbox' keeps the button parameter non-empty; the
-        // frontend doesn't currently read this suffix to select a thread anyway.
-        const dashboardButtonValue = chatSessionId || 'inbox';
+        // chat thread exists for this alert, straight into that tab (the
+        // frontend doesn't currently select the specific thread from this
+        // query param, just opens the chat tab). QR_SCAN_ALERT and
+        // LOCATION_SHARED's approved templates print this as plain body text
+        // now (see msg91Templates.js), not a WhatsApp button — a button's
+        // dynamic URL parameter can't be empty, which used to silently fail
+        // the whole send for any alert with no chat session.
+        const dashboardLink = buildDashboardChatLink(chatSessionId);
 
         // Send WhatsApp alert to the owner using the approved Meta templates
         if (ownerPhone) {
@@ -117,19 +115,16 @@ class AlertController {
           const isLocationShare = alertPayload.type === 'location_share' || String(alertPayload.message || '').includes('EMERGENCY GPS LOCATION');
 
           let alertType = 'QR_SCAN_ALERT';
-          let alertData = { label, message: alertPayload.message || 'an issue was reported', button_1: dashboardButtonValue };
+          let alertData = { label, message: alertPayload.message || 'an issue was reported', link: dashboardLink };
 
           if (hasGps && isLocationShare) {
             alertType = 'LOCATION_SHARED';
-            // button_1 = "View Location" (Google Maps), button_2 = "Open Dashboard".
-            alertData = { label, button_1: `${alertPayload.latitude},${alertPayload.longitude}`, button_2: dashboardButtonValue };
+            alertData = { label, maps_url: buildMapsLink(alertPayload.latitude, alertPayload.longitude), link: dashboardLink };
           } else if (isEmergency) {
             alertType = 'EMERGENCY_ALERT';
-            // EMERGENCY_ALERT's dashboard link is a WhatsApp button now, not
-            // body text — button_1 is just the dynamic suffix (the chat
-            // session id), appended to the button's static base URL
-            // registered with Meta (see msg91Templates.js EMERGENCY_ALERT.buttons).
-            alertData = { label, message: alertPayload.message || 'an urgent alert was reported', button_1: dashboardButtonValue };
+            // No approved no-button template for this one yet — still uses the
+            // button_1 path (see msg91Templates.js EMERGENCY_ALERT).
+            alertData = { label, message: alertPayload.message || 'an urgent alert was reported', button_1: chatSessionId || 'inbox' };
           }
 
           const result = await notifyOwner({

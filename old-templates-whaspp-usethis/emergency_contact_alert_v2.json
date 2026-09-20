@@ -1,0 +1,55 @@
+{
+  "category": "UTILITY",
+  "name": "emergency_contact_alert_v2",
+  "namespace": "7bd4b8a8_2f6f_4e9d_b673_2673a3a16385",
+  "languages": [
+    {
+      "id": "1605443171621626",
+      "name": "emergency_contact_alert_v2",
+      "language": "en",
+      "parameter_format": "NAMED",
+      "status": "approved",
+      "rejection_reason": "NONE",
+      "default_variables": null,
+      "code": [
+        {
+          "text": "RepiQR EMERGENCY NOTIFICATION: an urgent alert was raised on the registered tag \"{{label}}\". The reporter states: \"{{message}}\". Please check on this situation immediately.",
+          "type": "BODY",
+          "example": {
+            "body_text_named_params": [
+              {
+                "example": "label = Car GJ 01 XX 0000",
+                "param_name": "label"
+              },
+              {
+                "example": "message = Vehicle is blocking my driveway, please move it",
+                "param_name": "message"
+              }
+            ]
+          }
+        }
+      ],
+      "gtwy_thread_id": null,
+      "msg91_template_id": 536768,
+      "quality_score": "UNKNOWN",
+      "backup_templates": [],
+      "variables": [
+        "body_label",
+        "body_message"
+      ],
+      "variable_type": {
+        "body_label": {
+          "type": "text",
+          "parameter_name": "label"
+        },
+        "body_message": {
+          "type": "text",
+          "parameter_name": "message"
+        }
+      }
+    }
+  ],
+  "is_disabled": 0,
+  "ttl_in_seconds": 800,
+  "gtwy_thread_id": null
+}

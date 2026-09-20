@@ -1,10 +1,11 @@
 /**
  * MSG91 WhatsApp templates catalogue — the SINGLE source of truth.
  *
- * These are the exact template definitions to submit in the MSG91 dashboard
- * (control.msg91.com → WhatsApp → Templates → Create). Copy the `body` text
- * verbatim, choose the correct category, and keep the named variable
- * placeholders exactly as the `variables` object below.
+ * These now mirror the templates actually approved on MSG91 (exported from the
+ * dashboard into old-templates-whaspp-usethis/*.json) rather than the earlier
+ * button-based designs, which are on hold — none of the approved templates use
+ * a WhatsApp button component; a dashboard/maps link is plain body text
+ * instead (the `{{link}}` / `{{maps_url}}` placeholders below).
  *
  * Rules MSG91/Meta enforce:
  *  - Placeholders use named keys such as `{{label}}` and `{{message}}`.
@@ -25,6 +26,23 @@ function clip(value, max = 120) {
 }
 
 /**
+ * Full dashboard chat link for a WhatsApp message body (plain text now, not a
+ * button) — used by CHAT_STARTED, CHAT_MESSAGE, QR_SCAN_ALERT and
+ * LOCATION_SHARED's `link` variable. `sessionId` may be empty (no chat thread
+ * yet); the link still resolves, just without a specific thread selected.
+ */
+function buildDashboardChatLink(sessionId) {
+  const base = (process.env.APP_URL || 'https://repiqr.com').replace(/\/+$/, '');
+  return `${base}/#/dashboard?tab=chat${sessionId ? `&session=${sessionId}` : ''}`;
+}
+
+/** Google Maps link for a WhatsApp message body from raw lat/lng. */
+function buildMapsLink(latitude, longitude) {
+  if (!latitude || !longitude) return '';
+  return `https://maps.google.com/?q=${latitude},${longitude}`;
+}
+
+/**
  * MSG91_TEMPLATES[type] = {
  *   name:       MSG91 template name (as submitted for approval),
  *   audience:   'owner' | 'emergency_contact' | 'otp' — who receives it,
@@ -39,46 +57,27 @@ function clip(value, max = 120) {
  *   body:       the EXACT message you paste into MSG91, with named placeholders.
  * }
  */
-// Static prefix registered with Meta for every "open the dashboard" button
-// below; each template supplies only the dynamic suffix (a chat session id,
-// or '' when there's no session yet) as its button_N component value.
-const DASHBOARD_BUTTON_BASE_URL = 'https://repiqr.com/#/dashboard?tab=chat&session=';
-
 const MSG91_TEMPLATES = {
   QR_SCAN_ALERT: {
     name: process.env.MSG91_WHATSAPP_TEMPLATE_NAME || 'qr_scan_alert',
     audience: 'owner',
-    // `link` used to be a 3rd body variable rendered as plain text — now a
-    // WhatsApp button instead (see `buttons`). button_1 is positional (Meta
-    // requires dynamic URL button variables to be positional, not named).
-    variables: ['label', 'message', 'button_1'],
-    defaults: { label: 'your tag', message: 'an issue was reported', button_1: '' },
-    body: '*🔔 QR Scan Alert*\nYour tag *{{label}}* was just scanned.\nMessage: *{{message}}*\n— RepiQR',
-    buttons: [
-      { type: 'URL', urlType: 'dynamic', text: 'View & Reply', baseUrl: DASHBOARD_BUTTON_BASE_URL },
-    ],
+    variables: ['label', 'message', 'link'],
+    defaults: { label: 'your tag', message: 'an issue was reported', link: '' },
+    body: '*🔔 QR Scan Alert*\nYour tag *{{label}}* was just scanned.\nMessage: *{{message}}*\nCheck details and reply here: *{{link}}*\n— RepiQR',
   },
 
+  // No approved no-button template on file yet for this one — left as-is
+  // (still uses the button_1 path in alertController.js). msg91Client.js's
+  // buildMsg91WhatsAppComponents guards against an empty button value in the
+  // meantime, but this template should be swapped the same way once approved.
   EMERGENCY_ALERT: {
     name: process.env.MSG91_WHATSAPP_EMERGENCY_TEMPLATE || 'emergency_alert_v2',
     audience: 'owner',
-    // `link` used to be a 3rd body variable rendered as plain text. It's now a
-    // WHATSAPP BUTTON instead (see `buttons` below) — the dashboard/chat link
-    // is submitted as the dynamic suffix of a URL call-to-action button, not
-    // printed in the message body. `button_1` is positional (Meta requires
-    // dynamic URL button variables to be positional, not named), and flows
-    // through unchanged: buildVariables -> notify -> provider.send ->
-    // sendMsg91WhatsApp -> buildMsg91WhatsAppComponents, which already treats
-    // any `button_*`-prefixed key as a button component (see msg91Client.js).
     variables: ['label', 'message', 'button_1'],
     defaults: { label: 'your tag', message: 'an emergency alert was raised', button_1: '' },
     body: '🚨 *URGENT — ACCIDENT ALERT*\n\nPossible accident involving {{label}}.\nMessage: {{message}}\n\n— *RepiQR Safety*',
-    // Documentation for submitting this template in the MSG91 dashboard
-    // (control.msg91.com → WhatsApp → Templates → Create) — the `body` above
-    // goes in the Body field; this describes the one Call-to-Action button to
-    // add alongside it. Not read by any runtime code.
     buttons: [
-      { type: 'URL', urlType: 'dynamic', text: 'View & Take Action', baseUrl: DASHBOARD_BUTTON_BASE_URL },
+      { type: 'URL', urlType: 'dynamic', text: 'View & Take Action', baseUrl: 'https://repiqr.com/#/dashboard?tab=chat&session=' },
     ],
   },
 
@@ -93,37 +92,25 @@ const MSG91_TEMPLATES = {
   LOCATION_SHARED: {
     name: 'location_shared',
     audience: 'owner',
-    // maps_url and link were both plain body text — now two buttons.
-    // button_1 = "View Location" (Google Maps), button_2 = "Open Dashboard".
-    variables: ['label', 'button_1', 'button_2'],
-    defaults: { label: 'your tag', button_1: '', button_2: '' },
-    body: '*📍 Location Shared*\nSomeone has shared their live location for *{{label}}*.\n— RepiQR Safety',
-    buttons: [
-      { type: 'URL', urlType: 'dynamic', text: 'View Location', baseUrl: 'https://maps.google.com/?q=' },
-      { type: 'URL', urlType: 'dynamic', text: 'Open Dashboard', baseUrl: DASHBOARD_BUTTON_BASE_URL },
-    ],
+    variables: ['label', 'maps_url', 'link'],
+    defaults: { label: 'your tag', maps_url: '', link: '' },
+    body: '*📍 Location Shared*\nSomeone has shared their live location for *{{label}}*.\nView the location: *{{maps_url}}*\nCheck details and reply here: *{{link}}*\n— RepiQR Safety',
   },
 
   CHAT_STARTED: {
     name: 'chat_started',
     audience: 'owner',
-    variables: ['label', 'button_1'],
-    defaults: { label: 'your tag', button_1: '' },
-    body: 'RepiQR chat alert: a visitor has started a conversation about your tag "{{label}}". They are waiting for your response.',
-    buttons: [
-      { type: 'URL', urlType: 'dynamic', text: 'Reply Now', baseUrl: DASHBOARD_BUTTON_BASE_URL },
-    ],
+    variables: ['label', 'link'],
+    defaults: { label: 'your tag', link: '' },
+    body: 'RepiQR chat alert: a visitor has started a conversation about your tag "{{label}}". They are waiting for your response. Open your dashboard here: {{link}} to view the message and reply securely.',
   },
 
   CHAT_MESSAGE: {
     name: 'chat_message',
     audience: 'owner',
-    variables: ['label', 'button_1'],
-    defaults: { label: 'your tag', button_1: '' },
-    body: '*💬 RepiChat – New Message*\nSomeone has sent you a message about your RepiQR tag *{{label}}*.\n— RepiQR Safety',
-    buttons: [
-      { type: 'URL', urlType: 'dynamic', text: 'View & Reply', baseUrl: DASHBOARD_BUTTON_BASE_URL },
-    ],
+    variables: ['label', 'link'],
+    defaults: { label: 'your tag', link: '' },
+    body: '*💬 RepiChat – New Message*\nSomeone has sent you a message about your RepiQR tag *{{label}}*.\nTap the link below to view and reply:\n*{{link}}*\n— RepiQR Safety',
   },
 
   EMERGENCY_CONTACT_ADDED: {
@@ -191,5 +178,7 @@ module.exports = {
   MSG91_TEMPLATE_NAMES: Object.values(MSG91_TEMPLATES).map((t) => t.name),
   renderBody,
   buildVariables,
+  buildDashboardChatLink,
+  buildMapsLink,
   clip,
 };
