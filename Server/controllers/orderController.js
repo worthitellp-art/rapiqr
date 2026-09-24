@@ -3,53 +3,39 @@ const ShiprocketController = require('./shiprocketController');
 const { logger } = require('../middleware/loggerMiddleware');
 
 /**
- * Server-authoritative catalog prices.
- * Prevents client-side price tampering at checkout.
+ * Stickers themselves are free. Every checkout charges this flat amount,
+ * which is credited to the buyer's balance once Razorpay marks the order
+ * paid (the dashboard sums paid order totals into "My Balance").
+ * Server-authoritative so the client can't tamper with the charge.
  */
-const CATALOG_PRICES = {
-  'car-qr': 299,
-  'home-qr': 349,
-  'child-qr': 249,
-  'travel-qr': 299,
-};
-
-const EXPRESS_DELIVERY_FEE = 99;
-const STANDARD_DELIVERY_FEE = 0;
+const BALANCE_TOPUP_AMOUNT = 150;
 
 /**
- * Validates cart items and calculates canonical subtotal using server catalog.
+ * Validates cart items. Every sticker is priced at ₹0 — the order total is
+ * the flat balance top-up above, not a sum of item prices.
  */
 function computeCanonicalOrderItems(rawItems) {
   if (!Array.isArray(rawItems) || rawItems.length === 0) {
     throw new Error('Order must contain at least one item');
   }
 
-  let computedSubtotal = 0;
   const verifiedItems = rawItems.map((rawItem, index) => {
     const productId = String(rawItem.product?.id || rawItem.id || `custom-item-${index}`).trim();
     const name = String(rawItem.product?.name || rawItem.name || 'Safety Tag').trim();
     const rawQty = Number(rawItem.qty || rawItem.quantity || 1);
     const qty = Number.isInteger(rawQty) && rawQty >= 1 ? Math.min(rawQty, 100) : 1;
 
-    // Use catalog price if known product; fallback to positive declared price if valid
-    const catalogPrice = CATALOG_PRICES[productId];
-    const declaredPrice = Number(rawItem.product?.price ?? rawItem.price ?? 0);
-    const unitPrice = catalogPrice !== undefined ? catalogPrice : (Number.isFinite(declaredPrice) && declaredPrice > 0 ? declaredPrice : 299);
-
-    const lineTotal = unitPrice * qty;
-    computedSubtotal += lineTotal;
-
     return {
       id: productId,
       name,
-      price: unitPrice,
+      price: 0,
       qty,
       img: rawItem.product?.img || rawItem.img || '',
       category: rawItem.product?.category || rawItem.category || 'Safety',
     };
   });
 
-  return { verifiedItems, computedSubtotal };
+  return { verifiedItems };
 }
 
 /**
@@ -125,7 +111,7 @@ class OrderController {
   /** POST /api/orders — Secure order placement with server-authoritative pricing */
   static async create(req, res) {
     try {
-      const { name, email, phone, items, paymentMethod, deliveryMethod, shippingAddress } = req.body || {};
+      const { name, email, phone, items, paymentMethod, shippingAddress } = req.body || {};
 
       if (!name || !email || !phone) {
         return res.status(400).json({ success: false, error: 'Name, email, and phone number are required.' });
@@ -145,11 +131,8 @@ class OrderController {
         return res.status(400).json({ success: false, error: 'Please provide a valid phone number.' });
       }
 
-      // Compute pricing server-side to prevent price tampering
-      const { verifiedItems, computedSubtotal } = computeCanonicalOrderItems(items);
-      const isExpress = deliveryMethod === 'express';
-      const verifiedDeliveryFee = isExpress ? EXPRESS_DELIVERY_FEE : STANDARD_DELIVERY_FEE;
-      const verifiedTotal = computedSubtotal + verifiedDeliveryFee;
+      // Stickers are free; the charge is a flat balance top-up set server-side
+      const { verifiedItems } = computeCanonicalOrderItems(items);
 
       const order = await OrderModel.create({
         userId: req.user?.id || null,
@@ -157,11 +140,11 @@ class OrderController {
         email: cleanEmail,
         phone: cleanPhone,
         items: verifiedItems,
-        subtotal: computedSubtotal,
-        deliveryFee: verifiedDeliveryFee,
-        total: verifiedTotal,
+        subtotal: 0,
+        deliveryFee: 0,
+        total: BALANCE_TOPUP_AMOUNT,
         paymentMethod: paymentMethod || 'upi',
-        deliveryMethod: isExpress ? 'express' : 'standard',
+        deliveryMethod: 'standard',
         shippingAddress: shippingAddress || null,
       });
 

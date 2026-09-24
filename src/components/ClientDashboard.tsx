@@ -6,7 +6,6 @@ import LanguageSwitcher from './common/LanguageSwitcher';
 import { getCategoryIcon, getCategoryLabel } from '../stickerModules';
 import {
   Bell,
-  Search,
   ShieldCheck,
   LogOut,
   Eye,
@@ -37,6 +36,7 @@ import {
   MessageCircle,
   Package,
   Zap,
+  Wallet,
 } from 'lucide-react';
 import { DEFAULT_PRODUCTS, mapApiShopProduct, type ProductItem } from '../data/products';
 
@@ -381,7 +381,6 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   }, [activeTab]);
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
 
   const [products, setProducts] = useState<DashboardSticker[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
@@ -604,6 +603,12 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     })();
     return () => { cancelled = true; };
   }, [profile?.id]);
+
+  // Balance = every checkout top-up Razorpay has marked paid. Stickers are
+  // free, so a paid order's total is exactly what was added to the balance.
+  const balance = myOrders
+    .filter((o) => o?.payment?.status === 'paid')
+    .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
 
   // ─── DELIVERY TRACKING (per order, fetched on demand) ───
   // Expanding a card asks the server for live courier tracking; the server folds
@@ -856,7 +861,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
           <div className="mb-10 text-center">
 
             <h1 className="text-2xl font-black tracking-tight text-[var(--fx-ink)] sm:text-3xl">
-              Purchase a Safety Sticker to Create &amp; Activate Your Dashboard
+              Get Your Free Safety Sticker to Activate Your Dashboard
             </h1>
 
             <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
@@ -891,20 +896,14 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                 </div>
                 <div className="flex flex-1 flex-col justify-between p-4">
                   <div>
-                    <div className="flex items-start justify-between gap-3">
-                      <h3 className="text-sm font-bold text-[var(--fx-ink)]">{product.name}</h3>
-                      <div className="shrink-0 text-right">
-                        <div className="text-sm font-bold text-[var(--fx-ink)]">₹{product.price}</div>
-                        <div className="text-[11px] text-[var(--fx-faint)] line-through">₹{product.mrp}</div>
-                      </div>
-                    </div>
+                    <h3 className="text-sm font-bold text-[var(--fx-ink)]">{product.name}</h3>
                     <p className="mt-1.5 text-xs text-[var(--fx-ink-2)]">{product.desc}</p>
                   </div>
                   <button
                     onClick={() => handleBuyProduct(product)}
                     className="mt-4 flex items-center justify-center gap-1.5 rounded-lg bg-[var(--fx-ink)] py-2.5 text-xs font-bold text-white hover:opacity-90 cursor-pointer"
                   >
-                    <ShoppingBag size={13} /> Buy this sticker <ArrowRight size={13} />
+                    Get Free <ArrowRight size={13} />
                   </button>
                 </div>
               </div>
@@ -1047,7 +1046,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
         <div className="flex-1 md:ml-[245px] min-h-screen flex flex-col min-w-0">
           
           {/* Top Bar */}
-          <header className="h-[62px] flex-shrink-0 bg-[var(--fx-canvas)] border-b border-[var(--fx-border)] flex items-center justify-between gap-4 px-4 sm:px-8 lg:px-10 z-20">
+          <header className="h-[62px] flex-shrink-0 bg-[var(--fx-canvas)] border-b border-[var(--fx-border)] flex items-center justify-between gap-2 sm:gap-4 px-3 sm:px-8 lg:px-10 z-20">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <button
                 onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
@@ -1057,31 +1056,33 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                 <Menu size={18} />
               </button>
 
-              <div className="bg-[var(--fx-canvas)] rounded-full h-[36px] w-full max-w-[240px] min-w-0 flex items-center gap-2 px-3.5 text-[var(--fx-ink-2)] text-xs focus-within:ring-2 focus-within:ring-[var(--fx-accent)]/20 transition-all">
-                <Search size={14} />
-                <input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t.searchPlaceholder}
-                  className="bg-transparent border-none outline-none w-full text-xs text-[var(--fx-ink)] placeholder-[var(--fx-ink-2)]"
-                />
+              {/* My Balance — sum of this account's Razorpay-paid top-ups */}
+              <div
+                className="inline-flex items-center gap-2 h-9 pl-2 pr-3 rounded-full bg-white border border-[var(--fx-border)] min-w-0"
+                title="Balance from your paid top-ups"
+              >
+                <span className="w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                  <Wallet size={13} />
+                </span>
+                <span className="hidden sm:inline text-[11px] text-[var(--fx-ink-2)] font-medium">My Balance</span>
+                <span className="text-sm font-bold text-[var(--fx-ink)] tabular-nums">
+                  {myOrdersLoading ? '…' : `₹${balance.toLocaleString('en-IN')}`}
+                </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 sm:gap-3 text-xs flex-shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-3 text-xs flex-shrink-0">
               <LanguageSwitcher />
 
               <button
                 onClick={handlePurchaseStickerClick}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#111111] hover:bg-black active:scale-[0.99] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[#111111] hover:bg-black active:scale-[0.99] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                aria-label="Get a free sticker"
               >
-                <ShoppingBag size={13} />
-                <span>{t.buySticker}</span>
+                <Plus size={14} />
+                <span className="hidden sm:inline">Get Free Sticker</span>
               </button>
 
-              <span className="font-semibold text-[var(--fx-accent-ink)] hidden sm:inline-flex items-center gap-1.5 bg-[var(--fx-accent-soft)] px-2.5 py-1 rounded-full text-xs">
-                {t.proProtection}
-              </span>
               <button
                 onClick={() => setActiveTab('chat')}
                 className="relative p-2 text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:bg-black/5 rounded-full cursor-pointer transition-colors"
@@ -1094,7 +1095,6 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   </span>
                 )}
               </button>
-              <span className="bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] rounded-lg px-2 py-1 text-xs font-bold shadow-2xs">{t.active}</span>
             </div>
           </header>
 
@@ -1149,10 +1149,10 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
             {/* ════ SETUP GUIDE PAGE ════ */}
             {activeTab === 'setup' && (
               <div className="space-y-6 animate-fade-in">
-                <div className="bg-white border border-[var(--fx-border)] rounded-lg p-6 shadow-xs space-y-6">
-                  <div className="flex justify-between items-center border-b border-[var(--fx-border)] pb-4">
+                <div className="bg-white border border-[var(--fx-border)] rounded-lg p-4 sm:p-6 shadow-xs space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b border-[var(--fx-border)] pb-4">
                     <div>
-                      <h1 className="text-2xl font-bold text-[var(--fx-ink)]">Welcome to RapiQR, {profile?.fullName || 'Client'}!</h1>
+                      <h1 className="text-xl sm:text-2xl font-bold text-[var(--fx-ink)]">Welcome to RapiQR, {profile?.fullName || 'Client'}!</h1>
                       <p className="text-xs text-[var(--fx-ink-2)] mt-1">Let's start step-by-step to protect your vehicles.</p>
                     </div>
                     <div className="flex items-center gap-3 text-xs">
@@ -1254,13 +1254,13 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                     <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
                       <div className="max-w-xl space-y-2 text-left">
                         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white text-[11px] font-bold tracking-wide uppercase">
-                          <Sparkles size={13} /> Sticker Purchase Required
+                          <Sparkles size={13} /> Your Sticker Is Free
                         </div>
                         <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white font-display">
-                          Purchase a Safety Sticker to Create & Activate Your Dashboard
+                          Get Your Free Safety Sticker to Activate Your Dashboard
                         </h2>
                         <p className="text-zinc-300 text-xs sm:text-sm leading-relaxed">
-                          Your account is ready! To generate your vehicle QR plate, emergency responder tree, and instant WhatsApp parking alerts, purchase your RapiQR smart safety tag.
+                          Your account is ready! To generate your vehicle QR plate, emergency responder tree, and instant WhatsApp parking alerts, get your free RapiQR smart safety tag.
                         </p>
                         <div className="flex flex-wrap items-center gap-4 pt-1 text-xs text-zinc-400">
                           <span className="flex items-center gap-1"><ShieldCheck size={14} className="text-emerald-400" /> 100% Number Masking</span>
@@ -1275,7 +1275,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                           className="h-11 px-6 rounded-xl bg-white hover:bg-neutral-100 active:scale-[0.99] text-black font-extrabold text-sm shadow-lg shadow-black/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
                         >
                           <ShoppingBag size={17} />
-                          <span>Purchase Sticker (₹199) →</span>
+                          <span>Get Free Sticker →</span>
                         </button>
                         <button
                           onClick={() => setModal({ type: 'recover' })}
@@ -1291,21 +1291,21 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
 
                 {/* HoneyBook Stats Bar (4 columns) */}
                 <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.04)] grid grid-cols-2 lg:grid-cols-4 rounded-lg overflow-hidden divide-x divide-y lg:divide-y-0 divide-[var(--fx-border)]">
-                  <div className="p-6">
+                  <div className="p-4 sm:p-6">
                     <div className="text-xs text-[var(--fx-ink-2)] mb-1">Active Stickers</div>
-                    <div className="text-3xl font-light tracking-tight text-[var(--fx-ink)]">{activeCount}</div>
+                    <div className="text-2xl sm:text-3xl font-light tracking-tight text-[var(--fx-ink)]">{activeCount}</div>
                   </div>
-                  <div className="p-6">
+                  <div className="p-4 sm:p-6">
                     <div className="text-xs text-[var(--fx-ink-2)] mb-1">Total Scans</div>
-                    <div className="text-3xl font-light tracking-tight text-[var(--fx-ink)]">{totalScans}</div>
+                    <div className="text-2xl sm:text-3xl font-light tracking-tight text-[var(--fx-ink)]">{totalScans}</div>
                   </div>
-                  <div className="p-6">
+                  <div className="p-4 sm:p-6">
                     <div className="text-xs text-[var(--fx-ink-2)] mb-1">Emergency Contacts</div>
-                    <div className="text-3xl font-light tracking-tight text-[var(--fx-ink)]">{totalContacts}</div>
+                    <div className="text-2xl sm:text-3xl font-light tracking-tight text-[var(--fx-ink)]">{totalContacts}</div>
                   </div>
-                  <div className="p-6">
+                  <div className="p-4 sm:p-6">
                     <div className="text-xs text-[var(--fx-ink-2)] mb-1">Security Status</div>
-                    <div className="text-2xl font-semibold text-[#4FC47A] tracking-tight mt-1">Protected</div>
+                    <div className="text-xl sm:text-2xl font-semibold text-[#4FC47A] tracking-tight mt-1">Protected</div>
                   </div>
                 </div>
 
@@ -1313,7 +1313,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   
                   {/* Card 1: Create New */}
-                  <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4 flex flex-col justify-between min-h-[360px]">
+                  <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4 flex flex-col justify-between md:min-h-[360px]">
                     <div>
                       <h3 className="text-xs font-semibold text-[var(--fx-ink)] mb-3.5">Quick Actions</h3>
                       <div className="space-y-2">
@@ -1356,7 +1356,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   </div>
 
                   {/* Card 2: Active Stickers */}
-                  <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4 flex flex-col justify-between min-h-[360px]">
+                  <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4 flex flex-col justify-between md:min-h-[360px]">
                     <div>
                       <div className="flex justify-between items-center mb-3">
                         <h3 className="text-xs font-semibold text-[var(--fx-ink)]">My Safety Stickers ({products.length})</h3>
@@ -1375,13 +1375,13 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                           </div>
                           <div>
                             <p className="font-bold text-sm text-[var(--fx-ink)]">No Safety Stickers Linked Yet</p>
-                            <p className="text-[11px] text-[var(--fx-ink-2)] mt-0.5">Purchase your first sticker to create your vehicle plate.</p>
+                            <p className="text-[11px] text-[var(--fx-ink-2)] mt-0.5">Get your free sticker to create your vehicle plate.</p>
                           </div>
                           <button
                             onClick={handlePurchaseStickerClick}
                             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-black hover:bg-zinc-800 active:scale-[0.99] text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
                           >
-                            <Plus size={14} /> Buy Safety Sticker
+                            <Plus size={14} /> Get Free Sticker
                           </button>
                         </div>
                       ) : (
@@ -1447,7 +1447,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   </div>
 
                   {/* Card 3: Emergency Responders */}
-                  <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4 flex flex-col justify-between min-h-[360px]">
+                  <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4 flex flex-col justify-between md:min-h-[360px]">
                     <div>
                       <div className="flex justify-between items-center mb-3">
                         <h3 className="text-xs font-semibold text-[var(--fx-ink)]">Emergency Contacts ({totalContacts})</h3>
@@ -1657,7 +1657,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                             {(o.items || []).map((it: any, i: number) => (
                               <div key={i} className="flex items-center justify-between py-1.5 text-[13px]">
                                 <span className="text-[var(--fx-ink)]">{it.name} × {it.qty}</span>
-                                <span className="font-mono text-[var(--fx-ink-2)]">₹{(it.price * it.qty).toLocaleString('en-IN')}</span>
+                                <span className="font-mono text-[var(--fx-ink-2)]">{it.price > 0 ? `₹${(it.price * it.qty).toLocaleString('en-IN')}` : 'Free'}</span>
                               </div>
                             ))}
                           </div>

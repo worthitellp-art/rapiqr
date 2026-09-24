@@ -71,7 +71,7 @@ import { apiClient } from '../../lib/apiClient';
 import { SERVICE_TYPES } from '../scan/tileActions';
 import { getServiceMeta } from '../scan/serviceMeta';
 import { STICKER_CATEGORIES } from '../../stickerModules';
-import { DEFAULT_PRODUCTS, mapApiShopProduct, type ProductItem } from '../../data/products';
+import { DEFAULT_PRODUCTS, mapApiShopProduct, BALANCE_TOPUP_AMOUNT, type ProductItem } from '../../data/products';
 
 // Image assets
 import stepImg1 from '../../../assets/landing-step-1.webp';
@@ -1274,7 +1274,6 @@ export default function LandingPageMaster({
     [activeCategory, products]
   );
 
-  const cartSubtotal = cart.reduce((sum, i) => sum + i.product.price * i.qty, 0);
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
 
   const NAV_LINKS = [
@@ -1922,15 +1921,7 @@ export default function LandingPageMaster({
 
                   <div className="flex flex-1 flex-col justify-between p-6 pt-2 text-[#FFFFFF] sm:p-7 sm:pt-3">
                     <div>
-                      <div className="flex items-start justify-between gap-4">
-                        <h3 className="text-xl font-medium tracking-[-0.02em]">{product.name}</h3>
-                        <div className="shrink-0 text-right">
-                          <div className="text-lg font-medium">₹{product.price}</div>
-                          <div className="text-[11px] font-light text-[#FFFFFF]/50 line-through">
-                            ₹{product.mrp}
-                          </div>
-                        </div>
-                      </div>
+                      <h3 className="text-xl font-medium tracking-[-0.02em]">{product.name}</h3>
 
                       <p className="mt-2.5 text-[13px] font-light leading-relaxed text-[#FFFFFF]/55">
                         {product.desc}
@@ -1953,7 +1944,7 @@ export default function LandingPageMaster({
                           onClick={() => handleBuyNow(product)}
                           className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-[#FFFFFF] py-3 text-[13px] font-bold text-[#14120C] shadow-md transition-all hover:bg-neutral-100 hover:shadow-lg active:scale-95"
                         >
-                          <span>Buy Now</span>
+                          <span>Get Free</span>
                           <ArrowRight size={15} />
                         </button>
                         <button
@@ -2715,9 +2706,7 @@ export default function LandingPageMaster({
                         />
                         <div className="min-w-0 flex-1">
                           <h4 className="truncate text-[13px] font-medium">{item.product.name}</h4>
-                          <div className="mt-1 text-[13px] font-light text-[#14120C]/60">
-                            ₹{item.product.price}
-                          </div>
+                          <div className="mt-1 text-[13px] font-medium text-emerald-700">Free</div>
                         </div>
                         <div className="flex items-center gap-2 rounded-full border border-[#14120C]/10 p-1">
                           <button
@@ -2758,10 +2747,13 @@ export default function LandingPageMaster({
 
               {cart.length > 0 && (
                 <div className="border-t border-[#14120C]/8 pt-5">
-                  <div className="mb-5 flex items-center justify-between text-base font-medium">
-                    <span>Subtotal</span>
-                    <span>₹{cartSubtotal}</span>
+                  <div className="mb-1 flex items-center justify-between text-base font-medium">
+                    <span>Total</span>
+                    <span>₹{BALANCE_TOPUP_AMOUNT}</span>
                   </div>
+                  <p className="mb-5 text-[12px] font-light text-[#14120C]/60">
+                    Stickers are free. ₹{BALANCE_TOPUP_AMOUNT} is added to your balance.
+                  </p>
                   <button
                     onClick={openCheckout}
                     className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#C9A227] py-4 text-[13px] font-semibold text-[#14120C] transition-transform hover:scale-[1.01] active:scale-[0.99]"

@@ -153,7 +153,14 @@ export async function sendMsg91Otp(identifier: string): Promise<void> {
     window.sendOtp(
       identifier,
       () => resolve(),
-      (error) => reject(new Error(error?.message || 'Failed to send the verification code.'))
+      (error) => {
+        // MSG91's widget often calls onFailure with no `.message` (domain not
+        // whitelisted, invalid/expired widget credentials, exhausted SMS
+        // balance) — log the raw payload so the real reason is visible in
+        // devtools instead of just the generic fallback text below.
+        console.error('MSG91 sendOtp failure:', error);
+        reject(new Error(error?.message || 'Failed to send the verification code.'));
+      }
     );
   });
 }
@@ -175,7 +182,10 @@ export async function verifyMsg91Otp(otp: string): Promise<string> {
         }
         resolve(token);
       },
-      (error) => reject(new Error(error?.message || 'Incorrect code — please try again.'))
+      (error) => {
+        console.error('MSG91 verifyOtp failure:', error);
+        reject(new Error(error?.message || 'Incorrect code — please try again.'));
+      }
     );
   });
 }
@@ -195,7 +205,10 @@ export async function retryMsg91Otp(channel: 'text' | 'voice' | 'whatsapp' = 'te
     window.retryOtp(
       channel,
       () => resolve(),
-      (error) => reject(new Error(error?.message || 'Failed to resend the code.'))
+      (error) => {
+        console.error('MSG91 retryOtp failure:', error);
+        reject(new Error(error?.message || 'Failed to resend the code.'));
+      }
     );
   });
 }

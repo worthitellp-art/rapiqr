@@ -25,6 +25,7 @@ import { OrderInvoice } from '../../types/invoice';
 import { buildOrderInvoice, printOrderInvoice } from '../../services/invoiceService';
 import OrderInvoiceModal from './OrderInvoiceModal';
 import DashboardAccessModal from './DashboardAccessModal';
+import { BALANCE_TOPUP_AMOUNT } from '../../data/products';
 
 /**
  * Last-resort local receipt when the backend order API is unreachable —
@@ -212,9 +213,24 @@ export default function CheckoutPage({
   // user-facing choice, so there's no in-page selector for it anymore.
   const payment = 'razorpay';
 
-  const subtotal = cart.reduce((s, i) => s + i.product.price * i.qty, 0);
-  const deliveryFee = delivery === 'express' ? 99 : 0;
-  const total = subtotal + deliveryFee;
+  // Stickers are free — the only charge is a flat top-up credited to the
+  // buyer's balance (the server enforces the same amount in OrderController).
+  const subtotal = 0;
+  const deliveryFee = 0;
+  const total = BALANCE_TOPUP_AMOUNT;
+
+  // Invoice lines: each sticker at ₹0, plus the balance top-up that is the
+  // actual charge. Invoice subtotal is `total` so its grand total matches.
+  const invoiceItems = () => [
+    ...cart.map((cartItem) => ({
+      id: cartItem.product.id,
+      name: cartItem.product.name,
+      category: cartItem.product.category,
+      qty: cartItem.qty,
+      price: 0,
+    })),
+    { id: 'balance-topup', name: 'Balance top-up', category: 'Balance', qty: 1, price: total },
+  ];
 
   // Prefill from account when mounted
   useEffect(() => {
@@ -342,14 +358,8 @@ export default function CheckoutPage({
           state: state.trim(),
           pincode: pincode.trim(),
         },
-        items: cart.map((cartItem) => ({
-          id: cartItem.product.id,
-          name: cartItem.product.name,
-          category: cartItem.product.category,
-          qty: cartItem.qty,
-          price: cartItem.product.price,
-        })),
-        subtotal,
+        items: invoiceItems(),
+        subtotal: total,
         deliveryFee,
         paymentMethod: payment,
         deliveryType: delivery,
@@ -394,7 +404,7 @@ export default function CheckoutPage({
     const items = cart.map((i) => ({
       name: i.product.name,
       qty: i.qty,
-      price: i.product.price,
+      price: 0,
     }));
 
     try {
@@ -508,7 +518,7 @@ export default function CheckoutPage({
       id: i.product.id,
       name: i.product.name,
       qty: i.qty,
-      price: i.product.price,
+      price: 0,
       category: i.product.category,
     }));
 
@@ -689,14 +699,8 @@ export default function CheckoutPage({
             state: state.trim(),
             pincode: pincode.trim(),
           },
-          items: cart.map((cartItem) => ({
-            id: cartItem.product.id,
-            name: cartItem.product.name,
-            category: cartItem.product.category,
-            qty: cartItem.qty,
-            price: cartItem.product.price,
-          })),
-          subtotal,
+          items: invoiceItems(),
+          subtotal: total,
           deliveryFee,
           paymentMethod: payment,
           paymentTransactionId: response.razorpay_payment_id,
@@ -818,15 +822,22 @@ export default function CheckoutPage({
             {/* ── LEFT COLUMN: FORM DETAILS (7 COLS) ── */}
             <div className="lg:col-span-7 space-y-4">
 
-              {/* Account Awareness Banner */}
-              {isLoggedIn ? (
-                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs sm:text-sm flex items-center gap-2.5">
-                  <CheckCircle2 size={17} className="text-emerald-600 shrink-0" />
-                  <div>
-                    Checking out as <strong>{profile?.email || email}</strong>. Your purchased tags will be automatically linked to your account.
-                  </div>
+              {/* Free Sticker Banner */}
+              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start gap-3">
+                <CheckCircle2 size={20} className="text-emerald-600 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="font-bold text-sm sm:text-base">Your sticker is free!</p>
+                  <p className="text-xs sm:text-sm text-emerald-800 mt-0.5 leading-relaxed">
+                    You only pay ₹{total}, and the full ₹{total} is added to your RepiQR balance.
+                    {isLoggedIn && (
+                      <> Linked to <strong className="break-all">{profile?.email || email}</strong>.</>
+                    )}
+                  </p>
                 </div>
-              ) : (
+              </div>
+
+              {/* Guest Account Banner */}
+              {!isLoggedIn && (
                 <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-xs sm:text-sm flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <User size={16} className="text-[#111111] shrink-0" />
@@ -1010,7 +1021,7 @@ export default function CheckoutPage({
                   type="submit"
                   className="w-full h-11 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-sm shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-[0.99] group"
                 >
-                  <span>Pay ₹{total} Securely</span>
+                  <span>Pay ₹{total} &amp; Add to Balance</span>
                   <Lock size={15} className="text-black" />
                   <ArrowRight size={16} className="text-black transition-transform group-hover:translate-x-0.5" />
                 </button>
@@ -1054,8 +1065,8 @@ export default function CheckoutPage({
                         </div>
                         <div className="text-[11px] text-[#14120C]/50 font-semibold mt-0.5">Qty: {item.qty}</div>
                       </div>
-                      <div className="font-extrabold text-[14px] text-[#14120C]">
-                        ₹{item.product.price * item.qty}
+                      <div className="font-bold text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                        FREE
                       </div>
                     </div>
                   ))}
@@ -1064,23 +1075,24 @@ export default function CheckoutPage({
                 {/* Price Breakdown */}
                 <div className="space-y-2.5 pt-4 border-t border-[#14120C]/8 text-[13px]">
                   <div className="flex items-center justify-between text-[#14120C]/70 font-medium">
-                    <span>Item Subtotal</span>
-                    <span className="font-bold text-[#14120C]">₹{subtotal}</span>
+                    <span>Stickers</span>
+                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full text-xs">FREE</span>
                   </div>
                   <div className="flex items-center justify-between text-[#14120C]/70 font-medium">
-                    <span>Express Delivery (2-3 Days)</span>
-                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full text-xs">
-                      {deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}
-                    </span>
+                    <span>Delivery (2-3 Days)</span>
+                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full text-xs">FREE</span>
                   </div>
                   <div className="flex items-center justify-between text-[#14120C]/70 font-medium">
-                    <span>GST (18% Included)</span>
-                    <span className="font-medium text-[#14120C]/50">Included</span>
+                    <span>Balance top-up</span>
+                    <span className="font-bold text-[#14120C]">₹{total}</span>
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-[#14120C]/10 text-lg font-extrabold text-[#14120C]">
                     <span>Total Amount</span>
                     <span className="text-[#14120C] font-black">₹{total}</span>
                   </div>
+                  <p className="text-xs font-semibold text-emerald-700">
+                    ₹{total} will be added to your balance.
+                  </p>
                 </div>
 
                 {/* Trust Badges */}
@@ -1126,7 +1138,7 @@ export default function CheckoutPage({
                 <span className="font-mono font-medium text-gray-900 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
                   {orderId}
                 </span>{' '}
-                of <span className="font-semibold text-gray-900">₹{confirmedTotal}</span> is confirmed.
+                is confirmed and <span className="font-semibold text-gray-900">₹{confirmedTotal}</span> has been added to your balance.
               </p>
             </div>
 

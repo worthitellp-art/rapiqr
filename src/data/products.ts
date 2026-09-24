@@ -21,6 +21,13 @@ export interface ProductItem {
 }
 
 /**
+ * Stickers are free — every checkout charges this flat amount instead, and
+ * it's credited to the buyer's balance once the Razorpay payment is paid.
+ * Must match BALANCE_TOPUP_AMOUNT in Server/controllers/orderController.js.
+ */
+export const BALANCE_TOPUP_AMOUNT = 150;
+
+/**
  * Maps a `/api/shop-products` row (admin catalog, camelCase per
  * shopProductModel.js's toApi()) onto the shape the storefront/checkout UI
  * already knows how to render.
