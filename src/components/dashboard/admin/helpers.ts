@@ -161,9 +161,10 @@ export interface SheetOptions {
 }
 
 /**
- * Print-ready sheet export: tiles selected stickers onto 18x12in canvas at 300 DPI in a
- * 3x3 grid with trim-guide lines and corner crop marks.
- * When 1 sticker is provided, it repeats across all 9 grid slots as specified in 12x18sheet-export.txt.
+ * Print-ready sheet export: tiles selected stickers onto a 12x18in canvas at 300 DPI,
+ * in a grid sized to fill the sheet (see PRINT_SHEET_CONSTANTS.GRID_ROWS), with
+ * trim-guide lines and corner crop marks.
+ * When 1 sticker is provided, it repeats across every grid slot.
  */
 export async function generateSheetBlobs(
   records: QrRecord[],

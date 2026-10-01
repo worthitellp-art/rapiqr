@@ -13,11 +13,11 @@ export default function PrintSheetEmptyState({ onClose }: PrintSheetEmptyStatePr
       </div>
 
       <h3 className="font-display text-[17px] font-bold text-[var(--fx-ink)] mb-1.5">
-        No stickers exist
+        No stickers to print
       </h3>
 
       <p className="text-[13px] text-[var(--fx-ink-2)] max-w-md leading-relaxed mb-6">
-        There are currently no stickers available to generate an 18×12″ print sheet. Please generate or import QR stickers in the dashboard before printing.
+        Generate a sticker first, then come back here to print it.
       </p>
 
       <div className="flex items-center gap-3">

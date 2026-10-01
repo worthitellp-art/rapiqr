@@ -2,15 +2,52 @@ import { QrRecord, StickerPos } from "../components/dashboard/admin/types";
 import { generateQrDataUrl, qrFullUrl } from "../components/dashboard/admin/helpers";
 import stickerTemplateImg from "../assets/template-sticker.jpeg";
 
+// Natural pixel size of the sticker template artwork (src/assets/template-sticker.jpeg).
+// Used below to work out how many rows actually fit on a sheet — keep this in
+// sync if the template image is ever replaced with a different aspect ratio.
+const TEMPLATE_NATURAL_WIDTH = 4720;
+const TEMPLATE_NATURAL_HEIGHT = 2948;
+const TEMPLATE_ASPECT_RATIO = TEMPLATE_NATURAL_WIDTH / TEMPLATE_NATURAL_HEIGHT;
+
+const SHEET_WIDTH_INCHES = 12;
+const SHEET_HEIGHT_INCHES = 18;
+const DEFAULT_DPI = 300;
+const GRID_COLUMNS = 3;
+const MARGIN_INCHES = 0.25;
+const GAP_INCHES = 0.2;
+
+/**
+ * A fixed 3-column grid sized to fill the sheet's width leaves most of a
+ * 12×18 sheet blank if rows are also hardcoded to match (the sticker artwork
+ * is wide/landscape, so 3 of them stack into far less than 18 inches of
+ * height) — e.g. a hardcoded 3×3 grid used only ~42% of the sheet's height.
+ * Compute how many rows of the same (width-constrained) cell size actually
+ * fit, so the sheet prints at full capacity instead of wasting paper.
+ */
+function computeGridRows(): number {
+  const dpi = DEFAULT_DPI;
+  const marginPx = MARGIN_INCHES * dpi;
+  const gapPx = GAP_INCHES * dpi;
+  const availableWidth = SHEET_WIDTH_INCHES * dpi - 2 * marginPx;
+  const availableHeight = SHEET_HEIGHT_INCHES * dpi - 2 * marginPx;
+
+  const cellWidth = (availableWidth - (GRID_COLUMNS - 1) * gapPx) / GRID_COLUMNS;
+  const cellHeight = cellWidth / TEMPLATE_ASPECT_RATIO;
+
+  return Math.max(1, Math.floor((availableHeight + gapPx) / (cellHeight + gapPx)));
+}
+
+const GRID_ROWS = computeGridRows();
+
 export const PRINT_SHEET_CONSTANTS = {
-  SHEET_WIDTH_INCHES: 18,
-  SHEET_HEIGHT_INCHES: 12,
-  DEFAULT_DPI: 300,
-  GRID_COLUMNS: 3,
-  GRID_ROWS: 3,
-  STICKERS_PER_SHEET: 9,
-  MARGIN_INCHES: 0.25,
-  GAP_INCHES: 0.2,
+  SHEET_WIDTH_INCHES,
+  SHEET_HEIGHT_INCHES,
+  DEFAULT_DPI,
+  GRID_COLUMNS,
+  GRID_ROWS,
+  STICKERS_PER_SHEET: GRID_COLUMNS * GRID_ROWS,
+  MARGIN_INCHES,
+  GAP_INCHES,
   REFERENCE_EDITOR_WIDTH: 320,
   REFERENCE_EDITOR_HEIGHT: 200,
   QR_RESOLUTION_PIXELS: 768,
@@ -130,7 +167,7 @@ function drawCutGuideLines(
   canvasContext.lineWidth = Math.max(1, Math.round((0.75 / 72) * dpi));
   canvasContext.setLineDash([Math.round(dpi * 0.04), Math.round(dpi * 0.02)]);
 
-  // Vertical trim lines running through cell gaps across the full 12-inch height.
+  // Vertical trim lines running through cell gaps across the full 18-inch height.
   for (let colIndex = 1; colIndex < columns; colIndex++) {
     const lineX = grid.cellXCoordinates[colIndex - 1] + grid.cellPixelWidth + grid.cellGapPixels / 2;
     canvasContext.beginPath();
@@ -139,7 +176,7 @@ function drawCutGuideLines(
     canvasContext.stroke();
   }
 
-  // Horizontal trim lines running through cell gaps across the full 18-inch width.
+  // Horizontal trim lines running through cell gaps across the full 12-inch width.
   for (let rowIndex = 1; rowIndex < rows; rowIndex++) {
     const lineY = grid.cellYCoordinates[rowIndex - 1] + grid.cellPixelHeight + grid.cellGapPixels / 2;
     canvasContext.beginPath();
@@ -230,8 +267,8 @@ function convertCanvasToPngBlob(canvasElement: HTMLCanvasElement): Promise<Blob 
 }
 
 /**
- * Generates an 18×12 inch print sheet repeating a single sticker in a 3×3 grid (9 stickers)
- * as specified in 12x18sheet-export.txt.
+ * Generates a 12×18 inch print sheet repeating a single sticker across a grid
+ * sized to fill the sheet (see PRINT_SHEET_CONSTANTS.GRID_ROWS).
  */
 export async function generateRepeatedStickerSheetBlob(
   record: QrRecord,
@@ -269,7 +306,8 @@ export async function generateRepeatedStickerSheetBlob(
 }
 
 /**
- * Generates 18×12 inch print sheets tiling a batch of stickers (9 stickers per sheet).
+ * Generates 12×18 inch print sheets tiling a batch of stickers, as many per
+ * sheet as fit (see PRINT_SHEET_CONSTANTS.STICKERS_PER_SHEET).
  */
 export async function generateBatchStickersSheetBlobs(
   records: QrRecord[],
@@ -342,9 +380,13 @@ export function downloadSheetBlob(blob: Blob, fileName: string): void {
 }
 
 /**
- * Triggers browser print dialog with page layout formatted for 18x12 inch landscape sheets.
+ * Triggers browser print dialog with page layout formatted for 12x18 inch
+ * portrait sheets. `copies` repeats the sheet across that many print pages
+ * (via CSS page breaks) so one print job produces that many physical copies,
+ * rather than relying on the OS print dialog's own (inconsistently placed)
+ * copies field.
  */
-export function printSheetBlobInBrowser(blob: Blob, documentTitle = "RapiQR Print Sheet"): void {
+export function printSheetBlobInBrowser(blob: Blob, documentTitle = "RapiQR Print Sheet", copies = 1): void {
   const objectUrl = URL.createObjectURL(blob);
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
@@ -353,6 +395,12 @@ export function printSheetBlobInBrowser(blob: Blob, documentTitle = "RapiQR Prin
     return;
   }
 
+  const safeCopies = Math.max(1, Math.round(copies) || 1);
+  const pagesHtml = Array.from(
+    { length: safeCopies },
+    () => `<div class="sheet-page"><img class="print-sheet-img" src="${objectUrl}" alt="Print Sheet" /></div>`
+  ).join("");
+
   printWindow.document.write(`
     <!DOCTYPE html>
     <html>
@@ -360,7 +408,7 @@ export function printSheetBlobInBrowser(blob: Blob, documentTitle = "RapiQR Prin
         <title>${documentTitle}</title>
         <style>
           @page {
-            size: 18in 12in landscape;
+            size: 12in 18in portrait;
             margin: 0;
           }
           * {
@@ -369,17 +417,25 @@ export function printSheetBlobInBrowser(blob: Blob, documentTitle = "RapiQR Prin
           html, body {
             margin: 0;
             padding: 0;
-            width: 100%;
-            height: 100%;
             background: #ffffff;
+          }
+          .sheet-page {
+            width: 100%;
+            height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
+            page-break-after: always;
+            break-after: page;
           }
-          img {
-            width: 18in;
-            height: 12in;
+          .sheet-page:last-child {
+            page-break-after: auto;
+            break-after: auto;
+          }
+          .print-sheet-img {
+            width: 12in;
+            height: 18in;
             max-width: 100vw;
             max-height: 100vh;
             object-fit: contain;
@@ -390,7 +446,7 @@ export function printSheetBlobInBrowser(blob: Blob, documentTitle = "RapiQR Prin
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
             }
-            img {
+            .print-sheet-img {
               width: 100%;
               height: 100%;
             }
@@ -398,16 +454,16 @@ export function printSheetBlobInBrowser(blob: Blob, documentTitle = "RapiQR Prin
         </style>
       </head>
       <body>
-        <img id="print-sheet-img" src="${objectUrl}" alt="Print Sheet" />
+        ${pagesHtml}
         <script>
-          const img = document.getElementById("print-sheet-img");
-          img.onload = () => {
+          const images = Array.from(document.querySelectorAll(".print-sheet-img"));
+          Promise.all(images.map((img) => img.complete ? Promise.resolve() : new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; }))).then(() => {
             window.focus();
             window.print();
             window.onafterprint = () => {
               window.close();
             };
-          };
+          });
         </script>
       </body>
     </html>

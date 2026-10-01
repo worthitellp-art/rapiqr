@@ -37,6 +37,10 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
   const [templates, setTemplates] = useLocalStorage<Template[]>("repiqr-templates", []);
   const [qrList, setQrList] = useLocalStorage<QrRecord[]>("repiqr-qrlist", []);
   const [stickerPos, setStickerPos] = useLocalStorage<StickerPos>("repiqr-sticker-pos", { x: 193, y: 37, w: 110, h: 110 });
+  // Shared with both the main fleet table (read) and the Print Sheet modal
+  // (read/write) so marking a sticker printed in one place is reflected in
+  // the other immediately — see PrintSheetModal/usePrintSheetState.
+  const [printedStickerIdList, setPrintedStickerIdList] = useLocalStorage<string[]>("repiqr-printed-sticker-ids", []);
   const [quickLookQr, setQuickLookQr] = useState<QrRecord | null>(null);
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -228,6 +232,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
               setToast={setToast} openQuickLook={setQuickLookQr}
               openRestore={() => setRestoreModalOpen(true)} searchQuery={searchQuery}
               stickerPos={stickerPos} openPrintSheet={handleOpenPrintSheet}
+              printedStickerIdList={printedStickerIdList}
             />
           )}
           {page === "communication" && <CommunicationPage setToast={setToast} />}
@@ -275,6 +280,8 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
         initialSelectedSticker={printSheetTargetSticker}
         initialBatchStickers={printSheetInitialBatch}
         stickerPos={stickerPos}
+        printedStickerIdList={printedStickerIdList}
+        setPrintedStickerIdList={setPrintedStickerIdList}
         onShowToast={(msg) => {
           setToast(msg);
           setTimeout(() => setToast(null), 3500);

@@ -4,7 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import type { DashboardSticker, EmergencyContact } from './types';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
 import { getCategoryIcon } from '../../../stickerModules';
-import { generateRepeatedStickerSheetBlob, downloadSheetBlob } from '../../../services/stickerPrintSheetService';
+import { generateRepeatedStickerSheetBlob, downloadSheetBlob, PRINT_SHEET_CONSTANTS } from '../../../services/stickerPrintSheetService';
 import type { QrRecord } from '../admin/types';
 import repiqrWordmark from '../../../assets/repiqr-wordmark.png';
 
@@ -570,11 +570,11 @@ export function QrCodeModal({
                   fg: '000000',
                   bg: 'FFFFFF',
                 };
-                const pos = { x: 110, y: 40, w: 100, h: 100 };
+                const pos = { x: 193, y: 37, w: 110, h: 110 };
                 const blob = await generateRepeatedStickerSheetBlob(rec, pos);
                 if (blob) {
-                  downloadSheetBlob(blob, `repiqr-print-sheet-18x12-${rec.id}.png`);
-                  onShowToast('18×12″ print sheet (9 stickers) downloaded');
+                  downloadSheetBlob(blob, `repiqr-print-sheet-12x18-${rec.id}.png`);
+                  onShowToast(`12×18″ print sheet (${PRINT_SHEET_CONSTANTS.STICKERS_PER_SHEET} stickers) downloaded`);
                 }
               } catch (err) {
                 console.error('Failed to generate sticker sheet:', err);
@@ -584,7 +584,7 @@ export function QrCodeModal({
             className="w-full py-2.5 px-3 rounded-xl border border-[var(--fx-accent)]/30 bg-[var(--fx-accent-soft)] hover:bg-[var(--fx-accent-soft)] text-xs font-bold text-[var(--fx-accent-ink)] flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-2xs"
           >
             <Printer size={14} />
-            <span>Print 18×12″ Sheet (9 Stickers)</span>
+            <span>Print 12×18″ Sheet ({PRINT_SHEET_CONSTANTS.STICKERS_PER_SHEET} Stickers)</span>
           </button>
         </div>
       </div>

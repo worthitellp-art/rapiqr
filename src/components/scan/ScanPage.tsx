@@ -851,16 +851,11 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   // Activation country (limited list with dial codes)
   const [regCountry, setRegCountry] = useState("+91");
 
-  // Convenience only, not a verification shortcut: a signed-in visitor whose
-  // phone is already verified account-wide still has to OTP-verify before
-  // THIS tag activates (see handleSendOtp/handleVerifyOtpAndActivate) — this
-  // just saves them re-typing a name and number we already know.
-  useEffect(() => {
-    if (!regName && !regPhone && profile?.isPhoneVerified && profile?.phoneNumber) {
-      if (profile.fullName) setRegName(profile.fullName);
-      setRegPhone(profile.phoneNumber.replace(/\D/g, "").slice(-10));
-    }
-  }, [profile, regName, regPhone]);
+  // Deliberately NOT auto-filled from the signed-in account's profile — a
+  // visitor registering a tag they just scanned found a silently prefilled
+  // name/phone from an unrelated session confusing ("why does this already
+  // have someone else's info?"), not helpful. Every registration starts
+  // blank; OTP verification is still required regardless either way.
 
   // AI Chat Assistant — the conversation itself lives in <AssistantChat/>, which
   // seeds its greeting and suggested questions from the scanned tag's category.
@@ -885,31 +880,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     return digits.length >= rule.min && digits.length <= rule.max;
   }
 
-  // Prefill owner phone/name from the most recent purchase order (convenience
-  // only — this is client-supplied localStorage and must never be trusted as
-  // proof of identity, so it no longer skips OTP verification; see handleSendOtp).
-  useEffect(() => {
-    try {
-      const orders = JSON.parse(localStorage.getItem("repiqr-orders") || localStorage.getItem("namoqr-orders") || "[]");
-      if (orders.length > 0) {
-        // Orders are persisted with unshift → index 0 is the newest purchase
-        const last = orders[0];
-        if (last?.phone) {
-          const digits = String(last.phone).replace(/\D/g, "");
-          if (digits.length >= 10) {
-            const local = digits.slice(-10);
-            setRegPhone((prev) => prev || local);
-          }
-        }
-        if (last?.name) setRegName((prev) => prev || String(last.name));
-        const shipping = last?.invoice?.shippingAddress;
-        if (shipping?.address) {
-          const line = [shipping.address, shipping.city, shipping.state, shipping.pincode].filter(Boolean).join(", ");
-          setRegAddress((prev) => prev || line);
-        }
-      }
-    } catch { /* ignore */ }
-  }, []);
+  // Deliberately NOT prefilled from a stored past order either, for the same
+  // reason as above — see the note near the removed profile-prefill effect.
 
   const handleSendOtp = async () => {
     if (!qrData || otpSending) return;

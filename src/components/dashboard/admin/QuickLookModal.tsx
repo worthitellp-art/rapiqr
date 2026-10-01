@@ -175,10 +175,10 @@ export default function QuickLookModal({
                     onOpenPrintSheet(qr);
                   }}
                   className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition-colors shadow-2xs cursor-pointer"
-                  title="Open in 18×12 print sheet layout"
+                  title="Print this sticker"
                 >
                   <Printer size={13} />
-                  <span>Print Sheet</span>
+                  <span>Print</span>
                 </button>
               )}
             </div>

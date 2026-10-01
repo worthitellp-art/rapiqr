@@ -162,11 +162,6 @@ export default function ScanPaymentModal({
   return (
     <div className="w-full flex items-center justify-center px-4 py-3 sm:py-12 animate-fade-in">
       <div className="w-full max-w-xl">
-        {/* Tag context line — honest, no payment framing: nothing is purchased here */}
-        <p className="mb-2 sm:mb-5 text-center text-[12px] sm:text-[13px] font-medium text-slate-500">
-          Registering tag <span className="font-mono font-semibold text-slate-700">#{qrId}</span>
-        </p>
-
         {/* Compact step indicator (mobile): one line of text + a thin progress bar,
             so a long label like "Emergency contacts" never has to squeeze under a
             ~90px-wide slot the way the 4-node layout below needs. */}
@@ -272,12 +267,9 @@ export default function ScanPaymentModal({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between h-9 px-3.5 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-900">
-                  <div className="flex items-center gap-2">
-                    <CategoryIconComponent size={14} className="text-slate-600" />
-                    <span className="font-medium">{selectedCategory || category || 'Car & Auto & Truck'}</span>
-                  </div>
-                  <span className="text-[11px] text-slate-400 font-medium">Preselected</span>
+                <div className="flex items-center gap-2 h-9 px-3.5 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-900">
+                  <CategoryIconComponent size={14} className="text-slate-600" />
+                  <span className="font-medium">{selectedCategory || category || 'Car & Auto & Truck'}</span>
                 </div>
 
                 {isVehicle ? (

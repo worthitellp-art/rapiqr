@@ -48,6 +48,7 @@ export default function QrCodesPage({
   stickerPos,
   openPrintSheet,
   searchQuery,
+  printedStickerIdList,
 }: {
   qrList: QrRecord[];
   setQrList: React.Dispatch<React.SetStateAction<QrRecord[]>>;
@@ -58,7 +59,9 @@ export default function QrCodesPage({
   stickerPos: StickerPos;
   openPrintSheet?: (targetSticker?: QrRecord, selectedBatchStickers?: QrRecord[]) => void;
   searchQuery: string;
+  printedStickerIdList?: string[];
 }) {
+  const printedStickerIds = useMemo(() => new Set(printedStickerIdList || []), [printedStickerIdList]);
   const [selectedCategory, setSelectedCategory] = useState("car");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [tab, setTab] = useState<"single" | "bulk">("single");
@@ -582,7 +585,7 @@ export default function QrCodesPage({
             onClick={handlePrintSheet}
             disabled={filtered.length === 0 || sheetGenerating}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
-            title="Generate 18×12″ print sheet"
+            title="Print stickers"
           >
             <Printer size={13} />
             <span>Print Sheet{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</span>
@@ -733,20 +736,27 @@ export default function QrCodesPage({
                           </td>
                           <td className="px-4 py-3 text-gray-500">{fmtDate(q.createdAt)}</td>
                           <td className="px-4 py-3">
-                            <span
-                              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-wide ${
-                                computedStatus === "active"
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                  : "bg-amber-50 text-amber-700 border border-amber-200"
-                              }`}
-                            >
+                            <div className="flex items-center gap-1.5">
                               <span
-                                className={`w-1.5 h-1.5 rounded-full ${
-                                  computedStatus === "active" ? "bg-emerald-500" : "bg-amber-500"
+                                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-wide ${
+                                  computedStatus === "active"
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-amber-50 text-amber-700 border border-amber-200"
                                 }`}
-                              />
-                              <span>{computedStatus === "active" ? "Active" : "Inactive"}</span>
-                            </span>
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    computedStatus === "active" ? "bg-emerald-500" : "bg-amber-500"
+                                  }`}
+                                />
+                                <span>{computedStatus === "active" ? "Active" : "Inactive"}</span>
+                              </span>
+                              {printedStickerIds.has(q.id) && (
+                                <span title="Already printed" className="text-emerald-600">
+                                  <Printer size={12} />
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-right">
                             <QrRowActions
@@ -799,20 +809,27 @@ export default function QrCodesPage({
                         />
                         <span className="font-mono font-bold text-xs text-gray-900">{q.id}</span>
                       </div>
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${
-                          computedStatus === "active"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-amber-50 text-amber-700 border border-amber-200"
-                        }`}
-                      >
+                      <div className="flex items-center gap-1.5">
                         <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            computedStatus === "active" ? "bg-emerald-500" : "bg-amber-500"
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${
+                            computedStatus === "active"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-amber-50 text-amber-700 border border-amber-200"
                           }`}
-                        />
-                        <span>{computedStatus === "active" ? "Active" : "Inactive"}</span>
-                      </span>
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              computedStatus === "active" ? "bg-emerald-500" : "bg-amber-500"
+                            }`}
+                          />
+                          <span>{computedStatus === "active" ? "Active" : "Inactive"}</span>
+                        </span>
+                        {printedStickerIds.has(q.id) && (
+                          <span title="Already printed" className="text-emerald-600">
+                            <Printer size={12} />
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Sticker Graphic Preview */}
@@ -924,6 +941,11 @@ export default function QrCodesPage({
                       >
                         {computedStatus}
                       </span>
+                      {printedStickerIds.has(q.id) && (
+                        <span title="Already printed" className="text-emerald-600">
+                          <Printer size={12} />
+                        </span>
+                      )}
                       <QrRowActions
                         qr={q}
                         openQuickLook={openQuickLook}
