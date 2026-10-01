@@ -10,7 +10,7 @@ export type StickerViewMode = "physical" | "qr" | "windshield";
 
 const STICKER_SRC = stickerTemplateImg;
 const EDITOR_DISPLAY = { w: 320, h: 200 };
-const DEFAULT_SP: StickerPos = { x: 110, y: 40, w: 100, h: 100 };
+const DEFAULT_SP: StickerPos = { x: 193, y: 37, w: 110, h: 110 };
 
 function getSavedStickerPos(): StickerPos {
   try {

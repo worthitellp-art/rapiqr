@@ -1,4 +1,5 @@
 const { Schema, model } = require('mongoose');
+const { RETENTION, toExpireAfterSeconds } = require('../../config/privacyConfig');
 
 const chatSessionSchema = new Schema({
   qr_code_id: { type: String, default: null, index: true },
@@ -23,5 +24,9 @@ chatSessionSchema.index(
   { qr_code_id: 1, customer_token: 1 },
   { unique: true, partialFilterExpression: { status: 'open' } }
 );
+
+// Session metadata (visitor name, pseudonymous token) tracks its messages'
+// retention — no point keeping the session shell after its ChatMessages expire.
+chatSessionSchema.index({ created_at: 1 }, { expireAfterSeconds: toExpireAfterSeconds(RETENTION.CHAT_SESSION_RETENTION_DAYS) });
 
 module.exports = model('ChatSession', chatSessionSchema);

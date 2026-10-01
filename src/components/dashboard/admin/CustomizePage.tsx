@@ -3,7 +3,7 @@ import StickerEditor from "./StickerEditor";
 import { StickerPos } from "./types";
 
 export default function CustomizePage({
-  stickerPos = { x: 110, y: 40, w: 100, h: 100 },
+  stickerPos = { x: 193, y: 37, w: 110, h: 110 },
   setStickerPos = () => {},
   setToast = () => {},
   openPrintSheet,

@@ -48,6 +48,7 @@ import PhoneInputWithCountry from './common/PhoneInputWithCountry';
 import EmergencyContactsPanel from './dashboard/client/EmergencyContactsPanel';
 import AccountSettingsPanel from './dashboard/client/AccountSettingsPanel';
 import SupportLegalPanel from './dashboard/client/SupportLegalPanel';
+import PrivacyDataPanel from './dashboard/client/PrivacyDataPanel';
 import CompleteProfilePopup from './dashboard/client/CompleteProfilePopup';
 import AppLogo from './common/AppLogo';
 import InitialAvatar from './common/InitialAvatar';
@@ -141,7 +142,7 @@ interface ClientDashboardProps {
   switchToDistributor?: () => void;
 }
 
-type TabId = 'setup' | 'overview' | 'products' | 'chat' | 'contacts' | 'history' | 'settings' | 'support';
+type TabId = 'setup' | 'overview' | 'products' | 'chat' | 'contacts' | 'history' | 'settings' | 'privacy' | 'support';
 
 // `section` groups the flat list in the sidebar (a small uppercase label
 // renders above each run of items sharing a section); items with no
@@ -160,6 +161,7 @@ function buildNavItems(t: typeof dashboardTranslations['en']['client']): {
     { id: 'contacts', label: t.nav.contacts, icon: Users, section: t.navSections.communication },
     { id: 'history', label: t.nav.history, icon: History, section: t.navSections.communication },
     { id: 'settings', label: t.nav.settings, icon: Settings, section: t.navSections.account },
+    { id: 'privacy', label: t.nav.privacy, icon: ShieldCheck, section: t.navSections.account },
     { id: 'support', label: t.nav.support, icon: LifeBuoy, section: t.navSections.account },
   ];
 }
@@ -367,7 +369,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
       if (hash.includes('tab=products')) return 'products';
       if (hash.includes('tab=settings')) return 'settings';
       const saved = localStorage.getItem('repiqr-client-active-tab') || localStorage.getItem('namoqr-client-active-tab');
-      if (saved && ['setup', 'overview', 'products', 'chat', 'contacts', 'history', 'settings', 'support'].includes(saved)) {
+      if (saved && ['setup', 'overview', 'products', 'chat', 'contacts', 'history', 'settings', 'privacy', 'support'].includes(saved)) {
         return saved as TabId;
       }
     } catch { /* fallback */ }
@@ -1813,6 +1815,11 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
             {/* ════ VIEW 4: ACCOUNT SETTINGS ════ */}
             {activeTab === 'settings' && (
               <AccountSettingsPanel showToast={showToast} onProductsLinked={loadProducts} />
+            )}
+
+            {/* ════ VIEW: PRIVACY & DATA ════ */}
+            {activeTab === 'privacy' && (
+              <PrivacyDataPanel showToast={showToast} />
             )}
 
             {/* ════ VIEW 5: SUPPORT & LEGAL ════ */}

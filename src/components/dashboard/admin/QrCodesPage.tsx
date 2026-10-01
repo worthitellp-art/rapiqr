@@ -70,6 +70,11 @@ export default function QrCodesPage({
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [revealedCodes, setRevealedCodes] = useState(false);
+  // Recovery codes are no longer embedded in the fleet listing (see
+  // qrModel.js.getAll) — fetched on demand, per audited batch call, into this
+  // transient map instead of being cached alongside the rest of qrList.
+  const [recoveryCodeMap, setRecoveryCodeMap] = useState<Record<string, string | null>>({});
+  const [revealingCodes, setRevealingCodes] = useState(false);
 
   const PAGE_SIZE = viewMode === "cards" ? 18 : 25;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -293,14 +298,39 @@ export default function QrCodesPage({
     a.click();
   }
 
-  function downloadCsv() {
+  /**
+   * Recovery codes are fetched on demand (audited server-side) rather than
+   * held in qrList — this fills recoveryCodeMap for whichever ids don't
+   * already have an entry, reusing the cache for ones already fetched.
+   */
+  async function fetchMissingRecoveryCodes(ids: string[]) {
+    const missing = ids.filter((id) => !(id in recoveryCodeMap));
+    if (missing.length === 0) return recoveryCodeMap;
+    setRevealingCodes(true);
+    try {
+      const res = await apiClient.admin.revealRecoveryCodes(missing);
+      const merged = { ...recoveryCodeMap, ...(res?.data || {}) };
+      setRecoveryCodeMap(merged);
+      return merged;
+    } catch {
+      setToast("Failed to load recovery codes — please try again.");
+      setTimeout(() => setToast(null), 4000);
+      return recoveryCodeMap;
+    } finally {
+      setRevealingCodes(false);
+    }
+  }
+
+  async function downloadCsv() {
+    const codes = await fetchMissingRecoveryCodes(qrList.map((q) => q.id));
     const rows = [
       ["QR ID", "Recovery Code", "Phone Number", "Category", "Status", "Created"],
       ...qrList.map((q) => {
         const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
         const isActivated = Boolean(phoneNum && phoneNum.trim());
         const computedStatus = isActivated ? "active" : q.status;
-        return [q.id, q.recoveryCode || "N/A", phoneNum || "N/A", q.category || "car", computedStatus, fmtDate(q.createdAt)];
+        const code = codes[q.id] ?? q.recoveryCode;
+        return [q.id, code || "N/A", phoneNum || "N/A", q.category || "car", computedStatus, fmtDate(q.createdAt)];
       }),
     ];
     const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
@@ -317,38 +347,35 @@ export default function QrCodesPage({
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold font-display text-gray-900 tracking-tight">QR Code Fleet Management</h1>
+            <h1 className="text-2xl font-bold font-display text-gray-900 tracking-tight">QR Fleet Management</h1>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
               {metrics.total} Stickers
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-gray-500 mt-1">
-            Generate, print, and monitor scannable smart asset stickers across all categories.
-          </p>
         </div>
 
         {/* Fleet Quick Stats */}
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 flex items-center gap-2.5 shadow-xs">
+          <div
+            className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 flex items-center gap-2"
+            title="Active"
+          >
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <div className="text-left">
-              <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">Active</span>
-              <span className="text-xs font-extrabold text-gray-800">{metrics.active}</span>
-            </div>
+            <span className="text-xs font-extrabold text-gray-800">{metrics.active}</span>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 flex items-center gap-2.5 shadow-xs">
+          <div
+            className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 flex items-center gap-2"
+            title="Pending"
+          >
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-            <div className="text-left">
-              <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">Pending</span>
-              <span className="text-xs font-extrabold text-gray-800">{metrics.pending}</span>
-            </div>
+            <span className="text-xs font-extrabold text-gray-800">{metrics.pending}</span>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 flex items-center gap-2.5 shadow-xs">
+          <div
+            className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 flex items-center gap-2"
+            title="Scans"
+          >
             <Activity size={14} className="text-indigo-600" />
-            <div className="text-left">
-              <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">Scans</span>
-              <span className="text-xs font-extrabold text-gray-800">{metrics.scans}</span>
-            </div>
+            <span className="text-xs font-extrabold text-gray-800">{metrics.scans}</span>
           </div>
         </div>
       </div>
@@ -537,11 +564,16 @@ export default function QrCodesPage({
 
           <button
             type="button"
-            onClick={() => setRevealedCodes((prev) => !prev)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+            onClick={async () => {
+              const next = !revealedCodes;
+              setRevealedCodes(next);
+              if (next) await fetchMissingRecoveryCodes(qrList.map((q) => q.id));
+            }}
+            disabled={revealingCodes}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer disabled:opacity-60"
             title="Toggle recovery code visibility"
           >
-            {revealedCodes ? <EyeOff size={12} /> : <Eye size={12} />}
+            {revealingCodes ? <Loader2 size={12} className="animate-spin" /> : revealedCodes ? <EyeOff size={12} /> : <Eye size={12} />}
             <span>{revealedCodes ? "Hide Codes" : "See Codes"}</span>
           </button>
 
@@ -580,25 +612,22 @@ export default function QrCodesPage({
 
       {/* ── Empty State ────────────────────────────────────────────── */}
       {filtered.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-2xl p-14 text-center shadow-xs">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-3.5 border border-indigo-100">
-            <QrCode size={22} />
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center shadow-xs">
+          <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-2 border border-indigo-100">
+            <QrCode size={18} />
           </div>
-          <h3 className="font-bold text-gray-900 text-base">
-            {categoryFilter !== "all" || searchText.trim() ? "No tags match that filter." : "No QR codes yet"}
-          </h3>
-          <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+          <h3 className="font-bold text-gray-900 text-sm">
             {categoryFilter !== "all" || searchText.trim()
-              ? "Try clearing your search query or selecting another sticker category."
-              : "Generate a new sticker using the console above to begin managing your fleet."}
-          </p>
+              ? "No tags match that filter."
+              : "No QR codes yet — generate one using the console above."}
+          </h3>
           {(categoryFilter !== "all" || searchText.trim()) && (
             <button
               onClick={() => {
                 setCategoryFilter("all");
                 setSearchText("");
               }}
-              className="mt-4 inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer"
+              className="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer"
             >
               <RefreshCw size={12} /> Clear Filters
             </button>
@@ -683,7 +712,7 @@ export default function QrCodesPage({
                           </td>
                           <td className="px-4 py-3">
                             <span className="font-mono text-gray-600">
-                              {revealedCodes ? q.recoveryCode || "—" : "••••••••"}
+                              {revealedCodes ? (recoveryCodeMap[q.id] ?? q.recoveryCode ?? "—") : "••••••••"}
                             </span>
                           </td>
                           <td className="px-4 py-3">

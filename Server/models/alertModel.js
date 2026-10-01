@@ -78,6 +78,33 @@ class AlertModel {
   }
 
   /**
+   * Alerts filed against a specific set of sticker ids — used by the
+   * /api/privacy/export data export to include alerts tied to stickers the
+   * requesting user owns (their emergency-contact/visitor-report history),
+   * without exposing alerts filed against anyone else's stickers.
+   */
+  static async getByStickerIds(stickerIds) {
+    try {
+      if (!Array.isArray(stickerIds) || stickerIds.length === 0) return [];
+      const docs = await Alert.find({ sticker_id: { $in: stickerIds } }).sort({ created_at: -1 }).lean();
+      return docs.map((d) => ({
+        id: String(d._id),
+        stickerId: d.sticker_id,
+        type: d.type,
+        message: d.message,
+        reporterPhone: d.reporter_phone,
+        location: d.location,
+        status: d.status,
+        createdAt: d.created_at,
+      }));
+    } catch (err) {
+      console.error('AlertModel.getByStickerIds Error:', err);
+      logger.error('DB_ALERT', 'AlertModel.getByStickerIds failed', err);
+      return [];
+    }
+  }
+
+  /**
    * Delete all alerts from the database
    */
   static async deleteAllAlerts() {

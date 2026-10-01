@@ -140,56 +140,9 @@ export function usePrintSheetState({
     setSelectedStickerIds(new Set(availableStickers.map((sticker) => sticker.id)));
   }, [availableStickers]);
 
-  const handleSelectFirstNine = useCallback(() => {
-    const firstNineIds = availableStickers.slice(0, PRINT_SHEET_CONSTANTS.STICKERS_PER_SHEET).map((s) => s.id);
-    setSelectedStickerIds(new Set(firstNineIds));
-  }, [availableStickers]);
-
   const handleDeselectAll = useCallback(() => {
     setSelectedStickerIds(new Set());
   }, []);
-
-  // Category-wise selection handlers
-  const handleSelectCategory = useCallback((category: string, exclusive = false) => {
-    const targetCat = category.trim().toLowerCase();
-    const matchingIds = availableStickers
-      .filter((s) => (s.category || "car").trim().toLowerCase() === targetCat)
-      .map((s) => s.id);
-
-    setSelectedStickerIds((prev) => {
-      if (exclusive) {
-        return new Set(matchingIds);
-      }
-      const next = new Set(prev);
-      matchingIds.forEach((id) => next.add(id));
-      return next;
-    });
-  }, [availableStickers]);
-
-  const handleDeselectCategory = useCallback((category: string) => {
-    const targetCat = category.trim().toLowerCase();
-    const matchingIds = new Set(
-      availableStickers
-        .filter((s) => (s.category || "car").trim().toLowerCase() === targetCat)
-        .map((s) => s.id)
-    );
-
-    setSelectedStickerIds((prev) => {
-      const next = new Set(prev);
-      matchingIds.forEach((id) => next.delete(id));
-      return next;
-    });
-  }, [availableStickers]);
-
-  const handleSelectFirstNineOfCategory = useCallback((category: string) => {
-    const targetCat = category.trim().toLowerCase();
-    const matchingIds = availableStickers
-      .filter((s) => (s.category || "car").trim().toLowerCase() === targetCat)
-      .slice(0, PRINT_SHEET_CONSTANTS.STICKERS_PER_SHEET)
-      .map((s) => s.id);
-
-    setSelectedStickerIds(new Set(matchingIds));
-  }, [availableStickers]);
 
   // Pagination handlers
   const handleNextPage = useCallback(() => {
@@ -285,11 +238,7 @@ export function usePrintSheetState({
     exportAction,
     handleToggleSticker,
     handleSelectAll,
-    handleSelectFirstNine,
     handleDeselectAll,
-    handleSelectCategory,
-    handleDeselectCategory,
-    handleSelectFirstNineOfCategory,
     handleNextPage,
     handlePreviousPage,
     handleDownloadSheet,

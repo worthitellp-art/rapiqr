@@ -92,14 +92,18 @@ class WebhookController {
   }
 
   /**
-   * Verifies X-Hub-Signature-256 when an app secret is configured.
-   * Without a secret this returns true — the webhook is inert anyway until a
-   * provider is connected, and refusing everything would hide the payload
-   * samples we want while testing. Set WHATSAPP_APP_SECRET before going live.
+   * Verifies X-Hub-Signature-256. Fails closed when WHATSAPP_APP_SECRET is
+   * unset — same reasoning as the GET handshake and the MSG91 widget webhook
+   * below: an unconfigured deployment must not accept unsigned payloads from
+   * anyone who finds the URL, even while the provider integration is still
+   * being built out.
    */
   static isSignatureValid(req) {
     const secret = (process.env.WHATSAPP_APP_SECRET || '').trim();
-    if (!secret) return true;
+    if (!secret) {
+      logger.warn('WHATSAPP_WEBHOOK', 'Received a call but WHATSAPP_APP_SECRET is not set — refusing.');
+      return false;
+    }
 
     const header = req.get('x-hub-signature-256') || '';
     const raw = req.rawBody;

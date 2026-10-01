@@ -565,6 +565,8 @@ Email: [privacy@repiqr.com](mailto:privacy@repiqr.com)
 
 We will review and respond to requests in accordance with applicable law.
 
+**Self-service controls.** Signed-in account holders can also manage consent (grant/withdraw specific purposes), download a copy of their data, name a nominee, request account erasure, and submit a grievance directly — without emailing us — from **Dashboard → Privacy & Data**. Submitting a grievance there issues a tracked ticket number.
+
 ---
 
 ## 26. Consent

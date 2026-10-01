@@ -1,4 +1,5 @@
 const { Schema, model } = require('mongoose');
+const { RETENTION, toExpireAfterSeconds } = require('../../config/privacyConfig');
 
 const chatMessageSchema = new Schema({
   session_id: { type: Schema.Types.ObjectId, ref: 'ChatSession', required: true },
@@ -16,5 +17,10 @@ const chatMessageSchema = new Schema({
 }, { versionKey: false });
 
 chatMessageSchema.index({ session_id: 1, created_at: 1 });
+
+// No prior expiry despite holding message bodies + image attachment URLs — see
+// docs/DPDP_COMPLIANCE_AUDIT.md. Owners can still hard-delete a session early;
+// this is the backstop for ones nobody explicitly deletes.
+chatMessageSchema.index({ created_at: 1 }, { expireAfterSeconds: toExpireAfterSeconds(RETENTION.CHAT_MESSAGE_RETENTION_DAYS) });
 
 module.exports = model('ChatMessage', chatMessageSchema);

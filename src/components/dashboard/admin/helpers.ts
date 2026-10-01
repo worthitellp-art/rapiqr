@@ -1,6 +1,7 @@
-import QRCode from "qrcode";
+import QrCodeWithLogo from "qrcode-with-logos";
 import { QrRecord, StickerPos } from "./types";
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
+import repiqrWordmark from "../../../assets/repiqr-wordmark.png";
 import {
   generateRepeatedStickerSheetBlob,
   generateBatchStickersSheetBlobs,
@@ -11,16 +12,35 @@ const EDITOR_DISPLAY = { w: 320, h: 200 };
 
 const qrDataUrlCache = new Map<string, string>();
 
+/**
+ * Generates a QR code with the exact RepiQR wordmark embedded in the center,
+ * so a scanned/printed code is recognizable as a RepiQR tag at a glance.
+ * errorCorrectionLevel "H" (~30% recoverable) keeps it scannable with the logo
+ * covering the middle.
+ */
 export async function generateQrDataUrl(data: string, fg: string, bg: string, size = 220): Promise<string> {
-  const key = `${data}|${fg}|${bg}|${size}`;
+  const key = `${data}|${fg}|${bg}|${size}|logo`;
   const cached = qrDataUrlCache.get(key);
   if (cached) return cached;
 
-  const url = await QRCode.toDataURL(data, {
+  const qrInstance = new QrCodeWithLogo({
+    content: data,
     width: size,
-    margin: 1,
-    color: { dark: `#${fg}`, light: `#${bg}` },
+    nodeQrCodeOptions: {
+      margin: 1,
+      errorCorrectionLevel: "H",
+      color: { dark: `#${fg}`, light: `#${bg}` },
+    },
+    logo: {
+      src: repiqrWordmark,
+      bgColor: `#${bg}`,
+      borderRadius: Math.round(size * 0.04),
+      borderWidth: Math.round(size * 0.025),
+    },
   });
+
+  const image = await qrInstance.getImage();
+  const url = image.src;
   qrDataUrlCache.set(key, url);
   return url;
 }
@@ -122,7 +142,7 @@ export async function compositeQrOnSticker(qrDataUrl: string, pos: StickerPos): 
  */
 export async function generateStickerBlob(rec: QrRecord, pos: StickerPos): Promise<Blob | null> {
   try {
-    const qrDataUrl = await generateQrDataUrl(qrFullUrl(rec.id), rec.fg || "000000", rec.bg || "FFFFFF", 512);
+    const qrDataUrl = await generateQrDataUrl(qrFullUrl(rec.id), rec.fg || "000000", rec.bg || "FFFFFF", 1700);
     return await compositeQrOnSticker(qrDataUrl, pos);
   } catch (err) {
     console.warn("Failed to generate sticker image:", err);

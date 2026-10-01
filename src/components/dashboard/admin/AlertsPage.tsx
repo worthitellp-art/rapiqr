@@ -41,6 +41,28 @@ function fmtTimeAgo(iso: string): string {
   }
 }
 
+function formatLocationDisplay(location: any): string {
+  if (!location) return "";
+  if (typeof location === "string") return location;
+  if (typeof location === "object" && location.lat != null && location.lng != null) {
+    const acc = location.accuracy ? ` (±${Math.round(location.accuracy)}m)` : "";
+    return `${Number(location.lat).toFixed(5)}, ${Number(location.lng).toFixed(5)}${acc}`;
+  }
+  return "";
+}
+
+function getLocationMapsUrl(location: any): string {
+  if (!location) return "";
+  if (typeof location === "string") {
+    if (location.startsWith("http://") || location.startsWith("https://")) return location;
+    return `https://maps.google.com/?q=${encodeURIComponent(location)}`;
+  }
+  if (typeof location === "object" && location.lat != null && location.lng != null) {
+    return `https://maps.google.com/?q=${location.lat},${location.lng}`;
+  }
+  return "";
+}
+
 export default function AlertsPage({
   qrList,
   setToast,
@@ -257,7 +279,7 @@ export default function AlertsPage({
           (a.qrId && a.qrId.toLowerCase().includes(q)) ||
           (a.reporterPhone && a.reporterPhone.toLowerCase().includes(q)) ||
           (a.message && a.message.toLowerCase().includes(q)) ||
-          (a.location && a.location.toLowerCase().includes(q))
+          (a.location && formatLocationDisplay(a.location).toLowerCase().includes(q))
       );
     }
     return list;
@@ -439,9 +461,9 @@ export default function AlertsPage({
                         </a>
                       )}
 
-                      {alert.location && (
+                      {getLocationMapsUrl(alert.location) && (
                         <a
-                          href={`https://maps.google.com/?q=${encodeURIComponent(alert.location)}`}
+                          href={getLocationMapsUrl(alert.location)}
                           target="_blank"
                           rel="noreferrer"
                           className="p-1 text-gray-400 hover:text-indigo-600 rounded transition-colors"
@@ -497,16 +519,16 @@ export default function AlertsPage({
                         </a>
                       </div>
                     )}
-                    {alert.location && (
+                    {formatLocationDisplay(alert.location) && (
                       <div>
                         <span className="text-gray-400">Location: </span>
                         <a
-                          href={`https://maps.google.com/?q=${encodeURIComponent(alert.location)}`}
+                          href={getLocationMapsUrl(alert.location)}
                           target="_blank"
                           rel="noreferrer"
                           className="font-bold text-indigo-600 hover:underline inline-flex items-center gap-0.5"
                         >
-                          <span>{alert.location}</span>
+                          <span>{formatLocationDisplay(alert.location)}</span>
                           <ExternalLink size={9} />
                         </a>
                       </div>

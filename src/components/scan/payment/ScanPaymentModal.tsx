@@ -1,22 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import {
-  ArrowLeft,
   ArrowRight,
   Check,
   CheckCircle2,
   Loader2,
-  ShieldCheck,
   Car,
   Bike,
   Briefcase,
   HeartHandshake,
   Trash2,
   Plus,
-  Info,
   X,
 } from 'lucide-react';
 import ScanExitConfirmModal from './ScanExitConfirmModal';
 import { isVehicleCategory } from '../../../stickerModules';
+import { ACTIVATION_COUNTRIES, getPhoneDigitRule } from '../ScanPage';
 
 export interface EmergencyContactItem {
   id: string;
@@ -66,14 +64,13 @@ export interface ScanPaymentModalProps {
 interface StepDefinition {
   index: number;
   title: string;
-  description: string;
 }
 
 const WIZARD_STEPS: StepDefinition[] = [
-  { index: 0, title: 'Owner details', description: 'Contact information' },
-  { index: 1, title: 'Verification', description: 'One-time phone passcode' },
-  { index: 2, title: 'Emergency SOS', description: 'Trusted guardian contacts' },
-  { index: 3, title: 'Live protection', description: 'Smart tag activation' },
+  { index: 0, title: 'Your details' },
+  { index: 1, title: 'Verify phone' },
+  { index: 2, title: 'Emergency contacts' },
+  { index: 3, title: 'Done' },
 ];
 
 const RELATIONSHIP_PRESETS = ['Spouse', 'Parent', 'Sibling', 'Friend', 'Doctor'];
@@ -86,8 +83,11 @@ function getCategoryIcon(categoryName: string) {
   return Car;
 }
 
+const inputClass =
+  'w-full h-11 px-3.5 rounded-lg border border-slate-300 bg-white focus:border-[#14120C] focus:ring-2 focus:ring-[#14120C]/15 outline-none text-sm text-slate-900 placeholder:text-slate-400 transition-all';
+
 export default function ScanPaymentModal({
-  price = '₹299',
+  price,
   qrId = 'A4517DA1',
   category = 'Car & Auto & Truck',
   vehicleNumber = '',
@@ -97,6 +97,7 @@ export default function ScanPaymentModal({
   phone = '',
   onPhoneChange,
   country = '+91',
+  onCountryChange,
   message = '',
   onMessageChange,
   otpStep = false,
@@ -120,412 +121,249 @@ export default function ScanPaymentModal({
   onViewTag,
 }: ScanPaymentModalProps) {
   const [showExitModal, setShowExitModal] = useState(false);
-  const [agreeTerms, setAgreeTerms] = useState(true);
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [consentTouched, setConsentTouched] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(category);
 
-  // Keep category in sync with prop if updated from tag QR data
   useEffect(() => {
-    if (category) {
-      setSelectedCategory(category);
-    }
+    if (category) setSelectedCategory(category);
   }, [category]);
 
   const CategoryIconComponent = getCategoryIcon(selectedCategory || category);
   const isVehicle = isVehicleCategory(selectedCategory || category);
+  const phoneRule = getPhoneDigitRule(country);
 
-  // Compute active step index across the unified multi-step journey
-  const computeActiveStepIndex = (): number => {
+  const activeStepIndex = (() => {
     if (phase === 'success') return 3;
     if (phase === 'register') return 2;
     if (otpStep) return 1;
     return 0;
-  };
-
-  const activeStepIndex = computeActiveStepIndex();
-
-  const handleOpenExitConfirm = () => {
-    setShowExitModal(true);
-  };
-
-  const handleCloseExitConfirm = () => {
-    setShowExitModal(false);
-  };
+  })();
 
   const handleConfirmExit = () => {
     setShowExitModal(false);
     onExit();
   };
 
-  const handleFormSubmit = (event: React.FormEvent) => {
+  const handleOwnerDetailsSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (activeStepIndex === 2 && onFinishEmergencyContacts) {
-      onFinishEmergencyContacts();
-      return;
-    }
+    setConsentTouched(true);
+    if (!agreeTerms) return;
 
-    if (onSubmit) {
-      onSubmit();
-    } else if (onSuccess) {
-      onSuccess({ name, phone, category: selectedCategory, qrId, vehicleNumber, message });
-    }
+    if (onSubmit) onSubmit();
+    else if (onSuccess) onSuccess({ name, phone, category: selectedCategory, qrId, vehicleNumber, message });
+  };
+
+  const handleOtpSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    onSubmit?.();
   };
 
   return (
-    <div className="w-full flex items-center justify-center p-2 sm:p-4 md:p-6 animate-fade-in font-display">
-      {/* ── Windows-Style Application Window Container ── */}
-      <div className="w-full max-w-4xl lg:max-w-5xl bg-white rounded-3xl sm:rounded-[32px] shadow-[0_25px_70px_-15px_rgba(0,0,0,0.09)] border border-slate-200/90 overflow-hidden flex flex-col md:flex-row min-h-[560px] text-left">
-        
-        {/* ── Left Sidebar: Vertical Stepper & Meta ── */}
-        <aside className="w-full md:w-72 lg:w-80 bg-slate-50/80 border-b md:border-b-0 md:border-r border-slate-200/80 p-6 sm:p-8 flex flex-col justify-between select-none">
-          <div>
-            {/* Top Navigation: Back button */}
-            <button
-              type="button"
-              onClick={handleOpenExitConfirm}
-              className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-950 transition-colors cursor-pointer group mb-6 sm:mb-8"
-            >
-              <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-0.5" />
-              <span>Back to scan</span>
-            </button>
+    <div className="w-full flex items-center justify-center px-4 py-3 sm:py-12 animate-fade-in">
+      <div className="w-full max-w-xl">
+        {/* Tag context line — honest, no payment framing: nothing is purchased here */}
+        <p className="mb-2 sm:mb-5 text-center text-[12px] sm:text-[13px] font-medium text-slate-500">
+          Registering tag <span className="font-mono font-semibold text-slate-700">#{qrId}</span>
+        </p>
 
-            {/* Mobile Horizontal Progress Bar (< md screens) */}
-            <div className="flex md:hidden items-center justify-between gap-2 pb-4 mb-2 border-b border-slate-200/70">
-              {WIZARD_STEPS.map((step, idx) => (
-                <div key={step.index} className="flex items-center gap-2">
+        {/* Compact step indicator (mobile): one line of text + a thin progress bar,
+            so a long label like "Emergency contacts" never has to squeeze under a
+            ~90px-wide slot the way the 4-node layout below needs. */}
+        <div className="sm:hidden mb-3">
+          <div className="flex items-center justify-between text-[12px] font-semibold text-slate-700 mb-1.5">
+            <span>
+              Step {activeStepIndex + 1} of {WIZARD_STEPS.length} · {WIZARD_STEPS[activeStepIndex].title}
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-[#14120C] transition-all"
+              style={{ width: `${((activeStepIndex + 1) / WIZARD_STEPS.length) * 100}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Full step indicator (sm and up): node circles + labels */}
+        <ol className="hidden sm:flex items-center mb-7">
+          {WIZARD_STEPS.map((step, idx) => {
+            const isCompleted = idx < activeStepIndex;
+            const isActive = idx === activeStepIndex;
+            const isLast = idx === WIZARD_STEPS.length - 1;
+            return (
+              <li key={step.index} className={`flex items-center ${isLast ? '' : 'flex-1'}`}>
+                <div className="flex flex-col items-center gap-1.5">
                   <div
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                      idx < activeStepIndex
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                      isCompleted
                         ? 'bg-emerald-500 text-white'
-                        : idx === activeStepIndex
-                        ? 'border-2 border-black text-black bg-white'
-                        : 'border border-slate-300 text-slate-400 bg-white'
+                        : isActive
+                        ? 'bg-[#14120C] text-white'
+                        : 'bg-slate-100 text-slate-400'
                     }`}
                   >
-                    {idx < activeStepIndex ? <Check size={12} strokeWidth={3} /> : idx + 1}
+                    {isCompleted ? <Check size={14} strokeWidth={3} /> : idx + 1}
                   </div>
-                  {idx < WIZARD_STEPS.length - 1 && (
-                    <div
-                      className={`h-0.5 w-6 sm:w-10 ${
-                        idx < activeStepIndex ? 'bg-emerald-500' : 'bg-slate-200'
-                      }`}
-                    />
-                  )}
+                  <span
+                    className={`block text-[11px] font-semibold text-center leading-tight ${
+                      isActive ? 'text-slate-900' : 'text-slate-400'
+                    }`}
+                  >
+                    {step.title}
+                  </span>
                 </div>
-              ))}
-            </div>
+                {!isLast && (
+                  <div className={`flex-1 h-0.5 mx-2 mb-5 ${isCompleted ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+                )}
+              </li>
+            );
+          })}
+        </ol>
 
-            {/* Desktop Vertical Stepper (>= md screens) */}
-            <div className="hidden md:flex flex-col space-y-0">
-              {WIZARD_STEPS.map((step, index) => {
-                const isCompleted = index < activeStepIndex;
-                const isActive = index === activeStepIndex;
-                const isLast = index === WIZARD_STEPS.length - 1;
-
-                return (
-                  <div key={step.index} className="relative flex items-start gap-4 pb-8 last:pb-0">
-                    {/* Vertical connecting line */}
-                    {!isLast && (
-                      <div
-                        className={`absolute left-[11px] top-[24px] bottom-0 w-[2px] transition-colors ${
-                          isCompleted ? 'bg-emerald-500' : 'bg-slate-200'
-                        }`}
-                      />
-                    )}
-
-                    {/* Step Icon / Circle Indicator */}
-                    <div className="relative z-10 flex-shrink-0">
-                      {isCompleted ? (
-                        <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs">
-                          <Check size={13} strokeWidth={3} />
-                        </div>
-                      ) : isActive ? (
-                        /* Clean black ring with solid inner dot */
-                        <div className="w-6 h-6 rounded-full border-2 border-black bg-white flex items-center justify-center shadow-xs">
-                          <div className="w-2.5 h-2.5 rounded-full bg-black" />
-                        </div>
-                      ) : (
-                        <div className="w-6 h-6 rounded-full border-2 border-slate-300 bg-white" />
-                      )}
-                    </div>
-
-                    {/* Step Text Label */}
-                    <div className="pt-0.5">
-                      <p
-                        className={`text-sm tracking-tight leading-tight ${
-                          isActive
-                            ? 'font-bold text-slate-950'
-                            : isCompleted
-                            ? 'font-semibold text-slate-700'
-                            : 'font-medium text-slate-400'
-                        }`}
-                      >
-                        {step.title}
-                      </p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        {step.description}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Bottom Sidebar Meta: Tag Info & Price */}
-          <div className="mt-6 pt-5 border-t border-slate-200/80 space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-mono font-bold text-slate-700">#{qrId}</span>
-              <span className="font-bold text-slate-900 bg-slate-200/80 px-2.5 py-0.5 rounded-md text-[11px]">
-                {price} · Lifetime Tag
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
-              <ShieldCheck size={13} className="text-emerald-600" />
-              <span>Official RapiQR SafeSync™</span>
-            </p>
-          </div>
-        </aside>
-
-        {/* ── Right Content Area: Clean Forms with Minimal Text ── */}
-        <main className="flex-1 p-6 sm:p-8 md:p-10 lg:p-12 flex flex-col justify-between overflow-y-auto">
+        {/* Card */}
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-4 sm:p-8">
           {/* STEP 1: Owner Details */}
           {activeStepIndex === 0 && (
-            <form onSubmit={handleFormSubmit} className="space-y-6 flex-1 flex flex-col justify-between">
-              <div className="space-y-5">
+            <form onSubmit={handleOwnerDetailsSubmit} className="space-y-4 sm:space-y-5">
+              <h2 className="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">Tell us a bit more</h2>
+
+              <div className="space-y-3 sm:space-y-4">
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-                    Tell us a bit more
-                  </h2>
+                  <label className="block text-sm font-medium text-slate-900 mb-1.5">Your full name</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => onNameChange?.(e.target.value)}
+                    placeholder="e.g. Rahul Sharma"
+                    required
+                    className={inputClass}
+                  />
                 </div>
 
-                {/* Form Fields: Minimal Top-Aligned Style */}
-                <div className="space-y-4 pt-1">
-                  {/* Field: Full Name */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Your full name
-                    </label>
+                <div>
+                  <label className="block text-sm font-medium text-slate-900 mb-1.5">Mobile phone number</label>
+                  <div className="flex items-stretch gap-2">
+                    <select
+                      value={country}
+                      onChange={(e) => onCountryChange?.(e.target.value)}
+                      className="w-[4.5rem] flex-shrink-0 h-11 rounded-lg border border-slate-300 bg-white pl-2 pr-1 text-sm text-slate-900 outline-none focus:border-[#14120C] focus:ring-2 focus:ring-[#14120C]/15 transition-all"
+                      aria-label="Country code"
+                    >
+                      {/* Closed box shows just the dial code (there's no room for a
+                          full country name next to the phone input on a phone
+                          screen) — the full name still appears per-option when the
+                          native picker is open, via the title attribute some
+                          browsers surface and the option order grouping India first. */}
+                      {ACTIVATION_COUNTRIES.map((c) => (
+                        <option key={c.code + c.name} value={c.code} title={c.name}>
+                          {c.code}
+                        </option>
+                      ))}
+                    </select>
                     <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => onNameChange?.(e.target.value)}
-                      placeholder="e.g. Rahul Sharma"
+                      type="tel"
+                      inputMode="numeric"
+                      value={phone}
+                      onChange={(e) => onPhoneChange?.(e.target.value.replace(/\D/g, '').slice(0, phoneRule.max))}
+                      placeholder={`${phoneRule.min === phoneRule.max ? phoneRule.min : `${phoneRule.min}-${phoneRule.max}`}-digit number`}
                       required
-                      className="w-full h-11 px-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none text-sm font-normal text-gray-900 placeholder:text-gray-400 transition-all"
+                      className={`${inputClass} flex-1 min-w-0`}
                     />
                   </div>
-
-                  {/* Field: Mobile Number */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Mobile phone number
-                    </label>
-                    <div className="flex items-center h-11 rounded-lg border border-gray-300 bg-white focus-within:border-black focus-within:ring-1 focus-within:ring-black overflow-hidden transition-all">
-                      <div className="px-3.5 h-full bg-gray-50 border-r border-gray-200 text-sm font-medium text-gray-700 select-none flex items-center">
-                        {country}
-                      </div>
-                      <input
-                        type="tel"
-                        inputMode="numeric"
-                        value={phone}
-                        onChange={(e) => onPhoneChange?.(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                        placeholder="10-digit mobile number"
-                        required
-                        className="w-full px-3.5 h-full bg-transparent text-sm font-normal text-gray-900 placeholder:text-gray-400 outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Field: Preselected Tag Category */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Tag category
-                    </label>
-                    <div className="flex items-center justify-between h-11 px-3.5 rounded-lg border border-gray-300 bg-white text-sm text-gray-900">
-                      <div className="flex items-center gap-2">
-                        <CategoryIconComponent size={16} className="text-gray-700" />
-                        <span className="font-medium">{selectedCategory || category || 'Car & Auto & Truck'}</span>
-                      </div>
-                      <span className="text-xs text-gray-400 font-medium">Preselected</span>
-                    </div>
-                  </div>
-
-                  {/* Field: Vehicle Number (Vehicle Categories Only: Car, Truck, Auto, Bike) */}
-                  {isVehicle && (
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-medium text-gray-900">
-                          Vehicle number <span className="text-rose-500 font-bold">*</span>
-                        </label>
-                        {vehicleNumber && (
-                          <button
-                            type="button"
-                            onClick={() => onVehicleNumberChange?.('')}
-                            className="text-xs text-gray-400 hover:text-gray-700 font-medium cursor-pointer"
-                          >
-                            Clear
-                          </button>
-                        )}
-                      </div>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={vehicleNumber || ''}
-                          onChange={(e) => onVehicleNumberChange?.(e.target.value.toUpperCase())}
-                          placeholder="e.g. MH 02 AB 1234"
-                          required
-                          autoCapitalize="characters"
-                          autoCorrect="off"
-                          autoComplete="off"
-                          spellCheck={false}
-                          className="w-full h-11 px-3.5 pr-9 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none text-sm font-mono font-medium text-gray-900 placeholder:text-gray-400 uppercase transition-all"
-                        />
-                        {vehicleNumber && (
-                          <button
-                            type="button"
-                            onClick={() => onVehicleNumberChange?.('')}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700 rounded-full transition-colors cursor-pointer"
-                            title="Clear vehicle number"
-                          >
-                            <X size={15} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Field: Tag Note (Non-Vehicle Categories: Home, Pet, Kids, Luggage) */}
-                  {!isVehicle && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-2">
-                        Tag note / Label
-                      </label>
-                      <input
-                        type="text"
-                        value={message}
-                        onChange={(e) => onMessageChange?.(e.target.value)}
-                        placeholder="e.g. Main Gate, Office, Pet Name (optional)"
-                        className="w-full h-11 px-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none text-sm font-normal text-gray-900 placeholder:text-gray-400 transition-all"
-                      />
-                    </div>
-                  )}
-
-                  {/* Field: SafeSync Privacy Checkbox */}
-                  <div className="pt-2">
-                    <label className="flex items-center gap-2.5 text-sm text-gray-700 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={agreeTerms}
-                        onChange={(e) => setAgreeTerms(e.target.checked)}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
-                      />
-                      <span>I'm okay with sharing this with the SafeSync team.</span>
-                      <Info size={14} className="text-gray-400" />
-                    </label>
-                  </div>
                 </div>
 
-                {/* Error message */}
-                {error && (
-                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-600">
-                    {error}
+                <div className="flex items-center justify-between h-9 px-3.5 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-900">
+                  <div className="flex items-center gap-2">
+                    <CategoryIconComponent size={14} className="text-slate-600" />
+                    <span className="font-medium">{selectedCategory || category || 'Car & Auto & Truck'}</span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-medium">Preselected</span>
+                </div>
+
+                {isVehicle ? (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-1.5">
+                      Vehicle number <span className="text-rose-500 font-bold">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={vehicleNumber || ''}
+                        onChange={(e) => onVehicleNumberChange?.(e.target.value.toUpperCase())}
+                        placeholder="e.g. MH 02 AB 1234"
+                        required
+                        minLength={4}
+                        autoCapitalize="characters"
+                        autoCorrect="off"
+                        autoComplete="off"
+                        spellCheck={false}
+                        className={`${inputClass} pr-9 font-mono uppercase`}
+                      />
+                      {vehicleNumber && (
+                        <button
+                          type="button"
+                          onClick={() => onVehicleNumberChange?.('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded-full transition-colors cursor-pointer"
+                          title="Clear vehicle number"
+                        >
+                          <X size={15} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-1.5">Tag note / Label</label>
+                    <input
+                      type="text"
+                      value={message}
+                      onChange={(e) => onMessageChange?.(e.target.value)}
+                      placeholder="e.g. Main Gate, Office, Pet Name (optional)"
+                      className={inputClass}
+                    />
                   </div>
                 )}
+
+                <div>
+                  <label className="flex items-start gap-2.5 text-sm text-slate-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={agreeTerms}
+                      onChange={(e) => {
+                        setAgreeTerms(e.target.checked);
+                        setConsentTouched(true);
+                      }}
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[#14120C] focus:ring-[#14120C] cursor-pointer accent-[#14120C]"
+                    />
+                    <span>
+                      I agree this information will be stored to activate my RepiQR tag and may be shown to a scanner in
+                      an emergency.
+                    </span>
+                  </label>
+                  {consentTouched && !agreeTerms && (
+                    <p className="mt-1.5 text-xs font-medium text-rose-600">
+                      Please confirm this to continue — the tag can't be activated without it.
+                    </p>
+                  )}
+                </div>
               </div>
 
-              {/* Bottom Action CTA: White Background Button with Black Text */}
-              <div className="pt-6 mt-6 border-t border-gray-100 flex flex-col items-center">
+              {error && (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-600">
+                  {error}
+                </div>
+              )}
+
+              <div className="pt-1">
                 <button
                   type="submit"
                   disabled={isProcessing || otpSending}
-                  className="w-full h-11 rounded-lg bg-white hover:bg-gray-50 active:scale-[0.99] text-black border border-gray-300 hover:border-black font-semibold text-sm shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="w-full h-11 rounded-lg bg-[#14120C] hover:bg-black active:scale-[0.99] text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {isProcessing || otpSending ? (
                     <>
-                      <Loader2 size={16} className="animate-spin text-black" />
-                      <span>Sending OTP...</span>
-                    </>
-                  ) : (
-                    <span>Continue</span>
-                  )}
-                </button>
-                <div className="flex items-center justify-center gap-4 mt-3">
-                  <button
-                    type="button"
-                    onClick={handleOpenExitConfirm}
-                    className="text-xs text-gray-500 hover:text-gray-900 font-medium transition-colors cursor-pointer"
-                  >
-                    Skip for now
-                  </button>
-                </div>
-              </div>
-            </form>
-          )}
-
-          {/* STEP 2: Phone Verification (OTP) */}
-          {activeStepIndex === 1 && (
-            <form onSubmit={handleFormSubmit} className="space-y-6 flex-1 flex flex-col justify-between">
-              <div className="space-y-5">
-                <div>
-                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-                    Verify phone number
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Enter the code sent to <span className="font-semibold text-gray-800">{country} {phone}</span>
-                  </p>
-                </div>
-
-                <div className="space-y-4 pt-1 max-w-md">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={6}
-                    value={otpInput}
-                    onChange={(e) => onOtpInputChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="Enter code"
-                    required
-                    autoFocus
-                    className="w-full h-12 text-center tracking-[0.4em] font-mono text-xl rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none text-gray-900 placeholder:text-gray-300 transition-all"
-                  />
-
-                  <div className="flex items-center justify-between text-xs pt-1">
-                    <button
-                      type="button"
-                      onClick={onBackToPhone}
-                      className="font-medium text-gray-500 hover:text-gray-900 cursor-pointer"
-                    >
-                      Change phone number
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onResendOtp}
-                      disabled={otpSending}
-                      className="font-semibold text-gray-900 hover:underline cursor-pointer disabled:opacity-50"
-                    >
-                      {otpSending ? 'Resending code...' : 'Resend code'}
-                    </button>
-                  </div>
-                </div>
-
-                {error && (
-                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-600">
-                    {error}
-                  </div>
-                )}
-              </div>
-
-              {/* Bottom Action CTA: White Background Button with Black Text */}
-              <div className="pt-6 mt-6 border-t border-gray-100 flex flex-col items-center">
-                <button
-                  type="submit"
-                  disabled={isProcessing || otpSending}
-                  className="w-full h-11 rounded-lg bg-white hover:bg-gray-50 active:scale-[0.99] text-black border border-gray-300 hover:border-black font-semibold text-sm shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin text-black" />
-                      <span>Verifying...</span>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Sending code...</span>
                     </>
                   ) : (
                     <span>Continue</span>
@@ -533,44 +371,106 @@ export default function ScanPaymentModal({
                 </button>
                 <button
                   type="button"
-                  onClick={onBackToPhone}
-                  className="mt-3 text-sm text-gray-500 hover:text-gray-900 font-medium transition-colors cursor-pointer"
+                  onClick={() => setShowExitModal(true)}
+                  className="w-full mt-3 text-xs text-slate-500 hover:text-slate-900 font-medium transition-colors cursor-pointer"
                 >
-                  Change phone number
+                  Skip for now
                 </button>
               </div>
             </form>
           )}
 
-          {/* STEP 3: Emergency SOS (Guardian Network) */}
-          {activeStepIndex === 2 && (
-            <div className="space-y-6 flex-1 flex flex-col justify-between">
-              <div className="space-y-5">
-                <div>
-                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-                    Emergency contacts
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Add trusted family or friends who receive live GPS alerts during emergencies.
-                  </p>
-                </div>
+          {/* STEP 2: Phone Verification (OTP) */}
+          {activeStepIndex === 1 && (
+            <form onSubmit={handleOtpSubmit} className="space-y-5">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Verify phone number</h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  Enter the code sent to <span className="font-semibold text-slate-800">{country} {phone}</span>
+                </p>
+              </div>
 
-                {/* Contacts List */}
-                <div className="space-y-3.5 max-h-[360px] overflow-y-auto pr-1">
-                  {emergencyContacts.map((contact, index) => (
-                    <div
-                      key={contact.id}
-                      className="p-4 rounded-xl border border-gray-200 bg-white space-y-3 relative"
-                    >
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                value={otpInput}
+                onChange={(e) => onOtpInputChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="Enter code"
+                required
+                autoFocus
+                className="w-full h-12 text-center tracking-[0.4em] font-mono text-lg rounded-lg border border-slate-300 bg-white focus:border-[#14120C] focus:ring-2 focus:ring-[#14120C]/15 outline-none text-slate-900 placeholder:text-slate-300 transition-all"
+              />
+
+              <div className="flex items-center justify-between text-xs">
+                <button
+                  type="button"
+                  onClick={onBackToPhone}
+                  className="font-medium text-slate-500 hover:text-slate-900 cursor-pointer"
+                >
+                  Change phone number
+                </button>
+                <button
+                  type="button"
+                  onClick={onResendOtp}
+                  disabled={otpSending}
+                  className="font-semibold text-slate-900 hover:underline cursor-pointer disabled:opacity-50"
+                >
+                  {otpSending ? 'Resending...' : 'Resend code'}
+                </button>
+              </div>
+
+              {error && (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-600">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isProcessing || otpSending}
+                className="w-full h-11 rounded-lg bg-[#14120C] hover:bg-black active:scale-[0.99] text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Verifying...</span>
+                  </>
+                ) : (
+                  <span>Continue</span>
+                )}
+              </button>
+            </form>
+          )}
+
+          {/* STEP 3: Emergency Contacts */}
+          {activeStepIndex === 2 && (
+            <div className="space-y-5">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Emergency contacts</h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  Add trusted family or friends who receive live GPS alerts during emergencies.
+                </p>
+              </div>
+
+              <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
+                {emergencyContacts.map((contact, index) => {
+                  const phoneDigits = contact.phone.replace(/\D/g, '');
+                  const phoneTouched = phoneDigits.length > 0;
+                  const phoneInvalid = phoneTouched && phoneDigits.length !== 10;
+
+                  return (
+                    <div key={contact.id} className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-gray-700">
+                        <span className="text-xs font-semibold text-slate-700">
                           Contact {index + 1} {index === 0 ? '· Primary SOS' : ''}
                         </span>
                         {emergencyContacts.length > 1 && onRemoveEmergencyContact && (
                           <button
                             type="button"
                             onClick={() => onRemoveEmergencyContact(contact.id)}
-                            className="text-gray-400 hover:text-red-500 transition-colors p-1 cursor-pointer"
+                            className="text-slate-400 hover:text-red-500 transition-colors p-1 cursor-pointer"
                           >
                             <Trash2 size={15} />
                           </button>
@@ -579,30 +479,39 @@ export default function ScanPaymentModal({
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">Name</label>
                           <input
                             type="text"
                             value={contact.name}
                             onChange={(e) => onUpdateEmergencyContact?.(contact.id, 'name', e.target.value)}
                             placeholder="Full name"
-                            className="w-full h-10 px-3 rounded-lg bg-white border border-gray-300 text-sm font-normal text-gray-900 outline-none focus:border-black focus:ring-1 focus:ring-black"
+                            className="w-full h-10 px-3 rounded-lg bg-white border border-slate-300 text-sm text-slate-900 outline-none focus:border-[#14120C] focus:ring-2 focus:ring-[#14120C]/15"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Mobile</label>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">Mobile</label>
                           <input
                             type="tel"
+                            inputMode="numeric"
                             value={contact.phone}
-                            onChange={(e) => onUpdateEmergencyContact?.(contact.id, 'phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                            onChange={(e) =>
+                              onUpdateEmergencyContact?.(contact.id, 'phone', e.target.value.replace(/\D/g, '').slice(0, 10))
+                            }
                             placeholder="10-digit number"
-                            className="w-full h-10 px-3 rounded-lg bg-white border border-gray-300 text-sm font-normal text-gray-900 outline-none focus:border-black focus:ring-1 focus:ring-black"
+                            className={`w-full h-10 px-3 rounded-lg bg-white border text-sm text-slate-900 outline-none focus:ring-2 ${
+                              phoneInvalid
+                                ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/15'
+                                : 'border-slate-300 focus:border-[#14120C] focus:ring-[#14120C]/15'
+                            }`}
                           />
+                          {phoneInvalid && (
+                            <p className="mt-1 text-[11px] font-medium text-rose-600">Enter a valid 10-digit number</p>
+                          )}
                         </div>
                       </div>
 
-                      {/* Relationship Option Pills matching screenshot */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1.5">Relationship</label>
+                        <label className="block text-xs font-medium text-slate-700 mb-1.5">Relationship</label>
                         <div className="flex flex-wrap gap-2">
                           {RELATIONSHIP_PRESETS.map((label) => {
                             const isPicked = contact.relationship === label;
@@ -611,10 +520,10 @@ export default function ScanPaymentModal({
                                 key={label}
                                 type="button"
                                 onClick={() => onUpdateEmergencyContact?.(contact.id, 'relationship', label)}
-                                className={`px-3.5 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                                className={`px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
                                   isPicked
-                                    ? 'border border-blue-600 bg-blue-50/40 text-blue-600 font-semibold ring-1 ring-blue-600'
-                                    : 'border border-gray-200 bg-white text-gray-700 hover:border-gray-400 font-medium'
+                                    ? 'border border-[#14120C] bg-[#14120C]/5 text-[#14120C] font-semibold'
+                                    : 'border border-slate-200 bg-white text-slate-700 hover:border-slate-400 font-medium'
                                 }`}
                               >
                                 {label}
@@ -624,95 +533,78 @@ export default function ScanPaymentModal({
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-
-                {onAddEmergencyContact && (
-                  <button
-                    type="button"
-                    onClick={onAddEmergencyContact}
-                    className="w-full h-11 rounded-lg border border-dashed border-gray-300 bg-white hover:bg-gray-50 text-xs font-semibold text-gray-700 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                  >
-                    <Plus size={15} />
-                    <span>Add another contact</span>
-                  </button>
-                )}
-
-                {error && (
-                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-600">
-                    {error}
-                  </div>
-                )}
+                  );
+                })}
               </div>
 
-              {/* Bottom Action CTAs: White Background Button with Black Text */}
-              <div className="pt-6 mt-6 border-t border-gray-100 flex flex-col items-center">
+              {onAddEmergencyContact && (
                 <button
                   type="button"
-                  onClick={onFinishEmergencyContacts}
+                  onClick={onAddEmergencyContact}
+                  className="w-full h-11 rounded-lg border border-dashed border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Plus size={15} />
+                  <span>Add another contact</span>
+                </button>
+              )}
+
+              {error && (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-600">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={onFinishEmergencyContacts}
+                disabled={isProcessing}
+                className="w-full h-11 rounded-lg bg-[#14120C] hover:bg-black active:scale-[0.99] text-white font-semibold text-sm transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Activating...</span>
+                  </>
+                ) : (
+                  <span>Save &amp; activate tag</span>
+                )}
+              </button>
+              {onSkipEmergencyContacts && (
+                <button
+                  type="button"
+                  onClick={onSkipEmergencyContacts}
                   disabled={isProcessing}
-                  className="w-full h-11 rounded-lg bg-white hover:bg-gray-50 active:scale-[0.99] text-black border border-gray-300 hover:border-black font-semibold text-sm shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full text-xs text-slate-500 hover:text-slate-900 font-medium transition-colors cursor-pointer"
                 >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin text-black" />
-                      <span>Activating...</span>
-                    </>
-                  ) : (
-                    <span>Save & Activate Tag</span>
-                  )}
+                  Skip for now
                 </button>
-                {onSkipEmergencyContacts && (
-                  <button
-                    type="button"
-                    onClick={onSkipEmergencyContacts}
-                    disabled={isProcessing}
-                    className="mt-3 text-sm text-gray-500 hover:text-gray-900 font-medium transition-colors cursor-pointer"
-                  >
-                    Skip for now
-                  </button>
-                )}
-              </div>
+              )}
             </div>
           )}
 
-          {/* STEP 4: Live Protection Confirmation */}
+          {/* STEP 4: Done */}
           {activeStepIndex === 3 && (
-            <div className="space-y-6 flex-1 flex flex-col justify-between text-center py-4">
-              <div className="space-y-4 my-auto">
-                <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 mx-auto">
-                  <CheckCircle2 size={32} className="text-emerald-600" />
-                </div>
-
-                <div>
-                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-                    All set! Tag is live
-                  </h2>
-                </div>
+            <div className="text-center space-y-5 py-4">
+              <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 mx-auto">
+                <CheckCircle2 size={30} />
               </div>
-
-              <div className="pt-6 border-t border-gray-100 flex items-center justify-center">
-                <button
-                  type="button"
-                  onClick={onViewTag}
-                  className="w-full sm:w-auto h-11 px-8 rounded-lg bg-white hover:bg-gray-50 active:scale-[0.99] text-black border border-gray-300 hover:border-black font-semibold text-sm shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <span>View Public Scan Tag</span>
-                  <ArrowRight size={16} />
-                </button>
-              </div>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">All set! Tag is live</h2>
+              <button
+                type="button"
+                onClick={onViewTag}
+                className="inline-flex items-center justify-center gap-2 h-11 px-7 rounded-lg bg-[#14120C] hover:bg-black active:scale-[0.99] text-white font-semibold text-sm transition-all cursor-pointer"
+              >
+                <span>View public scan tag</span>
+                <ArrowRight size={16} />
+              </button>
             </div>
           )}
-        </main>
+        </div>
       </div>
 
-      {/* Exit Confirmation Dialog — "Access Sticker Directly" only offered once
-          phone verification has actually succeeded (phase reaches "register"
-          or later); exiting from Owner Details or the OTP step itself must
-          never hand over the tag view unverified. */}
       <ScanExitConfirmModal
         isOpen={showExitModal}
-        onContinuePayment={handleCloseExitConfirm}
+        onContinuePayment={() => setShowExitModal(false)}
         onConfirmExit={handleConfirmExit}
         onViewTag={activeStepIndex >= 2 ? onViewTag : undefined}
       />

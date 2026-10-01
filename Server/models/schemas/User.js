@@ -37,6 +37,17 @@ const userSchema = new Schema({
   last_login_user_agent: { type: String, default: null, select: false },
   login_count: { type: Number, default: 0, select: false },
   last_logout_at: { type: Date, default: null, select: false },
+
+  // DPDP Act §14 nomination — lets this account holder name someone else to
+  // exercise their data-principal rights in the event of death/incapacity.
+  // Optional; a single nominee is enough for this product's scope.
+  nominee: {
+    name: { type: String, default: null },
+    relationship: { type: String, default: null },
+    contact_phone: { type: String, default: null },
+    contact_email: { type: String, default: null },
+    set_at: { type: Date, default: null },
+  },
 }, { versionKey: false });
 
 module.exports = model('User', userSchema);

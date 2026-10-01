@@ -46,8 +46,13 @@ class AuthController {
    * backend environment variables (e.g. on Render) without a frontend rebuild.
    */
   static getMsg91WidgetConfig(req, res) {
-    const widgetId = (process.env.VITE_MSG91_WIDGET_ID || process.env.MSG91_WIDGET_ID || '').trim();
+    let widgetId = (process.env.VITE_MSG91_WIDGET_ID || process.env.MSG91_WIDGET_ID || '').trim();
     const tokenAuth = (process.env.VITE_MSG91_WIDGET_TOKEN_AUTH || process.env.MSG91_WIDGET_TOKEN_AUTH || '').trim();
+
+    // Auto-correct common typo where an extra '3' was inserted before '231'
+    if (widgetId === '36696e6551613339303333231') {
+      widgetId = '36696e655161333930333231';
+    }
 
     return res.json({
       success: true,

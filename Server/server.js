@@ -34,6 +34,7 @@ const shiprocketRoutes = require('./routes/shiprocketRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const pushRoutes = require('./routes/pushRoutes');
+const privacyRoutes = require('./routes/privacyRoutes');
 const { initChatSocket } = require('./sockets/chatSocket');
 
 const app = express();
@@ -139,6 +140,7 @@ app.use('/api/shiprocket', shiprocketRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/privacy', privacyRoutes);
 
 // Rescue for stickers printed while APP_URL was misconfigured to this backend's
 // own origin instead of the frontend (see qrModel.js's QR_HOST): their QR image

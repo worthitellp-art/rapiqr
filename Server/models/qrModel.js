@@ -156,15 +156,51 @@ function buildStickerIdFilter(qrId) {
 
 class QrModel {
   /**
+   * The authenticated owner's own stickers, full detail (name/phone/email/
+   * address/blood group/emergency contacts) — unlike getById/PUBLIC_QR_FIELDS,
+   * this is safe to return in full because the caller IS the owner. Used by
+   * the /api/privacy/export data export; nothing else in the API surface
+   * currently exposes a "my stickers" list at all (the client dashboard reads
+   * its own localStorage cache instead — see docs/DPDP_COMPLIANCE_AUDIT.md).
+   */
+  static async getOwnedByUserId(userId) {
+    try {
+      if (!userId) return [];
+      const docs = await Sticker.find({ user_id: userId, deleted_at: null }).sort({ created_at: -1 }).lean();
+      return docs.map((doc) => ({
+        id: doc._id,
+        clientId: doc.client_id,
+        status: doc.status,
+        category: doc.category,
+        vehicleNumber: doc.vehicle_number || null,
+        ownerName: doc.name || doc.assigned_to || null,
+        details: doc.details || {},
+        createdAt: doc.created_at,
+      }));
+    } catch (err) {
+      console.error('QrModel.getOwnedByUserId Error:', err);
+      logger.error('DB_QR', 'QrModel.getOwnedByUserId failed', err);
+      return [];
+    }
+  }
+
+  /**
    * Admin fleet view — owner info is on the same document now. Excludes soft-deleted stickers.
+   *
+   * Does NOT return recovery_code. It used to, on every row, on every poll —
+   * a secret credential (equivalent to a password) sitting in a bulk response
+   * that the admin dashboard then persisted into browser localStorage
+   * indefinitely (see docs/DPDP_COMPLIANCE_AUDIT.md, U2 follow-up). Recovery
+   * codes are still generated/backfilled here so every sticker has one, but
+   * fetching one now requires the explicit, audited
+   * QrModel.getRecoveryCodesByIds / AdminController.revealRecoveryCodes path.
    */
   static async getAll(limit = 100) {
     try {
       const docs = await Sticker.find({ deleted_at: null }).sort({ created_at: -1 }).limit(limit).lean();
       return docs.map((doc) => {
-        let recoveryCode = doc.recovery_code;
-        if (!recoveryCode) {
-          recoveryCode = generateRecoveryCode();
+        if (!doc.recovery_code) {
+          const recoveryCode = generateRecoveryCode();
           const codeHash = hashRecoveryCode(recoveryCode);
           Sticker.updateOne(
             { _id: doc._id },
@@ -191,13 +227,32 @@ class QrModel {
           owner_name: doc.name || doc.assigned_to || doc.details?.ownerName || null,
           notes: doc.details?.notes || null,
           product_status: doc.status,
-          recovery_code: recoveryCode,
         };
       });
     } catch (err) {
       console.error('QrModel.getAll Error:', err);
       logger.error('DB_QR', 'QrModel.getAll failed', err);
       return [];
+    }
+  }
+
+  /**
+   * On-demand recovery-code lookup for the admin console's "reveal codes"
+   * action — the only path back to a sticker's plaintext recovery code now
+   * that getAll() no longer includes it. Callers (AdminController) are
+   * responsible for the audit log entry; this just reads the field.
+   */
+  static async getRecoveryCodesByIds(ids) {
+    try {
+      if (!Array.isArray(ids) || ids.length === 0) return {};
+      const docs = await Sticker.find({ _id: { $in: ids } }).select('_id recovery_code').lean();
+      const out = {};
+      for (const doc of docs) out[doc._id] = doc.recovery_code || null;
+      return out;
+    } catch (err) {
+      console.error('QrModel.getRecoveryCodesByIds Error:', err);
+      logger.error('DB_QR', 'QrModel.getRecoveryCodesByIds failed', err);
+      return {};
     }
   }
 

@@ -16,6 +16,7 @@ export const dashboardTranslations: Record<Language, {
       contacts: string;
       history: string;
       settings: string;
+      privacy: string;
       support: string;
     };
     navSections: { myTag: string; communication: string; account: string };
@@ -50,6 +51,7 @@ export const dashboardTranslations: Record<Language, {
         contacts: 'Emergency Contacts',
         history: 'Alert History',
         settings: 'Account Settings',
+        privacy: 'Privacy & Data',
         support: 'Support & Help',
       },
       navSections: { myTag: 'My Tag', communication: 'Communication', account: 'Account' },
@@ -88,6 +90,7 @@ export const dashboardTranslations: Record<Language, {
         contacts: 'आपातकालीन संपर्क',
         history: 'अलर्ट इतिहास',
         settings: 'खाता सेटिंग्स',
+        privacy: 'गोपनीयता एवं डेटा',
         support: 'सहायता एवं मदद',
       },
       navSections: { myTag: 'मेरा टैग', communication: 'संचार', account: 'खाता' },
@@ -126,6 +129,7 @@ export const dashboardTranslations: Record<Language, {
         contacts: 'ઇમરજન્સી સંપર્કો',
         history: 'એલર્ટ ઇતિહાસ',
         settings: 'એકાઉન્ટ સેટિંગ્સ',
+        privacy: 'ગોપનીયતા અને ડેટા',
         support: 'સપોર્ટ અને મદદ',
       },
       navSections: { myTag: 'મારો ટેગ', communication: 'સંચાર', account: 'એકાઉન્ટ' },

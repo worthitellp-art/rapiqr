@@ -422,9 +422,6 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                 {totalCount} record{totalCount === 1 ? "" : "s"}
               </span>
             </h1>
-            <p className="text-[13px] text-[var(--fx-ink-2)] mt-0.5">
-              Track fulfillment, manage records, and contact customers right from this list.
-            </p>
           </div>
         </div>
 
@@ -540,17 +537,12 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                 </button>
               </div>
             ) : filteredOrders.length === 0 ? (
-              <div className="p-16 text-center space-y-3">
-                <div className="w-12 h-12 rounded-xl bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center mx-auto">
-                  <ShoppingBag size={22} />
+              <div className="p-8 text-center space-y-2">
+                <div className="w-10 h-10 rounded-xl bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center mx-auto">
+                  <ShoppingBag size={18} />
                 </div>
                 <p className="font-bold text-[13px] text-[var(--fx-ink)]">
                   {searchQuery || filter !== "all" ? "No orders match your filters." : "No orders yet."}
-                </p>
-                <p className="text-[12.5px] text-[var(--fx-ink-2)] max-w-[420px] mx-auto">
-                  {searchQuery || filter !== "all"
-                    ? "Try a different search term or status tab."
-                    : "Orders placed by customers on the Checkout page will appear here. You can also add one manually."}
                 </p>
                 {(searchQuery || filter !== "all") && (
                   <button onClick={() => { setSearchQuery(""); setFilter("all"); }} className="fx-btn fx-btn-secondary h-10">

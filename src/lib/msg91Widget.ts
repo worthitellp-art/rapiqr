@@ -41,7 +41,30 @@ declare global {
 
 import { API_BASE_URL } from './apiClient';
 
-let cachedWidgetId = (import.meta.env.VITE_MSG91_WIDGET_ID as string | undefined)?.trim() || '';
+function sanitizeWidgetId(id: unknown): string {
+  const trimmed = String(id || '').trim();
+  // Auto-correct common typo where an extra '3' was inserted before '231'
+  if (trimmed === '36696e6551613339303333231') {
+    return '36696e655161333930333231';
+  }
+  return trimmed;
+}
+
+function extractMsg91ErrorMessage(error: any, fallback: string): string {
+  if (!error) return fallback;
+  if (typeof error === 'string' && error.trim()) return error.trim();
+  if (typeof error.message === 'string' && error.message.trim()) return error.message.trim();
+  if (typeof error.error === 'string' && error.error.trim()) return error.error.trim();
+  if (typeof error.errors === 'string' && error.errors.trim()) return error.errors.trim();
+  if (Array.isArray(error.errors) && error.errors.length > 0) {
+    const first = error.errors[0];
+    if (typeof first === 'string' && first.trim()) return first.trim();
+    if (first && typeof first.message === 'string' && first.message.trim()) return first.message.trim();
+  }
+  return fallback;
+}
+
+let cachedWidgetId = sanitizeWidgetId((import.meta.env.VITE_MSG91_WIDGET_ID as string | undefined) || '');
 let cachedTokenAuth = (import.meta.env.VITE_MSG91_WIDGET_TOKEN_AUTH as string | undefined)?.trim() || '';
 
 export async function getWidgetConfig(): Promise<{ widgetId: string; tokenAuth: string }> {
@@ -54,7 +77,7 @@ export async function getWidgetConfig(): Promise<{ widgetId: string; tokenAuth: 
     if (res.ok) {
       const data = await res.json();
       if (data?.widgetId && data?.tokenAuth) {
-        cachedWidgetId = String(data.widgetId).trim();
+        cachedWidgetId = sanitizeWidgetId(data.widgetId);
         cachedTokenAuth = String(data.tokenAuth).trim();
       }
     }
@@ -159,7 +182,7 @@ export async function sendMsg91Otp(identifier: string): Promise<void> {
         // balance) — log the raw payload so the real reason is visible in
         // devtools instead of just the generic fallback text below.
         console.error('MSG91 sendOtp failure:', error);
-        reject(new Error(error?.message || 'Failed to send the verification code.'));
+        reject(new Error(extractMsg91ErrorMessage(error, 'Failed to send the verification code.')));
       }
     );
   });
@@ -184,7 +207,7 @@ export async function verifyMsg91Otp(otp: string): Promise<string> {
       },
       (error) => {
         console.error('MSG91 verifyOtp failure:', error);
-        reject(new Error(error?.message || 'Incorrect code — please try again.'));
+        reject(new Error(extractMsg91ErrorMessage(error, 'Incorrect code — please try again.')));
       }
     );
   });
@@ -207,7 +230,7 @@ export async function retryMsg91Otp(channel: 'text' | 'voice' | 'whatsapp' = 'te
       () => resolve(),
       (error) => {
         console.error('MSG91 retryOtp failure:', error);
-        reject(new Error(error?.message || 'Failed to resend the code.'));
+        reject(new Error(extractMsg91ErrorMessage(error, 'Failed to resend the code.')));
       }
     );
   });

@@ -23,7 +23,7 @@ export default function ScanExitConfirmModal({
       onClick={onContinuePayment}
     >
       <div
-        className="bg-white rounded-[28px] shadow-2xl w-full max-w-md p-6 sm:p-8 relative border border-slate-100 text-center animate-modal-pop"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 sm:p-8 relative border border-slate-100 text-center animate-modal-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close X Button in top right */}
@@ -53,7 +53,7 @@ export default function ScanExitConfirmModal({
             Are you sure you want to exit?
           </h3>
           <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-xs mx-auto">
-            You can access the smart sticker tag directly or return to RapiQR home.
+            You can access the smart sticker tag directly or come back to registration later.
           </p>
         </div>
 
@@ -74,7 +74,7 @@ export default function ScanExitConfirmModal({
             onClick={onContinuePayment}
             className="w-full py-3.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 active:scale-[0.99] text-slate-900 font-bold text-sm transition-colors cursor-pointer"
           >
-            Continue to payment
+            Continue registration
           </button>
 
           <button

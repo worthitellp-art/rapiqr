@@ -16,6 +16,7 @@
     "lighthouse": "lighthouse http://localhost:4173/ --output=html --output=json --output-path=./lighthouse-report --chrome-flags=\"--headless=new\" --view"
   },
   "dependencies": {
+    "@clerk/react": "^6.17.2",
     "@tailwindcss/vite": "^4.1.14",
     "@types/qrcode": "^1.5.6",
     "@vitejs/plugin-react": "^5.0.4",
@@ -26,6 +27,7 @@
     "lighthouse": "^13.4.1",
     "lucide-react": "^0.546.0",
     "qrcode": "^1.5.4",
+    "qrcode-with-logos": "^1.2.1",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",

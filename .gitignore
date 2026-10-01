@@ -9,3 +9,4 @@ lighthouse-report.*
 .env*
 !.env.example
 !.env.production
+keys/

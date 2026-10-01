@@ -1,0 +1,73 @@
+{
+  "category": "UTILITY",
+  "name": "rapi_tag_scan",
+  "namespace": "7bd4b8a8_2f6f_4e9d_b673_2673a3a16385",
+  "languages": [
+    {
+      "id": "2312016016206772",
+      "name": "rapi_tag_scan",
+      "language": "en",
+      "parameter_format": "NAMED",
+      "status": "approved",
+      "rejection_reason": "NONE",
+      "default_variables": null,
+      "code": [
+        {
+          "text": "🔔 *RapiQR Scan Alert*\n\nYour tag *{{item_name}}* *was scanned*.\n*Note*: \"{{message}}\"\n\n_*Tap below to view details and reply 👇*_",
+          "type": "BODY",
+          "example": {
+            "body_text_named_params": [
+              {
+                "example": "Car GJ 01 AB 1234",
+                "param_name": "item_name"
+              },
+              {
+                "example": "Found parked with headlights on",
+                "param_name": "message"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "url": "https://repiqr.com/#/dashboard?tab=chat&session={{1}}",
+              "text": "View & Reply",
+              "type": "URL",
+              "example": [
+                "https://repiqr.com/#/dashboard?tab=chat&session=6aae76dcae7ca2804553a390"
+              ]
+            }
+          ]
+        }
+      ],
+      "gtwy_thread_id": null,
+      "msg91_template_id": 547817,
+      "quality_score": "UNKNOWN",
+      "backup_templates": [],
+      "variables": [
+        "body_item_name",
+        "body_message",
+        "button_1"
+      ],
+      "variable_type": {
+        "body_item_name": {
+          "type": "text",
+          "parameter_name": "item_name"
+        },
+        "body_message": {
+          "type": "text",
+          "parameter_name": "message"
+        },
+        "button_1": {
+          "subtype": "url",
+          "type": "text"
+        }
+      }
+    }
+  ],
+  "is_disabled": 0,
+  "ttl_in_seconds": null,
+  "gtwy_thread_id": null
+}

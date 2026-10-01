@@ -13,6 +13,8 @@ import { apiClient } from "../../lib/apiClient";
 import { isRunningInstalled, useInstallPrompt } from "../../lib/pwaInstall";
 import PwaInstallModal from "../common/PwaInstallModal";
 import AppLogo from "../common/AppLogo";
+import SiteHeader from "../layout/SiteHeader";
+import SiteFooter from "../layout/SiteFooter";
 import groupLogo from "../../../assets/Group 1000005716.png";
 import groupLogo1 from "../../../assets/darkbglogo.png";
 import groupLogo2 from "../../../assets/Group 1000005716-2.png";
@@ -141,8 +143,11 @@ function makeContactId() {
   return `ec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// Emergency-contact numbers have no country selector of their own (the input
+// caps entry at 10 digits) — a ">= 7 digits" check let through numbers that
+// were obviously just partially typed (e.g. "1234567") and still proceed.
 function isValidContactPhone(phone: string) {
-  return phone.replace(/\D/g, "").length >= 7;
+  return phone.replace(/\D/g, "").length === 10;
 }
 
 function getQrBaseUrl() {
@@ -211,7 +216,7 @@ function formatCoord(n: number) {
   return n.toFixed(4);
 }
 
-const ACTIVATION_COUNTRIES: { name: string; code: string }[] = [
+export const ACTIVATION_COUNTRIES: { name: string; code: string }[] = [
   { name: "India", code: "+91" },
   { name: "United States", code: "+1" },
   { name: "United Kingdom", code: "+44" },
@@ -225,6 +230,29 @@ const ACTIVATION_COUNTRIES: { name: string; code: string }[] = [
   { name: "Sri Lanka", code: "+94" },
   { name: "Nepal", code: "+977" },
 ];
+
+// Local mobile-number digit length by dial code — a blanket "exactly 10
+// digits" check (the old behaviour) silently rejected every correctly-typed
+// number from the shorter-format countries in the list above (UAE, Saudi,
+// Singapore, Australia).
+export const PHONE_DIGIT_RULES: Record<string, { min: number; max: number }> = {
+  "+91": { min: 10, max: 10 },
+  "+1": { min: 10, max: 10 },
+  "+44": { min: 10, max: 10 },
+  "+971": { min: 9, max: 9 },
+  "+966": { min: 9, max: 9 },
+  "+65": { min: 8, max: 8 },
+  "+61": { min: 9, max: 9 },
+  "+49": { min: 10, max: 11 },
+  "+92": { min: 10, max: 10 },
+  "+94": { min: 9, max: 9 },
+  "+977": { min: 10, max: 10 },
+};
+const DEFAULT_PHONE_DIGIT_RULE = { min: 7, max: 12 };
+
+export function getPhoneDigitRule(countryCode: string) {
+  return PHONE_DIGIT_RULES[countryCode] || DEFAULT_PHONE_DIGIT_RULE;
+}
 
 function Security3DGraphic() {
   return (
@@ -848,8 +876,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   const [otpSending, setOtpSending] = useState(false);
   const [otpSimulated, setOtpSimulated] = useState(false);
 
-  function isValidPhoneNumber(phone: string) {
-    return /^\d{10}$/.test(phone.replace(/\D/g, ""));
+  // Country-aware: a blanket "exactly 10 digits" rejected every correctly
+  // typed number from shorter-format countries (UAE, Saudi, Singapore,
+  // Australia) in ACTIVATION_COUNTRIES above — see PHONE_DIGIT_RULES.
+  function isValidPhoneNumber(phone: string, countryCode: string = regCountry) {
+    const digits = phone.replace(/\D/g, "");
+    const rule = getPhoneDigitRule(countryCode);
+    return digits.length >= rule.min && digits.length <= rule.max;
   }
 
   // Prefill owner phone/name from the most recent purchase order (convenience
@@ -887,13 +920,16 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       return;
     }
     if (!isValidPhoneNumber(regPhone)) {
-      setActivationError("Please enter a valid 10-digit phone number.");
+      const rule = getPhoneDigitRule(regCountry);
+      const expected = rule.min === rule.max ? `${rule.min}-digit` : `${rule.min}-${rule.max} digit`;
+      setActivationError(`Please enter a valid ${expected} phone number for the selected country.`);
       return;
     }
 
     const isVehicle = isVehicleCategory(qrData.category);
-    if (isVehicle && !regVehicleNumber.trim()) {
-      setActivationError("Please enter vehicle registration number (e.g. MH 02 AB 1234).");
+    const cleanVehicleNumber = regVehicleNumber.trim().replace(/\s+/g, "");
+    if (isVehicle && cleanVehicleNumber.length < 4) {
+      setActivationError("Please enter a valid vehicle registration number (e.g. MH 02 AB 1234).");
       return;
     }
 
@@ -933,7 +969,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     setActivationError(null);
 
     const cleanOtp = otpInput.trim();
-    if (!cleanOtp) {
+    if (!/^\d{4,6}$/.test(cleanOtp)) {
       setActivationError("Please enter the verification code.");
       return;
     }
@@ -1093,12 +1129,18 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   /* ---- Get Admin Provided Contact Numbers ---- */
   const getTowingContacts = (filterCategory?: string) => {
     if (!qrData) return [];
-    const storedQrList = JSON.parse(localStorage.getItem("repiqr-qrlist") || localStorage.getItem("namoqr-qrlist") || "[]");
-    const storedClientStickers = JSON.parse(localStorage.getItem("repiqr-client-stickers") || localStorage.getItem("namoqr-client-stickers") || "[]");
     const adminHelplines = JSON.parse(localStorage.getItem("repiqr-helplines") || localStorage.getItem("namoqr-helplines") || "[]");
 
-    const allRecords = [...storedQrList, ...storedClientStickers];
-    const fullRecord = allRecords.find((q: any) => q.id === qrData.id || q.clientId === qrData.clientId || q.qrCodeId === qrData.id || q.code === qrData.id) || {};
+    // Owner contact fields must come only from the backend response for THIS
+    // scanned sticker (qrData) — never from the admin/client dashboard's
+    // full-fleet localStorage cache (repiqr-qrlist / repiqr-client-stickers).
+    // That cache holds every customer's phone/email/notes (and, historically,
+    // plaintext recovery codes) and is keyed by browser, not by session — a
+    // lookup against it here let anyone with access to an admin's or owner's
+    // browser profile pull ANY sticker's private contact details straight off
+    // the public scan page, bypassing the backend's PUBLIC_QR_FIELDS
+    // allow-list entirely. See docs/DPDP_COMPLIANCE_AUDIT.md (U2).
+    const fullRecord: any = qrData;
     const contacts: { label: string; phone: string; role: string; primary?: boolean; category?: string; name?: string }[] = [];
 
     // 1. Registered Vehicle Owner Contact from Admin/DB
@@ -1776,8 +1818,22 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         />
       </div>
 
+      {/* Registration wizard (owner details → verify → emergency contacts → done)
+          gets the site's real header/footer so it reads as a page, not an
+          orphaned app screen — the other phases (live tag view, location
+          prompts, errors) stay a focused full-screen experience. */}
+      {(phase === "activation" || phase === "register" || phase === "success") && (
+        <div className="w-full z-10">
+          <SiteHeader onBack={onBack} />
+        </div>
+      )}
+
       {/* Main Visitor Container */}
-      <main className="flex-1 w-full max-w-5xl mx-auto px-2 sm:px-4 py-4 pb-12 z-10 flex flex-col justify-center items-center">
+      <main
+        className={`flex-1 w-full max-w-5xl mx-auto px-2 sm:px-4 py-4 pb-12 z-10 flex flex-col items-center ${
+          phase === "activation" || phase === "register" || phase === "success" ? "justify-start" : "justify-center"
+        }`}
+      >
 
         {/* ============ VALIDATING STATE (prevents blank screen during lookup) ============ */}
         {phase === "validating" && (
@@ -3164,8 +3220,10 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
             page now; the old full-width promotional banner was removed so
             nothing about installing appears unless the visitor taps this.
             The assistant itself is still reachable via the category tiles'
-            "Ask" action (see handleCategoryButtonAction). */}
-        <InstallAppFab />
+            "Ask" action (see handleCategoryButtonAction). Hidden during the
+            registration wizard — it overlapped the form's own bottom actions
+            on small screens and is a distraction mid-registration anyway. */}
+        {!(phase === "activation" || phase === "register" || phase === "success") && <InstallAppFab />}
         <PwaInstallModal isOpen={pwaShowGuide} onClose={() => setPwaShowGuide(false)} />
 
         {/* ============ ASSISTANT CHAT ============ */}
@@ -3248,6 +3306,12 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           </div>
         )}
       </main>
+
+      {(phase === "activation" || phase === "register" || phase === "success") && (
+        <div className="w-full z-10">
+          <SiteFooter />
+        </div>
+      )}
 
       {/* RepiChat — real-time in-app chat with the sticker owner (replaces WhatsApp deep links) */}
       {chatOpen && qrData && (

@@ -6,6 +6,7 @@ import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
 import { getCategoryIcon } from '../../../stickerModules';
 import { generateRepeatedStickerSheetBlob, downloadSheetBlob } from '../../../services/stickerPrintSheetService';
 import type { QrRecord } from '../admin/types';
+import repiqrWordmark from '../../../assets/repiqr-wordmark.png';
 
 function ModalShell({
   onClose,
@@ -513,6 +514,12 @@ export function QrCodeModal({
             size={190}
             level="H"
             includeMargin={true}
+            imageSettings={{
+              src: repiqrWordmark,
+              height: 36,
+              width: 123,
+              excavate: true,
+            }}
           />
           <p className="text-[10px] font-extrabold text-[var(--fx-ink-2)] mt-2 tracking-widest uppercase">RepiQR Safety Tag</p>
         </div>

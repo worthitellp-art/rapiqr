@@ -1,4 +1,4 @@
-import { LayoutGrid, Plus, PhoneCall, Bell, Users, Palette, Store, ShoppingBag, MessageCircle, Send, Package } from "lucide-react";
+import { LayoutGrid, Plus, PhoneCall, Bell, Users, Printer, Store, ShoppingBag, MessageCircle, Send, Package } from "lucide-react";
 
 export const FONT_OPTIONS = [
   { id: "Pinterest Sans", label: "Pinterest Sans", css: "'Pinterest Sans', 'Pin Sans', ui-sans-serif, system-ui" },
@@ -24,7 +24,7 @@ export const NAV_ITEMS = [
   { id: "alerts", label: "Alerts", icon: Bell, section: "Engagement" },
   { id: "users", label: "Users", icon: Users, section: "Manage" },
   { id: "products", label: "Shop Products", icon: Package, section: "Manage" },
-  { id: "customize", label: "Customization", icon: Palette, section: "Manage" },
+  { id: "customize", label: "Sticker & Print", icon: Printer, section: "Manage" },
 ];
 
 // Client (sticker owner) only nav item — their link into the RepiChat inbox.

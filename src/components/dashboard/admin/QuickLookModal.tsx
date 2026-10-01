@@ -52,10 +52,12 @@ export default function QuickLookModal({
       >
         {/* Top Header & Close Button */}
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <h3 className="text-sm font-bold text-gray-900">Sticker Inspector</h3>
-            <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md font-semibold">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+              <h3 className="text-sm font-bold text-gray-900 truncate">{displayLabel}</h3>
+            </div>
+            <span className="font-mono text-[11px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md font-semibold mt-1 inline-block">
               {displayCode}
             </span>
           </div>

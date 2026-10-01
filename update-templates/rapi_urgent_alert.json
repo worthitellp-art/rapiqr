@@ -1,0 +1,73 @@
+{
+  "category": "MARKETING",
+  "name": "rapi_urgent_alert",
+  "namespace": "7bd4b8a8_2f6f_4e9d_b673_2673a3a16385",
+  "languages": [
+    {
+      "id": "1384262530486461",
+      "name": "rapi_urgent_alert",
+      "language": "en",
+      "parameter_format": "NAMED",
+      "status": "approved",
+      "rejection_reason": "NONE",
+      "default_variables": null,
+      "code": [
+        {
+          "text": "🚨 *Urgent Alert*\n\nAlert reported for *{{item_name}}*:\n\"{{message}}\"\n\n*_Tap below to reply securely_* 👇",
+          "type": "BODY",
+          "example": {
+            "body_text_named_params": [
+              {
+                "example": "Car GJ 01 AB 1234",
+                "param_name": "item_name"
+              },
+              {
+                "example": "Vehicle blocking emergency entrance",
+                "param_name": "message"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "url": "https://repiqr.com/#/dashboard?tab=chat&session={{1}}",
+              "text": "View Alert",
+              "type": "URL",
+              "example": [
+                "https://repiqr.com/#/dashboard?tab=chat&session=6aae76dcae7ca2804553a390"
+              ]
+            }
+          ]
+        }
+      ],
+      "gtwy_thread_id": null,
+      "msg91_template_id": 547841,
+      "quality_score": "UNKNOWN",
+      "backup_templates": [],
+      "variables": [
+        "body_item_name",
+        "body_message",
+        "button_1"
+      ],
+      "variable_type": {
+        "body_item_name": {
+          "type": "text",
+          "parameter_name": "item_name"
+        },
+        "body_message": {
+          "type": "text",
+          "parameter_name": "message"
+        },
+        "button_1": {
+          "subtype": "url",
+          "type": "text"
+        }
+      }
+    }
+  ],
+  "is_disabled": 0,
+  "ttl_in_seconds": null,
+  "gtwy_thread_id": null
+}

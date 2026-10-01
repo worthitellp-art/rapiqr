@@ -1,234 +1,65 @@
-﻿import type React from "react";
-import { useState, useRef, useEffect, useCallback } from "react";
-import { Save, Grid3X3, Lock, Unlock, Magnet, Check, ShieldCheck, Printer, SaveAll } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
+import { Printer, ShieldCheck, BadgeCheck } from "lucide-react";
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
 import QrCodeImage from "./QrCodeImage";
 import { StickerPos } from "./types";
 import PrintSheetModal from "./PrintSheetModal";
-import { apiClient } from "../../../lib/apiClient";
 
 const STICKER_SRC = stickerTemplateImg;
 const EDITOR_DISPLAY = { w: 320, h: 200 };
-const MIN_SIZE = 20;
-const MAX_SIZE = 280;
-const SNAP = 4;
 
 export default function StickerEditor({
   stickerPos,
-  setStickerPos,
   setToast,
   openPrintSheet,
 }: {
   stickerPos: StickerPos;
-  setStickerPos: (p: StickerPos) => void;
+  setStickerPos?: (p: StickerPos) => void;
   setToast: (msg: string | null) => void;
   openPrintSheet?: () => void;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [dragging, setDragging] = useState(false);
-  const [resizing, setResizing] = useState<"se" | "sw" | "ne" | "nw" | null>(null);
-  const dragOffset = useRef({ x: 0, y: 0 });
-  const startPos = useRef({ x: 0, y: 0, w: 0, h: 0 });
-
-  const [showGrid, setShowGrid] = useState(false);
-  const [snapEnabled, setSnapEnabled] = useState(true);
-  const [lockAspect, setLockAspect] = useState(true);
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [isLocalPrintOpen, setIsLocalPrintOpen] = useState(false);
-
-  function clamp(val: number, min: number, max: number) {
-    return Math.max(min, Math.min(max, val));
-  }
-  function snap(val: number) {
-    return snapEnabled ? Math.round(val / SNAP) * SNAP : Math.round(val);
-  }
-
-  const handleDragDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setDragging(true);
-      dragOffset.current = { x: e.clientX, y: e.clientY };
-      startPos.current = { x: stickerPos.x, y: stickerPos.y, w: stickerPos.w, h: stickerPos.h };
-    },
-    [stickerPos]
-  );
-
-  const handleResizeDown = useCallback(
-    (dir: "se" | "sw" | "ne" | "nw") => (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setResizing(dir);
-      dragOffset.current = { x: e.clientX, y: e.clientY };
-      startPos.current = { x: stickerPos.x, y: stickerPos.y, w: stickerPos.w, h: stickerPos.h };
-    },
-    [stickerPos]
-  );
-
-  useEffect(() => {
-    if (!dragging && !resizing) return;
-    const handleMove = (e: MouseEvent) => {
-      const container = containerRef.current;
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      const dx = e.clientX - dragOffset.current.x;
-      const dy = e.clientY - dragOffset.current.y;
-
-      if (dragging) {
-        setStickerPos({
-          ...stickerPos,
-          x: snap(clamp(startPos.current.x + dx, 0, rect.width - stickerPos.w)),
-          y: snap(clamp(startPos.current.y + dy, 0, rect.height - stickerPos.h)),
-        });
-      }
-      if (resizing) {
-        const s = startPos.current;
-        let nw = s.w,
-          nh = s.h,
-          nx = s.x,
-          ny = s.y;
-        if (resizing === "se") {
-          nw = clamp(s.w + dx, MIN_SIZE, MAX_SIZE);
-          nh = lockAspect ? nw : clamp(s.h + dy, MIN_SIZE, MAX_SIZE);
-        } else if (resizing === "sw") {
-          nw = clamp(s.w - dx, MIN_SIZE, MAX_SIZE);
-          nh = lockAspect ? nw : clamp(s.h + dy, MIN_SIZE, MAX_SIZE);
-          nx = s.x + s.w - nw;
-        } else if (resizing === "ne") {
-          nw = clamp(s.w + dx, MIN_SIZE, MAX_SIZE);
-          nh = lockAspect ? nw : clamp(s.h - dy, MIN_SIZE, MAX_SIZE);
-          ny = s.y + s.h - nh;
-        } else if (resizing === "nw") {
-          nw = clamp(s.w - dx, MIN_SIZE, MAX_SIZE);
-          nh = lockAspect ? nw : clamp(s.h - dy, MIN_SIZE, MAX_SIZE);
-          nx = s.x + s.w - nw;
-          ny = s.y + s.h - nh;
-        }
-        nx = snap(clamp(nx, 0, rect.width - nw));
-        ny = snap(clamp(ny, 0, rect.height - nh));
-        nw = snap(clamp(nw, MIN_SIZE, rect.width - nx));
-        nh = snap(clamp(nh, MIN_SIZE, rect.height - ny));
-        setStickerPos({ x: nx, y: ny, w: nw, h: nh });
-      }
-    };
-    const handleUp = () => {
-      setDragging(false);
-      setResizing(null);
-    };
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
-    };
-  }, [dragging, resizing, stickerPos, setStickerPos, lockAspect, snapEnabled]);
-
-  async function handleSaveDefaultPosition() {
-    if (saveState !== "idle") return;
-    setSaveState("saving");
-    try {
-      const currentPos = { ...stickerPos };
-      try {
-        localStorage.setItem("repiqr-sticker-pos", JSON.stringify(currentPos));
-      } catch {
-        /* ignore */
-      }
-
-      const res = await apiClient.admin.saveStickerPosition(currentPos);
-
-      setSaveState("saved");
-      setToast(res.success ? "Default sticker position saved!" : "Saved locally — server did not confirm the save");
-    } catch (error) {
-      console.error("Failed to save position:", error);
-      setToast("Saved locally — server did not confirm the save");
-    } finally {
-      setTimeout(() => {
-        setSaveState("idle");
-        setToast(null);
-      }, 2200);
-    }
-  }
-
   const previewSize = 360;
 
   return (
     <div className="space-y-6 text-[var(--fx-ink)] font-body">
-      {/* Top Header */}
-      <div className="flex items-baseline justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="font-display text-[22px] font-semibold text-[var(--fx-ink)]">
-            Sticker QR Placement
-          </h1>
-          
-        </div>
+      <div>
+        <h1 className="font-display text-[22px] font-semibold text-[var(--fx-ink)]">
+          Sticker Preview
+        </h1>
+        <p className="text-[13px] text-[var(--fx-ink-2)] mt-1">
+          The QR code is calibrated to this template automatically — placement can't drift out of position.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Interactive Canvas Box */}
+        {/* Left: Locked Preview */}
         <div className="lg:col-span-7 bg-white border border-[var(--fx-border)] p-5.5 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-display text-[13px] font-semibold text-[var(--fx-ink)]">
-              Sticker Canvas & Placement
+              Sticker Layout
             </h3>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowGrid(!showGrid)}
-                className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                  showGrid ? "bg-[var(--fx-accent)] text-white border-[var(--fx-accent)]" : "bg-[var(--fx-canvas)] border-[var(--fx-border)] text-[var(--fx-faint)] hover:text-[var(--fx-ink)]"
-                }`}
-                title="Toggle grid overlay"
-              >
-                <Grid3X3 size={14} />
-              </button>
-              <button
-                onClick={() => setSnapEnabled(!snapEnabled)}
-                className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                  snapEnabled ? "bg-[var(--fx-accent)] text-white border-[var(--fx-accent)]" : "bg-[var(--fx-canvas)] border-[var(--fx-border)] text-[var(--fx-faint)] hover:text-[var(--fx-ink)]"
-                }`}
-                title={`Snap to ${SNAP}px grid`}
-              >
-                <Magnet size={14} />
-              </button>
-              <button
-                onClick={() => setLockAspect(!lockAspect)}
-                className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                  lockAspect ? "bg-[var(--fx-accent)] text-white border-[var(--fx-accent)]" : "bg-[var(--fx-canvas)] border-[var(--fx-border)] text-[var(--fx-faint)] hover:text-[var(--fx-ink)]"
-                }`}
-                title="Lock aspect ratio"
-              >
-                {lockAspect ? <Lock size={14} /> : <Unlock size={14} />}
-              </button>
-              <span className="font-mono text-[11px] font-bold text-[var(--fx-accent-ink)] bg-[var(--fx-accent-soft)] px-2.5 py-1 rounded-lg">
-                {stickerPos.w}×{stickerPos.h} @ {stickerPos.x},{stickerPos.y}
-              </span>
-            </div>
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+              <BadgeCheck size={13} /> Auto-aligned
+            </span>
           </div>
 
-          {/* Interactive Canvas */}
           <div
-            ref={containerRef}
             className="relative mx-auto overflow-hidden select-none border-2 border-[var(--fx-ink)] rounded-lg shadow-[0_4px_12px_rgba(16,24,40,0.06)] bg-[var(--fx-canvas)]"
             style={{
               width: previewSize,
               height: Math.round(previewSize * (EDITOR_DISPLAY.h / EDITOR_DISPLAY.w)),
-              backgroundImage: showGrid
-                ? "linear-gradient(rgba(92,120,223,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(92,120,223,0.2) 1px, transparent 1px)"
-                : undefined,
-              backgroundSize: showGrid ? "20px 20px" : undefined,
             }}
           >
-            {/* Sticker Graphic */}
             <img
               src={STICKER_SRC}
               draggable={false}
               className="w-full h-full object-fill pointer-events-none"
               alt="Sticker Layout"
             />
-
-            {/* Draggable & Resizable QR Placement Overlay */}
             <div
-              onMouseDown={handleDragDown}
-              className="absolute cursor-move border-2 border-[var(--fx-ink)] rounded-lg shadow-[0_4px_10px_rgba(0,0,0,0.15)] flex items-center justify-center bg-white p-1"
+              className="absolute pointer-events-none"
               style={{
                 left: Math.round(stickerPos.x * (previewSize / EDITOR_DISPLAY.w)),
                 top: Math.round(stickerPos.y * (previewSize * (EDITOR_DISPLAY.h / EDITOR_DISPLAY.w) / EDITOR_DISPLAY.h)),
@@ -241,27 +72,14 @@ export default function StickerEditor({
                 fg="000000"
                 bg="FFFFFF"
                 size={128}
-                className="w-full h-full object-contain pointer-events-none"
+                className="w-full h-full object-contain"
                 alt="Black QR Code"
               />
-
-              {/* Corner Resize Handles */}
-              {(["nw", "ne", "sw", "se"] as const).map((dir) => (
-                <div
-                  key={dir}
-                  onMouseDown={handleResizeDown(dir)}
-                  className={`absolute w-3.5 h-3.5 bg-[var(--fx-accent)] border-2 border-[var(--fx-ink)] rounded-full transition-transform hover:scale-125 cursor-${dir}-resize ${
-                    dir === "nw" ? "-top-2 -left-2" : dir === "ne" ? "-top-2 -right-2" : dir === "sw" ? "-bottom-2 -left-2" : "-bottom-2 -right-2"
-                  }`}
-                />
-              ))}
             </div>
           </div>
-
-          
         </div>
 
-        {/* Right: Controls & Single Save Panel */}
+        {/* Right: Info & Print */}
         <div className="lg:col-span-5 bg-white border border-[var(--fx-border)] p-5.5 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] space-y-4 flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2.5 mb-3">
@@ -269,74 +87,28 @@ export default function StickerEditor({
                 <ShieldCheck size={18} />
               </div>
               <h3 className="font-display text-[13px] font-semibold text-[var(--fx-ink)]">
-                Placement Controls
+                Why this is locked
               </h3>
             </div>
-
-           
-            {/* Position Readout */}
-            <div className="bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-lg p-3.5 space-y-2 mb-4">
-              <p className="text-[11px] font-body font-semibold text-[var(--fx-ink-2)] uppercase tracking-wider">
-               Dimensions
-              </p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-2 font-mono text-[13px] font-bold text-[var(--fx-ink)]">
-                <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-[var(--fx-border)]">
-                  <span className="text-[var(--fx-ink-2)]">X:</span>
-                  <span className="text-[var(--fx-ink)]">{stickerPos.x}px</span>
-                </div>
-                <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-[var(--fx-border)]">
-                  <span className="text-[var(--fx-ink-2)]">Y:</span>
-                  <span className="text-[var(--fx-ink)]">{stickerPos.y}px</span>
-                </div>
-                <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-[var(--fx-border)]">
-                  <span className="text-[var(--fx-ink-2)]">Width:</span>
-                  <span className="text-[var(--fx-ink)]">{stickerPos.w}px</span>
-                </div>
-                <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-[var(--fx-border)]">
-                  <span className="text-[var(--fx-ink-2)]">Height:</span>
-                  <span className="text-[var(--fx-ink)]">{stickerPos.h}px</span>
-                </div>
-              </div>
-            </div>
-
-            
+            <p className="text-[13px] text-[var(--fx-ink-2)] leading-relaxed">
+              Every sticker uses the same fixed QR slot on the template, so it always lines up perfectly when printed —
+              no per-admin adjustment to get wrong or out of sync across devices.
+            </p>
           </div>
 
-          <div className="space-y-2.5">
-            {/* Single Save Action Button */}
-            <button
-              onClick={handleSaveDefaultPosition}
-              disabled={saveState !== "idle"}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-lg bg-[var(--fx-accent)] text-white font-bold text-[14.5px] hover:bg-[var(--fx-accent-ink)] active:scale-95 disabled:opacity-60 transition-all cursor-pointer shadow-sm shadow-[var(--fx-accent)]/20"
-            >
-              {saveState === "saving" ? (
-                "Saving Position..."
-              ) : saveState === "saved" ? (
-                <>
-                  <Check size={16} strokeWidth={2.5} /> Position Saved!
-                </>
-              ) : (
-                <>
-                   Save Default Position
-                </>
-              )}
-            </button>
-
-            {/* Print 18x12 Sheet Button */}
-            <button
-              type="button"
-              onClick={() => {
-                if (openPrintSheet) {
-                  openPrintSheet();
-                } else {
-                  setIsLocalPrintOpen(true);
-                }
-              }}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-lg bg-[var(--fx-accent-soft)] hover:bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] border border-[var(--fx-accent-ink)]/50 font-semibold text-[13.5px] active:scale-95 transition-all cursor-pointer shadow-2xs"
-            >
-              <Printer size={16} strokeWidth={2.2} /> Print
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (openPrintSheet) {
+                openPrintSheet();
+              } else {
+                setIsLocalPrintOpen(true);
+              }
+            }}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-lg bg-[var(--fx-accent)] text-white font-bold text-[14.5px] hover:bg-[var(--fx-accent-ink)] active:scale-95 transition-all cursor-pointer shadow-sm shadow-[var(--fx-accent)]/20"
+          >
+            <Printer size={16} strokeWidth={2.2} /> Print Bulk QR Sheet
+          </button>
         </div>
       </div>
 

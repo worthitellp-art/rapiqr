@@ -13,8 +13,8 @@ export const PRINT_SHEET_CONSTANTS = {
   GAP_INCHES: 0.2,
   REFERENCE_EDITOR_WIDTH: 320,
   REFERENCE_EDITOR_HEIGHT: 200,
-  QR_RESOLUTION_PIXELS: 512,
-  DEFAULT_STICKER_POS: { x: 110, y: 40, w: 100, h: 100 } as StickerPos,
+  QR_RESOLUTION_PIXELS: 768,
+  DEFAULT_STICKER_POS: { x: 193, y: 37, w: 110, h: 110 } as StickerPos,
 } as const;
 
 export interface SheetPrintConfig {

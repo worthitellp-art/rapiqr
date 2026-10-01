@@ -1015,23 +1015,42 @@ export const apiClient = {
 
   // Admin Support Console (RepiQR staff only — requires an admin-role token)
   admin: {
-    async listUsers(search?: string) {
-      const params = search ? `?search=${encodeURIComponent(search)}` : '';
-      return request<{ success: boolean; data: any[] }>(`/admin/users${params}`, {
+    // reveal=true asks the backend for unmasked phone/email — the backend
+    // defaults to masked otherwise. Defaulting this client call to true keeps
+    // today's admin UI showing real values (that's the job), while the
+    // request is now audit-logged as PII_REVEALED server-side either way —
+    // see Server/controllers/adminController.js.
+    async listUsers(search?: string, reveal = true) {
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+      if (reveal) params.set('reveal', 'true');
+      const qs = params.toString();
+      return request<{ success: boolean; data: any[] }>(`/admin/users${qs ? `?${qs}` : ''}`, {
         method: 'GET',
       });
     },
 
-    async getUserDetail(userId: string) {
-      return request<{ success: boolean; data: { profile: any; products: any[] } }>(`/admin/users/${userId}`, {
+    async getUserDetail(userId: string, reveal = true) {
+      const qs = reveal ? '?reveal=true' : '';
+      return request<{ success: boolean; data: { profile: any; products: any[] } }>(`/admin/users/${userId}${qs}`, {
         method: 'GET',
       });
     },
 
-    async searchStickers(search?: string) {
-      const params = search ? `?search=${encodeURIComponent(search)}` : '';
-      return request<{ success: boolean; data: any[] }>(`/admin/stickers${params}`, {
+    async searchStickers(search?: string, reveal = true) {
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+      if (reveal) params.set('reveal', 'true');
+      const qs = params.toString();
+      return request<{ success: boolean; data: any[] }>(`/admin/stickers${qs ? `?${qs}` : ''}`, {
         method: 'GET',
+      });
+    },
+
+    async revealRecoveryCodes(ids: string[]) {
+      return request<{ success: boolean; data: Record<string, string | null> }>('/admin/stickers/reveal-recovery-codes', {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
       });
     },
 
@@ -1236,6 +1255,61 @@ export const apiClient = {
         method: 'POST',
         body: JSON.stringify({ endpoint }),
       });
+    },
+  },
+
+  // Privacy / DPDP data-principal rights — see Server/routes/privacyRoutes.js
+  privacy: {
+    async getMe() {
+      return request<{ success: boolean; data: any }>('/privacy/me', { method: 'GET' });
+    },
+    async updateMe(updates: { fullName?: string; phoneNumber?: string; avatarUrl?: string }) {
+      return request<{ success: boolean; data: any }>('/privacy/me', {
+        method: 'PATCH',
+        body: JSON.stringify(updates),
+      });
+    },
+    async getSharing() {
+      return request<{ success: boolean; data: any[] }>('/privacy/sharing', { method: 'GET' });
+    },
+    async getConsent() {
+      return request<{ success: boolean; data: any[]; noticeVersion: string }>('/privacy/consent', { method: 'GET' });
+    },
+    async grantConsent(purpose: string, dataCategories?: string[]) {
+      return request<{ success: boolean; data: any }>('/privacy/consent', {
+        method: 'POST',
+        body: JSON.stringify({ purpose, dataCategories }),
+      });
+    },
+    async withdrawConsent(purpose: string) {
+      return request<{ success: boolean; data: any }>('/privacy/consent/withdraw', {
+        method: 'POST',
+        body: JSON.stringify({ purpose }),
+      });
+    },
+    async requestErasure(reason?: string) {
+      return request<{ success: boolean; data: any }>('/privacy/erasure-request', {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
+    },
+    async exportData() {
+      return request<{ success: boolean; data: any }>('/privacy/export', { method: 'GET' });
+    },
+    async setNominee(nominee: { name: string; relationship?: string; contactPhone?: string; contactEmail?: string }) {
+      return request<{ success: boolean; data: any }>('/privacy/nominee', {
+        method: 'POST',
+        body: JSON.stringify(nominee),
+      });
+    },
+    async submitGrievance(payload: { category?: string; description: string; contactEmail?: string; contactPhone?: string }) {
+      return request<{ success: boolean; data: any }>('/privacy/grievances', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+    async listGrievances() {
+      return request<{ success: boolean; data: any[] }>('/privacy/grievances', { method: 'GET' });
     },
   },
 };

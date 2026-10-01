@@ -3,20 +3,62 @@ const ProductModel = require('../models/productModel');
 const MessageModel = require('../models/messageModel');
 const LogModel = require('../models/logModel');
 const TemplateModel = require('../models/templateModel');
+const QrModel = require('../models/qrModel');
 const Sticker = require('../models/schemas/Sticker');
-const { logger } = require('../middleware/loggerMiddleware');
+const { logger, maskPhone, maskEmail } = require('../middleware/loggerMiddleware');
 const { sendEmail } = require('../services/emailService');
 const { createResetLink } = require('../services/passwordResetService');
 const { deleteUserAccount } = require('../services/accountDeletionService');
+const { logAuditEvent } = require('../services/auditService');
+const SecurityEventTypes = require('../utils/securityEventTypes');
+
+// Sensitive fields are masked in every admin listing/detail response by
+// default (task.md §13: "Mask sensitive fields by default. Only authorised
+// roles should be able to reveal sensitive information... Every reveal/
+// export/delete action should be auditable"). Pass ?reveal=true to get raw
+// values back — doing so is itself audit-logged as PII_REVEALED.
+function isRevealRequested(req) {
+  return String(req.query.reveal || '').toLowerCase() === 'true';
+}
+
+function maskUserFields(user) {
+  if (!user) return user;
+  return {
+    ...user,
+    email: user.email ? maskEmail(user.email) : user.email,
+    phone_number: user.phone_number ? maskPhone(user.phone_number) : user.phone_number,
+  };
+}
+
+function maskStickerFields(sticker) {
+  if (!sticker) return sticker;
+  const masked = { ...sticker };
+  if (masked.details) {
+    masked.details = {
+      ...masked.details,
+      ownerPhone: masked.details.ownerPhone ? maskPhone(masked.details.ownerPhone) : masked.details.ownerPhone,
+      ownerEmail: masked.details.ownerEmail ? maskEmail(masked.details.ownerEmail) : masked.details.ownerEmail,
+    };
+  }
+  if (masked.profiles) {
+    masked.profiles = {
+      ...masked.profiles,
+      email: masked.profiles.email ? maskEmail(masked.profiles.email) : masked.profiles.email,
+      phone_number: masked.profiles.phone_number ? maskPhone(masked.profiles.phone_number) : masked.profiles.phone_number,
+    };
+  }
+  return masked;
+}
 
 class AdminController {
   /**
    * Support console: list/search every user account with their sticker count.
-   * GET /api/admin/users?search=
+   * GET /api/admin/users?search=&reveal=true
    */
   static async listUsers(req, res) {
     try {
       const { search } = req.query;
+      const reveal = isRevealRequested(req);
       const users = await UserModel.searchAll(search, 1000);
 
       const counts = await Sticker.aggregate([
@@ -26,7 +68,18 @@ class AdminController {
       const countMap = {};
       counts.forEach((r) => { countMap[String(r._id)] = r.count; });
 
-      const data = users.map((u) => ({ ...u, stickerCount: countMap[u.id] || 0 }));
+      const data = users
+        .map((u) => ({ ...u, stickerCount: countMap[u.id] || 0 }))
+        .map((u) => (reveal ? u : maskUserFields(u)));
+
+      await logAuditEvent({
+        eventType: reveal ? SecurityEventTypes.PII_REVEALED : SecurityEventTypes.ADMIN_ACCESS,
+        actorType: 'ADMIN',
+        req,
+        resourceType: 'User',
+        metadata: { action: 'list', count: data.length, search: search || null },
+      });
+
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('ADMIN_USERS_LIST', 'Failed to list users', err);
@@ -36,16 +89,31 @@ class AdminController {
 
   /**
    * Support console: single user's profile + all their stickers.
-   * GET /api/admin/users/:id
+   * GET /api/admin/users/:id?reveal=true
    */
   static async getUserDetail(req, res) {
     try {
       const { id } = req.params;
+      const reveal = isRevealRequested(req);
       const profile = await UserModel.findById(id);
       if (!profile) return res.status(404).json({ success: false, error: 'User not found' });
 
       const products = await ProductModel.getAllByUser(id);
-      return res.json({ success: true, data: { profile, products } });
+      const data = {
+        profile: reveal ? profile : maskUserFields(profile),
+        products: reveal ? products : products.map(maskStickerFields),
+      };
+
+      await logAuditEvent({
+        eventType: reveal ? SecurityEventTypes.PII_REVEALED : SecurityEventTypes.ADMIN_ACCESS,
+        actorType: 'ADMIN',
+        req,
+        resourceType: 'User',
+        resourceId: id,
+        metadata: { action: 'detail' },
+      });
+
+      return res.json({ success: true, data });
     } catch (err) {
       logger.error('ADMIN_USER_DETAIL', `Failed to fetch user ${req.params.id}`, err);
       return res.status(500).json({ success: false, error: err.message });
@@ -80,10 +148,49 @@ class AdminController {
   static async searchStickers(req, res) {
     try {
       const { search } = req.query;
-      const data = await ProductModel.searchAll(search, 500);
+      const reveal = isRevealRequested(req);
+      const rows = await ProductModel.searchAll(search, 500);
+      const data = reveal ? rows : rows.map(maskStickerFields);
+
+      await logAuditEvent({
+        eventType: reveal ? SecurityEventTypes.PII_REVEALED : SecurityEventTypes.ADMIN_ACCESS,
+        actorType: 'ADMIN',
+        req,
+        resourceType: 'Sticker',
+        metadata: { action: 'search', count: data.length, search: search || null },
+      });
+
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('ADMIN_STICKER_SEARCH', 'Failed to search stickers', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * On-demand, audited recovery-code reveal for the "See Codes" toggle and
+   * the recovery-code CSV export — replaces getAll() ever embedding codes in
+   * the routine fleet listing (see qrModel.js.getAll's comment).
+   * POST /api/admin/stickers/reveal-recovery-codes  body: { ids: string[] }
+   */
+  static async revealRecoveryCodes(req, res) {
+    try {
+      const ids = Array.isArray(req.body?.ids) ? req.body.ids.slice(0, 1000) : [];
+      if (ids.length === 0) return res.status(400).json({ success: false, error: 'ids (array) is required' });
+
+      const codes = await QrModel.getRecoveryCodesByIds(ids);
+
+      await logAuditEvent({
+        eventType: SecurityEventTypes.PII_REVEALED,
+        actorType: 'ADMIN',
+        req,
+        resourceType: 'Sticker',
+        metadata: { action: 'reveal_recovery_codes', count: ids.length, stickerIds: ids },
+      });
+
+      return res.json({ success: true, data: codes });
+    } catch (err) {
+      logger.error('ADMIN_REVEAL_RECOVERY_CODES', 'Failed to reveal recovery codes', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

@@ -51,7 +51,7 @@ interface AuthContextType {
   sendPhoneLoginOtp: (phoneNumber: string) => Promise<{ success: boolean; simulated?: boolean; message?: string; debugCode?: string; error?: string }>;
   verifyPhoneLoginOtp: (phoneNumber: string, accessToken: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
-  deleteAccount: () => Promise<{ success: boolean; error?: string }>;
+  deleteAccount: (reason?: string) => Promise<{ success: boolean; error?: string }>;
   resetPassword: (email: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   demoLogin: () => void;
   // Links a phone number to the logged-in account — used at signup and to auto-link
@@ -334,12 +334,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Permanently deletes the account server-side (task.md #3 — DPDP/GDPR "right to
   // be forgotten"), then clears the local session the same way signOut does.
-  const deleteAccount = async () => {
+  const deleteAccount = async (reason?: string) => {
     if (!isApiBackendConfigured) {
       return { success: false, error: 'Account deletion requires the RapiQR backend to be connected.' };
     }
     try {
-      await apiClient.auth.deleteAccount();
+      // Routed through /privacy/erasure-request (not /auth/me) so every
+      // self-service deletion leaves the DPDP-required PrivacyRequest audit
+      // trail — see Server/controllers/privacyController.js.requestErasure.
+      await apiClient.privacy.requestErasure(reason);
       await signOut();
       return { success: true };
     } catch (err: any) {

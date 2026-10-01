@@ -495,6 +495,8 @@ module.exports = {
   getMemoryLogs,
   clearMemoryLogs,
   sanitize,
+  maskPhone,
+  maskEmail,
   generateRequestId,
   getRequestId,
   getUserId,

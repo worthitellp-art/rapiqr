@@ -39,11 +39,7 @@ export default function PrintSheetModal({
     exportAction,
     handleToggleSticker,
     handleSelectAll,
-    handleSelectFirstNine,
     handleDeselectAll,
-    handleSelectCategory,
-    handleDeselectCategory,
-    handleSelectFirstNineOfCategory,
     handleNextPage,
     handlePreviousPage,
     handleDownloadSheet,
@@ -101,7 +97,7 @@ export default function PrintSheetModal({
                 </span>
               </div>
               <p className="text-[12px] text-[var(--fx-ink-2)] mt-0.5">
-                Category-wise fleet printing · 300 DPI high-resolution output with crop & cut guides
+                300 DPI high-resolution output with crop &amp; cut guides
               </p>
             </div>
           </div>
@@ -127,11 +123,7 @@ export default function PrintSheetModal({
                 selectedStickerIds={selectedStickerIds}
                 onToggleSticker={handleToggleSticker}
                 onSelectAll={handleSelectAll}
-                onSelectFirstNine={handleSelectFirstNine}
                 onDeselectAll={handleDeselectAll}
-                onSelectCategory={handleSelectCategory}
-                onDeselectCategory={handleDeselectCategory}
-                onSelectFirstNineOfCategory={handleSelectFirstNineOfCategory}
               />
 
               {/* Live Preview Viewport with Sheet Pagination */}
