@@ -49,7 +49,7 @@ export default function CopyLinkButton({ qrId, compact }: CopyLinkButtonProps) {
     <div className="flex gap-2.5 w-full">
       <button
         onClick={handleCopyLink}
-        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] transition-all cursor-pointer shadow-xs"
+        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] transition-all cursor-pointer shadow-xs"
       >
         {copied ? (
           <>
@@ -65,7 +65,7 @@ export default function CopyLinkButton({ qrId, compact }: CopyLinkButtonProps) {
       </button>
       <button
         onClick={handleOpenPage}
-        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] transition-all cursor-pointer shadow-xs"
+        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] transition-all cursor-pointer shadow-xs"
       >
         <ExternalLink size={14} className="text-slate-500" />
         <span>Open Page</span>

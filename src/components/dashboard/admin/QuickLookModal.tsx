@@ -46,7 +46,7 @@ export default function QuickLookModal({
       onClick={onClose}
     >
       <div
-        className="bg-white border border-gray-200 w-full max-w-md rounded-2xl overflow-hidden text-gray-900 relative font-body shadow-[0_20px_50px_rgba(0,0,0,0.2)]"
+        className="bg-white border border-gray-200 w-full max-w-md rounded-lg overflow-hidden text-gray-900 relative font-body shadow-[0_20px_50px_rgba(0,0,0,0.2)]"
         style={{ animation: "modalIn 0.22s cubic-bezier(0.16, 1, 0.3, 1)" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -121,7 +121,7 @@ export default function QuickLookModal({
         {/* Bottom Details & Controls */}
         <div className="px-5 pb-5 pt-1 space-y-3">
           {/* Security Codes Box with See / Hide Toggle */}
-          <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2">
+          <div className="p-3 bg-gray-50 border border-gray-200 rounded-md space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
                 Security Codes
@@ -160,7 +160,7 @@ export default function QuickLookModal({
               <button
                 type="button"
                 onClick={handleDownloadQr}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-gray-300 bg-white text-gray-800 text-xs font-bold hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-gray-300 bg-white text-gray-800 text-xs font-bold hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
                 title="Download high-resolution QR image"
               >
                 <Download size={13} />
@@ -174,7 +174,7 @@ export default function QuickLookModal({
                     onClose();
                     onOpenPrintSheet(qr);
                   }}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition-colors shadow-2xs cursor-pointer"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition-colors shadow-2xs cursor-pointer"
                   title="Print this sticker"
                 >
                   <Printer size={13} />

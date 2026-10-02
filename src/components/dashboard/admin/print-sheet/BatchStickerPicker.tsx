@@ -101,7 +101,7 @@ export default function BatchStickerPicker({
                     // sticker instead of silently doing nothing here.
                     onToggleSticker(sticker.id);
                   }}
-                  className={`relative flex items-start gap-3 p-4 rounded-xl border transition-all select-none ${
+                  className={`relative flex items-start gap-3 p-4 rounded-md border transition-all select-none ${
                     isSelected
                       ? "border-slate-900 bg-[#FFFDF2] ring-2 ring-[#FFD444] cursor-pointer"
                       : isBlocked

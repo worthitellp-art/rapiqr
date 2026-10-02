@@ -412,7 +412,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
       {/* ── Page header ─────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-11 h-11 rounded-xl bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center shrink-0">
+          <div className="w-11 h-11 rounded-md bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center shrink-0">
             <ShoppingBag size={21} />
           </div>
           <div className="min-w-0">
@@ -442,7 +442,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
       </div>
 
       {/* ── Toolbar: tabs + search ──────────────────────────────────── */}
-      <div className="bg-white border border-[var(--fx-border)] rounded-xl shadow-[0_1px_2px_rgba(24,24,27,0.05)] p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="bg-white border border-[var(--fx-border)] rounded-md shadow-[0_1px_2px_rgba(24,24,27,0.05)] p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 overflow-x-auto -mx-1 px-1">
           {STATUS_TABS.map((tab) => {
             const count = tab.key === "all" ? totalCount : orders.filter((o) => o.status === tab.key).length;
@@ -476,7 +476,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
 
       {/* ── Bulk selection bar ──────────────────────────────────────── */}
       {selected.size > 0 && (
-        <div className="bg-[var(--fx-accent-soft)] border border-[var(--fx-accent-ink)]/50 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 animate-fade-in">
+        <div className="bg-[var(--fx-accent-soft)] border border-[var(--fx-accent-ink)]/50 rounded-md px-4 py-3 flex flex-wrap items-center justify-between gap-3 animate-fade-in">
           <span className="text-[12.5px] font-bold text-[var(--fx-ink)]">
             {selected.size} order{selected.size === 1 ? "" : "s"} selected
           </span>
@@ -517,17 +517,17 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         <div className="xl:col-span-8 space-y-4 min-w-0">
           {/* Table */}
-          <div className="bg-white border border-[var(--fx-border)] rounded-xl shadow-[0_1px_2px_rgba(24,24,27,0.05)] overflow-hidden">
+          <div className="bg-white border border-[var(--fx-border)] rounded-md shadow-[0_1px_2px_rgba(24,24,27,0.05)] overflow-hidden">
             {loading ? (
               <div className="p-16 text-center space-y-3">
-                <div className="w-12 h-12 rounded-xl bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center mx-auto">
+                <div className="w-12 h-12 rounded-md bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center mx-auto">
                   <Loader2 size={22} className="animate-spin" />
                 </div>
                 <p className="font-semibold text-[13px] text-[var(--fx-ink)]">Loading orders…</p>
               </div>
             ) : loadError ? (
               <div className="p-16 text-center space-y-3">
-                <div className="w-12 h-12 rounded-xl bg-[#FEF2F2] text-[#EF4444] flex items-center justify-center mx-auto">
+                <div className="w-12 h-12 rounded-md bg-[#FEF2F2] text-[#EF4444] flex items-center justify-center mx-auto">
                   <XCircle size={22} />
                 </div>
                 <p className="font-bold text-[13px] text-[var(--fx-ink)]">Couldn't load orders.</p>
@@ -538,7 +538,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
               </div>
             ) : filteredOrders.length === 0 ? (
               <div className="p-8 text-center space-y-2">
-                <div className="w-10 h-10 rounded-xl bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center mx-auto">
+                <div className="w-10 h-10 rounded-md bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center mx-auto">
                   <ShoppingBag size={18} />
                 </div>
                 <p className="font-bold text-[13px] text-[var(--fx-ink)]">
@@ -703,7 +703,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
         </div>
 
         {/* ── Details Inspector ─────────────────────────────────────── */}
-        <div className="xl:col-span-4 bg-white border border-[var(--fx-border)] rounded-xl shadow-[0_1px_2px_rgba(24,24,27,0.05)] sticky top-6 min-w-0">
+        <div className="xl:col-span-4 bg-white border border-[var(--fx-border)] rounded-md shadow-[0_1px_2px_rgba(24,24,27,0.05)] sticky top-6 min-w-0">
           <div className="px-6 py-4 border-b border-[var(--fx-border)] flex items-center justify-between gap-3">
             <h3 className="font-display font-semibold text-[14.5px] text-[var(--fx-ink)]">Order Inspector</h3>
             {selectedOrder && <span className="text-[11px] font-mono font-bold text-[var(--fx-accent-ink)] bg-[var(--fx-accent-soft)] px-2 py-0.5 rounded-md">{selectedOrder.id}</span>}
@@ -978,7 +978,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
       {/* ── New Order Modal ─────────────────────────────────────────── */}
       {newOrderOpen && (
         <div className="fixed inset-0 bg-[var(--fx-ink)]/50 backdrop-blur-[2px] flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => !savingOrder && setNewOrderOpen(false)}>
-           <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-[var(--fx-border)] p-6 space-y-5 animate-modal-pop" onClick={(e) => e.stopPropagation()}>
+           <div className="bg-white rounded-lg max-w-xl w-full shadow-2xl border border-[var(--fx-border)] p-6 space-y-5 animate-modal-pop" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="font-display text-[17px] font-bold text-[var(--fx-ink)] tracking-[-0.3px]">Create new order</h2>
@@ -1087,9 +1087,9 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
       {/* ── Delete Confirmation Modal ────────────────────────────────── */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-[var(--fx-ink)]/50 backdrop-blur-[2px] flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[var(--fx-border)] space-y-4 animate-modal-pop">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-2xl border border-[var(--fx-border)] space-y-4 animate-modal-pop">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[var(--fx-red-soft)] text-[var(--fx-red)] flex items-center justify-center shrink-0 mt-0.5">
+              <div className="w-10 h-10 rounded-md bg-[var(--fx-red-soft)] text-[var(--fx-red)] flex items-center justify-center shrink-0 mt-0.5">
                 <AlertTriangle size={20} />
               </div>
               <div>

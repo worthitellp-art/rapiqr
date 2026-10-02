@@ -1,51 +1,59 @@
+import type { jsPDF as JsPDF } from "jspdf";
 import { QrRecord, StickerPos } from "../components/dashboard/admin/types";
 import { generateQrDataUrl, qrFullUrl } from "../components/dashboard/admin/helpers";
 import stickerTemplateImg from "../assets/template-sticker.jpeg";
 
-// Natural pixel size of the sticker template artwork (src/assets/template-sticker.jpeg).
-// Used below to work out how many rows actually fit on a sheet — keep this in
-// sync if the template image is ever replaced with a different aspect ratio.
-const TEMPLATE_NATURAL_WIDTH = 4720;
-const TEMPLATE_NATURAL_HEIGHT = 2948;
-const TEMPLATE_ASPECT_RATIO = TEMPLATE_NATURAL_WIDTH / TEMPLATE_NATURAL_HEIGHT;
+// Physical die-cut sticker size — fixed, never derived or scaled to fit a
+// grid. Printing anything other than exactly 4in x 2.5in produces a decal
+// that doesn't match the die-cut stock, so every sheet/PDF layout below packs
+// around this fixed footprint instead of the other way around.
+const STICKER_WIDTH_INCHES = 4;
+const STICKER_HEIGHT_INCHES = 2.5;
+
+// Thin strip reserved under each sticker (outside its cut line) for a
+// human-readable "sticker id · recovery code" label — printed for the
+// admin's own paper record, not part of the die-cut artwork itself.
+const LABEL_HEIGHT_INCHES = 0.22;
 
 const SHEET_WIDTH_INCHES = 12;
 const SHEET_HEIGHT_INCHES = 18;
 const DEFAULT_DPI = 300;
-const GRID_COLUMNS = 3;
 const MARGIN_INCHES = 0.25;
-const GAP_INCHES = 0.2;
+const GAP_INCHES = 0.15;
 
 /**
- * A fixed 3-column grid sized to fill the sheet's width leaves most of a
- * 12×18 sheet blank if rows are also hardcoded to match (the sticker artwork
- * is wide/landscape, so 3 of them stack into far less than 18 inches of
- * height) — e.g. a hardcoded 3×3 grid used only ~42% of the sheet's height.
- * Compute how many rows of the same (width-constrained) cell size actually
- * fit, so the sheet prints at full capacity instead of wasting paper.
+ * How many fixed-size (4x2.5in) stickers fit on the sheet, computed from the
+ * sheet's usable area — never the other way around (we don't shrink/stretch
+ * the sticker to hit a preset column/row count).
  */
-function computeGridRows(): number {
-  const dpi = DEFAULT_DPI;
-  const marginPx = MARGIN_INCHES * dpi;
-  const gapPx = GAP_INCHES * dpi;
-  const availableWidth = SHEET_WIDTH_INCHES * dpi - 2 * marginPx;
-  const availableHeight = SHEET_HEIGHT_INCHES * dpi - 2 * marginPx;
+function computeGridCounts(
+  sheetWidthInches: number,
+  sheetHeightInches: number,
+  marginInches: number,
+  gapInches: number
+): { columns: number; rows: number } {
+  const availableWidth = sheetWidthInches - 2 * marginInches;
+  const availableHeight = sheetHeightInches - 2 * marginInches;
+  const colPitch = STICKER_WIDTH_INCHES + gapInches;
+  const rowPitch = STICKER_HEIGHT_INCHES + LABEL_HEIGHT_INCHES + gapInches;
 
-  const cellWidth = (availableWidth - (GRID_COLUMNS - 1) * gapPx) / GRID_COLUMNS;
-  const cellHeight = cellWidth / TEMPLATE_ASPECT_RATIO;
-
-  return Math.max(1, Math.floor((availableHeight + gapPx) / (cellHeight + gapPx)));
+  const columns = Math.max(1, Math.floor((availableWidth + gapInches) / colPitch));
+  const rows = Math.max(1, Math.floor((availableHeight + gapInches) / rowPitch));
+  return { columns, rows };
 }
 
-const GRID_ROWS = computeGridRows();
+const DEFAULT_GRID_COUNTS = computeGridCounts(SHEET_WIDTH_INCHES, SHEET_HEIGHT_INCHES, MARGIN_INCHES, GAP_INCHES);
 
 export const PRINT_SHEET_CONSTANTS = {
   SHEET_WIDTH_INCHES,
   SHEET_HEIGHT_INCHES,
+  STICKER_WIDTH_INCHES,
+  STICKER_HEIGHT_INCHES,
+  LABEL_HEIGHT_INCHES,
   DEFAULT_DPI,
-  GRID_COLUMNS,
-  GRID_ROWS,
-  STICKERS_PER_SHEET: GRID_COLUMNS * GRID_ROWS,
+  GRID_COLUMNS: DEFAULT_GRID_COUNTS.columns,
+  GRID_ROWS: DEFAULT_GRID_COUNTS.rows,
+  STICKERS_PER_SHEET: DEFAULT_GRID_COUNTS.columns * DEFAULT_GRID_COUNTS.rows,
   MARGIN_INCHES,
   GAP_INCHES,
   REFERENCE_EDITOR_WIDTH: 320,
@@ -67,16 +75,16 @@ export interface SheetPrintConfig {
 export interface GridCalculations {
   sheetPixelWidth: number;
   sheetPixelHeight: number;
+  /** Sticker artwork footprint only (excludes the label strip below it). */
   cellPixelWidth: number;
   cellPixelHeight: number;
+  labelPixelHeight: number;
   cellXCoordinates: number[];
   cellYCoordinates: number[];
   cellGapPixels: number;
   scaleFactorX: number;
   scaleFactorY: number;
 }
-
-export type SheetPrintMode = "repeat-single" | "batch-selection";
 
 let cachedTemplateImagePromise: Promise<HTMLImageElement> | null = null;
 
@@ -98,53 +106,64 @@ function loadStickerTemplate(): Promise<HTMLImageElement> {
   return cachedTemplateImagePromise;
 }
 
-export function calculateGridDimensions(
-  stickerAspectRatio: number,
-  config: SheetPrintConfig = {}
-): GridCalculations {
+function resolveGridCounts(config: SheetPrintConfig): { columns: number; rows: number } {
+  if (config.columns && config.rows) return { columns: config.columns, rows: config.rows };
+  const sheetWidthInches = config.sheetWidthInches ?? SHEET_WIDTH_INCHES;
+  const sheetHeightInches = config.sheetHeightInches ?? SHEET_HEIGHT_INCHES;
+  const marginInches = config.marginInches ?? MARGIN_INCHES;
+  const gapInches = config.gapInches ?? GAP_INCHES;
+  if (
+    sheetWidthInches === SHEET_WIDTH_INCHES &&
+    sheetHeightInches === SHEET_HEIGHT_INCHES &&
+    marginInches === MARGIN_INCHES &&
+    gapInches === GAP_INCHES
+  ) {
+    return DEFAULT_GRID_COUNTS;
+  }
+  return computeGridCounts(sheetWidthInches, sheetHeightInches, marginInches, gapInches);
+}
+
+export function calculateGridDimensions(config: SheetPrintConfig = {}): GridCalculations {
   const targetDpi = config.dpi ?? PRINT_SHEET_CONSTANTS.DEFAULT_DPI;
   const sheetWidthInches = config.sheetWidthInches ?? PRINT_SHEET_CONSTANTS.SHEET_WIDTH_INCHES;
   const sheetHeightInches = config.sheetHeightInches ?? PRINT_SHEET_CONSTANTS.SHEET_HEIGHT_INCHES;
   const marginInches = config.marginInches ?? PRINT_SHEET_CONSTANTS.MARGIN_INCHES;
   const gapInches = config.gapInches ?? PRINT_SHEET_CONSTANTS.GAP_INCHES;
-  const columns = config.columns ?? PRINT_SHEET_CONSTANTS.GRID_COLUMNS;
-  const rows = config.rows ?? PRINT_SHEET_CONSTANTS.GRID_ROWS;
+  const { columns, rows } = resolveGridCounts(config);
 
   const sheetPixelWidth = Math.round(sheetWidthInches * targetDpi);
   const sheetPixelHeight = Math.round(sheetHeightInches * targetDpi);
-  const marginPixels = Math.round(marginInches * targetDpi);
-  const cellGapPixels = Math.round(gapInches * targetDpi);
+  const gapPixels = Math.round(gapInches * targetDpi);
 
-  const availableWidth = sheetPixelWidth - 2 * marginPixels;
-  const availableHeight = sheetPixelHeight - 2 * marginPixels;
+  // Fixed sticker footprint in pixels — never derived from the grid or the
+  // template artwork's own aspect ratio.
+  const stickerPixelWidth = Math.round(STICKER_WIDTH_INCHES * targetDpi);
+  const stickerPixelHeight = Math.round(STICKER_HEIGHT_INCHES * targetDpi);
+  const labelPixelHeight = Math.round(LABEL_HEIGHT_INCHES * targetDpi);
+  const rowPitchPixels = stickerPixelHeight + labelPixelHeight + gapPixels;
+  const colPitchPixels = stickerPixelWidth + gapPixels;
 
-  const cellWidthBudgetFromSheetWidth = (availableWidth - (columns - 1) * cellGapPixels) / columns;
-  const cellWidthBudgetFromSheetHeight = (stickerAspectRatio * (availableHeight - (rows - 1) * cellGapPixels)) / rows;
-
-  // Fit within both width and height constraints without stretching the sticker artwork.
-  const cellPixelWidth = Math.floor(Math.min(cellWidthBudgetFromSheetWidth, cellWidthBudgetFromSheetHeight));
-  const cellPixelHeight = Math.round(cellPixelWidth / stickerAspectRatio);
-
-  const totalGridWidth = columns * cellPixelWidth + (columns - 1) * cellGapPixels;
-  const totalGridHeight = rows * cellPixelHeight + (rows - 1) * cellGapPixels;
+  const totalGridWidth = columns * stickerPixelWidth + (columns - 1) * gapPixels;
+  const totalGridHeight = rows * (stickerPixelHeight + labelPixelHeight) + (rows - 1) * gapPixels;
 
   const originX = Math.round((sheetPixelWidth - totalGridWidth) / 2);
   const originY = Math.round((sheetPixelHeight - totalGridHeight) / 2);
 
-  const cellXCoordinates = Array.from({ length: columns }, (_, colIndex) => originX + colIndex * (cellPixelWidth + cellGapPixels));
-  const cellYCoordinates = Array.from({ length: rows }, (_, rowIndex) => originY + rowIndex * (cellPixelHeight + cellGapPixels));
+  const cellXCoordinates = Array.from({ length: columns }, (_, colIndex) => originX + colIndex * colPitchPixels);
+  const cellYCoordinates = Array.from({ length: rows }, (_, rowIndex) => originY + rowIndex * rowPitchPixels);
 
-  const scaleFactorX = cellPixelWidth / PRINT_SHEET_CONSTANTS.REFERENCE_EDITOR_WIDTH;
-  const scaleFactorY = cellPixelHeight / PRINT_SHEET_CONSTANTS.REFERENCE_EDITOR_HEIGHT;
+  const scaleFactorX = stickerPixelWidth / PRINT_SHEET_CONSTANTS.REFERENCE_EDITOR_WIDTH;
+  const scaleFactorY = stickerPixelHeight / PRINT_SHEET_CONSTANTS.REFERENCE_EDITOR_HEIGHT;
 
   return {
     sheetPixelWidth,
     sheetPixelHeight,
-    cellPixelWidth,
-    cellPixelHeight,
+    cellPixelWidth: stickerPixelWidth,
+    cellPixelHeight: stickerPixelHeight,
+    labelPixelHeight,
     cellXCoordinates,
     cellYCoordinates,
-    cellGapPixels,
+    cellGapPixels: gapPixels,
     scaleFactorX,
     scaleFactorY,
   };
@@ -167,7 +186,6 @@ function drawCutGuideLines(
   canvasContext.lineWidth = Math.max(1, Math.round((0.75 / 72) * dpi));
   canvasContext.setLineDash([Math.round(dpi * 0.04), Math.round(dpi * 0.02)]);
 
-  // Vertical trim lines running through cell gaps across the full 18-inch height.
   for (let colIndex = 1; colIndex < columns; colIndex++) {
     const lineX = grid.cellXCoordinates[colIndex - 1] + grid.cellPixelWidth + grid.cellGapPixels / 2;
     canvasContext.beginPath();
@@ -176,7 +194,6 @@ function drawCutGuideLines(
     canvasContext.stroke();
   }
 
-  // Horizontal trim lines running through cell gaps across the full 12-inch width.
   for (let rowIndex = 1; rowIndex < rows; rowIndex++) {
     const lineY = grid.cellYCoordinates[rowIndex - 1] + grid.cellPixelHeight + grid.cellGapPixels / 2;
     canvasContext.beginPath();
@@ -227,6 +244,26 @@ function drawCornerCropMarks(
   canvasContext.restore();
 }
 
+function drawRecoveryCodeLabel(
+  canvasContext: CanvasRenderingContext2D,
+  grid: GridCalculations,
+  targetX: number,
+  targetY: number,
+  record: QrRecord,
+  recoveryCode: string | undefined,
+  dpi: number
+): void {
+  if (!recoveryCode) return;
+  canvasContext.save();
+  canvasContext.fillStyle = "#1A1A1A";
+  canvasContext.font = `${Math.round(grid.labelPixelHeight * 0.6)}px 'Courier New', monospace`;
+  canvasContext.textAlign = "center";
+  canvasContext.textBaseline = "middle";
+  const labelCenterY = targetY + grid.cellPixelHeight + grid.labelPixelHeight / 2;
+  canvasContext.fillText(`${record.id} · ${recoveryCode}`, targetX + grid.cellPixelWidth / 2, labelCenterY);
+  canvasContext.restore();
+}
+
 async function renderCellSticker(
   canvasContext: CanvasRenderingContext2D,
   stickerTemplate: HTMLImageElement,
@@ -234,9 +271,11 @@ async function renderCellSticker(
   position: StickerPos,
   targetX: number,
   targetY: number,
-  grid: GridCalculations
+  grid: GridCalculations,
+  recoveryCode: string | undefined,
+  dpi: number
 ): Promise<void> {
-  // 1. Draw the base sticker template artwork.
+  // 1. Draw the base sticker template artwork at its fixed physical size.
   canvasContext.drawImage(stickerTemplate, targetX, targetY, grid.cellPixelWidth, grid.cellPixelHeight);
 
   // 2. Generate and place the high-resolution QR code according to calibrated position.
@@ -258,6 +297,11 @@ async function renderCellSticker(
   const qrRenderHeight = position.h * grid.scaleFactorY;
 
   canvasContext.drawImage(qrImage, qrRenderX, qrRenderY, qrRenderWidth, qrRenderHeight);
+
+  // 3. Recovery code reference label, printed in the strip below the sticker
+  // (outside its cut line) — this is a paper record for the admin, not part
+  // of the die-cut artwork itself.
+  drawRecoveryCodeLabel(canvasContext, grid, targetX, targetY, record, recoveryCode, dpi);
 }
 
 function convertCanvasToPngBlob(canvasElement: HTMLCanvasElement): Promise<Blob | null> {
@@ -267,105 +311,304 @@ function convertCanvasToPngBlob(canvasElement: HTMLCanvasElement): Promise<Blob 
 }
 
 /**
- * Generates a 12×18 inch print sheet repeating a single sticker across a grid
- * sized to fill the sheet (see PRINT_SHEET_CONSTANTS.GRID_ROWS).
+ * Renders one sheet's worth (up to columns*rows) of stickers onto a canvas
+ * sized to the physical sheet. Shared by the PNG-preview path and the PDF
+ * export path below so both draw identical artwork.
  */
-export async function generateRepeatedStickerSheetBlob(
-  record: QrRecord,
+async function renderStickerSheetCanvas(
+  recordsChunk: QrRecord[],
   position: StickerPos,
-  config: SheetPrintConfig = {}
-): Promise<Blob | null> {
+  grid: GridCalculations,
+  columns: number,
+  rows: number,
+  recoveryCodeMap: Record<string, string | null | undefined>,
+  dpi: number
+): Promise<HTMLCanvasElement> {
   const stickerTemplate = await loadStickerTemplate();
-  const aspectRatio = stickerTemplate.naturalWidth / stickerTemplate.naturalHeight;
-  const grid = calculateGridDimensions(aspectRatio, config);
 
   const canvasElement = document.createElement("canvas");
   canvasElement.width = grid.sheetPixelWidth;
   canvasElement.height = grid.sheetPixelHeight;
 
   const canvasContext = canvasElement.getContext("2d");
-  if (!canvasContext) return null;
+  if (!canvasContext) return canvasElement;
 
   drawSheetBackground(canvasContext, grid.sheetPixelWidth, grid.sheetPixelHeight);
 
-  const totalCells = PRINT_SHEET_CONSTANTS.STICKERS_PER_SHEET;
-  for (let cellIndex = 0; cellIndex < totalCells; cellIndex++) {
-    const rowIndex = Math.floor(cellIndex / PRINT_SHEET_CONSTANTS.GRID_COLUMNS);
-    const colIndex = cellIndex % PRINT_SHEET_CONSTANTS.GRID_COLUMNS;
+  for (let cellIndex = 0; cellIndex < recordsChunk.length; cellIndex++) {
+    const rowIndex = Math.floor(cellIndex / columns);
+    const colIndex = cellIndex % columns;
     const targetX = grid.cellXCoordinates[colIndex];
     const targetY = grid.cellYCoordinates[rowIndex];
+    const record = recordsChunk[cellIndex];
 
-    await renderCellSticker(canvasContext, stickerTemplate, record, position, targetX, targetY, grid);
+    await renderCellSticker(
+      canvasContext,
+      stickerTemplate,
+      record,
+      position,
+      targetX,
+      targetY,
+      grid,
+      recoveryCodeMap[record.id] ?? record.recoveryCode ?? undefined,
+      dpi
+    );
   }
 
-  const targetDpi = config.dpi ?? PRINT_SHEET_CONSTANTS.DEFAULT_DPI;
-  drawCutGuideLines(canvasContext, grid, PRINT_SHEET_CONSTANTS.GRID_COLUMNS, PRINT_SHEET_CONSTANTS.GRID_ROWS, targetDpi);
-  drawCornerCropMarks(canvasContext, grid, PRINT_SHEET_CONSTANTS.GRID_COLUMNS, PRINT_SHEET_CONSTANTS.GRID_ROWS, targetDpi);
+  drawCutGuideLines(canvasContext, grid, columns, rows, dpi);
+  drawCornerCropMarks(canvasContext, grid, columns, rows, dpi);
 
-  return convertCanvasToPngBlob(canvasElement);
+  return canvasElement;
 }
 
 /**
- * Generates 12×18 inch print sheets tiling a batch of stickers, as many per
- * sheet as fit (see PRINT_SHEET_CONSTANTS.STICKERS_PER_SHEET).
+ * Generates a 12×18 inch print sheet repeating a single sticker across a grid
+ * sized to fill the sheet (see PRINT_SHEET_CONSTANTS.GRID_ROWS).
  */
-export async function generateBatchStickersSheetBlobs(
-  records: QrRecord[],
+export async function generateRepeatedStickerSheetBlob(
+  record: QrRecord,
   position: StickerPos,
-  config: SheetPrintConfig = {}
-): Promise<Blob[]> {
-  if (records.length === 0) return [];
+  config: SheetPrintConfig = {},
+  recoveryCode?: string
+): Promise<Blob | null> {
+  const grid = calculateGridDimensions(config);
+  const { columns, rows } = resolveGridCounts(config);
+  const totalCells = columns * rows;
+  const recordsChunk = Array.from({ length: totalCells }, () => record);
+  const dpi = config.dpi ?? PRINT_SHEET_CONSTANTS.DEFAULT_DPI;
 
+  const canvas = await renderStickerSheetCanvas(
+    recordsChunk,
+    position,
+    grid,
+    columns,
+    rows,
+    { [record.id]: recoveryCode },
+    dpi
+  );
+  return convertCanvasToPngBlob(canvas);
+}
+
+// A4 — the admin's actual printer paper. Every bulk-export page is this
+// size; as many fixed 4x2.5in stickers as actually fit are packed onto it
+// (never resized to hit a preset count), and the rest spill onto additional
+// A4 pages — a normal printer prints a full A4 page at 100% with no "fit to
+// page" scaling, so every sticker lands at its exact decided size.
+const A4_WIDTH_INCHES = 8.27;
+const A4_HEIGHT_INCHES = 11.69;
+
+function computeA4GridCounts(): { columns: number; rows: number } {
+  const availableWidth = A4_WIDTH_INCHES - 2 * MARGIN_INCHES;
+  const availableHeight = A4_HEIGHT_INCHES - 2 * MARGIN_INCHES;
+  const colPitch = STICKER_WIDTH_INCHES + GAP_INCHES;
+  const rowPitch = STICKER_HEIGHT_INCHES + GAP_INCHES;
+  const columns = Math.max(1, Math.floor((availableWidth + GAP_INCHES) / colPitch));
+  const rows = Math.max(1, Math.floor((availableHeight + GAP_INCHES) / rowPitch));
+  return { columns, rows };
+}
+
+const A4_GRID_COUNTS = computeA4GridCounts();
+
+/** How many stickers fit on one A4 export page at their fixed 4x2.5in size. */
+export const ADMIN_STICKERS_PER_PAGE = A4_GRID_COUNTS.columns * A4_GRID_COUNTS.rows;
+
+function drawStickerCropMarks(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  dpi: number
+): void {
+  ctx.save();
+  const markLengthPixels = Math.round(0.12 * dpi);
+  ctx.strokeStyle = "rgba(40, 40, 45, 0.9)";
+  ctx.lineWidth = Math.max(1, Math.round((0.85 / 72) * dpi));
+
+  const corners = [
+    [x, y],
+    [x + width, y],
+    [x, y + height],
+    [x + width, y + height],
+  ];
+  for (const [cornerX, cornerY] of corners) {
+    ctx.beginPath();
+    ctx.moveTo(cornerX - markLengthPixels, cornerY);
+    ctx.lineTo(cornerX + markLengthPixels, cornerY);
+    ctx.moveTo(cornerX, cornerY - markLengthPixels);
+    ctx.lineTo(cornerX, cornerY + markLengthPixels);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Renders ONE A4 page packed with up to ADMIN_STICKERS_PER_PAGE stickers,
+ * each at its exact physical size (4x2.5in) with corner crop marks — the
+ * page is standard paper; only the stickers themselves are the fixed,
+ * never-rescaled footprint. `recordsChunk` may be shorter than a full page
+ * (the last page of a batch).
+ */
+async function renderA4GridPageCanvas(
+  recordsChunk: QrRecord[],
+  position: StickerPos,
+  dpi: number
+): Promise<HTMLCanvasElement> {
   const stickerTemplate = await loadStickerTemplate();
-  const aspectRatio = stickerTemplate.naturalWidth / stickerTemplate.naturalHeight;
-  const grid = calculateGridDimensions(aspectRatio, config);
+  const { columns } = A4_GRID_COUNTS;
 
-  const stickersPerSheet = PRINT_SHEET_CONSTANTS.STICKERS_PER_SHEET;
-  const columns = PRINT_SHEET_COLUMNS_COUNT(config);
-  const rows = PRINT_SHEET_ROWS_COUNT(config);
-  const targetDpi = config.dpi ?? PRINT_SHEET_CONSTANTS.DEFAULT_DPI;
+  const pageWidthPx = Math.round(A4_WIDTH_INCHES * dpi);
+  const pageHeightPx = Math.round(A4_HEIGHT_INCHES * dpi);
+  const stickerWidthPx = Math.round(STICKER_WIDTH_INCHES * dpi);
+  const stickerHeightPx = Math.round(STICKER_HEIGHT_INCHES * dpi);
+  const gapPx = Math.round(GAP_INCHES * dpi);
 
-  const generatedBlobs: Blob[] = [];
-  const totalSheets = Math.ceil(records.length / stickersPerSheet);
+  const totalGridWidth = A4_GRID_COUNTS.columns * stickerWidthPx + (A4_GRID_COUNTS.columns - 1) * gapPx;
+  const totalGridHeight = A4_GRID_COUNTS.rows * stickerHeightPx + (A4_GRID_COUNTS.rows - 1) * gapPx;
+  const originX = Math.round((pageWidthPx - totalGridWidth) / 2);
+  const originY = Math.round((pageHeightPx - totalGridHeight) / 2);
 
-  for (let sheetIndex = 0; sheetIndex < totalSheets; sheetIndex++) {
-    const chunkStart = sheetIndex * stickersPerSheet;
-    const recordsChunk = records.slice(chunkStart, chunkStart + stickersPerSheet);
+  const canvas = document.createElement("canvas");
+  canvas.width = pageWidthPx;
+  canvas.height = pageHeightPx;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return canvas;
 
-    const canvasElement = document.createElement("canvas");
-    canvasElement.width = grid.sheetPixelWidth;
-    canvasElement.height = grid.sheetPixelHeight;
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(0, 0, pageWidthPx, pageHeightPx);
 
-    const canvasContext = canvasElement.getContext("2d");
-    if (!canvasContext) continue;
+  const scaleX = stickerWidthPx / PRINT_SHEET_CONSTANTS.REFERENCE_EDITOR_WIDTH;
+  const scaleY = stickerHeightPx / PRINT_SHEET_CONSTANTS.REFERENCE_EDITOR_HEIGHT;
 
-    drawSheetBackground(canvasContext, grid.sheetPixelWidth, grid.sheetPixelHeight);
+  for (let cellIndex = 0; cellIndex < recordsChunk.length; cellIndex++) {
+    const rowIndex = Math.floor(cellIndex / columns);
+    const colIndex = cellIndex % columns;
+    const targetX = originX + colIndex * (stickerWidthPx + gapPx);
+    const targetY = originY + rowIndex * (stickerHeightPx + gapPx);
+    const record = recordsChunk[cellIndex];
 
-    for (let cellIndex = 0; cellIndex < recordsChunk.length; cellIndex++) {
-      const rowIndex = Math.floor(cellIndex / columns);
-      const colIndex = cellIndex % columns;
-      const targetX = grid.cellXCoordinates[colIndex];
-      const targetY = grid.cellYCoordinates[rowIndex];
+    ctx.drawImage(stickerTemplate, targetX, targetY, stickerWidthPx, stickerHeightPx);
 
-      await renderCellSticker(canvasContext, stickerTemplate, recordsChunk[cellIndex], position, targetX, targetY, grid);
-    }
+    const qrDataUrl = await generateQrDataUrl(
+      qrFullUrl(record.id),
+      record.fg || "000000",
+      record.bg || "FFFFFF",
+      PRINT_SHEET_CONSTANTS.QR_RESOLUTION_PIXELS
+    );
+    const qrImage = await loadHtmlImage(qrDataUrl);
+    ctx.drawImage(
+      qrImage,
+      targetX + position.x * scaleX,
+      targetY + position.y * scaleY,
+      position.w * scaleX,
+      position.h * scaleY
+    );
 
-    drawCutGuideLines(canvasContext, grid, columns, rows, targetDpi);
-    drawCornerCropMarks(canvasContext, grid, columns, rows, targetDpi);
-
-    const sheetBlob = await convertCanvasToPngBlob(canvasElement);
-    if (sheetBlob) generatedBlobs.push(sheetBlob);
+    drawStickerCropMarks(ctx, targetX, targetY, stickerWidthPx, stickerHeightPx, dpi);
   }
 
-  return generatedBlobs;
+  return canvas;
 }
 
-function PRINT_SHEET_COLUMNS_COUNT(config: SheetPrintConfig): number {
-  return config.columns ?? PRINT_SHEET_CONSTANTS.GRID_COLUMNS;
+/**
+ * Live on-screen preview of one A4 export page (up to ADMIN_STICKERS_PER_PAGE
+ * stickers).
+ */
+export async function generateStickerPagePreviewBlob(
+  recordsChunk: QrRecord[],
+  position: StickerPos,
+  dpi = 100
+): Promise<Blob | null> {
+  if (recordsChunk.length === 0) return null;
+  const canvas = await renderA4GridPageCanvas(recordsChunk, position, dpi);
+  return convertCanvasToPngBlob(canvas);
 }
 
-function PRINT_SHEET_ROWS_COUNT(config: SheetPrintConfig): number {
-  return config.rows ?? PRINT_SHEET_CONSTANTS.GRID_ROWS;
+/**
+ * Appends a plain-text recovery-code manifest (sticker id -> recovery code)
+ * on standard A4 pages at the end of the document — kept off the sticker
+ * pages themselves since those are sized to the exact 4x2.5in artwork with
+ * no spare room for a label.
+ */
+function appendRecoveryManifestPages(
+  doc: JsPDF,
+  records: QrRecord[],
+  recoveryCodeMap: Record<string, string | null | undefined>
+): void {
+  const withCodes = records.filter((record) => recoveryCodeMap[record.id] ?? record.recoveryCode);
+  if (withCodes.length === 0) return;
+
+  const pageWidthIn = 8.27;
+  const pageHeightIn = 11.69;
+  const marginIn = 0.6;
+  const lineHeightIn = 0.24;
+  const headerHeightIn = 0.5;
+  const rowsPerPage = Math.max(1, Math.floor((pageHeightIn - 2 * marginIn - headerHeightIn) / lineHeightIn));
+
+  for (let start = 0; start < withCodes.length; start += rowsPerPage) {
+    doc.addPage([pageWidthIn, pageHeightIn], "portrait");
+    let cursorY = marginIn;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.text("RapiQR Recovery Code Manifest", marginIn, cursorY);
+    cursorY += headerHeightIn;
+
+    doc.setFont("courier", "normal");
+    doc.setFontSize(10);
+    withCodes.slice(start, start + rowsPerPage).forEach((record) => {
+      const code = recoveryCodeMap[record.id] ?? record.recoveryCode ?? "—";
+      doc.text(`${record.id}    ${code}`, marginIn, cursorY);
+      cursorY += lineHeightIn;
+    });
+  }
+}
+
+/**
+ * Bulk PDF export — packs as many stickers as fit (ADMIN_STICKERS_PER_PAGE)
+ * onto each A4 page at their exact physical size (4x2.5in) with corner crop
+ * marks, spilling the rest onto additional A4 pages. Prints true-to-size on
+ * any normal printer loaded with A4 paper at 100%/"actual size" (no custom
+ * label stock required). `copies` repeats the whole batch that many times
+ * without re-rendering the artwork. Recovery codes are appended as a
+ * manifest at the end, not on the sticker pages (see appendRecoveryManifestPages).
+ */
+export async function generateStickerBatchPdfBlob(
+  records: QrRecord[],
+  position: StickerPos,
+  recoveryCodeMap: Record<string, string | null | undefined> = {},
+  copies = 1,
+  dpi = PRINT_SHEET_CONSTANTS.DEFAULT_DPI
+): Promise<Blob | null> {
+  if (records.length === 0) return null;
+
+  const pageDataUrls: string[] = [];
+  for (let start = 0; start < records.length; start += ADMIN_STICKERS_PER_PAGE) {
+    const chunk = records.slice(start, start + ADMIN_STICKERS_PER_PAGE);
+    const canvas = await renderA4GridPageCanvas(chunk, position, dpi);
+    pageDataUrls.push(canvas.toDataURL("image/png"));
+  }
+
+  if (pageDataUrls.length === 0) return null;
+
+  const { jsPDF } = await import("jspdf");
+  const safeCopies = Math.max(1, Math.round(copies) || 1);
+
+  let doc: InstanceType<typeof jsPDF> | null = null;
+  for (let copyIndex = 0; copyIndex < safeCopies; copyIndex++) {
+    for (const pageDataUrl of pageDataUrls) {
+      if (!doc) {
+        doc = new jsPDF({ unit: "in", format: [A4_WIDTH_INCHES, A4_HEIGHT_INCHES], orientation: "portrait" });
+      } else {
+        doc.addPage([A4_WIDTH_INCHES, A4_HEIGHT_INCHES], "portrait");
+      }
+      doc.addImage(pageDataUrl, "PNG", 0, 0, A4_WIDTH_INCHES, A4_HEIGHT_INCHES);
+    }
+  }
+
+  if (!doc) return null;
+  appendRecoveryManifestPages(doc, records, recoveryCodeMap);
+  return doc.output("blob");
 }
 
 export function downloadSheetBlob(blob: Blob, fileName: string): void {
@@ -377,96 +620,4 @@ export function downloadSheetBlob(blob: Blob, fileName: string): void {
   downloadAnchor.click();
   document.body.removeChild(downloadAnchor);
   URL.revokeObjectURL(objectUrl);
-}
-
-/**
- * Triggers browser print dialog with page layout formatted for 12x18 inch
- * portrait sheets. `copies` repeats the sheet across that many print pages
- * (via CSS page breaks) so one print job produces that many physical copies,
- * rather than relying on the OS print dialog's own (inconsistently placed)
- * copies field.
- */
-export function printSheetBlobInBrowser(blob: Blob, documentTitle = "RapiQR Print Sheet", copies = 1): void {
-  const objectUrl = URL.createObjectURL(blob);
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    // Fallback if popup blocker intercepted the new tab.
-    downloadSheetBlob(blob, `${documentTitle.replace(/\s+/g, "_")}.png`);
-    return;
-  }
-
-  const safeCopies = Math.max(1, Math.round(copies) || 1);
-  const pagesHtml = Array.from(
-    { length: safeCopies },
-    () => `<div class="sheet-page"><img class="print-sheet-img" src="${objectUrl}" alt="Print Sheet" /></div>`
-  ).join("");
-
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>${documentTitle}</title>
-        <style>
-          @page {
-            size: 12in 18in portrait;
-            margin: 0;
-          }
-          * {
-            box-sizing: border-box;
-          }
-          html, body {
-            margin: 0;
-            padding: 0;
-            background: #ffffff;
-          }
-          .sheet-page {
-            width: 100%;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            page-break-after: always;
-            break-after: page;
-          }
-          .sheet-page:last-child {
-            page-break-after: auto;
-            break-after: auto;
-          }
-          .print-sheet-img {
-            width: 12in;
-            height: 18in;
-            max-width: 100vw;
-            max-height: 100vh;
-            object-fit: contain;
-            display: block;
-          }
-          @media print {
-            body {
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-            .print-sheet-img {
-              width: 100%;
-              height: 100%;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        ${pagesHtml}
-        <script>
-          const images = Array.from(document.querySelectorAll(".print-sheet-img"));
-          Promise.all(images.map((img) => img.complete ? Promise.resolve() : new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; }))).then(() => {
-            window.focus();
-            window.print();
-            window.onafterprint = () => {
-              window.close();
-            };
-          });
-        </script>
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
 }

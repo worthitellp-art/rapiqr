@@ -1,4 +1,16 @@
   
+
+
+Rules of genreating the sheet for the stickers 
+
+ - must selection based do not direct collect
+ -Widht-4inch
+Hight-2.5 inch this si the sticker size of the single sticker 
+- always give in pdf with possiible storage area inside the pdf use the all space and no chnage sticker size that type of logic 
+- user can genreate bulk prints in single pdf like 50 sheets in single pdf or less sheet and 50 stickers , user can put 50 sticker genreate then it will automaticlly align in pdf and genreeate 1 pdf with recovery codes inside pdf 
+
+
+
   
   
   remove option to delete the sticker if you want to delete the sticker request to the super admin , super admin can delete but 1 by 1 not all and it wills how popup for confirmation , 

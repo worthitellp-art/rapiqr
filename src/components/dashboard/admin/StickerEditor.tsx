@@ -35,7 +35,7 @@ export default function StickerEditor({
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Locked Preview */}
-        <div className="lg:col-span-7 bg-white border border-[var(--fx-border)] p-5.5 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] flex flex-col justify-between">
+        <div className="lg:col-span-7 bg-white border border-[var(--fx-border)] p-5.5 rounded-md shadow-[0_1px_2px_rgba(16,24,40,0.05)] flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-display text-[13px] font-semibold text-[var(--fx-ink)]">
               Sticker Layout
@@ -80,7 +80,7 @@ export default function StickerEditor({
         </div>
 
         {/* Right: Info & Print */}
-        <div className="lg:col-span-5 bg-white border border-[var(--fx-border)] p-5.5 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] space-y-4 flex flex-col justify-between">
+        <div className="lg:col-span-5 bg-white border border-[var(--fx-border)] p-5.5 rounded-md shadow-[0_1px_2px_rgba(16,24,40,0.05)] space-y-4 flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2.5 mb-3">
               <div className="w-8 h-8 rounded-lg bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center">

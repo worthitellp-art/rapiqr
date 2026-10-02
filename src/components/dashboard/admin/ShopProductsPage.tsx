@@ -196,7 +196,7 @@ export default function ShopProductsPage({ setToast }: { setToast: (msg: string 
     <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 text-[var(--fx-ink)] font-body" style={{ background: 'var(--fx-canvas)' }}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-11 h-11 rounded-xl bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center shrink-0">
+          <div className="w-11 h-11 rounded-md bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center shrink-0">
             <Package size={21} />
           </div>
           <div className="min-w-0">
@@ -216,7 +216,7 @@ export default function ShopProductsPage({ setToast }: { setToast: (msg: string 
         </button>
       </div>
 
-      <div className="bg-white border border-[var(--fx-border)] rounded-xl shadow-[0_1px_2px_rgba(24,24,27,0.05)] overflow-hidden">
+      <div className="bg-white border border-[var(--fx-border)] rounded-md shadow-[0_1px_2px_rgba(24,24,27,0.05)] overflow-hidden">
         {loading ? (
           <div className="p-16 text-center space-y-3">
             <Loader2 size={22} className="animate-spin mx-auto text-[var(--fx-accent-ink)]" />
@@ -242,7 +242,7 @@ export default function ShopProductsPage({ setToast }: { setToast: (msg: string 
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
             {products.map((p) => (
-              <div key={p.id} className="border border-[var(--fx-border)] rounded-xl overflow-hidden flex flex-col bg-white">
+              <div key={p.id} className="border border-[var(--fx-border)] rounded-md overflow-hidden flex flex-col bg-white">
                 <div className="relative aspect-[16/10] bg-[var(--fx-canvas)] flex items-center justify-center overflow-hidden">
                   {p.imageUrl ? (
                     <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
@@ -302,7 +302,7 @@ export default function ShopProductsPage({ setToast }: { setToast: (msg: string 
 
       {modal && (
         <div className="fixed inset-0 bg-[var(--fx-ink)]/50 backdrop-blur-[2px] flex items-center justify-center p-4 z-50 animate-fade-in" onClick={closeModal}>
-          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-[var(--fx-border)] p-6 space-y-5 max-h-[90vh] overflow-y-auto animate-modal-pop" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg max-w-2xl w-full shadow-2xl border border-[var(--fx-border)] p-6 space-y-5 max-h-[90vh] overflow-y-auto animate-modal-pop" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="font-display text-[17px] font-bold text-[var(--fx-ink)] tracking-[-0.3px]">

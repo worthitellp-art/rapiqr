@@ -26,7 +26,7 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string; ic
 
 function StatTile({ label, value, accent }: { label: string; value: number | string; accent?: string }) {
   return (
-    <div className="bg-white border border-[var(--fx-border)] p-4 rounded-xl shadow-xs">
+    <div className="bg-white border border-[var(--fx-border)] p-4 rounded-md shadow-xs">
       <p className="text-[10px] font-extrabold text-[var(--fx-ink-2)] uppercase tracking-wider mb-1.5">{label}</p>
       <p className="text-2xl font-display font-bold text-[var(--fx-ink)]" style={{ color: accent }}>{value}</p>
     </div>
@@ -178,7 +178,7 @@ export default function MessageManagerPage() {
     <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[var(--fx-ink)] font-body bg-[var(--fx-canvas)]/50 min-h-screen">
       {/* Toast Alert */}
       {toastMessage && (
-        <div className="fixed top-5 right-5 z-50 flex items-center gap-2 bg-[var(--fx-accent)] text-white px-4 py-3 rounded-xl shadow-xl text-xs font-bold animate-fade-in">
+        <div className="fixed top-5 right-5 z-50 flex items-center gap-2 bg-[var(--fx-accent)] text-white px-4 py-3 rounded-md shadow-xl text-xs font-bold animate-fade-in">
           <CheckCircle2 size={16} className="text-emerald-400" />
           <span>{toastMessage}</span>
         </div>
@@ -187,8 +187,8 @@ export default function MessageManagerPage() {
       {/* Confirmation Modal */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-[var(--fx-border)] p-6 space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+          <div className="w-full max-w-md bg-white rounded-lg shadow-2xl border border-[var(--fx-border)] p-6 space-y-4">
+            <div className="w-12 h-12 rounded-lg bg-red-50 text-red-600 flex items-center justify-center mx-auto">
               <Trash2 size={24} />
             </div>
             <div className="text-center space-y-1.5">
@@ -202,7 +202,7 @@ export default function MessageManagerPage() {
                 type="button"
                 onClick={() => setShowConfirmModal(false)}
                 disabled={deleting}
-                className="w-1/2 py-2.5 rounded-xl border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
+                className="w-1/2 py-2.5 rounded-md border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -210,7 +210,7 @@ export default function MessageManagerPage() {
                 type="button"
                 onClick={handleDeleteAll}
                 disabled={deleting}
-                className="w-1/2 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
+                className="w-1/2 py-2.5 rounded-md bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
               >
                 {deleting ? "Deleting..." : "Yes, Delete All"}
               </button>
@@ -227,7 +227,7 @@ export default function MessageManagerPage() {
           <button
             type="button"
             onClick={() => setTestOtpModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] transition-all cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-white border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] transition-all cursor-pointer shadow-xs"
             title="Test the live MSG91 OTP widget"
           >
             <PhoneCall size={13} /> Test OTP
@@ -236,14 +236,14 @@ export default function MessageManagerPage() {
             type="button"
             onClick={() => setShowConfirmModal(true)}
             disabled={messages.length === 0 || deleting}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Trash2 size={13} /> Delete All Messages
           </button>
           <button
             type="button"
             onClick={load}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] transition-all cursor-pointer shadow-xs flex-shrink-0"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-white border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] transition-all cursor-pointer shadow-xs flex-shrink-0"
           >
             <RefreshCcw size={13} className={loading ? "animate-spin" : ""} /> Refresh
           </button>
@@ -257,7 +257,7 @@ export default function MessageManagerPage() {
           onClick={() => setTestOtpModalOpen(false)}
         >
           <div
-            className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-[var(--fx-border)] p-4 sm:p-5 space-y-4"
+            className="w-full max-w-lg bg-white rounded-lg shadow-2xl border border-[var(--fx-border)] p-4 sm:p-5 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -287,7 +287,7 @@ export default function MessageManagerPage() {
 
             <div className="flex flex-col sm:flex-row gap-3 items-start">
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                <span className="px-3 py-2.5 rounded-xl bg-[var(--fx-canvas)] border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink-2)]">+91</span>
+                <span className="px-3 py-2.5 rounded-md bg-[var(--fx-canvas)] border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink-2)]">+91</span>
                 <input
                   type="tel"
                   inputMode="numeric"
@@ -295,7 +295,7 @@ export default function MessageManagerPage() {
                   value={testPhone}
                   disabled={testStep !== "idle"}
                   onChange={(e) => setTestPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                  className="flex-1 sm:w-56 px-3.5 py-2.5 rounded-xl border border-[var(--fx-border)] text-sm font-medium disabled:bg-[var(--fx-canvas)]/60 disabled:text-[var(--fx-ink-2)] focus:outline-none focus:ring-2 focus:ring-[var(--fx-accent)]/30"
+                  className="flex-1 sm:w-56 px-3.5 py-2.5 rounded-md border border-[var(--fx-border)] text-sm font-medium disabled:bg-[var(--fx-canvas)]/60 disabled:text-[var(--fx-ink-2)] focus:outline-none focus:ring-2 focus:ring-[var(--fx-accent)]/30"
                 />
               </div>
 
@@ -304,7 +304,7 @@ export default function MessageManagerPage() {
                   type="button"
                   onClick={handleTestSendOtp}
                   disabled={testSending}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--fx-accent)] text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-md bg-[var(--fx-accent)] text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50"
                 >
                   <Send size={13} /> {testSending ? "Sending…" : "Send Test OTP"}
                 </button>
@@ -319,7 +319,7 @@ export default function MessageManagerPage() {
                     value={testOtp}
                     disabled={testStep === "verified"}
                     onChange={(e) => setTestOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    className="w-full sm:w-36 px-3.5 py-2.5 rounded-xl border border-[var(--fx-border)] text-sm font-medium disabled:bg-[var(--fx-canvas)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--fx-accent)]/30"
+                    className="w-full sm:w-36 px-3.5 py-2.5 rounded-md border border-[var(--fx-border)] text-sm font-medium disabled:bg-[var(--fx-canvas)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--fx-accent)]/30"
                   />
                   {testStep === "sent" && (
                     <>
@@ -327,7 +327,7 @@ export default function MessageManagerPage() {
                         type="button"
                         onClick={handleTestVerifyOtp}
                         disabled={testVerifying}
-                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--fx-ink)] text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-md bg-[var(--fx-ink)] text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50"
                       >
                         <ShieldCheck size={13} /> {testVerifying ? "Verifying…" : "Verify"}
                       </button>
@@ -346,19 +346,19 @@ export default function MessageManagerPage() {
             </div>
 
             {testError && (
-              <div className="flex items-start gap-2 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5">
+              <div className="flex items-start gap-2 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-md px-3.5 py-2.5">
                 <XCircle size={14} className="mt-0.5 flex-shrink-0" /> {testError}
               </div>
             )}
 
             {testStep === "sent" && !testError && (
-              <div className="flex items-start gap-2 text-xs font-semibold text-[#B54708] bg-[#FEF6E7] border border-[#FBE5B8] rounded-xl px-3.5 py-2.5">
+              <div className="flex items-start gap-2 text-xs font-semibold text-[#B54708] bg-[#FEF6E7] border border-[#FBE5B8] rounded-md px-3.5 py-2.5">
                 <FlaskConical size={14} className="mt-0.5 flex-shrink-0" /> Code sent to +91{testPhone}. Check the Message Manager log once it lands.
               </div>
             )}
 
             {testStep === "verified" && testToken && (
-              <div className="flex items-start gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-2.5">
+              <div className="flex items-start gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3.5 py-2.5">
                 <CheckCircle2 size={14} className="mt-0.5 flex-shrink-0" />
                 Widget verified successfully — access token received (<span className="font-mono">{testToken.slice(0, 16)}…</span>). MSG91 send/verify is working live.
               </div>
@@ -406,7 +406,7 @@ export default function MessageManagerPage() {
       </div>
 
       {/* ── Message Log Table ── */}
-      <div className="bg-white border border-[var(--fx-border)] rounded-2xl shadow-xs overflow-hidden">
+      <div className="bg-white border border-[var(--fx-border)] rounded-lg shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[680px] text-sm">
             <thead>
@@ -452,7 +452,7 @@ export default function MessageManagerPage() {
 
         {!loading && messages.length === 0 && (
           <div className="py-8 flex flex-col items-center justify-center text-center px-6">
-            <div className="w-10 h-10 rounded-2xl bg-[var(--fx-canvas)] flex items-center justify-center text-[var(--fx-faint)] mb-2">
+            <div className="w-10 h-10 rounded-lg bg-[var(--fx-canvas)] flex items-center justify-center text-[var(--fx-faint)] mb-2">
               <MessageSquareText size={18} />
             </div>
             <p className="text-sm font-bold text-[var(--fx-ink)]">No messages logged yet</p>

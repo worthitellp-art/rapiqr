@@ -37,7 +37,7 @@ export default function PrintSheetModal({
     selectedStickerRecords,
     displayStickers,
     currentPreviewPage,
-    totalSheets,
+    totalPages,
     hasValidSelection,
     previewBlobUrl,
     isPreviewLoading,
@@ -51,7 +51,7 @@ export default function PrintSheetModal({
     handleDeselectAll,
     handleNextPage,
     handlePreviousPage,
-    handleDirectPrint,
+    handleExportPdf,
   } = usePrintSheetState({
     isOpen,
     availableStickers,
@@ -77,14 +77,14 @@ export default function PrintSheetModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200"
+        className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200"
         onClick={(clickEvent) => clickEvent.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Print Stickers</h2>
-            <p className="text-sm text-slate-500 mt-0.5">Choose stickers to print</p>
+            <h2 className="text-xl font-bold text-slate-900">Export Sticker PDF</h2>
+            <p className="text-sm text-slate-500 mt-0.5">Select stickers to include</p>
           </div>
           <button
             onClick={onClose}
@@ -118,7 +118,7 @@ export default function PrintSheetModal({
                 previewBlobUrl={previewBlobUrl}
                 hasSelection={hasValidSelection}
                 currentPage={currentPreviewPage}
-                totalSheets={totalSheets}
+                totalPages={totalPages}
                 selectedCount={selectedCount}
                 onPreviousPage={handlePreviousPage}
                 onNextPage={handleNextPage}
@@ -144,7 +144,7 @@ export default function PrintSheetModal({
             className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-slate-900 hover:bg-black active:scale-95 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
             {isExporting && <Loader2 size={15} className="animate-spin" />}
-            <span>Print {totalSheets > 1 ? `${totalSheets} Sheets` : "Sheet"}</span>
+            <span>Export PDF{totalPages > 1 ? ` (${totalPages} pages)` : ""}</span>
           </button>
         </div>
       </div>
@@ -154,7 +154,7 @@ export default function PrintSheetModal({
         onClose={() => setShowCopiesPopup(false)}
         isPrinting={isExporting}
         onConfirm={(copies) => {
-          handleDirectPrint(copies);
+          handleExportPdf(copies);
           setShowCopiesPopup(false);
         }}
       />

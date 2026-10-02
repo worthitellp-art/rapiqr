@@ -383,7 +383,7 @@ export default function AlertsPage({
       {/* ── Compact Feed List ────────────────────────────────────────── */}
       <div className="space-y-1.5">
         {filteredAlerts.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+          <div className="bg-white border border-gray-200 rounded-md p-8 text-center">
             <CheckCircle2 size={20} className="text-emerald-500 mx-auto mb-1.5" />
             <p className="text-xs font-semibold text-gray-600">No alerts matching filter</p>
           </div>
@@ -411,7 +411,7 @@ export default function AlertsPage({
             return (
               <div
                 key={alert.id}
-                className={`bg-white rounded-xl border border-gray-200 border-l-[3px] ${borderColor} transition-colors overflow-hidden ${
+                className={`bg-white rounded-md border border-gray-200 border-l-[3px] ${borderColor} transition-colors overflow-hidden ${
                   isEmergency && !isResolved ? "bg-red-50/20" : isResolved ? "opacity-70" : ""
                 }`}
               >
@@ -554,7 +554,7 @@ export default function AlertsPage({
           onClick={() => setConfirmClearAll(false)}
         >
           <div
-            className="bg-white rounded-xl border border-gray-200 p-4 max-w-xs w-full shadow-lg space-y-3"
+            className="bg-white rounded-md border border-gray-200 p-4 max-w-xs w-full shadow-lg space-y-3"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-2 text-red-600">

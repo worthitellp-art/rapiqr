@@ -1,17 +1,19 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { QrRecord, StickerPos } from "../types";
 import { useLocalStorage } from "../useLocalStorage";
+import { apiClient } from "../../../../lib/apiClient";
 import {
   PRINT_SHEET_CONSTANTS,
-  generateBatchStickersSheetBlobs,
-  printSheetBlobInBrowser,
+  ADMIN_STICKERS_PER_PAGE,
+  generateStickerPagePreviewBlob,
+  generateStickerBatchPdfBlob,
+  downloadSheetBlob,
 } from "../../../../services/stickerPrintSheetService";
 
-// One physical 12×18 sheet holds a grid sized to fill it (see
-// PRINT_SHEET_CONSTANTS.GRID_ROWS) — selection is capped to that many rather
-// than letting it spill into multiple sheets, so "select stickers to print"
-// always means "this one sheet," not an open-ended batch job.
-const MAX_SELECTABLE = PRINT_SHEET_CONSTANTS.STICKERS_PER_SHEET;
+// A single PDF export spans as many sheet-pages as needed, so selection isn't
+// capped to one physical sheet — just to a sane bulk ceiling (matches the
+// bulk tag-generation cap elsewhere in the admin panel).
+const MAX_SELECTABLE = 200;
 
 interface UsePrintSheetStateProps {
   isOpen: boolean;
@@ -71,7 +73,6 @@ export function usePrintSheetState({
     return extra.length > 0 ? [...selectableStickers, ...extra] : selectableStickers;
   }, [selectableStickers, availableStickers, selectedStickerIds]);
   const [currentPreviewPage, setCurrentPreviewPage] = useState<number>(0);
-  const [previewBlobs, setPreviewBlobs] = useState<Blob[]>([]);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
@@ -88,8 +89,6 @@ export function usePrintSheetState({
   latestInitialBatchStickersRef.current = initialBatchStickers;
   const latestInitialSelectedStickerRef = useRef(initialSelectedSticker);
   latestInitialSelectedStickerRef.current = initialSelectedSticker;
-  const latestAddableStickersRef = useRef(addableStickers);
-  latestAddableStickersRef.current = addableStickers;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -102,7 +101,7 @@ export function usePrintSheetState({
       const capped = batchStickers.slice(0, MAX_SELECTABLE);
       setSelectedStickerIds(new Set(capped.map((sticker) => sticker.id)));
       if (batchStickers.length > MAX_SELECTABLE) {
-        onShowToast?.(`Only ${MAX_SELECTABLE} fit on one sheet — the rest are still listed below if you'd like to swap one in.`);
+        onShowToast?.(`Only ${MAX_SELECTABLE} fit in one export — the rest are still listed below if you'd like to swap one in.`);
       }
       return;
     }
@@ -114,14 +113,9 @@ export function usePrintSheetState({
       return;
     }
 
-    // Default: pre-select up to one sheet's worth of available stickers,
-    // preferring ones that haven't been printed yet.
-    const addable = latestAddableStickersRef.current;
-    if (addable.length > 0) {
-      setSelectedStickerIds(new Set(addable.slice(0, MAX_SELECTABLE).map((sticker) => sticker.id)));
-    } else {
-      setSelectedStickerIds(new Set());
-    }
+    // Selection-based only — opened with no explicit context, so nothing is
+    // pre-selected. The admin picks stickers from the list below themselves.
+    setSelectedStickerIds(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -131,20 +125,24 @@ export function usePrintSheetState({
     return availableStickers.filter((sticker) => selectedStickerIds.has(sticker.id));
   }, [availableStickers, selectedStickerIds]);
 
-  const totalSheets = Math.ceil(selectedStickerRecords.length / PRINT_SHEET_CONSTANTS.STICKERS_PER_SHEET);
+  // As many stickers as fit (ADMIN_STICKERS_PER_PAGE) are packed onto each A4
+  // export page, with the rest spilling onto additional pages — see
+  // generateStickerBatchPdfBlob.
+  const totalPages = Math.max(1, Math.ceil(selectedStickerRecords.length / ADMIN_STICKERS_PER_PAGE));
   const hasValidSelection = selectedStickerRecords.length > 0;
 
   // Reset current preview page if out of bounds after deselecting
   useEffect(() => {
-    if (currentPreviewPage >= totalSheets && totalSheets > 0) {
-      setCurrentPreviewPage(totalSheets - 1);
+    if (currentPreviewPage >= totalPages && totalPages > 0) {
+      setCurrentPreviewPage(totalPages - 1);
     }
-  }, [currentPreviewPage, totalSheets]);
+  }, [currentPreviewPage, totalPages]);
 
-  // Generate live preview sheets for unique stickers
+  // Generate a live preview of the current A4 page (up to
+  // ADMIN_STICKERS_PER_PAGE stickers packed at their exact physical size) —
+  // matching what the PDF export will produce.
   const refreshPreview = useCallback(async () => {
     if (!isOpen || selectedStickerRecords.length === 0) {
-      setPreviewBlobs([]);
       setPreviewBlobUrl(null);
       return;
     }
@@ -153,18 +151,12 @@ export function usePrintSheetState({
     setPreviewErrorMessage(null);
 
     try {
-      const previewConfig = { dpi: 100 };
-      const generatedBlobs = await generateBatchStickersSheetBlobs(
-        selectedStickerRecords,
-        stickerPos,
-        previewConfig
-      );
+      const pageStart = currentPreviewPage * ADMIN_STICKERS_PER_PAGE;
+      const chunk = selectedStickerRecords.slice(pageStart, pageStart + ADMIN_STICKERS_PER_PAGE);
+      const blob = await generateStickerPagePreviewBlob(chunk, stickerPos, 100);
 
-      setPreviewBlobs(generatedBlobs);
-
-      const targetBlob = generatedBlobs[currentPreviewPage] || generatedBlobs[0] || null;
-      if (targetBlob) {
-        const nextUrl = URL.createObjectURL(targetBlob);
+      if (blob) {
+        const nextUrl = URL.createObjectURL(blob);
         setPreviewBlobUrl((previousUrl) => {
           if (previousUrl) URL.revokeObjectURL(previousUrl);
           return nextUrl;
@@ -173,7 +165,7 @@ export function usePrintSheetState({
         setPreviewBlobUrl(null);
       }
     } catch (previewError) {
-      console.error("Failed to generate unique stickers preview:", previewError);
+      console.error("Failed to generate sticker preview:", previewError);
       setPreviewErrorMessage("Unable to render preview. You can still export directly.");
     } finally {
       setIsPreviewLoading(false);
@@ -220,10 +212,10 @@ export function usePrintSheetState({
 
   // Pagination handlers
   const handleNextPage = useCallback(() => {
-    if (currentPreviewPage < totalSheets - 1) {
+    if (currentPreviewPage < totalPages - 1) {
       setCurrentPreviewPage((previousPage) => previousPage + 1);
     }
-  }, [currentPreviewPage, totalSheets]);
+  }, [currentPreviewPage, totalPages]);
 
   const handlePreviousPage = useCallback(() => {
     if (currentPreviewPage > 0) {
@@ -253,40 +245,61 @@ export function usePrintSheetState({
     });
   }, [setPrintedStickerIdList]);
 
-  const handleDirectPrint = useCallback(async (copies = 1) => {
+  // Recovery codes aren't carried in `selectedStickerRecords` unless the
+  // sticker was just generated in this session — reveal whichever are
+  // missing (audited server-side) right before baking them into the PDF.
+  const resolveRecoveryCodes = useCallback(async (records: QrRecord[]): Promise<Record<string, string>> => {
+    const known: Record<string, string> = {};
+    const missingIds: string[] = [];
+    records.forEach((record) => {
+      if (record.recoveryCode) known[record.id] = record.recoveryCode;
+      else missingIds.push(record.id);
+    });
+    if (missingIds.length === 0) return known;
+    try {
+      const res = await apiClient.admin.revealRecoveryCodes(missingIds);
+      return { ...known, ...(res?.data || {}) } as Record<string, string>;
+    } catch {
+      return known;
+    }
+  }, []);
+
+  const handleExportPdf = useCallback(async (copies = 1) => {
     if (!hasValidSelection) return;
 
     setIsExporting(true);
 
     try {
-      const fullResConfig = { dpi: PRINT_SHEET_CONSTANTS.DEFAULT_DPI };
-      const sheetBlobs = await generateBatchStickersSheetBlobs(
+      const recoveryCodeMap = await resolveRecoveryCodes(selectedStickerRecords);
+      const pdfBlob = await generateStickerBatchPdfBlob(
         selectedStickerRecords,
         stickerPos,
-        fullResConfig
+        recoveryCodeMap,
+        copies,
+        PRINT_SHEET_CONSTANTS.DEFAULT_DPI
       );
+      if (!pdfBlob) throw new Error("Could not create sticker PDF");
 
-      const targetBlob = sheetBlobs[currentPreviewPage] || sheetBlobs[0] || null;
-      if (!targetBlob) throw new Error("Could not create print sheet blob");
-
-      const printTitle = `RapiQR-Unique-Stickers-Sheet-12x18-Page-${currentPreviewPage + 1}`;
-      printSheetBlobInBrowser(targetBlob, printTitle, copies);
+      const dateStr = new Date().toISOString().slice(0, 10);
+      downloadSheetBlob(pdfBlob, `rapiqr-stickers-${dateStr}.pdf`);
       markStickersPrinted(selectedStickerRecords.map((sticker) => sticker.id));
-      onShowToast?.(copies > 1 ? `Opening print dialog for ${copies} copies...` : "Opening print dialog...");
-    } catch (printError) {
-      console.error("Failed to initiate browser print:", printError);
-      onShowToast?.("Could not open the print dialog. Please try again.");
+      onShowToast?.(
+        copies > 1 ? `PDF downloaded — ${copies} copies of ${totalPages} page${totalPages > 1 ? "s" : ""}.` : "PDF downloaded."
+      );
+    } catch (exportError) {
+      console.error("Failed to generate sticker PDF:", exportError);
+      onShowToast?.("Could not generate the PDF. Please try again.");
     } finally {
       setIsExporting(false);
     }
-  }, [hasValidSelection, selectedStickerRecords, currentPreviewPage, stickerPos, onShowToast, markStickersPrinted]);
+  }, [hasValidSelection, selectedStickerRecords, stickerPos, totalPages, onShowToast, markStickersPrinted, resolveRecoveryCodes]);
 
   return {
     selectedStickerIds,
     selectedStickerRecords,
     displayStickers,
     currentPreviewPage,
-    totalSheets,
+    totalPages,
     hasValidSelection,
     previewBlobUrl,
     isPreviewLoading,
@@ -300,6 +313,6 @@ export function usePrintSheetState({
     handleDeselectAll,
     handleNextPage,
     handlePreviousPage,
-    handleDirectPrint,
+    handleExportPdf,
   };
 }

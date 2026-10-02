@@ -49,14 +49,14 @@ export default function StickerMockupView({
   // 1. Pure QR Code Mode
   if (mode === "qr") {
     return (
-      <div className={`relative flex flex-col items-center justify-center p-6 bg-white rounded-2xl border border-gray-200 shadow-sm ${className}`}>
+      <div className={`relative flex flex-col items-center justify-center p-6 bg-white rounded-lg border border-gray-200 shadow-sm ${className}`}>
         {showModeBadge && (
           <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-700">
             <QrCode size={12} />
             <span>Pure QR Code</span>
           </div>
         )}
-        <div className="relative p-3 bg-white rounded-xl border border-gray-200 shadow-md">
+        <div className="relative p-3 bg-white rounded-md border border-gray-200 shadow-md">
           <QrCodeImage
             data={fullUrl}
             fg={qrFg}
@@ -82,7 +82,7 @@ export default function StickerMockupView({
   // 2. On-Vehicle Placement Mockup Mode (Simulated Car Windshield / Glass)
   if (mode === "windshield") {
     return (
-      <div className={`relative overflow-hidden rounded-2xl bg-[#111827] shadow-xl border border-gray-800 ${className}`}>
+      <div className={`relative overflow-hidden rounded-lg bg-[#111827] shadow-xl border border-gray-800 ${className}`}>
         {/* Windshield gradient & subtle glass texture */}
         <div
           className="w-full relative flex items-center justify-center p-6 sm:p-8"
@@ -104,7 +104,7 @@ export default function StickerMockupView({
 
           {/* Sticker positioned on the glass */}
           <div
-            className="relative w-full max-w-[280px] rounded-xl overflow-hidden shadow-[0_12px_36px_rgba(0,0,0,0.6),0_2px_10px_rgba(0,0,0,0.4)] border border-white/20 transition-transform duration-300 hover:scale-[1.02]"
+            className="relative w-full max-w-[280px] rounded-md overflow-hidden shadow-[0_12px_36px_rgba(0,0,0,0.6),0_2px_10px_rgba(0,0,0,0.4)] border border-white/20 transition-transform duration-300 hover:scale-[1.02]"
             style={{ aspectRatio: `${EDITOR_DISPLAY.w} / ${EDITOR_DISPLAY.h}` }}
           >
             <img
@@ -155,7 +155,7 @@ export default function StickerMockupView({
 
   // 3. Default: Physical Sticker Mode (Glossy Vinyl Die-Cut Look)
   return (
-    <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-b from-gray-50 to-gray-100 p-4 sm:p-5 flex flex-col items-center justify-center border border-gray-200 shadow-sm ${className}`}>
+    <div className={`relative overflow-hidden rounded-lg bg-gradient-to-b from-gray-50 to-gray-100 p-4 sm:p-5 flex flex-col items-center justify-center border border-gray-200 shadow-sm ${className}`}>
       {showModeBadge && (
         <div className="w-full flex items-center justify-between mb-3">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white text-gray-700 border border-gray-200 shadow-2xs">
@@ -168,7 +168,7 @@ export default function StickerMockupView({
 
       {/* Die-cut sticker card with vinyl gloss and drop shadow */}
       <div
-        className="relative w-full rounded-xl overflow-hidden shadow-[0_8px_24px_rgba(0,0,0,0.18),0_2px_6px_rgba(0,0,0,0.12)] border border-gray-300 transition-all duration-300 hover:shadow-[0_12px_32px_rgba(0,0,0,0.22)]"
+        className="relative w-full rounded-md overflow-hidden shadow-[0_8px_24px_rgba(0,0,0,0.18),0_2px_6px_rgba(0,0,0,0.12)] border border-gray-300 transition-all duration-300 hover:shadow-[0_12px_32px_rgba(0,0,0,0.22)]"
         style={{ aspectRatio: `${EDITOR_DISPLAY.w} / ${EDITOR_DISPLAY.h}` }}
       >
         <img

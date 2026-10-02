@@ -31,11 +31,11 @@ export default function PrintCopiesPopup({ isOpen, onClose, onConfirm, isPrintin
       }}
     >
       <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-sm border border-slate-200 p-6"
+        className="bg-white rounded-lg shadow-xl w-full max-w-sm border border-slate-200 p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-bold text-slate-900">How many copies?</h3>
-        <p className="text-sm text-slate-500 mt-0.5">Each copy prints the same sheet again.</p>
+        <p className="text-sm text-slate-500 mt-0.5">Each copy repeats this batch again in the PDF.</p>
 
         <div className="flex items-center justify-center gap-4 mt-5">
           <button
@@ -82,7 +82,7 @@ export default function PrintCopiesPopup({ isOpen, onClose, onConfirm, isPrintin
             disabled={isPrinting}
             className="px-5 py-2.5 text-sm font-semibold text-white bg-slate-900 hover:bg-black active:scale-95 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
-            {isPrinting ? "Opening…" : copies > 1 ? `Print ${copies} Copies` : "Print"}
+            {isPrinting ? "Generating…" : copies > 1 ? `Export ${copies} Copies` : "Export PDF"}
           </button>
         </div>
       </div>

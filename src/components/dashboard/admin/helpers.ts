@@ -2,10 +2,6 @@ import QrCodeWithLogo from "qrcode-with-logos";
 import { QrRecord, StickerPos } from "./types";
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
 import repiqrWordmark from "../../../assets/repiqr-wordmark.png";
-import {
-  generateRepeatedStickerSheetBlob,
-  generateBatchStickersSheetBlobs,
-} from "../../../services/stickerPrintSheetService";
 
 const STICKER_SRC = stickerTemplateImg;
 const EDITOR_DISPLAY = { w: 320, h: 200 };
@@ -150,43 +146,3 @@ export async function generateStickerBlob(rec: QrRecord, pos: StickerPos): Promi
   }
 }
 
-export interface SheetOptions {
-  dpi?: number;
-  sheetWidthIn?: number;
-  sheetHeightIn?: number;
-  marginIn?: number;
-  gapIn?: number;
-  cols?: number;
-  rows?: number;
-}
-
-/**
- * Print-ready sheet export: tiles selected stickers onto a 12x18in canvas at 300 DPI,
- * in a grid sized to fill the sheet (see PRINT_SHEET_CONSTANTS.GRID_ROWS), with
- * trim-guide lines and corner crop marks.
- * When 1 sticker is provided, it repeats across every grid slot.
- */
-export async function generateSheetBlobs(
-  records: QrRecord[],
-  pos: StickerPos,
-  opts: SheetOptions = {}
-): Promise<Blob[]> {
-  if (records.length === 0) return [];
-
-  const config = {
-    dpi: opts.dpi,
-    sheetWidthInches: opts.sheetWidthIn,
-    sheetHeightInches: opts.sheetHeightIn,
-    marginInches: opts.marginIn,
-    gapInches: opts.gapIn,
-    columns: opts.cols,
-    rows: opts.rows,
-  };
-
-  if (records.length === 1) {
-    const singleBlob = await generateRepeatedStickerSheetBlob(records[0], pos, config);
-    return singleBlob ? [singleBlob] : [];
-  }
-
-  return generateBatchStickersSheetBlobs(records, pos, config);
-}

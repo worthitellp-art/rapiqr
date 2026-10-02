@@ -4,8 +4,8 @@ import { useAuth } from "../../../context/AuthContext";
 import { useLocalStorage } from "./useLocalStorage";
 import { QrRecord, Template, StickerPos } from "./types";
 import { qrFullUrl } from "./helpers";
+import { Menu } from "lucide-react";
 import Sidebar from "./Sidebar";
-import TopBar from "./TopBar";
 import QuickLookModal from "./QuickLookModal";
 import RestoreStickerModal from "./RestoreStickerModal";
 import Toast from "./Toast";
@@ -208,12 +208,14 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
       />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: "var(--fx-canvas)" }}>
-        <TopBar
-          admin={admin} searchQuery={searchQuery} setSearchQuery={setSearchQuery}
-          page={page} setPage={setPage}
-          activeCount={qrList.filter(q => q.status === "active").length || 18}
-          onOpenSidebar={() => setSidebarOpen(true)}
-        />
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          className="md:hidden m-3 w-8 h-8 flex-shrink-0 rounded-md bg-[var(--fx-surface)] border border-[var(--fx-border)] flex items-center justify-center text-[var(--fx-ink)] cursor-pointer"
+          aria-label="Open navigation menu"
+        >
+          <Menu size={16} />
+        </button>
 
         <div className="flex-1 overflow-y-auto">
           {page === "overview" && (

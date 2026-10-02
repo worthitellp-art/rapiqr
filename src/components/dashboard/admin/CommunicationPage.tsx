@@ -138,7 +138,7 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
   return (
     <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[var(--fx-ink)] font-body" style={{ background: "var(--fx-canvas)" }}>
       {/* Add Provider Form */}
-      <div className="bg-white border border-[var(--fx-border)] p-6 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+      <div className="bg-white border border-[var(--fx-border)] p-6 rounded-md shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
         <h3 className="font-display font-semibold text-[var(--fx-ink)] text-[14px] mb-5 flex items-center gap-2">
           <Phone size={15} className="text-[#B54708]" /> Add Service Provider
         </h3>
@@ -217,7 +217,7 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
           {grouped.map(({ type, items }) => {
             const m = getServiceMeta(type.slug);
             return (
-              <div key={type.slug} className="bg-white border border-[var(--fx-border)] overflow-hidden rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+              <div key={type.slug} className="bg-white border border-[var(--fx-border)] overflow-hidden rounded-md shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
                 <div className="px-5 py-3 border-b border-[var(--fx-border)] bg-[var(--fx-canvas)] flex items-center gap-2.5">
                   <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: m.bg, color: m.color }}>
                     <m.Icon size={14} />
@@ -297,7 +297,7 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
           })}
 
           {orphans.length > 0 && (
-            <div className="bg-white border border-[var(--fx-border)] overflow-hidden rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+            <div className="bg-white border border-[var(--fx-border)] overflow-hidden rounded-md shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
               <div className="px-5 py-3 border-b border-[var(--fx-border)] bg-[#FEF6E7] flex items-center gap-2.5">
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: "#FEF2F2", color: "#B54708" }}>
                   <AlertTriangle size={14} />
@@ -324,7 +324,7 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
           )}
         </div>
       ) : (
-        <div className="bg-white border border-[var(--fx-border)] p-12 text-center rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+        <div className="bg-white border border-[var(--fx-border)] p-12 text-center rounded-md shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
           <div className="w-12 h-12 rounded-lg bg-[var(--fx-canvas)] flex items-center justify-center mx-auto mb-3">
             <Phone size={20} className="text-[var(--fx-faint)]" />
           </div>

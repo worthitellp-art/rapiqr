@@ -16,7 +16,6 @@ import {
   AlertTriangle,
   LayoutGrid,
   Table as TableIcon,
-  List,
   Copy,
   Check,
   Phone,
@@ -27,8 +26,9 @@ import {
   Activity,
 } from "lucide-react";
 import { QrRecord, Template, StickerPos } from "./types";
-import { qrFullUrl, fmtDate, dispatchActivationToUserDashboard, generateSheetBlobs } from "./helpers";
+import { qrFullUrl, fmtDate, dispatchActivationToUserDashboard } from "./helpers";
 import { apiClient } from "../../../lib/apiClient";
+import { generateStickerBatchPdfBlob, downloadSheetBlob } from "../../../services/stickerPrintSheetService";
 import { STICKER_CATEGORIES, getCategoryLabel, getCategoryIcon } from "../../../stickerModules";
 import QrRowActions from "./QrRowActions";
 import PrintSheetModal from "./PrintSheetModal";
@@ -36,7 +36,7 @@ import GenerateTagModal from "./GenerateTagModal";
 import StickerThumb from "./StickerThumb";
 import StickerMockupView from "./StickerMockupView";
 
-type ViewMode = "table" | "cards" | "compact";
+type ViewMode = "table" | "cards";
 
 export default function QrCodesPage({
   qrList,
@@ -68,7 +68,6 @@ export default function QrCodesPage({
   const [bulkCount, setBulkCount] = useState(25);
   const [bulkProgress, setBulkProgress] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<QrRecord | null>(null);
-  const [clearAllOpen, setClearAllOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -205,26 +204,19 @@ export default function QrCodesPage({
   async function handlePrintSheet() {
     const selected = filtered.filter((q) => selectedIds.has(q.id));
     if (selected.length === 0) {
-      handleTriggerPrintSheet(filtered[0], filtered);
+      setToast("Select at least one sticker to include in the print sheet.");
+      setTimeout(() => setToast(null), 3000);
       return;
     }
     if (sheetGenerating) return;
     setSheetGenerating(true);
     try {
-      const blobs = await generateSheetBlobs(selected, stickerPos);
+      const recoveryCodeMap = await fetchMissingRecoveryCodes(selected.map((q) => q.id));
+      const pdfBlob = await generateStickerBatchPdfBlob(selected, stickerPos, recoveryCodeMap);
+      if (!pdfBlob) throw new Error("No PDF generated");
       const dateStr = new Date().toISOString().slice(0, 10);
-      blobs.forEach((blob, i) => {
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `rapiqr-print-sheet-${dateStr}-${i + 1}-of-${blobs.length}.png`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-      });
-      setToast(
-        `Generated ${blobs.length} print sheet${blobs.length > 1 ? "s" : ""} for ${selected.length} sticker${
-          selected.length > 1 ? "s" : ""
-        }`
-      );
+      downloadSheetBlob(pdfBlob, `rapiqr-print-sheet-${dateStr}.pdf`);
+      setToast(`Generated a print-ready PDF for ${selected.length} sticker${selected.length > 1 ? "s" : ""}`);
     } catch (err) {
       console.error("Failed to generate print sheet:", err);
       setToast("Failed to generate print sheet — please try again");
@@ -360,21 +352,21 @@ export default function QrCodesPage({
         {/* Fleet Quick Stats */}
         <div className="flex items-center gap-2 flex-wrap">
           <div
-            className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 flex items-center gap-2"
+            className="bg-white border border-gray-200 rounded-md px-3 py-1.5 flex items-center gap-2"
             title="Active"
           >
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
             <span className="text-xs font-extrabold text-gray-800">{metrics.active}</span>
           </div>
           <div
-            className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 flex items-center gap-2"
+            className="bg-white border border-gray-200 rounded-md px-3 py-1.5 flex items-center gap-2"
             title="Pending"
           >
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
             <span className="text-xs font-extrabold text-gray-800">{metrics.pending}</span>
           </div>
           <div
-            className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 flex items-center gap-2"
+            className="bg-white border border-gray-200 rounded-md px-3 py-1.5 flex items-center gap-2"
             title="Scans"
           >
             <Activity size={14} className="text-indigo-600" />
@@ -384,12 +376,12 @@ export default function QrCodesPage({
       </div>
 
       {/* ── Generator Console Card (Classic Clean Style) ───────────────────────────────── */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-xs p-5 sm:p-6 transition-all">
+      <div className="bg-white border border-gray-200 rounded-lg shadow-xs p-5 sm:p-6 transition-all">
         <div className="flex flex-wrap items-end gap-4 sm:gap-6">
           {/* Mode Switcher */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Generation Mode</label>
-            <div className="inline-flex bg-gray-100 p-1 rounded-xl border border-gray-200">
+            <div className="inline-flex bg-gray-100 p-1 rounded-md border border-gray-200">
               <button
                 type="button"
                 onClick={() => setTab("single")}
@@ -418,7 +410,7 @@ export default function QrCodesPage({
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full pl-3 pr-8 py-2 text-xs font-semibold rounded-xl border border-gray-300 bg-white text-gray-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20 transition-all cursor-pointer"
+                className="w-full pl-3 pr-8 py-2 text-xs font-semibold rounded-md border border-gray-300 bg-white text-gray-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20 transition-all cursor-pointer"
               >
                 {STICKER_CATEGORIES.map((cat) => (
                   <option key={cat.value} value={cat.value}>
@@ -439,7 +431,7 @@ export default function QrCodesPage({
                 max={200}
                 value={bulkCount}
                 onChange={(e) => setBulkCount(parseInt(e.target.value, 10) || 1)}
-                className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20"
+                className="w-full px-3 py-2 text-xs font-bold rounded-md border border-gray-300 bg-white text-gray-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20"
               />
             </div>
           )}
@@ -450,7 +442,7 @@ export default function QrCodesPage({
               <button
                 type="button"
                 onClick={() => setGenerateModalOpen(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 active:scale-95 transition-all shadow-xs cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 active:scale-95 transition-all shadow-xs cursor-pointer"
               >
                 <Plus size={15} strokeWidth={2.4} />
                 <span>Generate Tag</span>
@@ -460,7 +452,7 @@ export default function QrCodesPage({
                 type="button"
                 onClick={() => doGenerateBulk()}
                 disabled={bulkProgress !== null}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 active:scale-95 disabled:opacity-50 transition-all shadow-xs cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 active:scale-95 disabled:opacity-50 transition-all shadow-xs cursor-pointer"
               >
                 {bulkProgress !== null ? (
                   <Loader2 size={15} className="animate-spin" />
@@ -501,14 +493,14 @@ export default function QrCodesPage({
               placeholder="Search sticker ID, phone..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-gray-300 bg-white text-gray-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20 shadow-2xs"
+              className="w-full pl-9 pr-3 py-2 text-xs rounded-md border border-gray-300 bg-white text-gray-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20 shadow-2xs"
             />
           </div>
 
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-2 text-xs font-semibold rounded-xl border border-gray-300 bg-white text-gray-700 outline-none cursor-pointer focus:border-indigo-600 shadow-2xs"
+            className="px-3 py-2 text-xs font-semibold rounded-md border border-gray-300 bg-white text-gray-700 outline-none cursor-pointer focus:border-indigo-600 shadow-2xs"
           >
             <option value="all">All Categories ({qrList.length})</option>
             {STICKER_CATEGORIES.map((cat) => (
@@ -521,8 +513,8 @@ export default function QrCodesPage({
 
         {/* Right Side: View Mode Switcher + Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* View Mode Toggle: Table, Cards, Compact */}
-          <div className="inline-flex bg-gray-200/80 p-0.5 rounded-xl border border-gray-200 shadow-2xs">
+          {/* View Mode Toggle: Table, Cards */}
+          <div className="inline-flex bg-gray-200/80 p-0.5 rounded-md border border-gray-200 shadow-2xs">
             <button
               type="button"
               onClick={() => setViewMode("table")}
@@ -543,22 +535,12 @@ export default function QrCodesPage({
             >
               <LayoutGrid size={14} />
             </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("compact")}
-              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                viewMode === "compact" ? "bg-white text-indigo-600 shadow-xs" : "text-gray-600 hover:text-gray-900"
-              }`}
-              title="Compact List View"
-            >
-              <List size={14} />
-            </button>
           </div>
 
           <button
             type="button"
             onClick={openRestore}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
             title="Restore a deleted sticker with recovery code"
           >
             <RefreshCw size={12} />
@@ -573,7 +555,7 @@ export default function QrCodesPage({
               if (next) await fetchMissingRecoveryCodes(qrList.map((q) => q.id));
             }}
             disabled={revealingCodes}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer disabled:opacity-60"
             title="Toggle recovery code visibility"
           >
             {revealingCodes ? <Loader2 size={12} className="animate-spin" /> : revealedCodes ? <EyeOff size={12} /> : <Eye size={12} />}
@@ -583,40 +565,30 @@ export default function QrCodesPage({
           <button
             type="button"
             onClick={handlePrintSheet}
-            disabled={filtered.length === 0 || sheetGenerating}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
-            title="Print stickers"
+            disabled={selectedIds.size === 0 || sheetGenerating}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
+            title="Select stickers above, then export a print-ready PDF"
           >
-            <Printer size={13} />
-            <span>Print Sheet{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</span>
+            {sheetGenerating ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />}
+            <span>Export PDF{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</span>
           </button>
 
           <button
             type="button"
             onClick={downloadCsv}
             disabled={qrList.length === 0}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs disabled:opacity-40 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs disabled:opacity-40 cursor-pointer"
           >
             <Download size={12} />
             <span>Export CSV</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setClearAllOpen(true)}
-            disabled={qrList.length === 0}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-red-200 text-red-600 bg-red-50/50 hover:bg-red-100 transition-colors shadow-2xs disabled:opacity-40 cursor-pointer"
-          >
-            <Trash2 size={12} />
-            <span>Clear All</span>
           </button>
         </div>
       </div>
 
       {/* ── Empty State ────────────────────────────────────────────── */}
       {filtered.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center shadow-xs">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-2 border border-indigo-100">
+        <div className="bg-white border border-gray-200 rounded-lg p-6 text-center shadow-xs">
+          <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-2 border border-indigo-100">
             <QrCode size={18} />
           </div>
           <h3 className="font-bold text-gray-900 text-sm">
@@ -630,7 +602,7 @@ export default function QrCodesPage({
                 setCategoryFilter("all");
                 setSearchText("");
               }}
-              className="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer"
+              className="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer"
             >
               <RefreshCw size={12} /> Clear Filters
             </button>
@@ -642,7 +614,7 @@ export default function QrCodesPage({
               VIEW MODE 1: TABLE VIEW (High density, clean data)
              ══════════════════════════════════════════════════════════ */}
           {viewMode === "table" && (
-            <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
+            <div className="bg-white border border-gray-200 rounded-lg shadow-xs overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs text-gray-800">
                   <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-bold uppercase tracking-wider text-[11px]">
@@ -794,7 +766,7 @@ export default function QrCodesPage({
                 return (
                   <div
                     key={q.id}
-                    className={`bg-white rounded-2xl border transition-all duration-200 shadow-xs overflow-hidden flex flex-col justify-between hover:shadow-md ${
+                    className={`bg-white rounded-lg border transition-all duration-200 shadow-xs overflow-hidden flex flex-col justify-between hover:shadow-md ${
                       isSelected ? "border-indigo-500 ring-2 ring-indigo-100" : "border-gray-200"
                     }`}
                   >
@@ -896,71 +868,6 @@ export default function QrCodesPage({
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════════════════
-              VIEW MODE 3: COMPACT LIST VIEW (Quick scanning)
-             ══════════════════════════════════════════════════════════ */}
-          {viewMode === "compact" && (
-            <div className="bg-white border border-gray-200 rounded-2xl shadow-xs divide-y divide-gray-100 overflow-hidden">
-              {paginated.map((q) => {
-                const catKey = (q.category || "car") as any;
-                const label = getCategoryLabel(catKey);
-                const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
-                const isActivated = Boolean(phoneNum && phoneNum.trim());
-                const computedStatus = isActivated ? "active" : q.status;
-
-                return (
-                  <div
-                    key={q.id}
-                    className="flex items-center gap-3 p-3.5 hover:bg-gray-50/70 transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(q.id)}
-                      onChange={() => toggleSelected(q.id)}
-                      className="w-4 h-4 rounded-md border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => openQuickLook(q)}
-                      className="cursor-pointer hover:opacity-80"
-                    >
-                      <StickerThumb qr={q} size={30} />
-                    </button>
-                    <div className="flex-1 min-w-0 flex items-center gap-4">
-                      <span className="font-mono font-bold text-xs text-gray-900">{q.id}</span>
-                      <span className="text-xs text-gray-600 font-semibold">{label}</span>
-                      <span className="text-xs text-gray-500 truncate">{isActivated ? phoneNum : "—"}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
-                          computedStatus === "active"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-amber-50 text-amber-700"
-                        }`}
-                      >
-                        {computedStatus}
-                      </span>
-                      {printedStickerIds.has(q.id) && (
-                        <span title="Already printed" className="text-emerald-600">
-                          <Printer size={12} />
-                        </span>
-                      )}
-                      <QrRowActions
-                        qr={q}
-                        openQuickLook={openQuickLook}
-                        setDeleteTarget={setDeleteTarget}
-                        openPrintSheet={(target) => handleTriggerPrintSheet(target, [target])}
-                        menuOpen={openActionMenu === q.id}
-                        onMenuToggle={() => setOpenActionMenu((prev) => (prev === q.id ? null : q.id))}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
           {/* ── Pagination Controls ────────────────────────────────────────── */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between gap-4 pt-2">
@@ -976,7 +883,7 @@ export default function QrCodesPage({
                   type="button"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors cursor-pointer"
                 >
                   <ChevronLeft size={14} />
                   <span>Prev</span>
@@ -988,7 +895,7 @@ export default function QrCodesPage({
                   type="button"
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors cursor-pointer"
                 >
                   <span>Next</span>
                   <ChevronRight size={14} />
@@ -999,7 +906,7 @@ export default function QrCodesPage({
         </>
       )}
 
-      {/* ── Modals: Delete Confirmation, Clear All, Generate Tag, Print Sheet ─── */}
+      {/* ── Modals: Delete Confirmation, Generate Tag, Print Sheet ─── */}
       {deleteTarget && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -1007,11 +914,11 @@ export default function QrCodesPage({
           onClick={() => setDeleteTarget(null)}
         >
           <div
-            className="bg-white rounded-2xl border border-gray-200 p-6 max-w-sm w-full shadow-2xl space-y-4"
+            className="bg-white rounded-lg border border-gray-200 p-6 max-w-sm w-full shadow-2xl space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-md bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
                 <AlertTriangle size={20} />
               </div>
               <div>
@@ -1026,7 +933,7 @@ export default function QrCodesPage({
               <button
                 type="button"
                 onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-bold rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -1057,71 +964,9 @@ export default function QrCodesPage({
                   setToast("Sticker deleted from database");
                   setTimeout(() => setToast(null), 2000);
                 }}
-                className="px-4 py-2 text-xs font-bold rounded-xl bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-bold rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer"
               >
                 Delete Sticker
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {clearAllOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(16, 24, 40, 0.5)", backdropFilter: "blur(4px)" }}
-          onClick={() => setClearAllOpen(false)}
-        >
-          <div
-            className="bg-white rounded-2xl border border-gray-200 p-6 max-w-md w-full shadow-2xl space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
-                <AlertTriangle size={20} />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-gray-900">Clear All {qrList.length} Stickers?</h3>
-                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                  Are you sure you want to permanently delete all {qrList.length} QR codes? This action cannot be
-                  undone.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setClearAllOpen(false)}
-                className="px-4 py-2 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  setClearAllOpen(false);
-                  const deleted = await apiClient.qr
-                    .deleteAllQrCodes()
-                    .then((res) => res?.success)
-                    .catch(() => false);
-                  if (!deleted) {
-                    setToast("Failed to clear QR codes. Please try again.");
-                    setTimeout(() => setToast(null), 3000);
-                    return;
-                  }
-                  setQrList([]);
-                  try {
-                    localStorage.removeItem("repiqr-qrlist");
-                    localStorage.removeItem("namoqr-qrlist");
-                  } catch {
-                    /* ignore */
-                  }
-                  setToast("All QR codes cleared from database");
-                  setTimeout(() => setToast(null), 2000);
-                }}
-                className="px-4 py-2 text-xs font-bold rounded-xl bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer"
-              >
-                Clear All
               </button>
             </div>
           </div>

@@ -106,7 +106,7 @@ export interface AdminUserRow {
 
       {/* ── Metric Stat Cards Grid ─────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <div className="bg-white border border-[var(--fx-border)] rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] p-6">
+        <div className="bg-white border border-[var(--fx-border)] rounded-md shadow-[0_1px_2px_rgba(16,24,40,0.05)] p-6">
           <span className="text-[12px] font-semibold text-[var(--fx-ink-2)]">
             Total Registered Users
           </span>
@@ -115,7 +115,7 @@ export interface AdminUserRow {
           </div>
         </div>
 
-        <div className="bg-white border border-[var(--fx-border)] rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] p-6">
+        <div className="bg-white border border-[var(--fx-border)] rounded-md shadow-[0_1px_2px_rgba(16,24,40,0.05)] p-6">
           <span className="text-[12px] font-semibold text-[var(--fx-ink-2)]">
             Administrators
           </span>
@@ -124,7 +124,7 @@ export interface AdminUserRow {
           </div>
         </div>
 
-        <div className="bg-white border border-[var(--fx-border)] rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] p-6">
+        <div className="bg-white border border-[var(--fx-border)] rounded-md shadow-[0_1px_2px_rgba(16,24,40,0.05)] p-6">
           <span className="text-[12px] font-semibold text-[var(--fx-ink-2)]">
             Client Accounts
           </span>
@@ -189,7 +189,7 @@ export interface AdminUserRow {
           </p>
         </div>
       ) : (
-        <div className="bg-white border border-[var(--fx-border)] rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.05)] overflow-x-auto">
+        <div className="bg-white border border-[var(--fx-border)] rounded-md shadow-[0_1px_2px_rgba(16,24,40,0.05)] overflow-x-auto">
           <table className="w-full min-w-[880px] text-sm text-[var(--fx-ink)]">
             <thead>
               <tr className="text-left font-display text-[12px] font-semibold text-[var(--fx-ink-2)] tracking-normal bg-[var(--fx-canvas)] border-b border-[var(--fx-border)]">

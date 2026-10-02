@@ -8,7 +8,7 @@ interface PrintSheetEmptyStateProps {
 export default function PrintSheetEmptyState({ onClose }: PrintSheetEmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-[var(--fx-canvas)] border border-[var(--fx-border)] flex items-center justify-center text-[var(--fx-ink-2)] mb-4 shadow-2xs">
+      <div className="w-16 h-16 rounded-lg bg-[var(--fx-canvas)] border border-[var(--fx-border)] flex items-center justify-center text-[var(--fx-ink-2)] mb-4 shadow-2xs">
         <PackageX size={32} strokeWidth={1.8} />
       </div>
 
