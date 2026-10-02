@@ -205,44 +205,7 @@ function drawCutGuideLines(
   canvasContext.restore();
 }
 
-function drawCornerCropMarks(
-  canvasContext: CanvasRenderingContext2D,
-  grid: GridCalculations,
-  columns: number,
-  rows: number,
-  dpi: number
-): void {
-  canvasContext.save();
-  const markLengthPixels = Math.round(0.12 * dpi);
-  canvasContext.strokeStyle = "rgba(40, 40, 45, 0.9)";
-  canvasContext.lineWidth = Math.max(1, Math.round((0.85 / 72) * dpi));
 
-  for (let rowIndex = 0; rowIndex < rows; rowIndex++) {
-    for (let colIndex = 0; colIndex < columns; colIndex++) {
-      const cellLeft = grid.cellXCoordinates[colIndex];
-      const cellTop = grid.cellYCoordinates[rowIndex];
-      const cellRight = cellLeft + grid.cellPixelWidth;
-      const cellBottom = cellTop + grid.cellPixelHeight;
-
-      const cornerPoints = [
-        [cellLeft, cellTop],
-        [cellRight, cellTop],
-        [cellLeft, cellBottom],
-        [cellRight, cellBottom],
-      ];
-
-      for (const [cornerX, cornerY] of cornerPoints) {
-        canvasContext.beginPath();
-        canvasContext.moveTo(cornerX - markLengthPixels, cornerY);
-        canvasContext.lineTo(cornerX + markLengthPixels, cornerY);
-        canvasContext.moveTo(cornerX, cornerY - markLengthPixels);
-        canvasContext.lineTo(cornerX, cornerY + markLengthPixels);
-        canvasContext.stroke();
-      }
-    }
-  }
-  canvasContext.restore();
-}
 
 function drawRecoveryCodeLabel(
   canvasContext: CanvasRenderingContext2D,
@@ -356,7 +319,6 @@ async function renderStickerSheetCanvas(
   }
 
   drawCutGuideLines(canvasContext, grid, columns, rows, dpi);
-  drawCornerCropMarks(canvasContext, grid, columns, rows, dpi);
 
   return canvasElement;
 }
@@ -395,62 +357,6 @@ const A4_HEIGHT_INCHES = 11.69;
 
 // Single sticker per A4 sheet export — 1 sticker centered per A4 page.
 export const ADMIN_STICKERS_PER_PAGE = 1;
-
-function drawStickerCropMarks(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  dpi: number
-): void {
-  ctx.save();
-  const markLengthPixels = Math.round(0.18 * dpi);
-  ctx.strokeStyle = "rgba(40, 40, 45, 0.9)";
-  ctx.lineWidth = Math.max(1, Math.round((0.85 / 72) * dpi));
-
-  const corners = [
-    [x, y],
-    [x + width, y],
-    [x, y + height],
-    [x + width, y + height],
-  ];
-  for (const [cornerX, cornerY] of corners) {
-    ctx.beginPath();
-    ctx.moveTo(cornerX - markLengthPixels, cornerY);
-    ctx.lineTo(cornerX + markLengthPixels, cornerY);
-    ctx.moveTo(cornerX, cornerY - markLengthPixels);
-    ctx.lineTo(cornerX, cornerY + markLengthPixels);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function drawPdfVectorCropMarks(
-  doc: JsPDF,
-  x: number,
-  y: number,
-  width: number,
-  height: number
-): void {
-  const markLen = 0.18; // 0.18 inches length
-  doc.setDrawColor(70, 70, 75);
-  doc.setLineWidth(0.01); // in inches (~0.72 pt)
-
-  const corners = [
-    [x, y],
-    [x + width, y],
-    [x, y + height],
-    [x + width, y + height],
-  ];
-
-  for (const [cx, cy] of corners) {
-    // Horizontal tick line
-    doc.line(cx - markLen, cy, cx + markLen, cy);
-    // Vertical tick line
-    doc.line(cx, cy - markLen, cx, cy + markLen);
-  }
-}
 
 /**
  * Renders the 4x2.5in sticker artwork at ultra-high print press quality (600 DPI, 2400×1500px).
@@ -553,9 +459,6 @@ async function renderSingleStickerA4PageCanvas(
     position.w * scaleX,
     position.h * scaleY
   );
-
-  // Draw corner crop marks around the sticker for cutting
-  drawStickerCropMarks(ctx, targetX, targetY, stickerWidthPx, stickerHeightPx, dpi);
 
   return canvas;
 }
@@ -713,9 +616,6 @@ export async function generateStickerBatchPdfBlob(
         undefined,
         "FAST"
       );
-
-      // Draw crisp vector crop marks around the sticker
-      drawPdfVectorCropMarks(doc, stickerX, stickerY, STICKER_WIDTH_INCHES, STICKER_HEIGHT_INCHES);
 
       pagesEmbedded++;
 
