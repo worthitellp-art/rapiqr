@@ -44,7 +44,7 @@ function getDuplicateDetails(err) {
 // document; without this whitelist, an unauthenticated caller who knows a
 // sticker's ID could pull a stranger's medical/contact details straight off
 // GET /api/qr/:id or the activate/scan response.
-const PUBLIC_QR_FIELDS = '_id client_id status scans_count last_scanned_at template_name fg_color bg_color category created_at recovered_at vehicle_number';
+const PUBLIC_QR_FIELDS = '_id client_id status scans_count last_scanned_at template_name fg_color bg_color category created_at recovered_at vehicle_number label_name label_color is_printed printed_at';
 
 function toPublicQr(doc) {
   if (!doc) return null;
@@ -65,6 +65,10 @@ function toPublicQr(doc) {
     // as still-current.
     recovered_at: doc.recovered_at || null,
     vehicle_number: doc.vehicle_number || null,
+    label_name: doc.label_name || null,
+    label_color: doc.label_color || null,
+    is_printed: Boolean(doc.is_printed),
+    printed_at: doc.printed_at || null,
   };
 }
 
@@ -227,6 +231,10 @@ class QrModel {
           owner_name: doc.name || doc.assigned_to || doc.details?.ownerName || null,
           notes: doc.details?.notes || null,
           product_status: doc.status,
+          label_name: doc.label_name || null,
+          label_color: doc.label_color || null,
+          is_printed: Boolean(doc.is_printed),
+          printed_at: doc.printed_at || null,
         };
       });
     } catch (err) {
@@ -313,6 +321,10 @@ class QrModel {
         normalized_phone_number: normalizedPhone,
         recovery_code: rawRecoveryCode,
         recovery_code_hash: codeHash,
+        label_name: qrData.labelName || qrData.label_name || null,
+        label_color: qrData.labelColor || qrData.label_color || null,
+        is_printed: Boolean(qrData.isPrinted || qrData.is_printed),
+        printed_at: (qrData.isPrinted || qrData.is_printed) ? new Date() : null,
         created_at: qrData.createdAt || new Date(),
       });
 
@@ -384,6 +396,10 @@ class QrModel {
         encoder_name: ENCODER_NAME,
         encoder_version: ENCODER_VERSION,
         rendered_image_sha256: sha256,
+        label_name: qrData.labelName || qrData.label_name || null,
+        label_color: qrData.labelColor || qrData.label_color || null,
+        is_printed: Boolean(qrData.isPrinted || qrData.is_printed),
+        printed_at: (qrData.isPrinted || qrData.is_printed) ? new Date() : null,
         created_at: qrData.createdAt || new Date(),
       });
 
@@ -408,6 +424,47 @@ class QrModel {
       console.error('QrModel.saveV2 Error:', err);
       logger.error('DB_QR', 'QrModel.saveV2 failed', err);
       return null;
+    }
+  }
+
+  /**
+   * Bulk update labels for sticker IDs
+   */
+  static async bulkUpdateLabels(ids, labelName, labelColor) {
+    try {
+      if (!Array.isArray(ids) || ids.length === 0) return { updatedCount: 0 };
+      const res = await Sticker.updateMany(
+        { _id: { $in: ids }, deleted_at: null },
+        { $set: { label_name: labelName || null, label_color: labelColor || null } }
+      );
+      return { updatedCount: res.modifiedCount || 0 };
+    } catch (err) {
+      console.error('QrModel.bulkUpdateLabels Error:', err);
+      logger.error('DB_QR', 'QrModel.bulkUpdateLabels failed', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Bulk update print status for sticker IDs
+   */
+  static async bulkUpdatePrintStatus(ids, isPrinted) {
+    try {
+      if (!Array.isArray(ids) || ids.length === 0) return { updatedCount: 0 };
+      const res = await Sticker.updateMany(
+        { _id: { $in: ids }, deleted_at: null },
+        {
+          $set: {
+            is_printed: Boolean(isPrinted),
+            printed_at: isPrinted ? new Date() : null,
+          },
+        }
+      );
+      return { updatedCount: res.modifiedCount || 0 };
+    } catch (err) {
+      console.error('QrModel.bulkUpdatePrintStatus Error:', err);
+      logger.error('DB_QR', 'QrModel.bulkUpdatePrintStatus failed', err);
+      throw err;
     }
   }
 

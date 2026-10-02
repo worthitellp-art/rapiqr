@@ -406,10 +406,33 @@ export const apiClient = {
      * the caller supplies neither. All admin-generated tags use this going
      * forward — see QrModel.saveV2.
      */
-    async saveQrCodeV2(qrData: { category?: string; ownerPhone?: string; fg?: string; bg?: string; template?: string }) {
+    async saveQrCodeV2(qrData: {
+      category?: string;
+      ownerPhone?: string;
+      fg?: string;
+      bg?: string;
+      template?: string;
+      labelName?: string;
+      labelColor?: string;
+      isPrinted?: boolean;
+    }) {
       return request<{ success: boolean; data?: any; error?: string }>('/qr/v2', {
         method: 'POST',
         body: JSON.stringify(qrData),
+      });
+    },
+
+    async bulkUpdateLabels(ids: string[], labelName: string | null, labelColor: string | null) {
+      return request<{ success: boolean; data?: { updatedCount: number }; error?: string }>('/qr/bulk/label', {
+        method: 'PATCH',
+        body: JSON.stringify({ ids, labelName, labelColor }),
+      });
+    },
+
+    async bulkUpdatePrintStatus(ids: string[], isPrinted: boolean) {
+      return request<{ success: boolean; data?: { updatedCount: number }; error?: string }>('/qr/bulk/print-status', {
+        method: 'PATCH',
+        body: JSON.stringify({ ids, isPrinted }),
       });
     },
 

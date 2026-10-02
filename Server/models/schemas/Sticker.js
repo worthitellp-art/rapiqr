@@ -69,6 +69,12 @@ const stickerSchema = new Schema({
   // with user_id on the same document, but kept for compatibility).
   client_id: { type: String, default: 'UNASSIGNED' },
 
+  // Label organization and print tracking
+  label_name: { type: String, default: null, index: true },
+  label_color: { type: String, default: null },
+  is_printed: { type: Boolean, default: false, index: true },
+  printed_at: { type: Date, default: null },
+
   user_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
   phone_number: { type: String, default: null, index: true },
   normalized_phone_number: { type: String, default: null, index: true },

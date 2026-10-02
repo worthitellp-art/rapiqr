@@ -367,6 +367,42 @@ class QrController {
       return res.status(500).json({ success: false, error: err.message });
     }
   }
+
+  /**
+   * Bulk update labels for stickers
+   */
+  static async bulkUpdateLabels(req, res) {
+    try {
+      const { ids, labelName, labelColor } = req.body || {};
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, error: 'ids array is required' });
+      }
+      const result = await QrModel.bulkUpdateLabels(ids, labelName, labelColor);
+      logger.info('QR_BULK_LABEL', `Updated label for ${result.updatedCount} stickers`);
+      return res.json({ success: true, data: result });
+    } catch (err) {
+      logger.error('QR_BULK_LABEL', 'Failed to bulk update labels', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Bulk update print status for stickers
+   */
+  static async bulkUpdatePrintStatus(req, res) {
+    try {
+      const { ids, isPrinted } = req.body || {};
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, error: 'ids array is required' });
+      }
+      const result = await QrModel.bulkUpdatePrintStatus(ids, isPrinted !== false);
+      logger.info('QR_BULK_PRINT', `Updated print status for ${result.updatedCount} stickers to ${isPrinted !== false}`);
+      return res.json({ success: true, data: result });
+    } catch (err) {
+      logger.error('QR_BULK_PRINT', 'Failed to bulk update print status', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
 }
 
 module.exports = QrController;

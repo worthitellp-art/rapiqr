@@ -129,7 +129,15 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
           bg: r.bg_color || "FFFFFF",
           ownerPhone: r.owner_phone || undefined,
           ownerName: r.owner_name || undefined,
+          labelName: r.label_name || undefined,
+          labelColor: r.label_color || undefined,
+          isPrinted: Boolean(r.is_printed),
         }));
+        // Sync any server-side printed flags into the local printedStickerIdList set
+        const serverPrintedIds = rows.filter((r: any) => Boolean(r.is_printed)).map((r: any) => r.id);
+        if (serverPrintedIds.length > 0) {
+          setPrintedStickerIdList((prev) => Array.from(new Set([...prev, ...serverPrintedIds])));
+        }
         setQrList((prev) => {
           const backendIds = new Set(mapped.map((r) => r.id));
           const localOnly = prev.filter((r) => !backendIds.has(r.id));
@@ -235,6 +243,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
               openRestore={() => setRestoreModalOpen(true)} searchQuery={searchQuery}
               stickerPos={stickerPos} openPrintSheet={handleOpenPrintSheet}
               printedStickerIdList={printedStickerIdList}
+              setPrintedStickerIdList={setPrintedStickerIdList}
             />
           )}
           {page === "communication" && <CommunicationPage setToast={setToast} />}

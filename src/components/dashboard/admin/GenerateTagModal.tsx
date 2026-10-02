@@ -1,11 +1,12 @@
 import type React from "react";
 import { useEffect, useState } from "react";
-import { X, Check, Copy, Download, Printer, AlertCircle, Loader2 } from "lucide-react";
-import { QrRecord } from "./types";
+import { X, Check, Copy, Download, Printer, AlertCircle, Loader2, Tag } from "lucide-react";
+import { QrRecord, StickerLabel } from "./types";
 import { qrFullUrl, generateQrDataUrl } from "./helpers";
 import { apiClient } from "../../../lib/apiClient";
 import { STICKER_CATEGORIES, getCategoryLabel } from "../../../stickerModules";
 import QrCodeImage from "./QrCodeImage";
+import LabelBadge from "./labels/LabelBadge";
 
 function normalizePhone(phone: string): string | null {
   const digits = String(phone ?? "").replace(/\D/g, "");
@@ -19,12 +20,13 @@ interface GenerateTagModalProps {
   qrList: QrRecord[];
   setQrList: React.Dispatch<React.SetStateAction<QrRecord[]>>;
   initialCategory: string;
+  labels?: StickerLabel[];
   setToast: (msg: string | null) => void;
   onPrint?: (target?: QrRecord, batch?: QrRecord[]) => void;
 }
 
 /** Maps the id-scheme v2 server response (QrModel.saveV2) into a QrRecord. */
-function recordFromV2Response(data: any, fallbackCategory: string, ownerPhone?: string): QrRecord {
+function recordFromV2Response(data: any, fallbackCategory: string, ownerPhone?: string, labelName?: string, labelColor?: string): QrRecord {
   const rec: QrRecord = {
     id: data.id,
     clientId: data.client_id,
@@ -37,6 +39,9 @@ function recordFromV2Response(data: any, fallbackCategory: string, ownerPhone?: 
     fg: data.fg_color || "000000",
     bg: data.bg_color || "FFFFFF",
     recoveryCode: data.recoveryCode,
+    labelName: data.label_name || labelName || undefined,
+    labelColor: data.label_color || labelColor || undefined,
+    isPrinted: false,
   };
   if (ownerPhone && ownerPhone.trim()) rec.ownerPhone = ownerPhone.trim();
   return rec;
@@ -48,6 +53,7 @@ export default function GenerateTagModal({
   qrList,
   setQrList,
   initialCategory,
+  labels = [],
   setToast,
   onPrint,
 }: GenerateTagModalProps) {
@@ -55,6 +61,7 @@ export default function GenerateTagModal({
   const [category, setCategory] = useState(initialCategory);
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [selectedLabelId, setSelectedLabelId] = useState<string>("none");
   const [created, setCreated] = useState<QrRecord | null>(null);
   const [recoveryCode, setRecoveryCode] = useState("");
   const [urlCopied, setUrlCopied] = useState(false);
@@ -66,6 +73,7 @@ export default function GenerateTagModal({
       setCategory(initialCategory);
       setPhone("");
       setPhoneError(null);
+      setSelectedLabelId("none");
       setCreated(null);
       setRecoveryCode("");
       setUrlCopied(false);
@@ -83,6 +91,8 @@ export default function GenerateTagModal({
     );
   }
 
+  const chosenLabel = labels.find((l) => l.id === selectedLabelId);
+
   async function handleGenerate() {
     setPhoneError(null);
 
@@ -98,23 +108,16 @@ export default function GenerateTagModal({
 
     setStep("creating");
 
-    // id-scheme v2: the server generates the recovery code AND derives the
-    // sticker id from it (see QrModel.saveV2) — neither is known until the
-    // response comes back, so there's nothing to optimistically prepend
-    // beforehand. The "success" screen only ever shows a tag the server
-    // actually persisted — a prior version of this flow could fall through to
-    // success on ANY save failure that wasn't a 409 (network blip, 500,
-    // expired session, ...), handing the admin a fully-formed-looking sticker
-    // that had never been written to the database: unrecoverable, never
-    // syncing to the client dashboard, because there was nothing there to sync.
     try {
       const res = await apiClient.qr.saveQrCodeV2({
         category,
         ownerPhone: phone.trim() || undefined,
+        labelName: chosenLabel?.name || undefined,
+        labelColor: chosenLabel?.color || undefined,
       });
       if (!res?.success || !res.data) throw new Error(res?.error || "Failed to create tag");
 
-      const rec = recordFromV2Response(res.data, category, phone);
+      const rec = recordFromV2Response(res.data, category, phone, chosenLabel?.name, chosenLabel?.color);
       setQrList((prev) => [rec, ...prev]);
       setCreated(rec);
       setRecoveryCode(rec.recoveryCode || "");
@@ -149,6 +152,7 @@ export default function GenerateTagModal({
   };
 
   const copyCode = () => {
+    if (!recoveryCode) return;
     navigator.clipboard?.writeText(recoveryCode).then(() => {
       setCodeCopied(true);
       setTimeout(() => setCodeCopied(false), 1800);
@@ -156,8 +160,22 @@ export default function GenerateTagModal({
   };
 
   return (
-    <div className="fx-modal-backdrop" style={{ fontFamily: "'Pinterest Sans', 'Pin Sans', ui-sans-serif, system-ui" }} onClick={onClose}>
-      <div className="fx-modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fx-modal-backdrop"
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(16, 24, 40, 0.55)",
+        backdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 100,
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div className="fx-modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
         <button className="fx-modal-close" onClick={onClose} aria-label="Close">
           <X size={15} />
         </button>
@@ -168,7 +186,7 @@ export default function GenerateTagModal({
               Create QR tag
             </h3>
             <p style={{ fontSize: 13, color: "var(--fx-ink-2)", marginBottom: 20 }}>
-              Stamp a new tag. Recovery codes appear once after creation.
+              Stamp a new tag with custom category and batch label.
             </p>
 
             <div className="fx-field">
@@ -186,7 +204,35 @@ export default function GenerateTagModal({
               </select>
             </div>
 
-            <div className="fx-field">
+            {/* Label Picker */}
+            {labels.length > 0 && (
+              <div className="fx-field" style={{ marginTop: 12 }}>
+                <label className="fx-field-label" htmlFor="gt-label">
+                  Batch Label <span style={{ fontWeight: 400, color: "var(--fx-faint)" }}>(optional)</span>
+                </label>
+                <select
+                  id="gt-label"
+                  className="fx-select"
+                  style={{ width: "100%" }}
+                  value={selectedLabelId}
+                  onChange={(e) => setSelectedLabelId(e.target.value)}
+                >
+                  <option value="none">No Label</option>
+                  {labels.map((lbl) => (
+                    <option key={lbl.id} value={lbl.id}>
+                      {lbl.name}
+                    </option>
+                  ))}
+                </select>
+                {chosenLabel && (
+                  <div style={{ marginTop: 6 }}>
+                    <LabelBadge name={chosenLabel.name} color={chosenLabel.color} size="xs" />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="fx-field" style={{ marginTop: 12 }}>
               <label className="fx-field-label" htmlFor="gt-phone">Phone number <span style={{ fontWeight: 400, color: "var(--fx-faint)" }}>(optional)</span></label>
               <input
                 id="gt-phone"
@@ -239,6 +285,12 @@ export default function GenerateTagModal({
               </div>
             </div>
 
+            {created.labelName && (
+              <div style={{ marginBottom: 12 }}>
+                <LabelBadge name={created.labelName} color={created.labelColor} size="sm" />
+              </div>
+            )}
+
             <div style={{ display: "flex", justifyContent: "center", margin: "4px 0 16px" }}>
               <div style={{ border: "1px solid var(--fx-border)", borderRadius: 10, padding: 10, background: "#FFF" }}>
                 <QrCodeImage data={qrFullUrl(created.id)} fg="000000" bg="FFFFFF" size={168} style={{ width: 168, height: 168 }} />
@@ -248,45 +300,54 @@ export default function GenerateTagModal({
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: "var(--fx-faint)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>Public URL</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--fx-canvas)", border: "1px solid var(--fx-border)", borderRadius: 8, padding: "6px 8px" }}>
-                <span className="fx-mono" style={{ flex: 1, fontSize: 12, color: "var(--fx-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {qrFullUrl(created.id)}
-                </span>
-                <button className="fx-icon-btn" title="Copy URL" onClick={copyUrl}>
-                  {urlCopied ? <Check size={14} style={{ color: "var(--fx-green)" }} /> : <Copy size={14} />}
+                <input readOnly value={qrFullUrl(created.id)} style={{ flex: 1, background: "transparent", border: "none", fontSize: 12, outline: "none", color: "var(--fx-ink)", fontFamily: "monospace" }} />
+                <button type="button" onClick={copyUrl} className="fx-btn fx-btn-secondary" style={{ padding: "4px 8px", fontSize: 11 }}>
+                  {urlCopied ? <Check size={12} style={{ color: "var(--fx-green)" }} /> : <Copy size={12} />}
+                  <span>{urlCopied ? "Copied" : "Copy"}</span>
                 </button>
               </div>
             </div>
 
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--fx-faint)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>Recovery code</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--fx-canvas)", border: "1px solid var(--fx-border)", borderRadius: 8, padding: "6px 8px" }}>
-                <span className="fx-mono" style={{ flex: 1, fontSize: 15, fontWeight: 600, letterSpacing: "0.08em", color: "var(--fx-ink)", userSelect: "all" }}>
-                  {recoveryCode}
-                </span>
-                <button className="fx-icon-btn" title="Copy recovery code" onClick={copyCode}>
-                  {codeCopied ? <Check size={14} style={{ color: "var(--fx-green)" }} /> : <Copy size={14} />}
-                </button>
+            {recoveryCode && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--fx-faint)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>Recovery code</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--fx-canvas)", border: "1px solid var(--fx-border)", borderRadius: 8, padding: "6px 8px" }}>
+                  <span style={{ flex: 1, fontFamily: "monospace", fontSize: 13, fontWeight: 700, letterSpacing: ".08em", color: "var(--fx-ink)" }}>
+                    {recoveryCode}
+                  </span>
+                  <button type="button" onClick={copyCode} className="fx-btn fx-btn-secondary" style={{ padding: "4px 8px", fontSize: 11 }}>
+                    {codeCopied ? <Check size={12} style={{ color: "var(--fx-green)" }} /> : <Copy size={12} />}
+                    <span>{codeCopied ? "Copied" : "Copy"}</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
-            <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: "#FFFBEB", border: "1px solid #FCD34D", borderRadius: 8, padding: "8px 10px", marginBottom: 18 }}>
-              <AlertCircle size={14} style={{ color: "#B45309", flexShrink: 0, marginTop: 1 }} />
-              <p style={{ fontSize: 12.5, color: "#92400E", lineHeight: 1.4 }}>
-                Save this recovery code securely. It is shown only once and restores the sticker if it is ever deleted.
-              </p>
-            </div>
-
-            <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-              <button className="fx-btn fx-btn-secondary" style={{ flex: 1 }} onClick={handleDownloadQr}>
-                <Download size={14} /> Download QR
+            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <button
+                type="button"
+                onClick={handleDownloadQr}
+                className="fx-btn fx-btn-secondary"
+                style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12 }}
+              >
+                <Download size={13} />
+                <span>Download PNG</span>
               </button>
-              <button className="fx-btn fx-btn-secondary" style={{ flex: 1 }} onClick={() => onPrint?.(created, [created])}>
-                <Printer size={14} /> Print tag
-              </button>
+              {onPrint && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onPrint(created, [created]);
+                  }}
+                  className="fx-btn fx-btn-primary"
+                  style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12 }}
+                >
+                  <Printer size={13} />
+                  <span>Print tag</span>
+                </button>
+              )}
             </div>
-            <button className="fx-btn fx-btn-primary" style={{ width: "100%" }} onClick={onClose}>
-              Done
-            </button>
           </>
         )}
       </div>

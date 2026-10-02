@@ -1,38 +1,47 @@
-﻿import type React from "react";
+import type React from "react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Copy, Check, ExternalLink, Eye, Trash2, Printer, MoreHorizontal } from "lucide-react";
+import { Copy, Check, ExternalLink, Eye, Trash2, Printer, MoreHorizontal, Tag } from "lucide-react";
 import { QrRecord } from "./types";
 import { qrFullUrl } from "./helpers";
 
-const MENU_WIDTH = 176;
+const MENU_WIDTH = 186;
 
 interface QrRowActionsProps {
   qr: QrRecord;
   openQuickLook: (qr: QrRecord) => void;
   setDeleteTarget: (qr: QrRecord) => void;
   openPrintSheet?: (qr: QrRecord) => void;
+  onAssignLabel?: (qr: QrRecord) => void;
+  onTogglePrinted?: (qr: QrRecord) => void;
+  isPrinted?: boolean;
   onMoreReveal?: (qr: QrRecord) => void;
   menuOpen?: boolean;
   onMenuToggle?: () => void;
 }
 
 export default function QrRowActions({
-  qr, openQuickLook, setDeleteTarget, openPrintSheet,
-  onMoreReveal, menuOpen, onMenuToggle,
+  qr,
+  openQuickLook,
+  setDeleteTarget,
+  openPrintSheet,
+  onAssignLabel,
+  onTogglePrinted,
+  isPrinted,
+  onMoreReveal,
+  menuOpen,
+  onMenuToggle,
 }: QrRowActionsProps) {
   const [copied, setCopied] = useState(false);
   const hasMenu = Boolean(onMenuToggle);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
 
-  // The table row this button lives in sits inside `.fx-table-wrap`, which uses
-  // `overflow: hidden` to clip its rounded corners — that same clip was cutting
-  // off (or hiding behind the next row's background) an absolutely-positioned
-  // dropdown opened near the bottom of the list. Portaling to <body> with
-  // fixed positioning escapes that ancestor clip entirely.
   useLayoutEffect(() => {
-    if (!menuOpen || !triggerRef.current) { setMenuPos(null); return; }
+    if (!menuOpen || !triggerRef.current) {
+      setMenuPos(null);
+      return;
+    }
     const updatePos = () => {
       const el = triggerRef.current;
       if (!el) return;
@@ -49,7 +58,9 @@ export default function QrRowActions({
     };
   }, [menuOpen]);
 
-  const closeMenu = () => { if (menuOpen) onMenuToggle?.(); };
+  const closeMenu = () => {
+    if (menuOpen) onMenuToggle?.();
+  };
 
   const handleCopyLink = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -78,17 +89,20 @@ export default function QrRowActions({
 
   return (
     <div className="flex items-center justify-end gap-0.5">
-      <button className="fx-icon-btn" onClick={handleView} title="View">
+      <button className="fx-icon-btn" onClick={handleView} title="View sticker">
         <Eye size={14} />
       </button>
-      <button className="fx-icon-btn" onClick={handleOpenLink} title="Open link">
+      <button className="fx-icon-btn" onClick={handleOpenLink} title="Open scan link">
         <ExternalLink size={14} />
       </button>
       {openPrintSheet && (
         <button
           className="fx-icon-btn"
-          onClick={(e) => { e.stopPropagation(); openPrintSheet(qr); }}
-          title="Print sheet"
+          onClick={(e) => {
+            e.stopPropagation();
+            openPrintSheet(qr);
+          }}
+          title="Print sticker sheet"
         >
           <Printer size={14} />
         </button>
@@ -99,38 +113,91 @@ export default function QrRowActions({
           <button ref={triggerRef} className="fx-icon-btn" onClick={onMenuToggle} title="More actions">
             <MoreHorizontal size={15} />
           </button>
-          {menuOpen && menuPos && createPortal(
-            <div
-              className="fx-menu"
-              data-fx-more
-              style={{ position: "fixed", top: menuPos.top, left: menuPos.left, right: "auto", width: MENU_WIDTH }}
-            >
-              <button
-                className="fx-menu-item"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCopyLink(e);
-                  closeMenu();
+          {menuOpen &&
+            menuPos &&
+            createPortal(
+              <div
+                className="fx-menu bg-white border border-gray-200 rounded-lg shadow-xl p-1 z-[200]"
+                data-fx-more
+                style={{
+                  position: "fixed",
+                  top: menuPos.top,
+                  left: menuPos.left,
+                  right: "auto",
+                  width: MENU_WIDTH,
                 }}
               >
-                {copied ? <Check size={14} style={{ color: "var(--fx-green)" }} /> : <Copy size={14} />}
-                {copied ? "Copied!" : "Copy link"}
-              </button>
-              {onMoreReveal && (
                 <button
-                  className="fx-menu-item"
-                  onClick={(e) => { e.stopPropagation(); onMoreReveal(qr); closeMenu(); }}
+                  type="button"
+                  className="w-full px-2.5 py-1.5 text-left text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-2 cursor-pointer transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopyLink(e);
+                    closeMenu();
+                  }}
                 >
-                  <Eye size={14} /> Reveal codes
+                  {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                  <span>{copied ? "Copied!" : "Copy link"}</span>
                 </button>
-              )}
-              <div className="fx-menu-sep" />
-              <button className="fx-menu-item fx-menu-item-danger" onClick={handleDelete}>
-                <Trash2 size={14} /> Delete
-              </button>
-            </div>,
-            document.body
-          )}
+
+                {onAssignLabel && (
+                  <button
+                    type="button"
+                    className="w-full px-2.5 py-1.5 text-left text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-2 cursor-pointer transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeMenu();
+                      onAssignLabel(qr);
+                    }}
+                  >
+                    <Tag size={14} className="text-indigo-600" />
+                    <span>Assign Label</span>
+                  </button>
+                )}
+
+                {onTogglePrinted && (
+                  <button
+                    type="button"
+                    className="w-full px-2.5 py-1.5 text-left text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-2 cursor-pointer transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeMenu();
+                      onTogglePrinted(qr);
+                    }}
+                  >
+                    <Printer size={14} className={isPrinted ? "text-amber-600" : "text-emerald-600"} />
+                    <span>{isPrinted ? "Mark as Unprinted" : "Mark as Printed"}</span>
+                  </button>
+                )}
+
+                {onMoreReveal && (
+                  <button
+                    type="button"
+                    className="w-full px-2.5 py-1.5 text-left text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-2 cursor-pointer transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMoreReveal(qr);
+                      closeMenu();
+                    }}
+                  >
+                    <Eye size={14} />
+                    <span>Reveal codes</span>
+                  </button>
+                )}
+
+                <div className="h-px bg-gray-100 my-1" />
+
+                <button
+                  type="button"
+                  className="w-full px-2.5 py-1.5 text-left text-xs font-semibold text-red-600 hover:bg-red-50 rounded-md flex items-center gap-2 cursor-pointer transition-colors"
+                  onClick={handleDelete}
+                >
+                  <Trash2 size={14} />
+                  <span>Delete Tag</span>
+                </button>
+              </div>,
+              document.body
+            )}
         </div>
       )}
     </div>

@@ -19,6 +19,8 @@ router.post('/', verifyToken, verifyAdmin, QrController.saveQrCode);
 // id-scheme v2: server-generated recovery code + HMAC-derived id (see
 // QrModel.saveV2). New issuance only — existing v1 stickers are untouched.
 router.post('/v2', verifyToken, verifyAdmin, QrController.saveQrCodeV2);
+router.patch('/bulk/label', verifyToken, verifyAdmin, QrController.bulkUpdateLabels);
+router.patch('/bulk/print-status', verifyToken, verifyAdmin, QrController.bulkUpdatePrintStatus);
 router.delete('/', verifyToken, verifyAdmin, QrController.deleteAllQrCodes);
 router.delete('/:id', verifyToken, verifyAdmin, QrController.deleteQrCode);
 router.post('/:id/restore', verifyToken, verifyAdmin, restoreLimiter, QrController.restoreQrCode);

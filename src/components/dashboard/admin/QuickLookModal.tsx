@@ -5,6 +5,7 @@ import { QrRecord, Template, StickerPos } from "./types";
 import { MaskedCodeDisplay, CodeVisibilityToggleButton } from "./StickerCodeComponents";
 import StickerMockupView, { StickerViewMode } from "./StickerMockupView";
 import { qrFullUrl } from "./helpers";
+import LabelBadge from "./labels/LabelBadge";
 
 interface QuickLookModalProps {
   qr: QrRecord | null;
@@ -57,9 +58,19 @@ export default function QuickLookModal({
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
               <h3 className="text-sm font-bold text-gray-900 truncate">{displayLabel}</h3>
             </div>
-            <span className="font-mono text-[11px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md font-semibold mt-1 inline-block">
-              {displayCode}
-            </span>
+            <div className="flex items-center gap-2 flex-wrap mt-1">
+              <span className="font-mono text-[11px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md font-semibold inline-block">
+                {displayCode}
+              </span>
+              {qr.labelName && (
+                <LabelBadge name={qr.labelName} color={qr.labelColor} size="xs" />
+              )}
+              {qr.isPrinted && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                  <Printer size={10} /> Printed
+                </span>
+              )}
+            </div>
           </div>
           <button
             onClick={onClose}

@@ -1,3 +1,10 @@
+export interface StickerLabel {
+  id: string;
+  name: string;
+  color: string;
+  createdAt?: string;
+}
+
 export interface QrRecord {
   id: string;
   qrUrl: string;
@@ -17,6 +24,9 @@ export interface QrRecord {
   ownerName?: string;
   phoneNumber?: string;
   recoveryCode?: string;
+  isPrinted?: boolean;
+  labelName?: string;
+  labelColor?: string;
 }
 
 export interface Template {
