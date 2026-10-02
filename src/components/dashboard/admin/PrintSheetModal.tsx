@@ -6,6 +6,7 @@ import PrintSheetEmptyState from "./print-sheet/PrintSheetEmptyState";
 import BatchStickerPicker from "./print-sheet/BatchStickerPicker";
 import PrintSheetPreview from "./print-sheet/PrintSheetPreview";
 import PrintCopiesPopup from "./print-sheet/PrintCopiesPopup";
+import PrintProgressModal from "./print-sheet/PrintProgressModal";
 
 interface PrintSheetModalProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ export default function PrintSheetModal({
     isPreviewLoading,
     previewErrorMessage,
     isExporting,
+    exportProgress,
     maxSelectable,
     printedStickerIds: resolvedPrintedStickerIds,
     handleToggleSticker,
@@ -158,6 +160,8 @@ export default function PrintSheetModal({
           setShowCopiesPopup(false);
         }}
       />
+
+      <PrintProgressModal progress={exportProgress} />
     </div>
   );
 }

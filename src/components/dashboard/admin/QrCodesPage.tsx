@@ -32,6 +32,7 @@ import { generateStickerBatchPdfBlob, downloadSheetBlob } from "../../../service
 import { STICKER_CATEGORIES, getCategoryLabel, getCategoryIcon } from "../../../stickerModules";
 import QrRowActions from "./QrRowActions";
 import PrintSheetModal from "./PrintSheetModal";
+import PrintProgressModal, { PrintProgressState } from "./print-sheet/PrintProgressModal";
 import GenerateTagModal from "./GenerateTagModal";
 import StickerThumb from "./StickerThumb";
 import StickerMockupView from "./StickerMockupView";
@@ -82,6 +83,13 @@ export default function QrCodesPage({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [revealedRowIds, setRevealedRowIds] = useState<Set<string>>(new Set());
   const [sheetGenerating, setSheetGenerating] = useState(false);
+  const [printProgress, setPrintProgress] = useState<PrintProgressState>({
+    isVisible: false,
+    current: 0,
+    total: 0,
+    percent: 0,
+    stage: "",
+  });
   const [generateModalOpen, setGenerateModalOpen] = useState(false);
   const [searchText, setSearchText] = useState(searchQuery);
   const [openActionMenu, setOpenActionMenu] = useState<string | null>(null);
@@ -210,9 +218,29 @@ export default function QrCodesPage({
     }
     if (sheetGenerating) return;
     setSheetGenerating(true);
+    setPrintProgress({
+      isVisible: true,
+      current: 0,
+      total: selected.length,
+      percent: 2,
+      stage: "Resolving sticker codes…",
+    });
+
     try {
       const recoveryCodeMap = await fetchMissingRecoveryCodes(selected.map((q) => q.id));
-      const pdfBlob = await generateStickerBatchPdfBlob(selected, stickerPos, recoveryCodeMap);
+      const pdfBlob = await generateStickerBatchPdfBlob(
+        selected,
+        stickerPos,
+        recoveryCodeMap,
+        1,
+        undefined,
+        (progressInfo) => {
+          setPrintProgress({
+            isVisible: true,
+            ...progressInfo,
+          });
+        }
+      );
       if (!pdfBlob) throw new Error("No PDF generated");
       const dateStr = new Date().toISOString().slice(0, 10);
       downloadSheetBlob(pdfBlob, `rapiqr-print-sheet-${dateStr}.pdf`);
@@ -222,6 +250,7 @@ export default function QrCodesPage({
       setToast("Failed to generate print sheet — please try again");
     } finally {
       setSheetGenerating(false);
+      setPrintProgress((prev) => ({ ...prev, isVisible: false }));
       setTimeout(() => setToast(null), 4000);
     }
   }
@@ -995,6 +1024,8 @@ export default function QrCodesPage({
           setTimeout(() => setToast(null), 4000);
         }}
       />
+
+      <PrintProgressModal progress={printProgress} />
     </div>
   );
 }

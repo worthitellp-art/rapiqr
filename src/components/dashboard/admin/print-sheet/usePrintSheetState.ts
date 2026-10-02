@@ -8,6 +8,7 @@ import {
   generateStickerPagePreviewBlob,
   generateStickerBatchPdfBlob,
   downloadSheetBlob,
+  PrintProgressInfo,
 } from "../../../../services/stickerPrintSheetService";
 
 // A single PDF export spans as many sheet-pages as needed, so selection isn't
@@ -76,6 +77,13 @@ export function usePrintSheetState({
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [exportProgress, setExportProgress] = useState<PrintProgressInfo & { isVisible: boolean }>({
+    isVisible: false,
+    current: 0,
+    total: 0,
+    percent: 0,
+    stage: "",
+  });
   const [previewErrorMessage, setPreviewErrorMessage] = useState<string | null>(null);
 
   // Initialize selection only when the modal actually opens — deliberately
@@ -125,9 +133,7 @@ export function usePrintSheetState({
     return availableStickers.filter((sticker) => selectedStickerIds.has(sticker.id));
   }, [availableStickers, selectedStickerIds]);
 
-  // As many stickers as fit (ADMIN_STICKERS_PER_PAGE) are packed onto each A4
-  // export page, with the rest spilling onto additional pages — see
-  // generateStickerBatchPdfBlob.
+  // 1 sticker per page at exact 4x2.5in size — see generateStickerBatchPdfBlob.
   const totalPages = Math.max(1, Math.ceil(selectedStickerRecords.length / ADMIN_STICKERS_PER_PAGE));
   const hasValidSelection = selectedStickerRecords.length > 0;
 
@@ -138,8 +144,7 @@ export function usePrintSheetState({
     }
   }, [currentPreviewPage, totalPages]);
 
-  // Generate a live preview of the current A4 page (up to
-  // ADMIN_STICKERS_PER_PAGE stickers packed at their exact physical size) —
+  // Generate a live preview of the current sticker page (4x2.5in) —
   // matching what the PDF export will produce.
   const refreshPreview = useCallback(async () => {
     if (!isOpen || selectedStickerRecords.length === 0) {
@@ -268,6 +273,13 @@ export function usePrintSheetState({
     if (!hasValidSelection) return;
 
     setIsExporting(true);
+    setExportProgress({
+      isVisible: true,
+      current: 0,
+      total: selectedStickerRecords.length,
+      percent: 2,
+      stage: "Resolving sticker codes…",
+    });
 
     try {
       const recoveryCodeMap = await resolveRecoveryCodes(selectedStickerRecords);
@@ -276,7 +288,13 @@ export function usePrintSheetState({
         stickerPos,
         recoveryCodeMap,
         copies,
-        PRINT_SHEET_CONSTANTS.DEFAULT_DPI
+        PRINT_SHEET_CONSTANTS.DEFAULT_DPI,
+        (progressInfo) => {
+          setExportProgress({
+            isVisible: true,
+            ...progressInfo,
+          });
+        }
       );
       if (!pdfBlob) throw new Error("Could not create sticker PDF");
 
@@ -291,6 +309,7 @@ export function usePrintSheetState({
       onShowToast?.("Could not generate the PDF. Please try again.");
     } finally {
       setIsExporting(false);
+      setExportProgress((prev) => ({ ...prev, isVisible: false }));
     }
   }, [hasValidSelection, selectedStickerRecords, stickerPos, totalPages, onShowToast, markStickersPrinted, resolveRecoveryCodes]);
 
@@ -305,6 +324,7 @@ export function usePrintSheetState({
     isPreviewLoading,
     previewErrorMessage,
     isExporting,
+    exportProgress,
     maxSelectable: MAX_SELECTABLE,
     printedStickerIds,
     handleToggleSticker,

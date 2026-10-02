@@ -69,7 +69,7 @@ export default function PrintSheetPreview({
         ) : previewBlobUrl ? (
           <img
             src={previewBlobUrl}
-            alt="A4 page preview — stickers printed at their exact 4x2.5in size"
+            alt="Sticker page preview — 4x2.5in sticker"
             className="w-full h-auto max-h-[340px] object-contain rounded-lg border border-slate-200 shadow-sm bg-white"
           />
         ) : (
