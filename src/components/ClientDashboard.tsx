@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   LogOut,
   Eye,
-  Menu,
+  Search,
   Grid,
   History,
   Trash2,
@@ -53,11 +53,9 @@ import AccountSettingsPanel from './dashboard/client/AccountSettingsPanel';
 import SupportLegalPanel from './dashboard/client/SupportLegalPanel';
 import CompleteProfilePopup from './dashboard/client/CompleteProfilePopup';
 import AppLogo from './common/AppLogo';
-import FxSidebar from './dashboard/shared/FxSidebar';
 import RepiChat from './chat/RepiChat';
 import { apiClient, ChatSession } from '../lib/apiClient';
 import { connectAsOwner } from '../lib/socketClient';
-import { recallOwnerThread, rememberOwnerThread } from '../lib/chatStorage';
 import { soundNotification } from '../utils/soundNotification';
 import { sendMsg91Otp, verifyMsg91Otp, toMsg91Identifier } from '../lib/msg91Widget';
 import { stickerRef, useCodesRevealed } from '../lib/codeVisibility';
@@ -168,10 +166,10 @@ function buildNavItems(t: typeof dashboardTranslations['en']['client']): {
   section?: string;
 }[] {
   return [
+    { id: 'chat', label: t.nav.chat, icon: MessageSquare },
     { id: 'overview', label: t.nav.overview, icon: Grid },
     { id: 'setup', label: t.nav.setup, icon: Sparkles, section: t.navSections.myTag },
     { id: 'products', label: t.nav.products, icon: ShoppingBag, section: t.navSections.myTag },
-    { id: 'chat', label: t.nav.chat, icon: MessageSquare, section: t.navSections.communication },
     { id: 'contacts', label: t.nav.contacts, icon: Users, section: t.navSections.communication },
     { id: 'history', label: t.nav.history, icon: History, section: t.navSections.communication },
     { id: 'settings', label: t.nav.settings, icon: Settings, section: t.navSections.account },
@@ -198,7 +196,7 @@ type ModalState =
   | null;
 
 export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDashboardProps) {
-  const { profile, signOut, sendPhoneOtp, verifyPhoneOtp } = useAuth();
+  const { profile, signOut, sendPhoneOtp, verifyPhoneOtp, chatLinkNotice } = useAuth();
   const { language } = useLanguage();
   const t = dashboardTranslations[language].client;
   const NAV_ITEMS = buildNavItems(t);
@@ -382,7 +380,9 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
       if (hash.includes('tab=products')) return 'products';
       if (hash.includes('tab=settings')) return 'settings';
       const saved = localStorage.getItem('repiqr-client-active-tab') || localStorage.getItem('namoqr-client-active-tab');
-      if (saved && ['setup', 'overview', 'products', 'chat', 'contacts', 'history', 'settings', 'support'].includes(saved)) {
+      // 'chat' is never restored from storage: a reload lands on the sticker
+      // list, and chat opens only from an explicit tab=chat link or a click.
+      if (saved && ['setup', 'overview', 'products', 'contacts', 'history', 'settings', 'support'].includes(saved)) {
         return saved as TabId;
       }
     } catch { /* fallback */ }
@@ -394,8 +394,6 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
       localStorage.setItem('repiqr-client-active-tab', activeTab);
     } catch { /* fallback */ }
   }, [activeTab]);
-
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const [products, setProducts] = useState<DashboardSticker[]>([]);
   const [codesRevealed, setCodesRevealed] = useCodesRevealed();
@@ -485,6 +483,11 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3000);
   }, []);
+
+  // A chat link that couldn't sign in (expired, or another account) is reported once here.
+  useEffect(() => {
+    if (chatLinkNotice) showToast(chatLinkNotice);
+  }, [chatLinkNotice, showToast]);
 
   const [notifBadgeVisible, setNotifBadgeVisible] = useState(true);
   const [modal, setModal] = useState<ModalState>(null);
@@ -685,12 +688,13 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   const [ownerSessions, setOwnerSessions] = useState<ChatSession[]>([]);
   const [ownerSessionsLoading, setOwnerSessionsLoading] = useState(false);
   const [selectedChatSession, setSelectedChatSession] = useState<ChatSession | null>(null);
+  const [chatSearch, setChatSearch] = useState('');
+  const [chatFilter, setChatFilter] = useState<'all' | 'unread'>('all');
 
-  // Selecting a thread records it, so a reload reopens the same conversation
-  // rather than dumping the owner back on the sticker list.
+  // Opening a thread is explicit only. The full-screen chat overlay is never
+  // restored on load, so the dashboard always lands on the sticker list first.
   const openChatSession = useCallback((session: ChatSession | null) => {
     setSelectedChatSession(session);
-    rememberOwnerThread(session?.id ?? null);
   }, []);
 
   // A WhatsApp/push alert link carries `&session=<id>` so it opens straight
@@ -703,12 +707,9 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     return match ? decodeURIComponent(match[1]) : null;
   };
 
-  // The remembered/deep-linked id can only be matched once the sessions
-  // themselves arrive. Runs again whenever the session list refreshes (e.g. a
-  // fresh alert link while the dashboard is already open on another thread),
-  // but only re-applies a given deep link once so it doesn't fight the owner
-  // manually switching threads afterwards.
-  const restoredChatRef = useRef(false);
+  // A deep-linked id can only be matched once the sessions arrive. Only a
+  // given deep link is applied once, so it doesn't fight the owner manually
+  // switching threads afterwards.
   useEffect(() => {
     if (ownerSessions.length === 0) return;
 
@@ -717,21 +718,17 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
       deepLinkedSessionIdRef.current = deepLinked;
       const match = ownerSessions.find((s) => s.id === deepLinked);
       if (match) {
+        setActiveTab('chat');
         openChatSession(match);
-        restoredChatRef.current = true;
-        return;
       }
     }
-
-    if (restoredChatRef.current) return;
-    restoredChatRef.current = true;
-    const remembered = recallOwnerThread();
-    if (!remembered) return;
-    const match = ownerSessions.find((s) => s.id === remembered);
-    if (match) setSelectedChatSession(match);
   }, [ownerSessions]);
 
   const totalUnreadChats = ownerSessions.reduce((sum, s) => sum + (s.unread_owner_count || 0), 0);
+  // Newest few threads for the Overview's "Latest chat" card.
+  const latestSessions = [...ownerSessions]
+    .sort((a, b) => new Date(b.last_message_at || 0).getTime() - new Date(a.last_message_at || 0).getTime())
+    .slice(0, 3);
 
   const loadOwnerSessions = useCallback(async () => {
     setOwnerSessionsLoading(true);
@@ -975,82 +972,207 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     );
   }
 
-  return (
-    // overflow-x-clip (not -hidden): hidden makes this wrapper a scroll container,
-    // which stops the docked sidebar's `position: sticky` from sticking to the viewport.
-    <div className="fx-shell min-h-screen w-full flex flex-col overflow-x-clip text-[var(--fx-ink)] bg-[var(--fx-canvas)] font-body pb-16">
+  // ─── CHAT INBOX: conversation list beside the open thread ───
+  const chatQuery = chatSearch.trim().toLowerCase();
+  const visibleSessions = ownerSessions
+    .filter((s) => chatFilter !== 'unread' || (s.unread_owner_count || 0) > 0)
+    .filter((s) => !chatQuery || [s.customer_name, s.vehicle_label, s.last_message_preview].some((v) => (v || '').toLowerCase().includes(chatQuery)))
+    .sort((a, b) => new Date(b.last_message_at || 0).getTime() - new Date(a.last_message_at || 0).getTime());
 
-      <div className="flex flex-1 min-h-screen">
-        {/* Mobile drawer backdrop — md+ docks the sidebar so it never renders there */}
-        {isMobileSidebarOpen && (
-          <div
-            className="fixed inset-0 z-[25] bg-black/50 md:hidden"
-            onClick={() => setIsMobileSidebarOpen(false)}
-            aria-hidden="true"
-          />
-        )}
+  const renderChatInbox = () => (
+    <div className="flex min-h-0 flex-1">
+      <section className={`${selectedChatSession ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col border-r border-[var(--fx-border)] bg-white md:w-[340px]`}>
+        <div className="flex items-center justify-between px-4 pb-2 pt-4">
+          <h1 className="font-display text-[20px] font-bold text-[var(--fx-ink)]">Chats</h1>
+          <button
+            type="button"
+            onClick={loadOwnerSessions}
+            disabled={ownerSessionsLoading}
+            aria-label="Refresh chats"
+            title="Refresh chats"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCcw size={16} className={ownerSessionsLoading ? 'animate-spin' : ''} />
+          </button>
+        </div>
 
-        {/* ─── SIDEBAR — the shared dashboard sidebar (see shared/FxSidebar) ─── */}
-        <FxSidebar
-          storageKey="client"
-          items={NAV_ITEMS.map((item) => ({
-            ...item,
-            badge: item.id === 'chat' ? totalUnreadChats : undefined,
-            badgeTone: 'alert' as const,
-          }))}
-          activeId={activeTab}
-          onSelect={(id) => setActiveTab(id as TabId)}
-          isOpen={isMobileSidebarOpen}
-          onClose={() => setIsMobileSidebarOpen(false)}
-          logo={
-            <button onClick={onBack} className="flex items-center gap-2 cursor-pointer group" aria-label="RapiQR home">
-              <AppLogo variant="light" className="h-8 w-auto object-contain transition-transform group-hover:scale-105" />
-            </button>
-          }
-          cta={{ label: 'Get free sticker', onClick: handlePurchaseStickerClick }}
-          widget={
-            // Onboarding progress only matters until it is done.
-            setupPercent < 100 ? (
+        <div className="px-4 pb-3">
+          <label className="flex h-9 items-center gap-2 rounded-xl bg-[var(--fx-canvas)] px-3">
+            <Search size={15} className="text-[var(--fx-faint)]" />
+            <input
+              value={chatSearch}
+              onChange={(e) => setChatSearch(e.target.value)}
+              placeholder="Search chats"
+              className="w-full bg-transparent text-xs text-[var(--fx-ink)] outline-none placeholder:text-[var(--fx-faint)]"
+            />
+          </label>
+          <div className="mt-2.5 flex gap-2">
+            {(['all', 'unread'] as const).map((f) => (
               <button
+                key={f}
                 type="button"
-                onClick={() => setActiveTab('setup')}
-                className="w-full text-left border border-[var(--fx-border)] rounded-[var(--fx-radius-control)] p-3 bg-[var(--fx-surface)] hover:bg-[var(--fx-sidebar-hover)] transition-colors cursor-pointer"
+                onClick={() => setChatFilter(f)}
+                className={`h-7 rounded-full px-3 text-xs font-semibold cursor-pointer transition-colors ${
+                  chatFilter === f
+                    ? 'bg-[var(--fx-accent-soft)] text-[var(--fx-accent)]'
+                    : 'border border-[var(--fx-border)] text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]'
+                }`}
               >
-                <span className="flex justify-between items-center text-xs text-[var(--fx-ink)] font-semibold mb-2">
-                  <span>Set up your account</span>
-                  <span className="text-[var(--fx-ink-2)] tabular-nums">{completedSetupCount}/3</span>
-                </span>
-                <span className="block h-[6px] bg-[var(--fx-border)] rounded-full overflow-hidden">
-                  <span className="block h-full bg-[var(--fx-green)] rounded-full transition-all duration-500" style={{ width: `${setupPercent}%` }} />
-                </span>
+                {f === 'all' ? 'All' : 'Unread'}
               </button>
-            ) : undefined
-          }
-          account={{
-            name: profile?.fullName || 'Client',
-            email: profile?.email,
-            subtitle: isAdminAccount ? 'Fleet admin' : profile?.isPhoneVerified ? 'Phone verified' : 'Phone unverified',
-            tone: isAdminAccount || profile?.isPhoneVerified ? 'ok' : 'warn',
-            menu: [
-              { label: 'Back to site', icon: Globe, onClick: onBack },
-              { label: 'Sign out', icon: LogOut, onClick: handleSignOut, danger: true },
-            ],
-          }}
-        />
+            ))}
+          </div>
+        </div>
 
-        {/* ─── MAIN CONTENT CANVAS (the sidebar docks in flow at md+) ─── */}
-        <div className="flex-1 min-h-screen flex flex-col min-w-0">
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {ownerSessionsLoading ? (
+            <div className="py-10 text-center text-xs text-[var(--fx-ink-2)]">Loading chats...</div>
+          ) : visibleSessions.length === 0 ? (
+            <div className="px-6 py-10 text-center text-xs text-[var(--fx-ink-2)]">
+              {ownerSessions.length === 0 ? 'Your inbox is empty. Visitor chats appear here after a scan.' : 'No chats match.'}
+            </div>
+          ) : (
+            visibleSessions.map((sess) => {
+              const selected = selectedChatSession?.id === sess.id;
+              const unread = sess.unread_owner_count || 0;
+              const name = sess.customer_name || 'Visitor';
+              return (
+                <div
+                  key={sess.id}
+                  className={`group flex items-center ${selected ? 'bg-[var(--fx-accent-soft)]' : 'hover:bg-[var(--fx-canvas)]'}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => openChatSession(sess)}
+                    className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left cursor-pointer"
+                  >
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--fx-accent-soft)] text-sm font-bold text-[var(--fx-accent)]">
+                      {name.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline justify-between gap-2">
+                        <span className="truncate text-[13.5px] font-bold text-[var(--fx-ink)]">{name}</span>
+                        <span className="shrink-0 font-mono text-[11px] text-[var(--fx-faint)]">
+                          {sess.last_message_at ? new Date(sess.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </span>
+                      </span>
+                      <span className="mt-0.5 flex items-center justify-between gap-2">
+                        <span className="truncate text-xs text-[var(--fx-ink-2)]">{sess.last_message_preview || 'No messages yet'}</span>
+                        {unread > 0 && (
+                          <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-[var(--fx-accent)] px-1.5 text-[10px] font-bold text-white">
+                            {unread}
+                          </span>
+                        )}
+                      </span>
+                      {sess.vehicle_label && (
+                        <span className="mt-0.5 block truncate text-[11px] font-medium text-[var(--fx-faint)]">{sess.vehicle_label}</span>
+                      )}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => handleDeleteChatSession(e, sess.id)}
+                    title="Delete conversation"
+                    aria-label="Delete conversation"
+                    className="mr-2 hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--fx-faint)] hover:bg-[#FEE2E2] hover:text-[#DC2626] group-hover:flex cursor-pointer"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
+
+      <section className={`${selectedChatSession ? 'flex' : 'hidden md:flex'} min-w-0 flex-1 flex-col bg-[var(--fx-canvas)]`}>
+        {selectedChatSession ? (
+          <RepiChat
+            key={selectedChatSession.id}
+            mode="owner"
+            sessionId={selectedChatSession.id}
+            title={selectedChatSession.customer_name}
+            subtitle={[selectedChatSession.vehicle_label, selectedChatSession.qr_code_id].filter(Boolean).join(' · ') || undefined}
+            onClose={() => openChatSession(null)}
+            className="h-full"
+          />
+        ) : (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center text-[var(--fx-ink-2)]">
+            <MessageSquare size={28} className="text-[var(--fx-faint)]" />
+            <p className="text-xs font-semibold">Select a chat to reply</p>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+
+  return (
+    <div className="fx-shell flex h-screen w-full overflow-hidden text-[var(--fx-ink)] bg-[var(--fx-canvas)] font-body">
+
+      <div className="flex min-h-0 min-w-0 flex-1">
+        {/* ─── ICON RAIL: every dashboard section, always visible ─── */}
+        <nav aria-label="Dashboard sections" className="flex w-[60px] shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-[var(--fx-border)] bg-white py-3">
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="RapiQR home"
+            title="RapiQR home"
+            className="mb-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--fx-ink)] text-sm font-black text-white cursor-pointer"
+          >
+            R
+          </button>
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const active = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveTab(item.id)}
+                title={item.label}
+                aria-label={item.label}
+                aria-current={active ? 'page' : undefined}
+                className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors cursor-pointer ${
+                  active ? 'bg-[var(--fx-accent-soft)] text-[var(--fx-accent)]' : 'text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]'
+                }`}
+              >
+                <Icon size={18} strokeWidth={2} />
+                {item.id === 'chat' && totalUnreadChats > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--fx-accent)] px-1 text-[9px] font-bold text-white">
+                    {totalUnreadChats}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          <div className="mt-auto flex flex-col items-center gap-1 pt-2">
+            <button
+              type="button"
+              onClick={onBack}
+              title="Back to site"
+              aria-label="Back to site"
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] cursor-pointer"
+            >
+              <Globe size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              title={`Sign out (${profile?.fullName || profile?.email || 'account'})`}
+              aria-label="Sign out"
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-[#DC2626] hover:bg-[#FEE2E2] cursor-pointer"
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
+        </nav>
+
+        {/* ─── MAIN CONTENT CANVAS ─── */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           
           {/* Top Bar */}
           <header className="h-[62px] flex-shrink-0 bg-[var(--fx-canvas)] border-b border-[var(--fx-border)] flex items-center justify-between gap-2 sm:gap-4 px-3 sm:px-8 lg:px-10 z-20">
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <button
-                onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-                className="md:hidden flex-shrink-0 w-9 h-9 rounded-full bg-white border border-[var(--fx-border)] flex items-center justify-center text-[var(--fx-ink)] cursor-pointer"
-                aria-label="Open navigation menu"
-              >
-                <Menu size={18} />
-              </button>
 
               {/* My Balance — sum of this account's Razorpay-paid top-ups */}
               <div
@@ -1073,7 +1195,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
               {/* md+ has this action in the sidebar; keep it reachable on phones. */}
               <button
                 onClick={handlePurchaseStickerClick}
-                className="md:hidden inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[#111111] hover:bg-black active:scale-[0.99] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[#111111] hover:bg-black active:scale-[0.99] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
                 aria-label="Get a free sticker"
               >
                 <Plus size={14} />
@@ -1096,7 +1218,8 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
           </header>
 
           {/* Page Container (expanded for spacious and zoomed look) */}
-          <main className="max-w-[1360px] w-full mx-auto p-4 sm:p-7 lg:p-9 space-y-7">
+          {activeTab === 'chat' ? renderChatInbox() : (
+          <main className="max-w-[1360px] w-full mx-auto p-4 sm:p-7 lg:p-9 space-y-7 min-h-0 flex-1 overflow-y-auto">
 
             {/* ── MANDATORY PHONE VERIFICATION ALERT BANNER ── */}
             {(!isAdminAccount && !profile?.isPhoneVerified && (!profile?.phoneNumber || profile?.isPhoneVerified === false) && !profilePopupDismissed) && (
@@ -1305,6 +1428,56 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   </div>
                 </div>
 
+                {/* Latest chat — compact, newest few threads, above the stickers */}
+                <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-xs font-semibold text-[var(--fx-ink)]">
+                      Latest chat{totalUnreadChats > 0 ? ` (${totalUnreadChats} unread)` : ''}
+                    </h3>
+                    <button onClick={() => setActiveTab('chat')} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">
+                      View inbox ›
+                    </button>
+                  </div>
+
+                  {ownerSessionsLoading ? (
+                    <div className="py-4 text-center text-xs text-[var(--fx-ink-2)]">Loading chats...</div>
+                  ) : latestSessions.length === 0 ? (
+                    <div className="py-4 text-center text-xs text-[var(--fx-ink-2)]">No chats yet.</div>
+                  ) : (
+                    <div className="divide-y divide-[var(--fx-canvas)]">
+                      {latestSessions.map((sess) => (
+                        <button
+                          key={sess.id}
+                          type="button"
+                          onClick={() => {
+                            setActiveTab('chat');
+                            openChatSession(sess);
+                          }}
+                          className="w-full flex items-center justify-between gap-3 py-2.5 px-1 text-left rounded hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-[var(--fx-ink)] truncate">
+                              {sess.customer_name || 'Visitor'}
+                              {sess.vehicle_label && <span className="font-medium text-[var(--fx-ink-2)]"> · {sess.vehicle_label}</span>}
+                            </p>
+                            <p className="text-[11px] text-[var(--fx-ink-2)] truncate">{sess.last_message_preview || 'No messages yet'}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {(sess.unread_owner_count || 0) > 0 && (
+                              <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--fx-accent)] text-white text-[10px] font-bold flex items-center justify-center">
+                                {sess.unread_owner_count}
+                              </span>
+                            )}
+                            <span className="text-[11px] font-mono text-[var(--fx-faint)]">
+                              {sess.last_message_at ? new Date(sess.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Bento Grid (3 Columns) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   
@@ -1498,89 +1671,6 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                     defaultOpen
                   />
                 </div>
-
-              </div>
-            )}
-
-            {/* ════ VIEW: LIVE VISITOR CHAT INBOX ════ */}
-            {activeTab === 'chat' && (
-              <div className="space-y-6 animate-fade-in">
-                <div className="flex justify-between items-start flex-wrap gap-4">
-                  <div>
-                    <h1 className="font-display text-[26px] font-bold text-[var(--fx-ink)]">
-                      Chat inbox
-                    </h1>
-                  </div>
-                  <button
-                    onClick={loadOwnerSessions}
-                    disabled={ownerSessionsLoading}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] cursor-pointer"
-                  >
-                    <RefreshCcw size={14} className={ownerSessionsLoading ? 'animate-spin' : ''} /> Refresh Inbox
-                  </button>
-                </div>
-
-                {ownerSessionsLoading ? (
-                  <div className="bg-white border border-[var(--fx-border)] rounded-lg py-10 px-6 text-center text-[var(--fx-ink-2)]">
-                    <Loader2 size={32} className="animate-spin mx-auto mb-2 text-[var(--fx-accent)]" />
-                    <p className="text-xs font-semibold">Loading live visitor chat sessions...</p>
-                  </div>
-                ) : ownerSessions.length === 0 ? (
-                  <div className="bg-white border border-[var(--fx-border)] rounded-lg p-12 text-center text-[var(--fx-ink-2)] space-y-3">
-                    <div className="w-14 h-14 rounded-2xl bg-[var(--fx-accent-soft)] text-[var(--fx-accent)] mx-auto flex items-center justify-center font-bold">
-                      <MessageSquare size={28} />
-                    </div>
-                    <p className="text-sm font-bold text-[var(--fx-ink)]">Your inbox is empty</p>
-                    <p className="text-xs text-[var(--fx-ink-2)] max-w-md mx-auto">
-                      When a visitor scans your vehicle's QR plate and sends a message, their live chat thread will appear here so you can reply instantly.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="bg-white border border-[var(--fx-border)] rounded-lg overflow-hidden divide-y divide-[var(--fx-border)]">
-                    {ownerSessions.map((sess) => (
-                      <div
-                        key={sess.id}
-                        onClick={() => openChatSession(sess)}
-                        className="p-4 hover:bg-[var(--fx-canvas)] transition-colors flex items-center justify-between gap-4 cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3.5 min-w-0">
-                          <div className="w-10 h-10 rounded-full bg-[var(--fx-accent-soft)] text-[var(--fx-accent)] flex items-center justify-center font-bold text-sm shrink-0">
-                            <MessageCircle size={20} />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="font-bold text-sm text-[var(--fx-ink)] truncate">{sess.customer_name || 'Visitor'}</p>
-                              {sess.vehicle_label && (
-                                <span className="px-2 py-0.5 rounded bg-[var(--fx-canvas)] border border-[var(--fx-border)] text-[10px] font-mono font-semibold text-[var(--fx-ink-2)]">
-                                  {sess.vehicle_label}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-[var(--fx-ink-2)] truncate mt-0.5">{sess.last_message_preview || 'No messages yet'}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <div className="text-right">
-                            <span className="text-[11px] text-[var(--fx-faint)] font-mono">
-                              {sess.last_message_at ? new Date(sess.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                            </span>
-                            <span className="mt-1 block text-xs font-bold text-[var(--fx-accent)] hover:underline">
-                              Open Chat ›
-                            </span>
-                          </div>
-                          <button
-                            onClick={(e) => handleDeleteChatSession(e, sess.id)}
-                            title="Delete conversation"
-                            className="p-2 text-[var(--fx-faint)] hover:text-[#DC2626] hover:bg-[#FEE2E2] rounded-lg transition-colors cursor-pointer"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
 
               </div>
             )}
@@ -1804,32 +1894,11 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
             )}
 
           </main>
+          )}
         </div>
       </div>
 
 
-
-      {/* ─── LIVE VISITOR CHAT RIGHT-SIDE DRAWER ─── */}
-      {selectedChatSession && (
-        <div className="fixed inset-0 z-50 bg-white animate-fade-in" role="dialog" aria-modal="true" aria-label="Chat">
-          {/* Full window on every screen (dvh keeps the composer clear of the browser chrome). */}
-          <div className="w-full h-dvh flex flex-col overflow-hidden">
-            <RepiChat
-              key={selectedChatSession.id}
-              mode="owner"
-              sessionId={selectedChatSession.id}
-              title={selectedChatSession.customer_name}
-              subtitle={
-                [selectedChatSession.vehicle_label, selectedChatSession.qr_code_id]
-                  .filter(Boolean)
-                  .join(' · ') || undefined
-              }
-              onClose={() => openChatSession(null)}
-              className="h-full"
-            />
-          </div>
-        </div>
-      )}
 
       {/* ─── MODALS ─── */}
       {modal?.type === 'qrCode' && (

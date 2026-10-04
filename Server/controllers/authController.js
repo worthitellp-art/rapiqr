@@ -3,7 +3,7 @@ const { OAuth2Client } = require('google-auth-library');
 const UserModel = require('../models/userModel');
 const ProductModel = require('../models/productModel');
 const OrderModel = require('../models/orderModel');
-const { JWT_SECRET, ADMIN_EMAIL, ADMIN_PHONE } = require('../middleware/authMiddleware');
+const { JWT_SECRET, ADMIN_EMAIL } = require('../middleware/authMiddleware');
 const { logger } = require('../middleware/loggerMiddleware');
 const { generateSecret, verifyTOTP, buildOtpauthUrl } = require('../utils/totp');
 const { sendWhatsAppOtp } = require('../services/smsService');
@@ -18,6 +18,7 @@ const { deleteUserAccount } = require('../services/accountDeletionService');
 const loginAttemptTracker = require('../utils/loginAttemptTracker');
 const SecurityEventTypes = require('../utils/securityEventTypes');
 const { logAuditEvent } = require('../services/auditService');
+const { consumeChatLoginLink } = require('../services/loginLinkService');
 
 // Same IP/origin extraction the request logger uses (loggerMiddleware.js), kept
 // local here since these are recorded onto the user record, not just logged.
@@ -38,6 +39,40 @@ const googleClient = process.env.GOOGLE_CLIENT_ID ? new OAuth2Client(process.env
 // returns instantly while a known one takes ~100ms, and that timing gap is
 // enough to enumerate which emails have accounts.
 const DUMMY_HASH = '$2a$10$CwTycUXWue0Thq9StjUM0uJ8Vp1G3XLxaR7dyx7NcgCkJ6RxYWMKa';
+
+/**
+ * Issues the session JWT and runs the post-login bookkeeping: new-device
+ * check, login record, guest-order linking and the audit event. Every sign-in
+ * path (password, login link) goes through here, so they produce identical sessions.
+ */
+async function completeSignIn({ req, profile, ip, userAgent, method }) {
+  const securityMeta = await UserModel.getSecurityMeta(profile.id);
+  const token = jwt.sign({ id: profile.id, email: profile.email, role: profile.role }, JWT_SECRET, { expiresIn: '7d' });
+
+  if (securityMeta?.last_login_ip && securityMeta.last_login_ip !== ip) {
+    logger.security('NEW_DEVICE_LOGIN', `Sign-in for ${profile.email} from a new IP (previously ${securityMeta.last_login_ip})`, { userId: profile.id, previousIp: securityMeta.last_login_ip, ip, userAgent }, { userId: profile.id });
+  }
+  await UserModel.recordLogin(profile.id, { ip, userAgent });
+
+  // Automatically link previous guest checkout orders matching email or phone
+  await OrderModel.linkGuestOrdersToUser(profile.id, profile.email, profile.phoneNumber).catch((linkErr) => {
+    logger.warn('AUTH_SIGNIN', `Non-blocking error linking guest orders: ${linkErr.message}`);
+  });
+
+  logger.success('AUTH_SIGNIN', `User signed in successfully: ${profile.email}`, { ip, userAgent }, { userId: profile.id });
+
+  await logAuditEvent({
+    eventType: SecurityEventTypes.AUTH_LOGIN_SUCCESS,
+    actorType: profile.role === 'admin' ? 'ADMIN' : 'USER',
+    req,
+    userId: profile.id,
+    userEmail: profile.email,
+    statusCode: 200,
+    metadata: { role: profile.role, method },
+  });
+
+  return token;
+}
 
 class AuthController {
   /**
@@ -207,36 +242,8 @@ class AuthController {
 
       loginAttemptTracker.clear(normalizedEmail);
 
-      const securityMeta = await UserModel.getSecurityMeta(authUser._id);
       const profile = await UserModel.reconcileAdminRole(await UserModel.findById(authUser._id));
-
-      const token = jwt.sign(
-        { id: profile.id, email: profile.email, role: profile.role },
-        JWT_SECRET,
-        { expiresIn: '7d' }
-      );
-
-      if (securityMeta?.last_login_ip && securityMeta.last_login_ip !== ip) {
-        logger.security('NEW_DEVICE_LOGIN', `Sign-in for ${email} from a new IP (previously ${securityMeta.last_login_ip})`, { userId: profile.id, previousIp: securityMeta.last_login_ip, ip, userAgent }, { userId: profile.id });
-      }
-      await UserModel.recordLogin(profile.id, { ip, userAgent });
-
-      // Automatically link previous guest checkout orders matching email or phone
-      await OrderModel.linkGuestOrdersToUser(profile.id, profile.email, profile.phoneNumber).catch((linkErr) => {
-        logger.warn('AUTH_SIGNIN', `Non-blocking error linking guest orders: ${linkErr.message}`);
-      });
-
-      logger.success('AUTH_SIGNIN', `User signed in successfully: ${email}`, { ip, userAgent }, { userId: profile.id });
-
-      await logAuditEvent({
-        eventType: SecurityEventTypes.AUTH_LOGIN_SUCCESS,
-        actorType: profile.role === 'admin' ? 'ADMIN' : 'USER',
-        req,
-        userId: profile.id,
-        userEmail: profile.email,
-        statusCode: 200,
-        metadata: { role: profile.role },
-      });
+      const token = await completeSignIn({ req, profile, ip, userAgent, method: 'password' });
 
       return res.json({
         success: true,
@@ -250,137 +257,38 @@ class AuthController {
   }
 
   /**
-   * Admin Fleet Panel Sign In — Step 1: pre-flight. The ADMIN_EMAIL/ADMIN_PASSWORD
-   * sign-in has been retired; the only way to obtain an admin-role token now is
-   * OTP verification on the single number in ADMIN_PHONE (Server/.env). Rejecting
-   * every other number here means the OTP is never even sent to anyone else. The
-   * actual send happens client-side via the MSG91 OTP Widget
-   * (src/lib/msg91Widget.ts), same as every other OTP flow in this app.
+   * Exchanges a one-time chat link token (sent in an owner's WhatsApp button)
+   * for a normal session. The token is in the request body, never the query
+   * string, and is not logged. A failed exchange returns 401 and the client
+   * falls back to the normal sign-in page.
    */
-  static async sendAdminPhoneOtp(req, res) {
+  static async chatLinkLogin(req, res) {
     try {
-      const { phoneNumber } = req.body || {};
-      const normalized = normalizePhone(phoneNumber);
       const ip = getClientIp(req);
       const userAgent = getUserAgent(req);
-
-      if (!normalized) {
-        return res.status(400).json({ success: false, error: 'Enter a valid 10-digit mobile number.' });
-      }
-
-      if (normalized !== ADMIN_PHONE) {
-        const failCount = loginAttemptTracker.recordFailure(`admin-phone:${ip}`);
-        logger.warn('AUTH_ADMIN_SIGNIN', 'Admin phone login pre-flight rejected an unauthorized number', { ip, failCount });
-        logger.security('ADMIN_LOGIN_FAILED', 'Admin phone login attempted from an unauthorized number', { ip, userAgent, failCount });
-
+      const link = await consumeChatLoginLink(req.body?.token);
+      if (!link) {
         await logAuditEvent({
           eventType: SecurityEventTypes.AUTH_LOGIN_FAILED,
           actorType: 'ANONYMOUS',
           req,
-          statusCode: 403,
-          reason: 'Unauthorized admin phone number',
-          metadata: { target: 'admin', failCount },
+          statusCode: 401,
+          reason: 'Chat login link invalid, used or expired',
+          metadata: { method: 'chat_link' },
         });
-
-        // Same error either way — never confirm/deny which number is the admin number.
-        return res.status(403).json({ success: false, error: 'This number is not authorized for admin access.' });
+        return res.status(401).json({ success: false, error: 'This link has expired. Sign in to open your chat.' });
       }
 
-      logger.user('ADMIN_PHONE_OTP_SEND', 'Admin phone login pre-flight passed — widget will send the OTP');
-      return res.json({ success: true });
-    } catch (err) {
-      logger.error('ADMIN_PHONE_OTP_SEND', 'Failed to run admin phone login pre-flight', err);
-      return res.status(500).json({ success: false, error: err.message });
-    }
-  }
-
-  /**
-   * Admin Fleet Panel Sign In — Step 2: verify the MSG91 widget access token
-   * server-to-server (never trusting the browser's own "verified" claim),
-   * confirm it verified the ONE authorized admin number, then mint an
-   * admin-role JWT.
-   */
-  static async verifyAdminPhoneOtp(req, res) {
-    try {
-      const { phoneNumber, accessToken } = req.body || {};
-      const normalized = normalizePhone(phoneNumber);
-      const ip = getClientIp(req);
-      const userAgent = getUserAgent(req);
-
-      if (!normalized || !accessToken) {
-        return res.status(400).json({ success: false, error: 'Phone number and verification code are required.' });
-      }
-
-      if (normalized !== ADMIN_PHONE) {
-        const failCount = loginAttemptTracker.recordFailure(`admin-phone:${ip}`);
-        logger.security('ADMIN_LOGIN_FAILED', 'Admin phone verify attempted for an unauthorized number', { ip, userAgent, failCount });
-        return res.status(403).json({ success: false, error: 'This number is not authorized for admin access.' });
-      }
-
-      const verification = await verifyMsg91WidgetAccessToken({ accessToken });
-      if (!verification.success) {
-        logger.security('ADMIN_LOGIN_FAILED', `MSG91 widget token rejected for admin phone login: ${verification.error || verification.reason}`, { ip });
-        return res.status(400).json({ success: false, error: verification.error || 'Invalid or expired verification code.' });
-      }
-      if (normalizePhone(verification.verifiedIdentifier) !== normalized) {
-        logger.security('ADMIN_LOGIN_FAILED', 'Verified identifier did not match the claimed admin number', { ip });
-        return res.status(400).json({ success: false, error: 'Verified number does not match — please retry.' });
-      }
-
-      loginAttemptTracker.clear(`admin-phone:${ip}`);
-
-      // The admin identity is still the ADMIN_EMAIL profile row — verifyAdmin,
-      // security-alert recipients, etc. all key off it. The phone number is only
-      // the gate that decides who is allowed to sign into that identity now.
-      let profile = await UserModel.findByEmail(ADMIN_EMAIL);
+      const profile = await UserModel.reconcileAdminRole(await UserModel.findById(link.userId));
       if (!profile) {
-        profile = await UserModel.createUser({
-          email: ADMIN_EMAIL,
-          fullName: 'Fleet Admin',
-          role: 'admin',
-          emailVerified: true,
-          phoneNumber: normalized,
-        });
-      } else {
-        if (profile.role !== 'admin') profile = await UserModel.reconcileAdminRole(profile);
-        if (profile.phone_number !== normalized) {
-          await UserModel.updateProfile(profile.id, { phoneNumber: normalized }).catch(() => {});
-          profile.phone_number = normalized;
-        }
+        return res.status(401).json({ success: false, error: 'This link has expired. Sign in to open your chat.' });
       }
 
-      const securityMeta = await UserModel.getSecurityMeta(profile.id);
-      if (securityMeta?.last_login_ip && securityMeta.last_login_ip !== ip) {
-        logger.security('NEW_DEVICE_LOGIN', `Admin sign-in from a new IP (previously ${securityMeta.last_login_ip})`, { userId: profile.id, previousIp: securityMeta.last_login_ip, ip, userAgent }, { userId: profile.id });
-      }
-      await UserModel.recordLogin(profile.id, { ip, userAgent });
-
-      const token = jwt.sign(
-        { id: profile.id, email: profile.email, role: 'admin' },
-        JWT_SECRET,
-        { expiresIn: '7d' }
-      );
-
-      logger.success('AUTH_ADMIN_SIGNIN', `Admin signed in via phone OTP: ${ADMIN_EMAIL}`, { ip, userAgent }, { userId: profile.id });
-
-      await logAuditEvent({
-        eventType: SecurityEventTypes.ADMIN_ACCESS,
-        actorType: 'ADMIN',
-        req,
-        userId: profile.id,
-        userEmail: ADMIN_EMAIL,
-        statusCode: 200,
-        metadata: { action: 'ADMIN_SIGNIN', method: 'phone_otp' },
-      });
-
-      return res.json({
-        success: true,
-        token,
-        user: { ...profile, role: 'admin' }
-      });
+      const token = await completeSignIn({ req, profile, ip, userAgent, method: 'chat_link' });
+      return res.json({ success: true, token, user: profile, sessionId: link.sessionId });
     } catch (err) {
-      logger.error('ADMIN_PHONE_OTP_VERIFY', 'Failed to verify admin phone OTP', err);
-      return res.status(500).json({ success: false, error: err.message || 'Admin sign in failed' });
+      logger.error('AUTH_CHAT_LINK', 'Chat link sign-in failed', err);
+      return res.status(500).json({ success: false, error: 'Could not open your chat. Please sign in.' });
     }
   }
 
@@ -1074,7 +982,7 @@ class AuthController {
    *
    * Regular accounts re-enter their current password. The admin account does not:
    * it authenticates via phone OTP against ADMIN_PHONE in Server/.env rather than
-   * a stored password, so there is nothing to re-verify. See verifyAdminPhoneOtp.
+   * a stored password, so there is nothing to re-verify. See adminAuthController.adminLogin.
    */
   static async changeEmail(req, res) {
     try {

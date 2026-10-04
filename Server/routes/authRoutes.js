@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const AuthController = require('../controllers/authController');
+const AdminAuthController = require('../controllers/adminAuthController');
 const { verifyToken, optionalAuth } = require('../middleware/authMiddleware');
 const { rateLimit } = require('../middleware/rateLimiter');
 
@@ -20,18 +21,19 @@ const twoFactorVerifyLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, me
 
 const phoneOtpSendLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, message: 'Too many code requests, please try again later.' });
 const phoneOtpVerifyLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many attempts, please try again later.' });
-// Admin login is the highest-value target in the system — tighter caps than the
-// regular phone-login OTP routes above.
-const adminPhoneOtpSendLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, message: 'Too many code requests, please try again later.' });
-const adminPhoneOtpVerifyLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many attempts, please try again later.' });
+// Admin login is the highest-value target in the system — tightest cap on the server.
+const adminLoginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, message: 'Too many admin sign-in attempts, please try again later.' });
+// Chat link tokens are 256-bit and single use, so guessing is already futile —
+// this only blunts a flood of exchange attempts from one network.
+const chatLinkLoginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, message: 'Too many attempts, please try again later.' });
 
 router.get('/msg91-widget-config', AuthController.getMsg91WidgetConfig);
 router.post('/phone-login/send', phoneOtpSendLimiter, AuthController.sendPhoneLoginOtp);
 router.post('/phone-login/verify', phoneOtpVerifyLimiter, AuthController.verifyPhoneLoginOtp);
-router.post('/admin-phone-login/send', adminPhoneOtpSendLimiter, AuthController.sendAdminPhoneOtp);
-router.post('/admin-phone-login/verify', adminPhoneOtpVerifyLimiter, AuthController.verifyAdminPhoneOtp);
+router.post('/admin-login', adminLoginLimiter, AdminAuthController.adminLogin);
 router.post('/signup', signUpLimiter, AuthController.signUp);
 router.post('/signin', signInLimiter, AuthController.signIn);
+router.post('/chat-link-login', chatLinkLoginLimiter, AuthController.chatLinkLogin);
 router.post('/google', AuthController.googleAuth);
 router.post('/email-otp/send', emailOtpSendLimiter, AuthController.sendEmailOtp);
 router.post('/email-otp/verify', emailOtpVerifyLimiter, AuthController.verifyEmailOtp);

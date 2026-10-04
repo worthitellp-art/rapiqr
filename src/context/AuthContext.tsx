@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { UserProfileData, ADMIN_EMAIL } from '../lib/authService';
 import { apiClient, isApiBackendConfigured } from '../lib/apiClient';
+import { readChatLinkToken, setChatLinkSession } from '../lib/chatLink';
 
 /**
  * Map a backend (Express/Render) user profile into the app's UserProfileData shape.
@@ -33,14 +34,14 @@ function backendUserToProfile(u: any): UserProfileData {
 interface AuthContextType {
   profile: UserProfileData | null;
   loading: boolean;
+  /** Set when a WhatsApp chat link could not sign the owner in (expired, used, or another account). */
+  chatLinkNotice: string | null;
   isLoggedIn: boolean;
   isAdmin: boolean;
   signUp: (email: string, password: string, fullName: string, phoneNumber?: string) => Promise<{ success: boolean; error?: string }>;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  // Admin (/admin route) sign-in: OTP-only, restricted server-side to the single
-  // ADMIN_PHONE number. `accessToken` comes from the MSG91 OTP Widget's verifyOtp().
-  sendAdminPhoneOtp: (phoneNumber: string) => Promise<{ success: boolean; error?: string }>;
-  verifyAdminPhoneOtp: (phoneNumber: string, accessToken: string) => Promise<{ success: boolean; error?: string }>;
+  // Admin (/admin route) sign-in with the admin email and password, checked server-side.
+  adminLogin: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   // Passwordless email login: request a 6-digit code, then verify it — verifying
   // IS the login, no password anywhere in this path.
@@ -107,6 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   });
   const [loading, setLoading] = useState<boolean>(true);
+  const [chatLinkNotice, setChatLinkNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isApiBackendConfigured) {
@@ -114,10 +116,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    // A WhatsApp chat link carries a one-time login token. Exchange it before the
+    // stored-session check, so the owner lands on their chat from any browser.
+    const linkToken = readChatLinkToken();
+    if (linkToken) {
+      const signedInAs = profile;
+      apiClient.auth.chatLinkLogin(linkToken)
+        .then((res) => {
+          if (!res?.success || !res.token || !res.user) throw new Error('This link has expired. Sign in to open your chat.');
+          const next = backendUserToProfile(res.user);
+          if (signedInAs && signedInAs.id !== next.id) {
+            // The link is used up, but this browser keeps its current account — never swap silently.
+            setChatLinkNotice('This link belongs to another account. You are still signed in as before.');
+            setChatLinkSession(null);
+            return;
+          }
+          localStorage.setItem('repiqr-token', res.token);
+          localStorage.setItem('namoqr-token', res.token);
+          setProfile(next);
+          localStorage.setItem('repiqr-auth-user', JSON.stringify(next));
+          localStorage.setItem('namoqr-auth-user', JSON.stringify(next));
+          setChatLinkNotice(null);
+          setChatLinkSession(res.sessionId || null);
+        })
+        .catch((err: any) => {
+          setChatLinkNotice(err?.message || 'This link has expired. Sign in to open your chat.');
+          setChatLinkSession(null);
+        })
+        .finally(() => setLoading(false));
+      return;
+    }
+
     const token = localStorage.getItem('repiqr-token') || localStorage.getItem('namoqr-token');
 
     // Legacy guard: an older build's local-only admin fallback (removed — admin
-    // login is now OTP-only via verifyAdminPhoneOtp) used to stamp this exact id
+    // login is now OTP-only via the admin login) used to stamp this exact id
     // with role:'admin' and never obtain any token — no backend JWT. If that
     // cached profile is still around from before this change, every apiClient
     // call (Orders, Alerts, ...) will 401 forever since there was never a real
@@ -200,7 +233,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Standard login: assigns role = 'user' for everyone EXCEPT the designated admin
   // email, which unlocks the Admin Fleet Dashboard. Admin access is otherwise gated
-  // behind verifyAdminPhoneOtp() in AdminAuthModal (secret /admin route).
+  // behind adminLogin() in AdminAuthModal (secret /admin route).
   const signIn = async (identifier: string, password?: string) => {
     try {
       const cleanId = identifier.trim();
@@ -244,34 +277,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Dedicated Admin Panel login (/admin route): OTP-only, restricted server-side
-  // to the single ADMIN_PHONE number in Server/.env — never against a regular
-  // user's account or a password, so admin access can only ever be gained here.
-  // Requires the Express backend; there is no local-only demo fallback for this
-  // one, since a fake "admin" bypass in dev defeats the point of the number gate.
-  const sendAdminPhoneOtp = async (phoneNumber: string) => {
+  // Dedicated Admin Panel login (/admin route): email and password, checked
+  // server-side against the admin password hash in Server/.env. Only the admin
+  // email can sign in, so admin access can't be gained through a regular account.
+  // Requires the Express backend; there is no local-only demo fallback.
+  const adminLogin = async (email: string, password: string) => {
     if (!isApiBackendConfigured) {
       return { success: false, error: 'Admin login requires the backend to be configured.' };
     }
     try {
-      await apiClient.auth.sendAdminPhoneOtp(phoneNumber.trim());
-      return { success: true };
-    } catch (err: any) {
-      return { success: false, error: err.message || 'Failed to send verification code.' };
-    }
-  };
-
-  // `accessToken` comes from the MSG91 OTP Widget's verifyOtp() (src/lib/msg91Widget.ts) —
-  // the widget runs the actual code exchange with MSG91; this hands the resulting
-  // token to the backend, which re-verifies it and confirms it verified ADMIN_PHONE.
-  const verifyAdminPhoneOtp = async (phoneNumber: string, accessToken: string) => {
-    if (!isApiBackendConfigured) {
-      return { success: false, error: 'Admin login requires the backend to be configured.' };
-    }
-    try {
-      const res = await apiClient.auth.verifyAdminPhoneOtp(phoneNumber.trim(), accessToken);
+      const res = await apiClient.auth.adminLogin(email.trim(), password);
       if (!res?.user || !res?.token) {
-        return { success: false, error: 'Admin authentication failed.' };
+        return { success: false, error: res?.error || 'Incorrect email or password.' };
       }
       const p = backendUserToProfile(res.user);
       p.role = 'admin';
@@ -282,7 +299,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Invalid or expired verification code.' };
+      return { success: false, error: err.message || 'Incorrect email or password.' };
     }
   };
 
@@ -704,7 +721,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isLoggedIn = Boolean(profile);
-  // isAdmin is purely role-based — verifyAdminPhoneOtp() is the dedicated way to obtain role='admin'
+  // isAdmin is purely role-based — adminLogin() is the dedicated way to obtain role='admin'
   const isAdmin = profile?.role === 'admin';
 
   return (
@@ -712,12 +729,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         profile,
         loading,
+        chatLinkNotice,
         isLoggedIn,
         isAdmin,
         signUp,
         signIn,
-        sendAdminPhoneOtp,
-        verifyAdminPhoneOtp,
+        adminLogin,
         signInWithGoogle,
         sendEmailOtp,
         verifyEmailOtp,

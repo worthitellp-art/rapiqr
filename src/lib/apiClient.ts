@@ -157,6 +157,7 @@ async function execute<T>(endpoint: string, options: RequestInit = {}): Promise<
           '/auth/email-otp/verify',
           '/auth/phone-login/send',
           '/auth/phone-login/verify',
+          '/auth/chat-link-login',
         ].some(path => endpoint.includes(path));
 
         if (!isAuthLifecycleEndpoint) {
@@ -332,22 +333,19 @@ export const apiClient = {
       });
     },
 
-    // Admin (/admin route) sign-in — OTP only, restricted server-side to the
-    // single ADMIN_PHONE number. Step 1: pre-flight (rejects any other number
-    // before the MSG91 widget even sends a code).
-    async sendAdminPhoneOtp(phoneNumber: string) {
-      return request<{ success: boolean; error?: string }>('/auth/admin-phone-login/send', {
+    // One-time WhatsApp chat link (the token from the owner's button) → session.
+    async chatLinkLogin(token: string) {
+      return request<{ success: boolean; token?: string; user?: any; sessionId?: string; error?: string }>('/auth/chat-link-login', {
         method: 'POST',
-        body: JSON.stringify({ phoneNumber }),
+        body: JSON.stringify({ token }),
       });
     },
 
-    // Step 2: `accessToken` comes from the MSG91 OTP Widget's verifyOtp()
-    // (src/lib/msg91Widget.ts) — verifying it here is the actual admin login.
-    async verifyAdminPhoneOtp(phoneNumber: string, accessToken: string) {
-      return request<{ success: boolean; token?: string; user?: any; error?: string }>('/auth/admin-phone-login/verify', {
+    // Admin (/admin route) sign-in — email and password, checked server-side.
+    async adminLogin(email: string, password: string) {
+      return request<{ success: boolean; token?: string; user?: any; error?: string }>('/auth/admin-login', {
         method: 'POST',
-        body: JSON.stringify({ phoneNumber, accessToken }),
+        body: JSON.stringify({ email, password }),
       });
     },
 

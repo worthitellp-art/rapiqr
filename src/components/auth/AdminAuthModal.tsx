@@ -1,8 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { X, ShieldAlert, ShieldCheck, ArrowRight, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
-import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
-import { sendMsg91Otp, verifyMsg91Otp, retryMsg91Otp, toMsg91Identifier } from '../../lib/msg91Widget';
+import { X, ShieldAlert, ArrowRight, Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 interface AdminAuthModalProps {
   isOpen: boolean;
@@ -11,101 +9,44 @@ interface AdminAuthModalProps {
 }
 
 /**
- * The ONLY entry point into the admin dashboard (secret /admin route). Restricted
- * server-side to a single phone number (ADMIN_PHONE in Server/.env) — this modal
- * itself never knows or checks that number, it just forwards to the backend.
+ * The ONLY entry point into the admin dashboard (secret /admin route). The server
+ * accepts only the admin email and its password (bcrypt hash in Server/.env), so
+ * this modal just forwards what was typed.
  */
 export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuthModalProps) {
-  const { sendAdminPhoneOtp, verifyAdminPhoneOtp } = useAuth();
+  const { adminLogin } = useAuth();
 
-  const [step, setStep] = useState<'phone' | 'otp'>('phone');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [phoneDigits, setPhoneDigits] = useState('');
-  const [otpCode, setOtpCode] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState(0);
-
-  useEffect(() => {
-    if (countdown <= 0) return;
-    const timer = setInterval(() => setCountdown((c) => (c > 1 ? c - 1 : 0)), 1000);
-    return () => clearInterval(timer);
-  }, [countdown]);
 
   if (!isOpen) {
     return null;
   }
 
-  const resetToPhoneStep = () => {
-    setStep('phone');
-    setOtpCode('');
-    setErrorMessage(null);
-  };
-
-  const handleSendOtp = async (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setErrorMessage(null);
 
-    if (phoneDigits.length < 10) {
-      setErrorMessage('Please enter a valid 10-digit mobile number.');
+    if (!email.trim() || !password) {
+      setErrorMessage('Enter the admin email and password.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // Backend pre-flight — rejects every number except the one authorized
-      // admin phone before we ever ask MSG91 to send a code.
-      const preflight = await sendAdminPhoneOtp(phoneNumber);
-      if (!preflight.success) {
-        setErrorMessage(preflight.error || 'This number is not authorized for admin access.');
-        return;
-      }
-
-      await sendMsg91Otp(toMsg91Identifier(phoneNumber));
-      setStep('otp');
-      setCountdown(30);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to send verification code.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleVerifyOtp = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setErrorMessage(null);
-
-    const cleanOtp = otpCode.trim();
-    if (cleanOtp.length < 4) {
-      setErrorMessage('Please enter the verification code.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const accessToken = await verifyMsg91Otp(cleanOtp);
-      const result = await verifyAdminPhoneOtp(phoneNumber, accessToken);
+      const result = await adminLogin(email, password);
       if (!result.success) {
-        setErrorMessage(result.error || 'Invalid admin credentials.');
+        setErrorMessage(result.error || 'Incorrect email or password.');
         return;
       }
+      setPassword('');
       onSuccess();
       onClose();
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Incorrect code — please try again.');
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    if (countdown > 0 || isSubmitting) return;
-    setErrorMessage(null);
-    try {
-      await retryMsg91Otp();
-      setCountdown(30);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to resend the code.');
     }
   };
 
@@ -130,14 +71,8 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
           <div className="w-13 h-13 rounded-2xl bg-[#F5F5F5] border border-[#111111]/40 text-[#111111] flex items-center justify-center mx-auto mb-3.5">
             <ShieldAlert size={26} />
           </div>
-          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Admin Access
-          </h2>
-          <p className="mt-1.5 text-xs text-slate-500">
-            {step === 'phone'
-              ? 'Sign in with the authorized admin phone number.'
-              : `Enter the code sent to ${phoneNumber}`}
-          </p>
+          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Admin Access</h2>
+          <p className="mt-1.5 text-xs text-slate-500">Sign in with the admin email and password.</p>
         </div>
 
         {errorMessage && (
@@ -147,84 +82,63 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
           </div>
         )}
 
-        {step === 'phone' ? (
-          <form onSubmit={handleSendOtp} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1.5">
-                Admin mobile number
-              </label>
-              <PhoneInputWithCountry
-                value={phoneNumber}
-                onChange={(full, digits) => { setPhoneNumber(full); setPhoneDigits(digits); }}
-                placeholder="10-digit mobile number"
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="admin-email" className="block text-sm font-medium text-gray-900 mb-1.5">
+              Admin email
+            </label>
+            <input
+              id="admin-email"
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin email"
+              autoFocus
+              className="w-full h-11 px-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all text-sm text-gray-900 placeholder:text-gray-400"
+            />
+          </div>
 
-            <button
-              type="submit"
-              disabled={isSubmitting || phoneDigits.length < 10}
-              className="w-full h-11 rounded-lg font-semibold text-black text-sm flex items-center justify-center gap-2 bg-white hover:bg-gray-50 border border-gray-300 hover:border-black active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs mt-2"
-            >
-              {isSubmitting ? (
-                <Loader2 className="w-4 h-4 animate-spin text-black" />
-              ) : (
-                <>
-                  <span>Send Verification Code</span>
-                  <ArrowRight size={16} />
-                </>
-              )}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerifyOtp} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1.5">
-                Verification code
-              </label>
+          <div>
+            <label htmlFor="admin-password" className="block text-sm font-medium text-gray-900 mb-1.5">
+              Password
+            </label>
+            <div className="relative">
               <input
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={4}
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                placeholder="Enter code"
-                autoFocus
-                className="w-full text-center tracking-[0.4em] font-mono text-xl h-12 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all text-gray-900 placeholder:text-gray-300"
+                id="admin-password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+                className="w-full h-11 pl-3.5 pr-11 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all text-sm text-gray-900 placeholder:text-gray-400"
               />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting || otpCode.trim().length < 4}
-              className="w-full h-11 rounded-lg font-semibold text-black text-sm flex items-center justify-center gap-2 bg-white hover:bg-gray-50 border border-gray-300 hover:border-black active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs mt-2"
-            >
-              {isSubmitting ? (
-                <Loader2 className="w-4 h-4 animate-spin text-black" />
-              ) : (
-                <>
-                  <ShieldCheck size={16} />
-                  <span>Verify &amp; Sign In</span>
-                </>
-              )}
-            </button>
-
-            <div className="flex items-center justify-between pt-1 text-xs">
-              <button type="button" onClick={resetToPhoneStep} className="text-gray-500 hover:text-black font-medium transition-colors cursor-pointer">
-                Change phone number
-              </button>
               <button
                 type="button"
-                onClick={handleResendOtp}
-                disabled={countdown > 0 || isSubmitting}
-                className="text-gray-700 hover:text-black font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md text-gray-500 hover:text-black flex items-center justify-center cursor-pointer"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                <RotateCcw size={12} />
-                <span>{countdown > 0 ? `Resend in ${countdown}s` : 'Resend code'}</span>
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
-          </form>
-        )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSubmitting || !email.trim() || !password}
+            className="w-full h-11 rounded-lg font-semibold text-black text-sm flex items-center justify-center gap-2 bg-white hover:bg-gray-50 border border-gray-300 hover:border-black active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs mt-2"
+          >
+            {isSubmitting ? (
+              <Loader2 className="w-4 h-4 animate-spin text-black" />
+            ) : (
+              <>
+                <span>Sign In</span>
+                <ArrowRight size={16} />
+              </>
+            )}
+          </button>
+        </form>
       </div>
     </div>
   );

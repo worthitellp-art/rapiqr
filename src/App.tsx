@@ -100,7 +100,7 @@ function getAuthUrlMode(): 'login' | 'register' | null {
 }
 
 function MainAppContent() {
-  const { isLoggedIn, isAdmin, loading } = useAuth();
+  const { isLoggedIn, isAdmin, loading, chatLinkNotice } = useAuth();
   const [dashboardMode, setDashboardMode] = useState<'admin' | null>(null);
   const [adminModalOpen, setAdminModalOpen] = useState(() => isAdminUrl());
   const [joinServiceType, setJoinServiceType] = useState<string | undefined>();
@@ -332,6 +332,11 @@ function MainAppContent() {
   if (page === 'login' || page === 'register') {
     return (
       <Suspense fallback={<PageLoader />}>
+        {chatLinkNotice && (
+          <div role="alert" className="fixed left-1/2 top-4 z-[60] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-center text-xs font-semibold text-amber-900 shadow">
+            {chatLinkNotice}
+          </div>
+        )}
         <AuthPage
           initialMode={page === 'register' ? 'signup' : 'login'}
           prefillEmail={authPrefillEmail}

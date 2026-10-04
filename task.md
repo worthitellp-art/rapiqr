@@ -86,3 +86,10 @@ EXECUTION & DELIVERABLE RULES:
   and one more 
 (node:14272) [MONGOOSE] Warning: mongoose: Duplicate schema index on {"created_at":1} for model "Alert". This is often due to declaring an index using both "index: true" and "schema.index()". MongoDB will not create the duplicate index and options on the duplicate definition (such as expireAfterSeconds or unique) will not be applied. Please remove the duplicate index definition.
 (Use `node --trace-warnings ...` to show where the warning was created)
+
+
+from offical repiqr i test  whaspp notificaitn was not reciving
+
+
+
+do not blur the service provider user will send reqeuest that will comes in admin pannel then admin will arrage it that have the number share in dashboard og the admin so admin wil contact with the visitor 

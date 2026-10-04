@@ -4,6 +4,7 @@ const ChatModel = require('../models/chatModel');
 const { notifyOwner, notifyEmergencyContacts, formatWait } = require('../services/notificationService');
 const MessageModel = require('../models/messageModel');
 const { buildMapsLink } = require('../services/msg91Templates');
+const { createChatLoginLink } = require('../services/loginLinkService');
 const { getIo } = require('../sockets/chatSocket');
 const { logger } = require('../middleware/loggerMiddleware');
 const { sendServerError } = require('../utils/httpErrors');
@@ -185,6 +186,13 @@ class AlertController {
             alertType = 'EMERGENCY_ALERT';
             alertData = { item_name: label, message: alertPayload.message || 'an urgent alert was reported', session: chatSessionId };
           }
+
+          // The owner's button carries a one-time login token (see loginLinkService),
+          // so it signs them in from any browser. Emergency contacts never get one.
+          const ownerLinkSession = product?.user_id && chatSessionId
+            ? await createChatLoginLink({ userId: product.user_id, sessionId: chatSessionId })
+            : chatSessionId;
+          alertData = { ...alertData, session: ownerLinkSession };
 
           ownerWhatsAppSentAt.set(throttleKey, Date.now());
           const result = await notifyOwner({

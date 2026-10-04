@@ -4,6 +4,7 @@ const { JWT_SECRET } = require('../middleware/authMiddleware');
 const ChatModel = require('../models/chatModel');
 const ProductModel = require('../models/productModel');
 const { notifyOwner } = require('../services/notificationService');
+const { createChatLoginLink } = require('../services/loginLinkService');
 const pushService = require('../services/pushService');
 
 
@@ -220,10 +221,14 @@ function initChatSocket(httpServer, allowedOrigins) {
         if (socket.identity.type === 'customer') {
           const label = session.vehicle_label || product?.name || 'your vehicle';
           if (product?.details?.ownerPhone) {
+            // The owner's "Open Chat" button carries a one-time login token (see loginLinkService).
+            const ownerLinkSession = ownerId
+              ? await createChatLoginLink({ userId: ownerId, sessionId }).catch(() => sessionId)
+              : sessionId;
             notifyOwner({
               type: 'CHAT_MESSAGE',
               ownerPhone: product.details.ownerPhone,
-              data: { item_name: label, message: text, session: sessionId },
+              data: { item_name: label, message: text, session: ownerLinkSession },
               eventId: sessionId,
             }).catch(() => { /* best effort */ });
           }
