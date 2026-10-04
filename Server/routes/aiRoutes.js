@@ -7,5 +7,7 @@ const aiChatLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 20, message: 'T
 
 // Public: anonymous scan-page visitors use the emergency AI assistant
 router.post('/chat', aiChatLimiter, AiController.chat);
+// Public: lets the scan page show the assistant only when it can actually answer.
+router.get('/status', AiController.status);
 
 module.exports = router;

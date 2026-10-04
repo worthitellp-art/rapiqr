@@ -386,9 +386,9 @@ export default function ScanPaymentModal({
                 type="text"
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                maxLength={6}
+                maxLength={4}
                 value={otpInput}
-                onChange={(e) => onOtpInputChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onChange={(e) => onOtpInputChange?.(e.target.value.replace(/\D/g, '').slice(0, 4))}
                 placeholder="Enter code"
                 required
                 autoFocus

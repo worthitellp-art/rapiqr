@@ -10,6 +10,7 @@ import { fmtDateTime } from "./helpers";
 import FxKpiStrip from "../shared/FxKpiStrip";
 import { CodeVisibilityToggleButton } from "./StickerCodeComponents";
 import { useCodesRevealed } from "../../../lib/codeVisibility";
+import { usePolling } from "../../../hooks/usePolling";
 
 interface OrderItem { name: string; qty: number; price: number }
 interface OrderPayment {
@@ -123,6 +124,13 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
   useEffect(() => {
     loadOrders();
   }, []);
+
+  // New orders land while the page is open — refresh quietly (no spinner, no error
+  // banner; the rows on screen stay put if a refresh fails) only while the tab is visible.
+  usePolling(async () => {
+    const res = await apiClient.orders.list();
+    setOrders((res?.data || []) as Order[]);
+  }, { intervalMs: 60_000, immediate: false });
 
   const showToast = (msg: string, ms = 2500) => {
     setToast(msg);
@@ -521,14 +529,14 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
           {/* Table */}
           <div className="bg-white border border-[var(--fx-border)] rounded-md shadow-[0_1px_2px_rgba(24,24,27,0.05)] overflow-hidden w-full">
             {loading ? (
-              <div className="p-16 text-center space-y-3">
+              <div className="py-10 px-6 text-center space-y-3">
                 <div className="w-12 h-12 rounded-md bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center mx-auto">
                   <Loader2 size={22} className="animate-spin" />
                 </div>
                 <p className="font-semibold text-[13px] text-[var(--fx-ink)]">Loading orders…</p>
               </div>
             ) : loadError ? (
-              <div className="p-16 text-center space-y-3">
+              <div className="py-10 px-6 text-center space-y-3">
                 <div className="w-12 h-12 rounded-md bg-[var(--fx-red-soft)] text-[var(--fx-red)] flex items-center justify-center mx-auto">
                   <XCircle size={22} />
                 </div>

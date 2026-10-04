@@ -36,7 +36,6 @@ export default function AccountSettingsPanel({
       <div className="space-y-6 animate-fade-in">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-[var(--fx-ink)]">Account Settings</h1>
-          <p className="text-xs sm:text-sm text-[var(--fx-ink-2)] mt-1">Manage your name, phone, email, password and security options.</p>
         </div>
         <div className={cardCls}>
           <p className="text-sm text-[var(--fx-ink-2)]">
@@ -51,9 +50,6 @@ export default function AccountSettingsPanel({
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-[var(--fx-ink)]">Account Settings</h1>
-        <p className="text-sm text-[var(--fx-ink-2)] mt-1">
-          Manage your account profile, contact credentials, and security preferences in one unified view.
-        </p>
       </div>
 
       {/* SINGLE UNIFIED ACCOUNT DETAILS FORM WITH SINGLE SAVE BUTTON */}
@@ -407,11 +403,11 @@ function UnifiedAccountForm({
                   <input
                     type="text"
                     inputMode="numeric"
-                    maxLength={6}
+                    maxLength={4}
                     autoFocus
                     value={otpCode}
-                    onChange={(e) => { setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setPhoneMsg(null); }}
-                    placeholder="Enter 6-digit OTP"
+                    onChange={(e) => { setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 4)); setPhoneMsg(null); }}
+                    placeholder="Enter 4-digit OTP"
                     className={`${inputCls} font-mono tracking-widest flex-1`}
                   />
                   <button

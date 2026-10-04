@@ -100,7 +100,6 @@ export default function SupportLegalPanel({ showToast }: { showToast: (msg: stri
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-[var(--fx-ink)]">Support &amp; Legal</h1>
-        <p className="text-xs sm:text-sm text-[var(--fx-ink-2)] mt-1">Get help, report an issue, or review our policies.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

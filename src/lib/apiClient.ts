@@ -56,7 +56,61 @@ function getAuthHeader(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+// ── GET de-duplication ──────────────────────────────────────────────────────
+// Identical GETs that overlap in time share ONE network call, and an endpoint can
+// opt in to reusing a successful response for `cacheMs`. This is what stops
+// `GET /api/products` firing several times in a row (React StrictMode's doubled
+// effects in dev, two components asking for the same list, quick tab changes).
+// Entries are keyed by auth token + URL, so one account's data is never served to
+// another, and ANY write clears the cache so a read after a mutation is always fresh.
+interface GetCacheEntry {
+  promise: Promise<unknown>;
+  expiresAt: number;
+  pending: boolean;
+}
+const getCache = new Map<string, GetCacheEntry>();
+
+export function clearApiCache(): void {
+  getCache.clear();
+}
+
+if (typeof window !== 'undefined') {
+  // A dead session must not leave the previous user's cached reads behind.
+  window.addEventListener('rapiqr:unauthorized', clearApiCache);
+}
+
+async function request<T>(endpoint: string, options: RequestInit = {}, cacheMs = 0): Promise<T> {
+  const method = (options.method || 'GET').toUpperCase();
+
+  // Calls carrying their own AbortSignal (geocoding) manage their own lifecycle.
+  if (method !== 'GET' || options.signal) {
+    try {
+      return await execute<T>(endpoint, options);
+    } finally {
+      if (method !== 'GET') clearApiCache();
+    }
+  }
+
+  const key = `${getAuthHeader().Authorization || ''}|${endpoint}`;
+  const hit = getCache.get(key);
+  if (hit && (hit.pending || Date.now() < hit.expiresAt)) return hit.promise as Promise<T>;
+
+  const entry: GetCacheEntry = { promise: execute<T>(endpoint, options), expiresAt: 0, pending: true };
+  getCache.set(key, entry);
+  entry.promise.then(
+    () => {
+      entry.pending = false;
+      entry.expiresAt = Date.now() + cacheMs;
+    },
+    () => {
+      // Never cache a failure — the next caller should get a real retry.
+      if (getCache.get(key) === entry) getCache.delete(key);
+    }
+  );
+  return entry.promise as Promise<T>;
+}
+
+async function execute<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const headers = {
     'Content-Type': 'application/json',
     ...getAuthHeader(),
@@ -221,6 +275,37 @@ export interface OrderTracking {
   etd?: string | null;
   lastUpdatedAt?: string | null;
   timeline?: OrderTrackingEvent[];
+}
+
+/** GET /api/admin/summary — exact fleet totals plus the "needs attention" counts. */
+export interface AdminSummary {
+  tags: { total: number; active: number; inactive: number; scans: number; lastCreatedAt: string | null };
+  attention: { unresolvedAlerts: number; ordersToShip: number; pendingPartners: number; failedMessages24h: number };
+  generatedAt: string;
+}
+
+/** GET /api/distributors/me/dashboard — a partner's own application and allocated stock. */
+export interface DistributorDashboardData {
+  application: {
+    id: string;
+    status: 'pending' | 'approved' | 'rejected';
+    tier: string | null;
+    city: string | null;
+    business: string | null;
+    createdAt: string;
+    approvedAt: string | null;
+  } | null;
+  stats: { allocated: number; activated: number; inStock: number; scans: number };
+  stickers: Array<{
+    ref: string;
+    category: string;
+    status: 'active' | 'inactive';
+    ownerName: string | null;
+    ownerPhone: string | null;
+    activatedAt: string | null;
+    scans: number;
+    allocatedAt: string | null;
+  }>;
 }
 
 export interface OnlineOwner {
@@ -530,10 +615,17 @@ export const apiClient = {
 
   // My Stickers / Products Services (dashboard sticker management)
   products: {
-    async list() {
-      return request<{ success: boolean; data: any[] }>('/products', {
-        method: 'GET',
-      });
+    /**
+     * `sync: true` is for user-driven refreshes (the Refresh button, right after
+     * phone verification): it asks the server to re-run sticker auto-claiming,
+     * which it otherwise throttles, and skips the short client-side reuse window.
+     */
+    async list(opts: { sync?: boolean } = {}) {
+      return request<{ success: boolean; data: any[] }>(
+        `/products${opts.sync ? '?sync=1' : ''}`,
+        { method: 'GET' },
+        opts.sync ? 0 : 5_000
+      );
     },
 
     async getById(productId: string) {
@@ -594,6 +686,12 @@ export const apiClient = {
       return request<{ success: boolean; data: any[] }>(`/products/${productId}/history`, {
         method: 'GET',
       });
+    },
+
+    // Every event across all of the caller's stickers in ONE request (each row
+    // carries its `sticker_id`) — instead of one getHistory call per sticker.
+    async getAllHistory() {
+      return request<{ success: boolean; data: any[] }>('/products/history', { method: 'GET' }, 15_000);
     },
   },
 
@@ -964,9 +1062,8 @@ export const apiClient = {
   // Shop catalog (public storefront listing + admin CRUD) shown on the landing page
   shopProducts: {
     async list() {
-      return request<{ success: boolean; data: any[] }>('/shop-products', {
-        method: 'GET',
-      });
+      // Public catalog shared by the landing page and the client dashboard.
+      return request<{ success: boolean; data: any[] }>('/shop-products', { method: 'GET' }, 60_000);
     },
 
     async listAdmin() {
@@ -1026,9 +1123,17 @@ export const apiClient = {
       });
     },
 
-    async myStatus(identifier?: string) {
-      const qs = identifier ? `?identifier=${encodeURIComponent(identifier)}` : '';
-      return request<{ success: boolean; data: any }>(`/distributors/me${qs}`, {
+    // The server resolves "me" from the session — it ignores any identifier, and
+    // putting an email/phone in the URL only wrote it into access logs.
+    async myStatus() {
+      return request<{ success: boolean; data: any }>('/distributors/me', {
+        method: 'GET',
+      });
+    },
+
+    // The signed-in partner's application, allocated stock and its outcome.
+    async myDashboard() {
+      return request<{ success: boolean; data: DistributorDashboardData }>('/distributors/me/dashboard', {
         method: 'GET',
       });
     },
@@ -1037,6 +1142,14 @@ export const apiClient = {
       return request<{ success: boolean; data: any[] }>('/distributors', {
         method: 'GET',
       });
+    },
+
+    // Admin: hand N unactivated stickers to an approved partner (server picks the stock).
+    async allocate(appId: string, opts: { count: number; category?: string; printedOnly?: boolean }) {
+      return request<{ success: boolean; data: { allocated: number; remainingPool: number }; error?: string }>(
+        `/distributors/${encodeURIComponent(appId)}/allocate`,
+        { method: 'POST', body: JSON.stringify(opts) }
+      );
     },
 
     async updateStatus(appId: string, status: 'approved' | 'rejected', notes?: string) {
@@ -1049,6 +1162,9 @@ export const apiClient = {
 
   // Scan-page Emergency AI Assistant (proxied server-side so the OpenRouter key never ships to the browser)
   ai: {
+    async status() {
+      return request<{ success: boolean; available: boolean }>('/ai/status', { method: 'GET' });
+    },
     async chat(messages: { role: 'user' | 'assistant' | 'system'; content: string }[], vehicleNumber?: string) {
       return request<{ success: boolean; reply?: string; error?: string }>('/ai/chat', {
         method: 'POST',
@@ -1069,6 +1185,12 @@ export const apiClient = {
 
   // Admin Support Console (RepiQR staff only — requires an admin-role token)
   admin: {
+    // One small response (no rows, no PII) that the console polls instead of
+    // re-downloading the alert, order and QR lists on separate timers.
+    async getSummary() {
+      return request<{ success: boolean; data: AdminSummary }>('/admin/summary', { method: 'GET' });
+    },
+
     // reveal=true asks the backend for unmasked phone/email — the backend
     // defaults to masked otherwise. Defaulting this client call to true keeps
     // today's admin UI showing real values (that's the job), while the

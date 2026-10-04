@@ -13,6 +13,7 @@ const SecurityEventTypes = Object.freeze({
   PASSWORD_CHANGED: 'PASSWORD_CHANGED',
   MFA_SUCCESS: 'MFA_SUCCESS',
   MFA_FAILED: 'MFA_FAILED',
+  MFA_DISABLED: 'MFA_DISABLED',
 
   // User management events
   USER_CREATED: 'USER_CREATED',

@@ -75,6 +75,12 @@ const stickerSchema = new Schema({
   is_printed: { type: Boolean, default: false, index: true },
   printed_at: { type: Date, default: null },
 
+  // Stock handed to an approved distributor (admin "allocate" action). Separate
+  // from user_id: the distributor holds the physical sticker, the retail
+  // customer who activates it later becomes the user_id owner.
+  distributor_user_id: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+  distributed_at: { type: Date, default: null },
+
   user_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
   phone_number: { type: String, default: null, index: true },
   normalized_phone_number: { type: String, default: null, index: true },

@@ -1,5 +1,6 @@
 const ShopProductModel = require('../models/shopProductModel');
 const { logger } = require('../middleware/loggerMiddleware');
+const { sendServerError } = require('../utils/httpErrors');
 
 class ShopProductController {
   /** GET /api/shop-products — public storefront catalog (active only) */
@@ -9,7 +10,7 @@ class ShopProductController {
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('SHOP_PRODUCT_LIST', 'Failed to list active shop products', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -20,7 +21,7 @@ class ShopProductController {
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('SHOP_PRODUCT_LIST_ADMIN', 'Failed to list shop products for admin', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -36,7 +37,7 @@ class ShopProductController {
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('SHOP_PRODUCT_CREATE', 'Failed to create shop product', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -49,7 +50,7 @@ class ShopProductController {
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('SHOP_PRODUCT_UPDATE', `Failed to update shop product: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -62,7 +63,7 @@ class ShopProductController {
       return res.json({ success: true });
     } catch (err) {
       logger.error('SHOP_PRODUCT_DELETE', `Failed to delete shop product: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 }

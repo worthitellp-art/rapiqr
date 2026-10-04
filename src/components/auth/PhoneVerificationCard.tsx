@@ -39,7 +39,7 @@ export default function PhoneVerificationCard({
   };
 
   const handleOtpInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const numericOnlyValue = event.target.value.replace(/\D/g, '');
+    const numericOnlyValue = event.target.value.replace(/\D/g, '').slice(0, 4);
     setOtpCode(numericOnlyValue);
     setLinkingMessage(null);
   };
@@ -137,7 +137,7 @@ export default function PhoneVerificationCard({
               <input
                 type="text"
                 inputMode="numeric"
-                maxLength={6}
+                maxLength={4}
                 value={otpCode}
                 onChange={handleOtpInputChange}
                 placeholder="Enter code"

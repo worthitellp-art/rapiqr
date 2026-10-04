@@ -74,6 +74,15 @@ function isAdminUrl(): boolean {
   return /\/admin(\/|$)/i.test(window.location.pathname) || /#\/admin(\/|$)/i.test(window.location.hash);
 }
 
+/**
+ * Owner dashboard deep link used by WhatsApp alert buttons, e.g.
+ * #/dashboard?tab=chat&session=<id> (see update-templates/rapi_*.json).
+ */
+function isDashboardDeepLink(): boolean {
+  if (typeof window === 'undefined') return false;
+  return /^\/dashboard(\/|$)/i.test(window.location.pathname) || /^#\/dashboard(\?|\/|$)/i.test(window.location.hash);
+}
+
 function getAuthUrlMode(): 'login' | 'register' | null {
   if (typeof window === 'undefined') return null;
   const pathName = window.location.pathname.toLowerCase();
@@ -119,6 +128,7 @@ function MainAppContent() {
   // Restore page from localStorage or URL
   const [page, setPage] = useState<AppPage>(() => {
     if (isScanUrl()) return 'scan';
+    if (isDashboardDeepLink()) return 'dashboard';
     const authUrlMode = getAuthUrlMode();
     if (authUrlMode) return authUrlMode;
     const pathName = window.location.pathname.toLowerCase();
@@ -172,7 +182,10 @@ function MainAppContent() {
     if (loading) return; // wait for the session restore to resolve
     if ((page === 'dashboard' || page === 'distributor') && !isLoggedIn) {
       setDashboardMode(null);
-      navigateTo('landing');
+      // Signed-out visitor opened an alert link: go to sign-in but keep the hash,
+      // so the owner returns to the same chat thread after logging in.
+      if (page === 'dashboard' && isDashboardDeepLink()) setPage('login');
+      else navigateTo('landing');
     }
     if ((page === 'login' || page === 'register') && isLoggedIn) {
       navigateTo('dashboard');
@@ -181,6 +194,10 @@ function MainAppContent() {
 
   useEffect(() => {
     const handleUrlChange = () => {
+      if (isDashboardDeepLink() && page !== 'dashboard') {
+        setPage('dashboard');
+        return;
+      }
       if (isScanUrl() && page !== 'scan') {
         navigateTo('scan');
       }

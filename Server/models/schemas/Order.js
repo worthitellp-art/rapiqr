@@ -13,7 +13,12 @@ const orderSchema = new Schema({
   total: { type: Number, default: 0 },
   payment_method: { type: String, default: 'upi' },
   delivery_method: { type: String, default: 'standard' },
-  status: { type: String, default: 'pending' },
+  // Fulfilment state: placed -> shipped -> delivered | cancelled. This used to
+  // default to 'pending', a value the API's allowed-status list and every admin
+  // filter/KPI ("placed") never recognised — so a freshly created order matched
+  // no status tab and could not be advanced. Rows already stored as 'pending'
+  // are read back as 'placed' (see OrderModel's normalizeStatus).
+  status: { type: String, enum: ['placed', 'shipped', 'delivered', 'cancelled', 'pending'], default: 'placed' },
   shipping_address: { type: Schema.Types.Mixed, default: null },
   payment: { type: Schema.Types.Mixed, default: null },
   // Promoted out of payment.razorpayOrderId (was a JSON-path filter in

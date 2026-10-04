@@ -1,12 +1,27 @@
 const AlertModel = require('../models/alertModel');
 const ProductModel = require('../models/productModel');
 const ChatModel = require('../models/chatModel');
-const { notifyOwner, notifyEmergencyContacts } = require('../services/notificationService');
+const { notifyOwner, notifyEmergencyContacts, formatWait } = require('../services/notificationService');
+const MessageModel = require('../models/messageModel');
 const { buildMapsLink } = require('../services/msg91Templates');
 const { getIo } = require('../sockets/chatSocket');
 const { logger } = require('../middleware/loggerMiddleware');
+const { sendServerError } = require('../utils/httpErrors');
+const { clampLimit } = require('../utils/pagination');
+const { logAuditEvent } = require('../services/auditService');
+const SecurityEventTypes = require('../utils/securityEventTypes');
 
 const URL_RE = /(https?:\/\/\S+)/;
+
+/**
+ * WhatsApp anti-spam: the owner gets at most one WhatsApp per chat thread per
+ * window. Alerts are still saved and the chat message still lands in the
+ * thread, so nothing is lost — only the repeat notification is held back.
+ * In-memory, so a server restart resets it (acceptable for a short window).
+ */
+const OWNER_WHATSAPP_COOLDOWN_MS = 5 * 60 * 1000;
+const OWNER_WHATSAPP_COOLDOWN_EMERGENCY_MS = 60 * 1000;
+const ownerWhatsAppSentAt = new Map(); // threadKey -> last WhatsApp time (ms)
 
 /**
  * Builds the chat-thread copy of an alert. A plain `.slice(0, 100)` here used
@@ -17,6 +32,9 @@ const URL_RE = /(https?:\/\/\S+)/;
  * owner saw in their chat inbox was broken. This truncates only the
  * free-text part and always appends the map URL (if any) in full.
  */
+/** Longest free-text description kept in the chat thread copy of an alert. */
+const CHAT_TEXT_MAX = 600;
+
 function buildAlertChatText(label, rawMessage) {
   if (!rawMessage) {
     return `RepiQR Alert: someone scanned and reported an issue with ${label}. Open the app for details.`;
@@ -24,12 +42,12 @@ function buildAlertChatText(label, rawMessage) {
   const msg = String(rawMessage);
   const urlMatch = msg.match(URL_RE);
   if (!urlMatch) {
-    const truncated = msg.length > 100 ? `${msg.slice(0, 97)}...` : msg;
+    const truncated = msg.length > CHAT_TEXT_MAX ? `${msg.slice(0, CHAT_TEXT_MAX - 3)}...` : msg;
     return `RepiQR Alert on ${label}: "${truncated}"`;
   }
   const url = urlMatch[0];
   const withoutUrl = (msg.slice(0, urlMatch.index) + msg.slice(urlMatch.index + url.length)).trim();
-  const truncated = withoutUrl.length > 100 ? `${withoutUrl.slice(0, 97)}...` : withoutUrl;
+  const truncated = withoutUrl.length > CHAT_TEXT_MAX ? `${withoutUrl.slice(0, CHAT_TEXT_MAX - 3)}...` : withoutUrl;
   return truncated ? `RepiQR Alert on ${label}: "${truncated}"\n${url}` : `RepiQR Alert on ${label}\n${url}`;
 }
 
@@ -58,7 +76,12 @@ class AlertController {
       // Best-effort WhatsApp to the sticker owner AND, for emergencies, their
       // registered emergency contacts. SMS is deliberately not used and is not a
       // fallback for this launch (see services/notificationService.js).
-      let smsResult = { sent: false, simulated: false, reason: 'no_owner_phone' };
+      let smsResult = {
+        sent: false,
+        simulated: false,
+        reason: 'no_owner_phone',
+        detail: 'No owner phone number is saved for this sticker, so WhatsApp could not be sent.',
+      };
       let contactsNotified = 0;
       let chatSessionId = null;
 
@@ -75,6 +98,31 @@ class AlertController {
       // WhatsApp message to the owner on every one of those would spam them
       // once every 5 seconds. The one-time "Share My Location" action still
       // uses type "emergency" and notifies as normal.
+      // Live location trail: one card in the visitor's chat thread that the server
+      // updates in place (socket 'live_location'). Pings never add a chat message
+      // and never send WhatsApp — WhatsApp goes out once, from the first share.
+      if (alertPayload.type === 'location_ping' && alertPayload.customerToken && alertPayload.latitude && alertPayload.longitude) {
+        const { session } = await ChatModel.findOrCreateOpenSession({
+          qrCodeId: qrId,
+          customerToken: alertPayload.customerToken,
+          customerName: alertPayload.customerName || 'Visitor',
+          ownerId: product?.user_id || null,
+          vehicleLabel: `${product?.name || 'Vehicle'}${product?.vehicle_number ? ` (${product.vehicle_number})` : ''}`,
+        });
+        if (session) {
+          const live = {
+            lat: Number(alertPayload.latitude),
+            lng: Number(alertPayload.longitude),
+            accuracy: Number(alertPayload.accuracy) || null,
+            updated_at: new Date().toISOString(),
+          };
+          await ChatModel.setLiveLocation(session.id, live);
+          const payload = { sessionId: session.id, ...live };
+          getIo()?.to(`session:${session.id}`).emit('live_location', payload);
+          if (product?.user_id) getIo()?.to(`owner:${product.user_id}`).emit('live_location', payload);
+        }
+      }
+
       if ((product || alertPayload.ownerPhone) && alertPayload.type !== 'location_ping') {
         const ownerPhone = product?.details?.ownerPhone || product?.phone_number || product?.details?.phone || product?.details?.phoneNumber || product?.profiles?.phone_number || alertPayload.ownerPhone;
         const label = alertPayload.vehicleName || alertPayload.vehicleNumber || product?.name || 'your RepiQR item';
@@ -102,8 +150,27 @@ class AlertController {
         // Each one has an "open dashboard" URL button whose parameter is the
         // chat session id (msg91Client sends a placeholder when there is none,
         // since Meta rejects an empty button parameter).
-        if (ownerPhone) {
-          const isEmergency = alertPayload.type === 'emergency' || alertPayload.type === 'sos';
+        const isEmergencyAlert = alertPayload.type === 'emergency' || alertPayload.type === 'sos';
+        const throttleKey = `${qrId}:${chatSessionId || alertPayload.customerToken || 'anon'}`;
+        const cooldownMs = isEmergencyAlert ? OWNER_WHATSAPP_COOLDOWN_EMERGENCY_MS : OWNER_WHATSAPP_COOLDOWN_MS;
+        const withinCooldown = Date.now() - (ownerWhatsAppSentAt.get(throttleKey) || 0) < cooldownMs;
+        if (withinCooldown) {
+          const retryAfterSec = Math.ceil((cooldownMs - (Date.now() - (ownerWhatsAppSentAt.get(throttleKey) || 0))) / 1000);
+          const detail = `The owner was already sent a WhatsApp for this chat moments ago. The next one is allowed in ${formatWait(retryAfterSec)}.`;
+          smsResult = { sent: false, simulated: false, status: 'held', reason: 'thread_cooldown', retryAfterSec, detail };
+          if (ownerPhone) {
+            MessageModel.record({
+              channel: 'whatsapp',
+              to: ownerPhone,
+              event: `NOTIFY_${isEmergencyAlert ? 'EMERGENCY_ALERT' : 'QR_SCAN_ALERT'}`,
+              status: 'held',
+              error: detail,
+            });
+          }
+        }
+
+        if (ownerPhone && !withinCooldown) {
+          const isEmergency = isEmergencyAlert;
           const hasGps = Boolean(alertPayload.latitude && alertPayload.longitude);
           const isLocationShare = alertPayload.type === 'location_share' || String(alertPayload.message || '').includes('EMERGENCY GPS LOCATION');
 
@@ -119,6 +186,7 @@ class AlertController {
             alertData = { item_name: label, message: alertPayload.message || 'an urgent alert was reported', session: chatSessionId };
           }
 
+          ownerWhatsAppSentAt.set(throttleKey, Date.now());
           const result = await notifyOwner({
             type: alertType,
             ownerPhone,
@@ -128,12 +196,23 @@ class AlertController {
           // The scan page renders this receipt; `simulated` covers both the mock
           // provider and a live provider with no credentials, so the visitor is
           // never told a message was delivered when it was not.
-          smsResult = { sent: result.sent && !result.mock, simulated: result.mock || result.status === 'simulated' };
+          // Pass the real outcome through: whether it was sent, held back (with
+          // how long until it's allowed again), capped, or rejected by the provider.
+          smsResult = {
+            sent: Boolean(result.sent && !result.mock),
+            simulated: Boolean(result.mock || result.status === 'simulated'),
+            status: result.status,
+            reason: result.reason,
+            retryAfterSec: result.retryAfterSec ?? null,
+            detail: result.detail || null,
+          };
         }
 
         // The owner already got their own copy above — don't message them again
         // just because their number is also saved as an emergency contact.
         const lastTen = (value) => String(value || '').replace(/\D/g, '').slice(-10);
+        // Contacts are a separate audience from the owner: the owner's chat cooldown
+        // must not silence them. notify() still debounces each contact on its own.
         const emergencyContacts = notifyContacts && Array.isArray(product.details?.emergencyContacts)
           ? product.details.emergencyContacts.filter((c) => !ownerPhone || lastTen(c?.phone) !== lastTen(ownerPhone))
           : [];
@@ -150,7 +229,7 @@ class AlertController {
       return res.json({ success: true, data: result, smsResult, contactsNotified, chatSessionId, message: 'Alert dispatched successfully' });
     } catch (err) {
       logger.error('ALERT_EMERGENCY', 'Failed to dispatch alert', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -159,13 +238,13 @@ class AlertController {
    */
   static async getAlerts(req, res) {
     try {
-      const limit = parseInt(req.query.limit) || 50;
+      const limit = clampLimit(req.query.limit, { fallback: 50, max: 500 });
       logger.info('ALERT_LIST', `Fetching emergency alerts log (limit: ${limit})`);
       const data = await AlertModel.getAlerts(limit);
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('ALERT_LIST', 'Failed to fetch alerts log', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -177,10 +256,17 @@ class AlertController {
     try {
       logger.info('ALERT_DELETE_ALL', 'Deleting all emergency alerts');
       const result = await AlertModel.deleteAllAlerts();
+      await logAuditEvent({
+        eventType: SecurityEventTypes.DATA_DELETED,
+        actorType: 'ADMIN',
+        req,
+        resourceType: 'Alert',
+        metadata: { action: 'delete_all_alerts', deletedCount: result?.deletedCount ?? null },
+      });
       return res.json({ success: true, message: 'All alerts deleted successfully', data: result });
     } catch (err) {
       logger.error('ALERT_DELETE_ALL', 'Failed to delete all alerts', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -196,7 +282,7 @@ class AlertController {
       return res.json({ success: true, message: 'Alert deleted successfully', data: result });
     } catch (err) {
       logger.error('ALERT_DELETE_ONE', 'Failed to delete alert', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -212,7 +298,7 @@ class AlertController {
       return res.json({ success: true, message: 'Alert marked as resolved', data: result });
     } catch (err) {
       logger.error('ALERT_RESOLVE', 'Failed to resolve alert', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 }

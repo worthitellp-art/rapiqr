@@ -14,10 +14,12 @@ export default function FxTodoList({
   title = "To-do List",
   items,
   onViewAll,
+  emptyLabel = "Nothing pending right now.",
 }: {
   title?: string;
   items: FxTodoItem[];
   onViewAll?: () => void;
+  emptyLabel?: string;
 }) {
   return (
     <div className="fx-card p-6 space-y-4">
@@ -31,7 +33,7 @@ export default function FxTodoList({
       </div>
 
       {items.length === 0 ? (
-        <p className="text-[12.5px] text-[var(--fx-faint)] py-6 text-center">Nothing pending right now.</p>
+        <p className="text-[12.5px] text-[var(--fx-faint)] py-6 text-center">{emptyLabel}</p>
       ) : (
         <div className="divide-y divide-[var(--fx-border)]">
           {items.map((it) => (

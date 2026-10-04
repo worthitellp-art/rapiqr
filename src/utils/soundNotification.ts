@@ -7,6 +7,10 @@
 class SoundNotificationService {
   private audioCtx: AudioContext | null = null;
   private audioUnlocked = false;
+  /** Message ids already announced — the same socket event reaches several listeners. */
+  private announcedMessageIds = new Map<string, number>();
+  /** Last announcement per chat thread, so a busy thread doesn't ping every message. */
+  private lastAnnouncedAt = new Map<string, number>();
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -109,6 +113,37 @@ class SoundNotificationService {
         osc.stop(startTime + 0.3);
       });
     } catch { /* ignore */ }
+  }
+
+  /**
+   * Chime + desktop notification for an incoming visitor message. Only when the
+   * tab is in the background (the owner can already see a message they're
+   * looking at), once per message id, and at most once per 30 s per thread.
+   * Every listener calls this, so the dedupe is what keeps one message from
+   * alerting several times.
+   */
+  notifyIncomingMessage({ id, threadId, title, body }: { id?: string; threadId?: string; title: string; body: string }): void {
+    const now = Date.now();
+    if (id) {
+      if (this.announcedMessageIds.has(id)) return;
+      this.announcedMessageIds.set(id, now);
+    }
+
+    // Prune old entries so the maps stay small on a long-lived dashboard.
+    if (this.announcedMessageIds.size > 500) {
+      for (const [key, time] of this.announcedMessageIds) {
+        if (now - time > 5 * 60 * 1000) this.announcedMessageIds.delete(key);
+      }
+    }
+
+    if (typeof document !== 'undefined' && !document.hidden) return;
+
+    const thread = threadId || 'default';
+    if (now - (this.lastAnnouncedAt.get(thread) || 0) < 30 * 1000) return;
+    this.lastAnnouncedAt.set(thread, now);
+
+    this.playMessageChime();
+    this.showBrowserNotification(title, body);
   }
 
   /**

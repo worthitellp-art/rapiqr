@@ -8,6 +8,7 @@ const http = require('http');
 const { requestLogger, logger } = require('./middleware/loggerMiddleware');
 const { connectDB } = require('./config/db');
 const { rateLimit } = require('./middleware/rateLimiter');
+const { privateCacheControl } = require('./middleware/responseHardening');
 
 // Single project-wide env file lives at the repo root (shared with Vite) —
 // also check Server/.env for standalone backend setups.
@@ -65,6 +66,9 @@ app.use(helmet({
 // alerts) — this one exists to blunt a generic flood/scrape rather than
 // target a specific abuse pattern.
 app.use('/api', rateLimit({ windowMs: 5 * 60 * 1000, max: 300, message: 'Too many requests, please slow down.' }));
+
+// Signed-in responses hold personal data — keep them out of shared caches.
+app.use('/api', privateCacheControl);
 
 // Enable CORS & Request Parsing — configured frontend plus local dev origins.
 // The custom domain is listed explicitly (not just via FRONTEND_URL) so a

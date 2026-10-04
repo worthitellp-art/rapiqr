@@ -158,7 +158,9 @@ const MSG91_TEMPLATES = {
 };
 
 /** Max clip length per variable key (message text tends to run long). */
-const CLIP_MAX = { label: 40, item_name: 40, message: 160, contact_name: 40, owner_name: 40 };
+// `message` is the owner-facing description of what the visitor reported; keep it
+// whole (WhatsApp body parameters allow ~1024 chars), so the reason isn't cut off.
+const CLIP_MAX = { label: 40, item_name: 40, message: 900, contact_name: 40, owner_name: 40 };
 
 /** Clipped value for one template variable, falling back to its default — Meta rejects empty params. */
 function resolveValue(template, key, data) {

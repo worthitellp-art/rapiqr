@@ -186,10 +186,10 @@ export default function CompleteProfilePopup({
                     <input
                       type="text"
                       inputMode="numeric"
-                      maxLength={6}
+                      maxLength={4}
                       autoFocus
                       value={otpCode}
-                      onChange={(e) => { setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setMsg(null); }}
+                      onChange={(e) => { setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 4)); setMsg(null); }}
                       placeholder="Enter code"
                       className={`${inputCls} font-mono tracking-widest`}
                     />

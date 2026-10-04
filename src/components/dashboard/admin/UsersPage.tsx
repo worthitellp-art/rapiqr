@@ -87,20 +87,13 @@ export interface AdminUserRow {
     <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[var(--fx-ink)] font-body" style={{ background: "var(--fx-canvas)" }}>
       {/* ── Section Header ─────────────────────── */}
       <div className="flex items-baseline justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="font-display text-[28px] font-bold text-[var(--fx-ink)] leading-tight tracking-[-0.8px]">
-            User accounts & access management
-          </h1>
-          <p className="text-[13px] text-[var(--fx-ink-2)] mt-0.5">
-            Overview of all registered accounts, roles, linked safety stickers, and administrative operations
-          </p>
-        </div>
+        <h1 className="fx-text-heading-page text-[var(--fx-ink)]">Users</h1>
 
         <button
           onClick={() => fetchUserAccounts(searchQuery)}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[var(--fx-border)] bg-white text-[var(--fx-ink)] font-semibold text-[13px] hover:bg-[var(--fx-canvas)] transition-all cursor-pointer"
         >
-          <RefreshCw size={14} className={usersLoading ? "animate-spin" : ""} /> Refresh Accounts
+          <RefreshCw size={14} className={usersLoading ? "animate-spin" : ""} /> Refresh
         </button>
       </div>
 
@@ -173,19 +166,19 @@ export interface AdminUserRow {
 
       {/* ── User Accounts Table ────────────────────────────────────── */}
       {usersLoading ? (
-        <div className="bg-white border border-[var(--fx-border)] p-16 text-center space-y-2">
+        <div className="bg-white border border-[var(--fx-border)] py-10 px-6 text-center space-y-2">
           <div className="w-12 h-12 rounded-lg bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center mx-auto">
             <Loader2 size={22} className="animate-spin" />
           </div>
-          <p className="text-[14px] font-semibold text-[var(--fx-ink)]">Loading user accounts from database...</p>
+          <p className="text-[14px] font-semibold text-[var(--fx-ink)]">Loading users…</p>
         </div>
       ) : filteredUsers.length === 0 ? (
-        <div className="bg-white border border-[var(--fx-border)] p-16 text-center space-y-2">
+        <div className="bg-white border border-[var(--fx-border)] py-10 px-6 text-center space-y-2">
           <div className="w-12 h-12 rounded-lg bg-[var(--fx-canvas)] text-[var(--fx-ink-2)] flex items-center justify-center mx-auto">
             <UsersIcon size={22} />
           </div>
           <p className="text-[14px] text-[var(--fx-ink)] font-semibold">
-            {searchQuery ? "No user accounts match that search query." : "No registered user accounts found."}
+            {searchQuery ? "No users match" : "No users yet"}
           </p>
         </div>
       ) : (

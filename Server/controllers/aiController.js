@@ -8,6 +8,37 @@ const FREE_MODELS = [
 ];
 
 /**
+ * Is the assistant actually usable right now? A real check against OpenRouter's
+ * key-info endpoint (a valid key answers 200), cached for 5 minutes so scan-page
+ * loads don't each cost an upstream call. The key itself is never returned.
+ * GET /api/ai/status  →  { success, available }
+ */
+const STATUS_TTL_MS = 5 * 60 * 1000;
+let statusCache = { at: 0, available: false };
+
+exports.status = async (req, res) => {
+  const now = Date.now();
+  if (now - statusCache.at < STATUS_TTL_MS) {
+    return res.json({ success: true, available: statusCache.available });
+  }
+  let available = false;
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (apiKey) {
+    try {
+      const upstream = await fetch('https://openrouter.ai/api/v1/auth/key', {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      available = upstream.ok;
+    } catch {
+      available = false;
+    }
+  }
+  statusCache = { at: now, available };
+  return res.json({ success: true, available });
+};
+
+/**
  * Proxy chat messages to OpenRouter using the server-side key — the key must
  * never be shipped to the browser, so this endpoint exists instead of calling
  * OpenRouter directly from the frontend.

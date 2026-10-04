@@ -8,6 +8,7 @@ const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
 // support console (RepiQR staff only): user accounts, stickers, lost-access recovery.
 router.use(verifyToken, verifyAdmin);
 
+router.get('/summary', AdminController.getSummary);
 router.get('/users', AdminController.listUsers);
 router.get('/users/:id', AdminController.getUserDetail);
 router.get('/users/:id/activity', AdminController.getUserActivity);

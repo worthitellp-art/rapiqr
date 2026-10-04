@@ -6,6 +6,7 @@ import RepiChat from "../../chat/RepiChat";
 import { connectAsOwner } from "../../../lib/socketClient";
 import { soundNotification } from "../../../utils/soundNotification";
 import { recallOwnerThread, rememberOwnerThread } from "../../../lib/chatStorage";
+import { usePolling } from "../../../hooks/usePolling";
 import ConfirmModal from "./ConfirmModal";
 
 function timeAgo(iso: string | null) {
@@ -64,21 +65,27 @@ export default function RepiChatPage() {
     const socket = connectAsOwner(token);
     const onNewMsg = (msg: any) => {
       if (msg.sender_type === "customer") {
-        soundNotification.playMessageChime();
-        soundNotification.showBrowserNotification("New Chat Message", msg.body || "New visitor message");
+        soundNotification.notifyIncomingMessage({
+          id: msg.id,
+          threadId: msg.session_id,
+          title: "New Chat Message",
+          body: msg.body || "New visitor message",
+        });
         loadSessions();
       }
     };
     socket.on("new_message", onNewMsg);
     socket.on("inbox_updated", loadSessions);
 
-    const timer = setInterval(loadSessions, 15000);
     return () => {
-      clearInterval(timer);
       socket.off("new_message", onNewMsg);
       socket.off("inbox_updated", loadSessions);
     };
   }, [loadSessions]);
+
+  // The socket pushes new messages; this slow, visible-tab-only poll just heals a
+  // missed event (it was a flat 15s timer running in every background tab).
+  usePolling(loadSessions, { intervalMs: 45_000, immediate: false });
 
   const filtered = sessions.filter((s) => {
     const q = searchQuery.toLowerCase();
@@ -132,9 +139,6 @@ export default function RepiChatPage() {
             <MessageCircle className="text-[var(--fx-accent)]" size={24} />
             RepiChat
           </h1>
-          <p className="text-[12.5px] sm:text-[13.5px] text-[var(--fx-ink-2)] mt-1">
-            Real-time conversations with visitors who scanned your stickers.
-          </p>
         </div>
         {totalUnread > 0 && (
           <div className="self-start px-3.5 py-2 rounded-[4px] bg-[var(--fx-accent-soft)] border border-[var(--fx-accent)]/20 text-[var(--fx-accent-ink)] text-xs font-bold flex items-center gap-2">

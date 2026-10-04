@@ -24,9 +24,9 @@ import {
 import { useOtpLock } from '../../lib/useOtpLock';
 
 const sendLockedMessage = (time: string) =>
-  `You've used all ${MAX_OTP_ATTEMPTS} code requests. For your security, new codes are locked for 4 hours — try again in ${time}.`;
+  `You've used all ${MAX_OTP_ATTEMPTS} code requests. For your security, new codes are locked for 1 hour — try again in ${time}.`;
 const verifyLockedMessage = (time: string) =>
-  `Too many incorrect codes (${MAX_OTP_ATTEMPTS}/${MAX_OTP_ATTEMPTS}). For your security, verification is locked for 4 hours — try again in ${time}.`;
+  `Too many incorrect codes (${MAX_OTP_ATTEMPTS}/${MAX_OTP_ATTEMPTS}). For your security, verification is locked for 1 hour — try again in ${time}.`;
 
 interface AuthPageProps {
   initialMode?: 'login' | 'signup';
@@ -133,7 +133,7 @@ export default function AuthPage({
       refreshLock();
       setSuccessMessage(
         attemptResult.isLocked
-          ? 'Code sent. That was your last code request — new codes are locked for 4 hours.'
+          ? 'Code sent. That was your last code request — new codes are locked for 1 hour.'
           : `Verification code sent to your phone. (${attemptResult.attempts} of ${MAX_OTP_ATTEMPTS} requests used)`
       );
       setStep('otp');
@@ -240,7 +240,7 @@ export default function AuthPage({
       setOtpCode('');
       setSuccessMessage(
         attemptResult.isLocked
-          ? 'New code sent. That was your last code request — new codes are locked for 4 hours.'
+          ? 'New code sent. That was your last code request — new codes are locked for 1 hour.'
           : `New verification code sent. (${attemptResult.attempts} of ${MAX_OTP_ATTEMPTS} requests used)`
       );
       setCountdown(30);
@@ -300,7 +300,7 @@ export default function AuthPage({
             <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold flex items-start gap-2.5">
               <Clock size={16} className="shrink-0 mt-0.5 text-amber-700" />
               <div>
-                <p className="font-bold text-amber-900">Locked for 4 hours</p>
+                <p className="font-bold text-amber-900">Locked for 1 hour</p>
                 <p className="text-[11.5px] text-amber-800 mt-0.5 leading-relaxed">
                   {step === 'otp'
                     ? `${MAX_OTP_ATTEMPTS} incorrect codes entered.`
@@ -423,9 +423,9 @@ export default function AuthPage({
                     type="text"
                     inputMode="numeric"
                     autoComplete="one-time-code"
-                    maxLength={6}
+                    maxLength={4}
                     value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
                     placeholder="Enter code"
                     autoFocus
                     disabled={verifyLockMs > 0}

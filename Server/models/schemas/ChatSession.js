@@ -10,6 +10,8 @@ const chatSessionSchema = new Schema({
   status: { type: String, enum: ['open', 'closed'], default: 'open' },
   last_message_at: { type: Date, default: null },
   last_message_preview: { type: String, default: null },
+  // Latest live GPS fix from the visitor's location trail — overwritten in place.
+  live_location: { type: Object, default: null },
   unread_owner_count: { type: Number, default: 0 },
   unread_customer_count: { type: Number, default: 0 },
   created_at: { type: Date, default: Date.now },

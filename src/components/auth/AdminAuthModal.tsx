@@ -185,9 +185,9 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
                 type="text"
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                maxLength={6}
+                maxLength={4}
                 value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
                 placeholder="Enter code"
                 autoFocus
                 className="w-full text-center tracking-[0.4em] font-mono text-xl h-12 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all text-gray-900 placeholder:text-gray-300"

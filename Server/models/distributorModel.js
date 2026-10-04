@@ -1,5 +1,8 @@
+const mongoose = require('mongoose');
 const DistributorApplication = require('./schemas/DistributorApplication');
 const User = require('./schemas/User');
+const Sticker = require('./schemas/Sticker');
+const { maskPhone } = require('../middleware/loggerMiddleware');
 
 function toApi(doc) {
   if (!doc) return null;
@@ -80,12 +83,106 @@ class DistributorModel {
     if (!doc) return null;
 
     // Approval grants the real distributor role on the account (task.md #17) —
-    // not just a status flag on the application row.
-    if (status === 'approved' && doc.user_id) {
-      await User.findByIdAndUpdate(doc.user_id, { $set: { role: 'distributor' } });
+    // not just a status flag on the application row. An application created from
+    // the admin console has no user_id yet, so fall back to the account that
+    // owns the applicant's email (if they have signed up).
+    let userId = doc.user_id;
+    if (!userId && doc.user_email) {
+      const account = await User.findOne({ email: String(doc.user_email).trim().toLowerCase() }).select('_id').lean();
+      userId = account?._id || null;
+      if (userId) await DistributorApplication.updateOne({ _id: doc._id }, { $set: { user_id: userId } });
     }
 
-    return toApi(doc);
+    if (userId) {
+      if (status === 'approved') {
+        // Never touch an admin's role — an admin-created application used to be
+        // bound to the admin's own account, and approving it overwrote that role.
+        await User.updateOne({ _id: userId, role: { $ne: 'admin' } }, { $set: { role: 'distributor' } });
+      } else if (status === 'rejected') {
+        // Rejecting (or revoking) must take the privilege back, not just flip a flag.
+        await User.updateOne({ _id: userId, role: 'distributor' }, { $set: { role: 'user' } });
+      }
+    }
+
+    return toApi({ ...doc, user_id: userId });
+  }
+
+  /**
+   * Admin: hand N unactivated, unowned stickers to an approved distributor.
+   * The server picks the stock (oldest first) so the admin never has to copy
+   * sticker ids around, and the guarded update means two concurrent
+   * allocations can never give the same sticker to two partners.
+   */
+  static async allocateStickers(applicationId, { count, category = null, printedOnly = true }) {
+    const app = await DistributorApplication.findById(applicationId).lean();
+    if (!app) return { ok: false, reason: 'not_found' };
+    if (app.status !== 'approved' || !app.user_id) return { ok: false, reason: 'not_approved' };
+
+    const pool = {
+      deleted_at: null,
+      user_id: null,
+      distributor_user_id: null,
+      status: 'inactive',
+      phone_number: null,
+      'details.ownerPhone': null,
+    };
+    if (category) pool.category = String(category);
+    if (printedOnly) pool.is_printed = true;
+
+    const picked = await Sticker.find(pool).sort({ created_at: 1 }).limit(count).select('_id').lean();
+    const ids = picked.map((s) => s._id);
+    let allocated = 0;
+    if (ids.length > 0) {
+      const res = await Sticker.updateMany(
+        { _id: { $in: ids }, distributor_user_id: null },
+        { $set: { distributor_user_id: app.user_id, distributed_at: new Date() } }
+      );
+      allocated = res.modifiedCount || 0;
+    }
+
+    const remainingPool = await Sticker.countDocuments(pool);
+    return { ok: true, allocated, remainingPool, userId: String(app.user_id) };
+  }
+
+  /**
+   * A distributor's own dashboard: their application plus the stock allocated
+   * to them and what became of it. Customer phones are masked, and the sticker
+   * id is shortened to a reference — enough to reconcile with a customer, not
+   * enough to act on the sticker.
+   */
+  static async getDashboard(userId) {
+    const owner = new mongoose.Types.ObjectId(String(userId));
+    const mine = { distributor_user_id: owner, deleted_at: null };
+
+    const [application, allocated, activated, scanAgg, docs] = await Promise.all([
+      this.getByUserId(userId),
+      Sticker.countDocuments(mine),
+      Sticker.countDocuments({ ...mine, status: 'active' }),
+      Sticker.aggregate([{ $match: mine }, { $group: { _id: null, scans: { $sum: { $ifNull: ['$scans_count', 0] } } } }]),
+      Sticker.find(mine)
+        .sort({ 'details.activatedAt': -1, distributed_at: -1 })
+        .limit(200)
+        .select('_id category status name phone_number details.ownerPhone details.activatedAt scans_count distributed_at')
+        .lean(),
+    ]);
+
+    return {
+      application,
+      stats: { allocated, activated, inStock: Math.max(0, allocated - activated), scans: scanAgg[0]?.scans || 0 },
+      stickers: docs.map((d) => {
+        const phone = d.details?.ownerPhone || d.phone_number || null;
+        return {
+          ref: String(d._id).slice(0, 8).toUpperCase(),
+          category: d.category,
+          status: d.status === 'active' ? 'active' : 'inactive',
+          ownerName: d.name || null,
+          ownerPhone: phone ? maskPhone(phone) : null,
+          activatedAt: d.details?.activatedAt || null,
+          scans: d.scans_count || 0,
+          allocatedAt: d.distributed_at || null,
+        };
+      }),
+    };
   }
 }
 

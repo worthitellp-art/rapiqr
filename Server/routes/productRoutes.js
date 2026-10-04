@@ -11,6 +11,8 @@ const recoverLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, message: '
 router.use(verifyToken);
 
 router.get('/', ProductController.getMyProducts);
+// Static path — must stay above '/:id' or "history" would be read as a sticker id.
+router.get('/history', ProductController.getAllHistory);
 router.get('/:id', ProductController.getProductById);
 router.get('/:id/history', ProductController.getHistory);
 router.patch('/:id', ProductController.updateDetails);

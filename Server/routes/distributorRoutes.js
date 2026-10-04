@@ -5,7 +5,9 @@ const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
 
 router.post('/', verifyToken, DistributorController.apply);
 router.get('/me', verifyToken, DistributorController.myStatus);
+router.get('/me/dashboard', verifyToken, DistributorController.dashboard);
 router.get('/', verifyToken, verifyAdmin, DistributorController.list);
 router.patch('/:id/status', verifyToken, verifyAdmin, DistributorController.updateStatus);
+router.post('/:id/allocate', verifyToken, verifyAdmin, DistributorController.allocate);
 
 module.exports = router;

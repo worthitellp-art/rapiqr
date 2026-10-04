@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Send, CheckCircle2, XCircle, FlaskConical, MessageSquareText, RefreshCcw, Trash2, AlertTriangle, PhoneCall, ShieldCheck } from "lucide-react";
 import { apiClient } from "../../../lib/apiClient";
 import { sendMsg91Otp, verifyMsg91Otp, retryMsg91Otp, toMsg91Identifier } from "../../../lib/msg91Widget";
+import { usePolling } from "../../../hooks/usePolling";
 
 type MessageStats = { total: number; sent: number; failed: number; simulated: number; sms: number; whatsapp: number; last24h: number };
 
@@ -47,6 +48,7 @@ export default function MessageManagerPage() {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [channelFilter, setChannelFilter] = useState<string>("ALL");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -132,41 +134,50 @@ export default function MessageManagerPage() {
     setTestError(null);
   };
 
-  const load = useCallback(() => {
+  // One load fetches the tiles and the log together. A failed call throws so the
+  // poller backs off, but the last good data stays on screen meanwhile.
+  const load = useCallback(async () => {
     setLoading(true);
-    apiClient.admin.getMessageStats().then((res) => {
-      if (res.success) setStats(res.data);
-    }).catch(() => { /* table may not be provisioned yet */ });
-
-    apiClient.admin.getMessages({
-      limit: 150,
-      status: statusFilter !== "ALL" ? statusFilter : undefined,
-      channel: channelFilter !== "ALL" ? channelFilter : undefined,
-    }).then((res) => {
-      if (res.success) setMessages(res.data);
-    }).catch(() => { /* table may not be provisioned yet */ })
-      .finally(() => setLoading(false));
+    try {
+      const [statsRes, listRes] = await Promise.all([
+        apiClient.admin.getMessageStats(),
+        apiClient.admin.getMessages({
+          limit: 150,
+          status: statusFilter !== "ALL" ? statusFilter : undefined,
+          channel: channelFilter !== "ALL" ? channelFilter : undefined,
+        }),
+      ]);
+      if (statsRes?.success) setStats(statsRes.data);
+      if (listRes?.success) setMessages(listRes.data);
+      setLoadError(null);
+    } catch (err: any) {
+      setLoadError(err?.message || "Could not load the message log.");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   }, [statusFilter, channelFilter]);
 
+  // Filters changing must always reload; the poll below only keeps it fresh
+  // while this tab is visible (it used to be a flat 15s timer in background tabs too).
   useEffect(() => {
-    load();
-    const interval = setInterval(load, 15000);
-    return () => clearInterval(interval);
+    load().catch(() => { /* surfaced through loadError */ });
   }, [load]);
+  const refresh = usePolling(load, { intervalMs: 30_000, immediate: false });
 
   const handleDeleteAll = async () => {
     setDeleting(true);
     try {
       const res = await apiClient.admin.deleteAllMessages();
-      if (res.success) {
-        setMessages([]);
-        setStats({ total: 0, sent: 0, failed: 0, simulated: 0, sms: 0, whatsapp: 0, last24h: 0 });
-        setShowConfirmModal(false);
-        setToastMessage("All messages have been successfully deleted.");
-        setTimeout(() => setToastMessage(null), 4000);
-      }
+      if (!res.success) throw new Error("The server did not delete the messages.");
+      setMessages([]);
+      setStats({ total: 0, sent: 0, failed: 0, simulated: 0, sms: 0, whatsapp: 0, last24h: 0 });
+      setShowConfirmModal(false);
+      setToastMessage("All messages have been successfully deleted.");
+      setTimeout(() => setToastMessage(null), 4000);
     } catch (err: any) {
-      alert(err?.message || "Failed to delete messages");
+      setShowConfirmModal(false);
+      setLoadError(err?.message || "Failed to delete messages");
     } finally {
       setDeleting(false);
     }
@@ -242,7 +253,7 @@ export default function MessageManagerPage() {
           </button>
           <button
             type="button"
-            onClick={load}
+            onClick={refresh}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-white border border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] transition-all cursor-pointer shadow-xs flex-shrink-0"
           >
             <RefreshCcw size={13} className={loading ? "animate-spin" : ""} /> Refresh
@@ -318,7 +329,7 @@ export default function MessageManagerPage() {
                     placeholder="Enter code"
                     value={testOtp}
                     disabled={testStep === "verified"}
-                    onChange={(e) => setTestOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    onChange={(e) => setTestOtp(e.target.value.replace(/\D/g, "").slice(0, 4))}
                     className="w-full sm:w-36 px-3.5 py-2.5 rounded-md border border-[var(--fx-border)] text-sm font-medium disabled:bg-[var(--fx-canvas)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--fx-accent)]/30"
                   />
                   {testStep === "sent" && (
@@ -364,6 +375,13 @@ export default function MessageManagerPage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {loadError && (
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-md border border-[var(--fx-red)]/30 bg-[var(--fx-red-soft)] px-4 py-2.5 text-xs text-[var(--fx-red)]">
+          <span className="font-semibold">{loadError}</span>
+          <button type="button" onClick={refresh} className="font-bold underline underline-offset-2 cursor-pointer">Retry</button>
         </div>
       )}
 

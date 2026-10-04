@@ -173,7 +173,6 @@ export default function PrivacyDataPanel({ showToast }: { showToast: (msg: strin
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-[var(--fx-ink)]">Privacy &amp; Data</h1>
-        <p className="text-xs sm:text-sm text-[var(--fx-ink-2)] mt-1">What RepiQR holds about you, who it's shared with, and your rights over it.</p>
       </div>
 
       {/* What we hold & why */}

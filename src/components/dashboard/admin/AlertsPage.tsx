@@ -20,6 +20,7 @@ import { CodeVisibilityToggleButton } from "./StickerCodeComponents";
 import { stickerRef, useCodesRevealed } from "../../../lib/codeVisibility";
 import { getCategoryLabel } from "../../../stickerModules";
 import { apiClient } from "../../../lib/apiClient";
+import { usePolling } from "../../../hooks/usePolling";
 import ConfirmModal from "./ConfirmModal";
 
 interface AlertsPageProps {
@@ -29,6 +30,8 @@ interface AlertsPageProps {
   setToast: (message: string | null) => void;
   isAdmin: boolean;
   searchQuery: string;
+  /** Called after a resolve/delete/clear so the sidebar badge re-counts straight away. */
+  onChanged?: () => void;
 }
 
 type AlertCategoryFilter = "all" | "emergency" | "assistance" | "activation" | "scan";
@@ -72,10 +75,12 @@ export default function AlertsPage({
   setToast,
   isAdmin,
   searchQuery,
+  onChanged,
 }: AlertsPageProps) {
   const [selectedCategory, setSelectedCategory] = useState<AlertCategoryFilter>("all");
   const [incidentReports, setIncidentReports] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [expandedAlertId, setExpandedAlertId] = useState<string | null>(null);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -86,108 +91,68 @@ export default function AlertsPage({
     setLocalSearch(searchQuery);
   }, [searchQuery]);
 
+  // The backend is the only source of alert reports. They used to be merged in
+  // from localStorage too, which showed ghost rows nobody could resolve
+  // server-side and kept reporter phones + GPS on disk.
   const fetchReports = useCallback(async () => {
+    if (!isAdmin) return;
     setIsLoading(true);
     try {
-      const dbPromise = isAdmin
-        ? apiClient.alerts.getAlerts().then((res) => res?.data || []).catch(() => [])
-        : Promise.resolve([]);
-
-      const dbReports = await dbPromise;
-      let combined: any[] = Array.isArray(dbReports) ? dbReports : [];
-
-      try {
-        const local = localStorage.getItem("repiqr-reports") || localStorage.getItem("namoqr-reports") || "[]";
-        const parsed = JSON.parse(local);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingIds = new Set(combined.map((r) => String(r.id)));
-          const uniqueLocal = parsed.filter((r: any) => !existingIds.has(String(r.id)));
-          combined = [...uniqueLocal, ...combined];
-        }
-      } catch {
-        /* ignore */
-      }
-
-      setIncidentReports(combined);
+      const res = await apiClient.alerts.getAlerts(200);
+      setIncidentReports(Array.isArray(res?.data) ? res.data : []);
+      setLoadError(null);
+    } catch (err: any) {
+      setLoadError(err?.message || "Could not load alerts.");
+      throw err; // lets the poller back off instead of hammering a failing server
     } finally {
       setIsLoading(false);
     }
   }, [isAdmin]);
 
-  useEffect(() => {
-    fetchReports();
-    const handleUpdate = () => fetchReports();
-    window.addEventListener("repiqr-reports-updated", handleUpdate);
-    window.addEventListener("namoqr-reports-updated", handleUpdate);
-    const interval = isAdmin ? setInterval(fetchReports, 20000) : null;
+  const refresh = usePolling(fetchReports, { intervalMs: 30_000, enabled: isAdmin });
 
-    return () => {
-      window.removeEventListener("repiqr-reports-updated", handleUpdate);
-      window.removeEventListener("namoqr-reports-updated", handleUpdate);
-      if (interval) clearInterval(interval);
-    };
-  }, [fetchReports, isAdmin]);
-
+  // Each action reports what the SERVER did. The old calls swallowed failures
+  // (`.catch(() => null)`) and then updated the screen and toasted success anyway,
+  // so a failed resolve/delete looked done until the next refresh undid it.
   const handleResolve = async (alertId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const rawId = alertId.replace(/^report-/, "");
     try {
-      if (isAdmin) {
-        await apiClient.alerts.resolveAlert(rawId).catch(() => null);
-      }
-      try {
-        const stored = JSON.parse(localStorage.getItem("repiqr-reports") || "[]");
-        const updated = stored.map((item: any) =>
-          String(item.id) === String(rawId) ? { ...item, status: "resolved" } : item
-        );
-        localStorage.setItem("repiqr-reports", JSON.stringify(updated));
-      } catch {
-        /* ignore */
-      }
-
+      const res = await apiClient.alerts.resolveAlert(rawId);
+      if (!res?.success || res.data?.success === false) throw new Error("Alert not resolved");
       setIncidentReports((prev) =>
         prev.map((r) => (String(r.id) === String(rawId) ? { ...r, status: "resolved" } : r))
       );
       setToast("Resolved");
+      onChanged?.();
     } catch {
-      setToast("Could not resolve");
+      setToast("Could not resolve — try again");
     }
   };
 
   const handleDelete = async (alertId: string) => {
     const rawId = alertId.replace(/^report-/, "");
     try {
-      if (isAdmin) {
-        await apiClient.alerts.deleteAlert(rawId).catch(() => null);
-      }
-      try {
-        const stored = JSON.parse(localStorage.getItem("repiqr-reports") || "[]");
-        const updated = stored.filter((item: any) => String(item.id) !== String(rawId));
-        localStorage.setItem("repiqr-reports", JSON.stringify(updated));
-      } catch {
-        /* ignore */
-      }
-
+      const res = await apiClient.alerts.deleteAlert(rawId);
+      if (!res?.success) throw new Error("Alert not deleted");
       setIncidentReports((prev) => prev.filter((r) => String(r.id) !== String(rawId)));
       setToast("Deleted");
+      onChanged?.();
     } catch {
-      setToast("Could not delete");
+      setToast("Could not delete — try again");
     }
   };
 
   const handleClearAll = async () => {
     setConfirmClearAll(false);
     try {
-      if (isAdmin) {
-        await apiClient.alerts.deleteAllAlerts().catch(() => null);
-      }
-      localStorage.removeItem("repiqr-reports");
-      localStorage.removeItem("namoqr-reports");
-      window.dispatchEvent(new Event("repiqr-reports-updated"));
+      const res = await apiClient.alerts.deleteAllAlerts();
+      if (!res?.success) throw new Error("Alerts not cleared");
       setIncidentReports([]);
       setToast("Cleared all alerts");
+      onChanged?.();
     } catch {
-      setToast("Failed to clear");
+      setToast("Failed to clear — try again");
     }
   };
 
@@ -291,11 +256,11 @@ export default function AlertsPage({
   }, [unifiedAlerts, selectedCategory, localSearch]);
 
   return (
-    <div className="px-3 sm:px-5 py-4 space-y-3 text-gray-900 font-body bg-[#F8FAFC] min-h-screen">
+    <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-4 text-[var(--fx-ink)] font-body min-h-screen" style={{ background: "var(--fx-canvas)" }}>
       {/* ── Top Bar (Minimal, Compact) ─────────────────────────────────── */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <h1 className="text-lg sm:text-xl font-bold font-display text-gray-900">Alerts</h1>
+          <h1 className="fx-text-heading-page text-[var(--fx-ink)]">Alerts</h1>
           <span className="text-xs font-bold text-gray-500 bg-gray-200/80 px-2 py-0.5 rounded-full">
             {counts.total}
           </span>
@@ -309,7 +274,7 @@ export default function AlertsPage({
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={fetchReports}
+            onClick={refresh}
             disabled={isLoading}
             className="p-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer disabled:opacity-40"
             title="Refresh"
@@ -329,6 +294,13 @@ export default function AlertsPage({
           )}
         </div>
       </div>
+
+      {loadError && (
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-md border border-[var(--fx-red)]/30 bg-[var(--fx-red-soft)] px-3 py-2 text-xs text-[var(--fx-red)]">
+          <span className="font-semibold">{loadError}</span>
+          <button type="button" onClick={refresh} className="font-bold underline underline-offset-2 cursor-pointer">Retry</button>
+        </div>
+      )}
 
       {/* ── Filters & Search (Single Compact Row) ───────────────────────── */}
       <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">

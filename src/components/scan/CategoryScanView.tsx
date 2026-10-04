@@ -222,6 +222,8 @@ export interface CategoryScanViewProps {
   /** Status line under the hero — GPS share result, alert delivery receipt, ... */
   banner?: string | null;
   busy?: boolean;
+  /** True only when the server confirmed the AI assistant can answer right now. */
+  aiAvailable?: boolean;
 }
 
 const MAX_MSG = 220;
@@ -238,6 +240,7 @@ export default function CategoryScanView({
   onSendMessage,
   banner,
   busy = false,
+  aiAvailable = false,
 }: CategoryScanViewProps) {
   const [openTile, setOpenTile] = useState<VariantTile | null>(null);
   const [message, setMessage] = useState("");
@@ -277,7 +280,8 @@ export default function CategoryScanView({
       ? resolveServiceProviders(providers, serviceType, category).length > 0
       : false;
 
-    const actionButtons = buttons.filter((b) => b.action.actionType !== "SERVICE_PROVIDER" || hasProvider);
+    /* Service buttons stay on screen; with no provider serving the visitor's
+       area they are blurred and cannot be tapped. */
     const showEmptyProviderNote = Boolean(serviceButton) && !hasProvider;
 
     return (
@@ -299,22 +303,26 @@ export default function CategoryScanView({
           <div className="px-4 pb-4 space-y-3">
             {/* Action buttons as a grid of flat boxes, not a stacked list */}
             <div className="grid grid-cols-2 gap-2.5">
-              {actionButtons.map((b, i) => (
-                <button
-                  key={i}
-                  disabled={busy}
-                  onClick={() => onButton(b.action, openTile.title)}
-                  className={`${BUTTON_STYLES[b.style] || BUTTON_STYLES.ghost} font-bold text-[12.5px] rounded-2xl flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed`}
-                >
-                  {buttonIcon(b.action)}
-                  <span className="text-center leading-tight">{b.label}</span>
-                </button>
-              ))}
+              {buttons.map((b, i) => {
+                const unavailable = b.action.actionType === "SERVICE_PROVIDER" && !hasProvider;
+                return (
+                  <button
+                    key={i}
+                    disabled={busy || unavailable}
+                    aria-disabled={unavailable}
+                    onClick={() => onButton(b.action, openTile.title)}
+                    className={`${BUTTON_STYLES[b.style] || BUTTON_STYLES.ghost} font-bold text-[12.5px] rounded-2xl flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${unavailable ? "blur-[2.5px] opacity-50 pointer-events-none" : ""}`}
+                  >
+                    {buttonIcon(b.action)}
+                    <span className="text-center leading-tight">{b.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {showEmptyProviderNote && (
               <p className="text-[11.5px] font-semibold text-[#62625B] bg-[#F6F6F3] rounded-2xl px-4 py-3 text-center">
-                No service provider available — notify the owner or chat instead.
+                {(serviceType && getServiceType(serviceType)?.label) || "This service"} is not available in your area.
               </p>
             )}
 
@@ -333,9 +341,12 @@ export default function CategoryScanView({
                       <p className="text-xs font-bold text-[#211922] leading-tight truncate">{p.label}</p>
                       <p className="text-sm font-mono font-bold text-[#33332E] mt-0.5">{p.phone}</p>
                     </div>
-                    <span className="bg-gray-100 text-gray-400 font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 flex-shrink-0">
-                      <Lock size={13} /> Coming Soon
-                    </span>
+                    <a
+                      href={`tel:${String(p.phone).replace(/\s/g, "")}`}
+                      className="bg-[#111111] hover:bg-black text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 flex-shrink-0 transition-colors"
+                    >
+                      <PhoneCall size={13} /> Call
+                    </a>
                   </div>
                 ))}
               </div>
@@ -478,21 +489,34 @@ export default function CategoryScanView({
         {/* Subtle section divider */}
         <div className="border-t border-gray-100 pt-0.5" />
 
-        {/* Assistant action row */}
-        <button
-          type="button"
-          onClick={() => onAction({ kind: "ask" }, "assistant")}
-          className="w-full bg-gray-50/80 hover:bg-violet-50/60 border border-gray-100 hover:border-violet-200 rounded-lg p-3 flex items-center gap-3 text-left transition-all active:scale-98 cursor-pointer group"
-        >
-          <span className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform">
-            <Sparkles size={18} className="text-white" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-black text-gray-900 leading-tight">Ask the RepiQR Assistant</span>
-            <span className="block text-[11px] text-gray-400 font-semibold mt-0.5 truncate">{variant.aiHello}</span>
-          </span>
-          <ChevronRight size={17} className="text-gray-400 group-hover:text-violet-500 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
-        </button>
+        {/* Assistant action row — live only when the server confirmed the AI can answer */}
+        {aiAvailable ? (
+          <button
+            type="button"
+            onClick={() => onAction({ kind: "ask" }, "assistant")}
+            className="w-full bg-gray-50/80 hover:bg-violet-50/60 border border-gray-100 hover:border-violet-200 rounded-lg p-3 flex items-center gap-3 text-left transition-all active:scale-98 cursor-pointer group"
+          >
+            <span className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+              <Sparkles size={18} className="text-white" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-black text-gray-900 leading-tight">Ask the RepiQR Assistant</span>
+              <span className="block text-[11px] text-gray-400 font-semibold mt-0.5 truncate">{variant.aiHello}</span>
+            </span>
+            <ChevronRight size={17} className="text-gray-400 group-hover:text-violet-500 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+          </button>
+        ) : (
+          <div aria-disabled="true" className="relative w-full bg-gray-50 border border-gray-100 rounded-lg p-3 flex items-center gap-3 select-none cursor-not-allowed">
+            <span className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+              <Sparkles size={18} className="text-gray-400" />
+            </span>
+            <span className="min-w-0 flex-1 blur-[2.5px]">
+              <span className="block text-sm font-black text-gray-900 leading-tight">Ask the RepiQR Assistant</span>
+              <span className="block text-[11px] text-gray-400 font-semibold mt-0.5 truncate">{variant.aiHello}</span>
+            </span>
+            <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-gray-700">Assistant unavailable right now</span>
+          </div>
+        )}
       </div>
 
     </div>

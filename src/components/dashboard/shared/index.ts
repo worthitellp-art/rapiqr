@@ -1,12 +1,12 @@
 export { default as FxSidebarShell } from "./FxSidebarShell";
 export { default as FxNavItem } from "./FxNavItem";
-export { FxSearchInput, FxIconButton, FxAvatarTrigger } from "./FxTopBar";
-export { default as FxStatTile } from "./FxStatTile";
-export { default as FxAssetCard } from "./FxAssetCard";
-export type { FxAssetTile } from "./FxAssetCard";
+export { default as FxSidebar } from "./FxSidebar";
+export type { FxSidebarItem } from "./FxSidebar";
+export { default as FxAccountMenu } from "./FxAccountMenu";
+export type { FxAccountMenuItem } from "./FxAccountMenu";
+export { FxSearchInput } from "./FxTopBar";
 export { default as FxTodoList } from "./FxTodoList";
 export type { FxTodoItem } from "./FxTodoList";
-export { default as FxCalendarWidget } from "./FxCalendarWidget";
 export { default as FxTransactionsTable } from "./FxTransactionsTable";
 export type { FxTableColumn as FxTransactionsColumn } from "./FxTransactionsTable";
 export { default as FxTable } from "./FxTable";

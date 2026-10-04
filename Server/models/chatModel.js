@@ -98,6 +98,17 @@ class ChatModel {
     }
   }
 
+  /** Overwrites the thread's live location with the newest fix. Nothing is appended. */
+  static async setLiveLocation(sessionId, live) {
+    try {
+      await ChatSession.updateOne({ _id: sessionId }, { $set: { live_location: live } });
+      return true;
+    } catch (err) {
+      logger.warn('DB_CHAT', `ChatModel.setLiveLocation failed (${sessionId})`, { error: err.message });
+      return false;
+    }
+  }
+
   static async getSessionById(sessionId) {
     try {
       if (typeof sessionId !== 'string' && typeof sessionId !== 'number') return null;

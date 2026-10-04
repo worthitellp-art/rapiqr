@@ -1,8 +1,8 @@
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import { useLocalStorage } from "./useLocalStorage";
-import { QrRecord, Template, StickerPos } from "./types";
+import { QrRecord, Template } from "./types";
 import { qrFullUrl, DEFAULT_STICKER_POS } from "./helpers";
 import { Menu } from "lucide-react";
 import Sidebar from "./Sidebar";
@@ -21,7 +21,44 @@ import ShopProductsPage from "./ShopProductsPage";
 import OrdersPage from "./OrdersPage";
 import RepiChatPage from "./RepiChatPage";
 import PrintSheetModal from "./PrintSheetModal";
-import { apiClient } from "../../../lib/apiClient";
+import { apiClient, AdminSummary } from "../../../lib/apiClient";
+import { usePolling } from "../../../hooks/usePolling";
+
+// How often the cheap heartbeat runs, and the slower safety-net refresh of the
+// full fleet list (which otherwise only reloads when the heartbeat says it changed).
+const SUMMARY_INTERVAL_MS = 30_000;
+const FLEET_FALLBACK_INTERVAL_MS = 120_000;
+const CHAT_INTERVAL_MS = 20_000;
+// A just-generated row may not be in a response that was already in flight; keep it
+// this long before treating a row the server doesn't know about as a deleted ghost.
+const LOCAL_ONLY_GRACE_MS = 2 * 60_000;
+
+// Browsers that used the old console still hold the fleet list (owner names and
+// phones) and alert reports in localStorage. The backend is the only source now,
+// so clear those copies instead of leaving personal data on disk indefinitely.
+const LEGACY_PII_KEYS = ["repiqr-qrlist", "namoqr-qrlist", "repiqr-reports", "namoqr-reports"];
+
+function mapRowToRecord(r: any): QrRecord {
+  return {
+    id: r.id,
+    qrUrl: qrFullUrl(r.id),
+    clientId: r.client_id,
+    createdAt: r.created_at,
+    scans: r.scans_count || 0,
+    status: r.status || "inactive",
+    template: r.template_name || "Default",
+    category: r.category || "car",
+    fg: r.fg_color || "D9581F",
+    bg: r.bg_color || "FFFFFF",
+    ownerPhone: r.owner_phone || undefined,
+    ownerName: r.owner_name || undefined,
+    vehicleNumber: r.vehicle_number || undefined,
+    activatedAt: r.activated_at || undefined,
+    labelName: r.label_name || undefined,
+    labelColor: r.label_color || undefined,
+    isPrinted: Boolean(r.is_printed),
+  };
+}
 
 export default function AdminDashboard({ onBack }: { onBack: () => void }) {
   const { profile, signOut, isAdmin } = useAuth();
@@ -32,10 +69,9 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
     } catch { /* fallback */ }
     return isAdmin ? "overview" : "qr";
   });
-  const accent = "FFB020";
-  const fontCss = "'Pinterest Sans', 'Pin Sans', ui-sans-serif, system-ui";
   const [templates, setTemplates] = useLocalStorage<Template[]>("repiqr-templates", []);
-  const [qrList, setQrList] = useLocalStorage<QrRecord[]>("repiqr-qrlist", []);
+  // In memory only — never persisted. See LEGACY_PII_KEYS.
+  const [qrList, setQrList] = useState<QrRecord[]>([]);
   // The QR slot is fixed to the template's panel — not a saved/per-admin setting,
   // so no stale localStorage or server value can ever push it out of place.
   const stickerPos = DEFAULT_STICKER_POS;
@@ -47,7 +83,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [unreadAlerts, setUnreadAlerts] = useState(0);
+  const [summary, setSummary] = useState<AdminSummary | null>(null);
   const [unreadChats, setUnreadChats] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [printSheetTargetSticker, setPrintSheetTargetSticker] = useState<QrRecord | null>(null);
@@ -60,104 +96,85 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
     setIsPrintSheetModalOpen(true);
   }
 
+  useEffect(() => {
+    try {
+      LEGACY_PII_KEYS.forEach((key) => localStorage.removeItem(key));
+    } catch { /* storage unavailable */ }
+  }, []);
+
   // RepiChat unread count — client accounts only; admin gets the "Online Now"
   // presence widget on the Overview page instead of a chat inbox.
-  useEffect(() => {
-    if (isAdmin) return;
-    const update = () => {
-      apiClient.chat.listOwnerSessions().then((res) => {
-        if (res.success) setUnreadChats(res.data.reduce((sum, s) => sum + (s.unread_owner_count || 0), 0));
-      }).catch(() => { /* not logged in yet / transient network error */ });
-    };
-    update();
-    const interval = setInterval(update, 15000);
-    return () => clearInterval(interval);
-  }, [isAdmin]);
+  usePolling(async () => {
+    const res = await apiClient.chat.listOwnerSessions();
+    if (res.success) setUnreadChats(res.data.reduce((sum, s) => sum + (s.unread_owner_count || 0), 0));
+  }, { intervalMs: CHAT_INTERVAL_MS, enabled: !isAdmin });
 
-  useEffect(() => {
-    if (!isAdmin) return;
-    const update = () => {
-      apiClient.alerts.getAlerts().then((res) => {
-        let combined: any[] = res?.data || [];
-        try {
-          const local = JSON.parse(localStorage.getItem("repiqr-reports") || localStorage.getItem("namoqr-reports") || "[]");
-          const existingIds = new Set(combined.map((r) => r.id));
-          combined = [...local.filter((r: any) => !existingIds.has(r.id)), ...combined];
-        } catch { /* ignore */ }
-        setUnreadAlerts(combined.filter((r: any) => r.status !== "resolved").length);
-      }).catch(() => { /* transient network error */ });
-    };
-    update();
-    const onUpdated = () => update();
-    window.addEventListener("repiqr-reports-updated", onUpdated);
-    const interval = setInterval(update, 15000);
-    return () => {
-      window.removeEventListener("repiqr-reports-updated", onUpdated);
-      clearInterval(interval);
-    };
-  }, [isAdmin]);
+  // Heartbeat: one small, PII-free response gives the sidebar badges and the
+  // Overview KPIs (exact, straight from the database — not derived from a capped
+  // list). Pauses while the tab is hidden, backs off if the server errors.
+  const refreshSummary = usePolling(async () => {
+    const res = await apiClient.admin.getSummary();
+    if (res?.success) setSummary(res.data);
+  }, { intervalMs: SUMMARY_INTERVAL_MS, enabled: isAdmin });
 
-  // Sync the fleet list with the real database — previously qrList was purely a
-  // localStorage cache of QR codes generated in THIS browser, so a sticker a
-  // client activated (and its owner phone) from their own device never showed
-  // up here. Backend rows are the source of truth for anything already synced;
-  // local-only rows (e.g. freshly generated, not yet round-tripped) are kept.
-  //
-  // There used to be a client-side "deleted ids" blacklist here to hide rows
-  // the admin had just deleted, in case the backend hadn't caught up yet. That
-  // blacklist was written unconditionally BEFORE the delete call's result was
-  // even checked (see QrCodesPage/OverviewPage/QRFleetDashboard), so any delete
-  // that actually failed server-side (e.g. the FK-constraint bug previously in
-  // qrModel.js) still hid the row here forever — a real Supabase row that could
-  // never show up in this admin panel again. Deletes now propagate real success/
-  // failure and only update local state on confirmed success, so backend rows
-  // can be trusted directly with no separate hide-list.
+  // The fleet list backs the tables. Backend rows are the source of truth; a row
+  // that exists only locally survives just long enough for its create call to
+  // round-trip, after which it is a ghost (deleted elsewhere) and is dropped.
+  // Deletes only update state on confirmed success, so there is no client-side
+  // "hidden ids" blacklist to go stale.
+  const refreshFleet = usePolling(async () => {
+    const res = await apiClient.qr.getQrCodes(500);
+    const rows = res?.data;
+    if (!rows) return;
+    const mapped = rows.map(mapRowToRecord);
+
+    // Sync any server-side printed flags into the local printedStickerIdList set
+    const serverPrintedIds = rows.filter((r: any) => Boolean(r.is_printed)).map((r: any) => r.id);
+    if (serverPrintedIds.length > 0) {
+      setPrintedStickerIdList((prev) => Array.from(new Set([...prev, ...serverPrintedIds])));
+    }
+
+    setQrList((prev) => {
+      const backendIds = new Set(mapped.map((r) => r.id));
+      const now = Date.now();
+      const freshLocalOnly = prev.filter(
+        (r) => !backendIds.has(r.id) && now - new Date(r.createdAt || 0).getTime() < LOCAL_ONLY_GRACE_MS
+      );
+      return [...freshLocalOnly, ...mapped];
+    });
+  }, { intervalMs: FLEET_FALLBACK_INTERVAL_MS, enabled: isAdmin });
+
+  // Re-download the list only when the heartbeat reports the fleet actually changed.
+  const tagSignature = summary
+    ? `${summary.tags.total}|${summary.tags.active}|${summary.tags.scans}|${summary.tags.lastCreatedAt}`
+    : null;
+  const lastSignatureRef = useRef<string | null>(null);
+  const refreshFleetRef = useRef(refreshFleet);
+  refreshFleetRef.current = refreshFleet;
   useEffect(() => {
-    if (!isAdmin) return;
-    const sync = () => {
-      apiClient.qr.getQrCodes(500).then((res) => {
-        const rows = res?.data;
-        if (!rows) return;
-        const mapped: QrRecord[] = rows.map((r: any) => ({
-          id: r.id,
-          qrUrl: qrFullUrl(r.id),
-          clientId: r.client_id,
-          createdAt: r.created_at,
-          scans: r.scans_count || 0,
-          status: r.status || "inactive",
-          template: r.template_name || "Default",
-          category: r.category || "car",
-          fg: r.fg_color || "D9581F",
-          bg: r.bg_color || "FFFFFF",
-          ownerPhone: r.owner_phone || undefined,
-          ownerName: r.owner_name || undefined,
-          vehicleNumber: r.vehicle_number || undefined,
-          activatedAt: r.activated_at || undefined,
-          labelName: r.label_name || undefined,
-          labelColor: r.label_color || undefined,
-          isPrinted: Boolean(r.is_printed),
-        }));
-        // Sync any server-side printed flags into the local printedStickerIdList set
-        const serverPrintedIds = rows.filter((r: any) => Boolean(r.is_printed)).map((r: any) => r.id);
-        if (serverPrintedIds.length > 0) {
-          setPrintedStickerIdList((prev) => Array.from(new Set([...prev, ...serverPrintedIds])));
-        }
-        setQrList((prev) => {
-          const backendIds = new Set(mapped.map((r) => r.id));
-          const localOnly = prev.filter((r) => !backendIds.has(r.id));
-          return [...mapped, ...localOnly];
-        });
-      }).catch(() => { /* transient network error */ });
-    };
-    sync();
-    const interval = setInterval(sync, 15000);
-    return () => clearInterval(interval);
-  }, [isAdmin]);
+    if (!tagSignature) return;
+    if (lastSignatureRef.current !== null && lastSignatureRef.current !== tagSignature) refreshFleetRef.current();
+    lastSignatureRef.current = tagSignature;
+  }, [tagSignature]);
+
+  const refreshAll = useCallback(() => {
+    refreshSummary();
+    refreshFleet();
+  }, [refreshSummary, refreshFleet]);
 
   const admin = {
     name: profile?.fullName || (isAdmin ? "System Admin" : "Client User"),
     email: profile?.email || "",
     role: isAdmin ? "Administrator" : "Client Account",
+  };
+
+  const attention = summary?.attention;
+  const badges: Record<string, number> = {
+    alerts: attention?.unresolvedAlerts ?? 0,
+    orders: attention?.ordersToShip ?? 0,
+    distributors: attention?.pendingPartners ?? 0,
+    messages: attention?.failedMessages24h ?? 0,
+    repichat: unreadChats,
   };
 
   // Persist active menu & reset search on page change & guard admin-only pages for client users
@@ -203,7 +220,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
 
       <Sidebar
         page={page} setPage={setPage} admin={admin} onBack={onBack} onSignOut={signOut}
-        unreadAlerts={unreadAlerts} unreadChats={unreadChats}
+        badges={badges}
         isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)}
       />
 
@@ -220,10 +237,10 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
         <div className="flex-1 overflow-y-auto">
           {page === "overview" && (
             <OverviewPage
-              qrList={qrList} setQrList={setQrList} templates={templates}
+              qrList={qrList} setQrList={setQrList}
+              summary={summary} onRefresh={refreshAll}
               setPage={setPage} openQuickLook={setQuickLookQr}
-              openRestore={() => setRestoreModalOpen(true)} setToast={setToast}
-              openPrintSheet={handleOpenPrintSheet} admin={admin}
+              setToast={setToast} openPrintSheet={handleOpenPrintSheet}
             />
           )}
           {page === "orders" && <OrdersPage setToast={setToast} />}
@@ -244,10 +261,11 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
             <AlertsPage
               qrList={qrList} setQrList={setQrList} templates={templates}
               setToast={setToast} searchQuery={searchQuery} isAdmin={isAdmin}
+              onChanged={refreshSummary}
             />
           )}
           {page === "repichat" && <RepiChatPage />}
-           {page === "users" && <UsersPage setToast={setToast} />}
+          {page === "users" && <UsersPage setToast={setToast} />}
           {page === "products" && <ShopProductsPage setToast={setToast} />}
 
           {page === "customize" && (

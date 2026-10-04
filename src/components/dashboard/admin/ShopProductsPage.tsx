@@ -206,9 +206,6 @@ export default function ShopProductsPage({ setToast }: { setToast: (msg: string 
                 {products.length}
               </span>
             </h1>
-            <p className="text-[13px] text-[var(--fx-ink-2)] mt-0.5">
-              What's shown in the landing page shop and the client dashboard's pre-purchase shop.
-            </p>
           </div>
         </div>
         <button onClick={openCreate} className="fx-btn fx-btn-primary">
@@ -218,25 +215,23 @@ export default function ShopProductsPage({ setToast }: { setToast: (msg: string 
 
       <div className="bg-white border border-[var(--fx-border)] rounded-md shadow-[0_1px_2px_rgba(24,24,27,0.05)] overflow-hidden">
         {loading ? (
-          <div className="p-16 text-center space-y-3">
+          <div className="py-10 px-6 text-center space-y-3">
             <Loader2 size={22} className="animate-spin mx-auto text-[var(--fx-accent-ink)]" />
             <p className="font-semibold text-[13px]">Loading products…</p>
           </div>
         ) : loadError ? (
-          <div className="p-16 text-center space-y-3">
+          <div className="py-10 px-6 text-center space-y-3">
             <p className="font-bold text-[13px]">Couldn't load products.</p>
             <p className="text-[12px] text-[var(--fx-ink-2)] font-mono">{loadError}</p>
             <button onClick={load} className="fx-btn fx-btn-secondary h-10">Retry</button>
           </div>
         ) : products.length === 0 ? (
-          <div className="p-16 text-center space-y-3">
+          <div className="py-10 px-6 text-center space-y-3">
             <Package size={28} className="mx-auto text-[var(--fx-faint)]" />
-            <p className="font-bold text-[13px]">No products yet.</p>
-            <p className="text-[12.5px] text-[var(--fx-ink-2)] max-w-[420px] mx-auto">
-              The landing page and client shop fall back to the built-in default catalog until you add at least one product here.
-            </p>
+            <p className="font-bold text-[13px]">No products yet</p>
+            <p className="text-[12.5px] text-[var(--fx-ink-2)]">The shop shows the default catalog until you add one.</p>
             <button onClick={openCreate} className="fx-btn fx-btn-primary h-10 mx-auto">
-              <Plus size={14} /> Add your first product
+              <Plus size={14} /> Add product
             </button>
           </div>
         ) : (

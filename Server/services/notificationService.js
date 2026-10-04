@@ -23,6 +23,11 @@ const { getTemplate, buildBody, buildVariables } = require('./notificationTempla
 
 /** Per (recipient, notification type) WhatsApp cap, resets every calendar month. */
 const MONTHLY_LIMIT_PER_TYPE = 10;
+/**
+ * Emergency alerts get a far higher cap: a real emergency must never be dropped
+ * because routine or test alerts already used up the default quota this month.
+ */
+const MONTHLY_LIMIT_BY_TYPE = { EMERGENCY_ALERT: 500, EMERGENCY_CONTACT_ALERT: 500 };
 
 // Anti-spam debounce: minimum 30 seconds between alerts of the same type to the same recipient
 const RECENT_SENDS = new Map();
@@ -39,6 +44,14 @@ const DUPLICATE_WINDOW_MS = 60 * 1000;
 // OTP is a login/verification code, never subject to the notification quota —
 // capping it could lock a client out of their own account.
 const UNLIMITED_TYPES = new Set(['OTP']);
+
+/** "45s" or "4m 05s" — how long until a WhatsApp of this kind is allowed again. */
+function formatWait(totalSec) {
+  const s = Math.max(0, Math.ceil(totalSec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return m > 0 ? `${m}m ${String(r).padStart(2, '0')}s` : `${r}s`;
+}
 
 /**
  * Send one notification.
@@ -67,7 +80,9 @@ async function notify({ type, to, data = {}, eventId = null }) {
     if (now - lastSent < ANTI_SPAM_COOLDOWN_MS) {
       const waitSec = Math.ceil((ANTI_SPAM_COOLDOWN_MS - (now - lastSent)) / 1000);
       logger.warn('NOTIFY', `Anti-spam debounce active for ${to} (${type}) — wait ${waitSec}s.`);
-      return { sent: true, mock: false, status: 'cooldown_active', note: `Debounced to prevent spam. Please wait ${waitSec}s.` };
+      const detail = `The owner was messaged moments ago. The next WhatsApp of this type is allowed in ${formatWait(waitSec)}.`;
+      MessageModel.record({ channel: 'whatsapp', to, event, status: 'held', error: detail });
+      return { sent: false, mock: false, status: 'held', reason: 'debounce', retryAfterSec: waitSec, detail };
     }
     RECENT_SENDS.set(key, now);
     if (RECENT_SENDS.size > 1000) {
@@ -84,7 +99,10 @@ async function notify({ type, to, data = {}, eventId = null }) {
     const now = Date.now();
     if (now - (RECENT_BODIES.get(dupKey) || 0) < DUPLICATE_WINDOW_MS) {
       logger.warn('NOTIFY', `Skipped duplicate ${type} to ${to} — identical message already sent in the last minute.`);
-      return { sent: true, mock: false, status: 'duplicate_suppressed', note: 'Identical message already sent.' };
+      const waitSec = Math.ceil((DUPLICATE_WINDOW_MS - (now - (RECENT_BODIES.get(dupKey) || 0))) / 1000);
+      const detail = `This exact alert was just sent to the owner. An identical repeat is held for ${formatWait(waitSec)}.`;
+      MessageModel.record({ channel: 'whatsapp', to, event, status: 'held', error: detail });
+      return { sent: false, mock: false, status: 'held', reason: 'duplicate', retryAfterSec: waitSec, detail };
     }
     RECENT_BODIES.set(dupKey, now);
     if (RECENT_BODIES.size > 1000) {
@@ -95,10 +113,16 @@ async function notify({ type, to, data = {}, eventId = null }) {
   }
 
   if (!UNLIMITED_TYPES.has(type)) {
+    const monthlyLimit = MONTHLY_LIMIT_BY_TYPE[type] ?? MONTHLY_LIMIT_PER_TYPE;
     const sentThisMonth = await MessageModel.countThisMonth({ to, event });
-    if (sentThisMonth >= MONTHLY_LIMIT_PER_TYPE) {
-      logger.warn('NOTIFY', `Monthly WhatsApp limit (${MONTHLY_LIMIT_PER_TYPE}) reached for ${type} to ${to} — skipping.`);
-      return { sent: false, mock: false, status: 'limit_reached', error: 'monthly_limit_reached' };
+    if (sentThisMonth >= monthlyLimit) {
+      logger.warn('NOTIFY', `Monthly WhatsApp limit (${monthlyLimit}) reached for ${type} to ${to} — skipping.`);
+      const nextReset = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
+      const retryAfterSec = Math.ceil((nextReset.getTime() - Date.now()) / 1000);
+      const resetLabel = nextReset.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      const detail = `Monthly WhatsApp limit reached for this owner (${monthlyLimit} per month). It resets on ${resetLabel}.`;
+      MessageModel.record({ channel: 'whatsapp', to, event, status: 'held', error: detail });
+      return { sent: false, mock: false, status: 'limit_reached', reason: 'monthly_limit', retryAfterSec, detail, error: 'monthly_limit_reached' };
     }
   }
 
@@ -125,11 +149,16 @@ async function notify({ type, to, data = {}, eventId = null }) {
       body,
     });
 
-    return { ...result, eventId };
+    const rejected = !result.sent && !result.mock;
+    return {
+      ...result,
+      eventId,
+      ...(rejected ? { reason: 'provider_failed', detail: `The WhatsApp provider did not accept the message: ${result.error || result.status}.` } : {}),
+    };
   } catch (err) {
     logger.error('NOTIFY', `Provider "${provider.name}" threw sending ${type} to ${to}`, err);
     MessageModel.record({ channel: 'whatsapp', to, event, status: 'failed', error: err.message, body });
-    return { sent: false, mock: false, status: 'failed', error: err.message };
+    return { sent: false, mock: false, status: 'failed', error: err.message, reason: 'provider_failed', detail: `The WhatsApp provider failed: ${err.message}` };
   }
 }
 
@@ -188,6 +217,7 @@ const activeProvider = () => resolveProvider().name;
 
 module.exports = {
   notify,
+  formatWait,
   notifyMany,
   notifyOwner,
   notifyEmergencyContacts,

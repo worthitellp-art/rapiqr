@@ -171,9 +171,6 @@ export default function EmergencyContactsPanel({
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-[var(--fx-ink)]">Emergency Contacts</h1>
-        <p className="text-xs sm:text-sm text-[var(--fx-ink-2)] mt-1">
-          Add up to 7 emergency contacts per tag. Verify phone numbers to ensure emergency alerts reach the right people.
-        </p>
       </div>
 
       {products.length === 0 ? (

@@ -15,9 +15,9 @@ import {
 import { useOtpLock } from '../../lib/useOtpLock';
 
 const sendLockedMessage = (time: string) =>
-  `You've used all ${MAX_OTP_ATTEMPTS} code requests. For your security, new codes are locked for 4 hours — try again in ${time}.`;
+  `You've used all ${MAX_OTP_ATTEMPTS} code requests. For your security, new codes are locked for 1 hour — try again in ${time}.`;
 const verifyLockedMessage = (time: string) =>
-  `Too many incorrect codes (${MAX_OTP_ATTEMPTS}/${MAX_OTP_ATTEMPTS}). For your security, verification is locked for 4 hours — try again in ${time}.`;
+  `Too many incorrect codes (${MAX_OTP_ATTEMPTS}/${MAX_OTP_ATTEMPTS}). For your security, verification is locked for 1 hour — try again in ${time}.`;
 
 interface DashboardAccessModalProps {
   isOpen: boolean;
@@ -211,7 +211,7 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
           <div className="p-3.5 rounded-md bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold flex items-start gap-2">
             <AlertCircle size={15} className="mt-0.5 shrink-0 text-amber-700" />
             <div>
-              <p className="font-bold">Locked for 4 hours</p>
+              <p className="font-bold">Locked for 1 hour</p>
               <p className="text-[11.5px] text-amber-800 mt-0.5">
                 {step === 'otp'
                   ? `${MAX_OTP_ATTEMPTS} incorrect codes entered.`
@@ -251,9 +251,9 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
               type="text"
               inputMode="numeric"
               autoComplete="one-time-code"
-              maxLength={6}
+              maxLength={4}
               value={otpCode}
-              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
               placeholder="Enter code"
               autoFocus
               disabled={verifyLockMs > 0}

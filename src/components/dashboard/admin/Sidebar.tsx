@@ -1,8 +1,9 @@
-﻿import { LogOut, Settings as SettingsIcon } from "lucide-react";
+import { Globe, LogOut } from "lucide-react";
 import { NAV_ITEMS, REPICHAT_NAV_ITEM } from "./constants";
 import AppLogo from "../../common/AppLogo";
-import FxSidebarShell from "../shared/FxSidebarShell";
-import FxNavItem from "../shared/FxNavItem";
+import FxSidebar, { FxSidebarItem } from "../shared/FxSidebar";
+
+const ALERT_TONE_IDS = new Set(["alerts", "messages", "repichat"]);
 
 export default function Sidebar({
   page,
@@ -10,8 +11,7 @@ export default function Sidebar({
   admin,
   onBack,
   onSignOut,
-  unreadAlerts,
-  unreadChats,
+  badges = {},
   isOpen = false,
   onClose,
 }: {
@@ -20,15 +20,15 @@ export default function Sidebar({
   admin: { name: string; email?: string; role?: string };
   onBack: () => void;
   onSignOut: () => void;
-  unreadAlerts?: number;
-  unreadChats?: number;
+  /** Count per nav id (alerts, orders, distributors, messages, repichat); 0/absent shows nothing. */
+  badges?: Record<string, number>;
   /** Mobile drawer state — ignored at md+ where the sidebar is always docked. */
   isOpen?: boolean;
   onClose?: () => void;
 }) {
   const isClientUser = admin.role === "Client Account";
 
-  const mainNav = isClientUser
+  const navItems = isClientUser
     ? [
         { id: "qr", label: "Your Codes", icon: NAV_ITEMS.find((i) => i.id === "qr")!.icon },
         { id: "alerts", label: "Alerts", icon: NAV_ITEMS.find((i) => i.id === "alerts")!.icon },
@@ -36,11 +36,23 @@ export default function Sidebar({
       ]
     : NAV_ITEMS;
 
+  const items: FxSidebarItem[] = navItems.map((item) => ({
+    ...item,
+    section: (item as { section?: string }).section,
+    badge: badges[item.id],
+    // Red only where the count means "something is going wrong / waiting on you now".
+    badgeTone: ALERT_TONE_IDS.has(item.id) ? "alert" : "neutral",
+  }));
+
   return (
-    <FxSidebarShell
+    <FxSidebar
+      storageKey="admin"
+      items={items}
+      activeId={page}
+      onSelect={setPage}
       isOpen={isOpen}
       onClose={onClose}
-      logoSlot={
+      logo={
         <a
           href="/"
           className="flex items-center cursor-pointer group"
@@ -53,56 +65,16 @@ export default function Sidebar({
           <AppLogo variant="light" className="h-7 w-auto object-contain transition-transform group-hover:scale-105" />
         </a>
       }
-      footerSlot={
-        <>
-          <button
-            onClick={() => { setPage("customize"); onClose?.(); }}
-            className="w-full flex items-center gap-2.5 h-[38px] px-3 rounded-lg text-[13.5px] text-[var(--fx-sidebar-ink)] hover:text-[var(--fx-ink)] hover:bg-[var(--fx-sidebar-hover)] transition-colors cursor-pointer"
-          >
-            <SettingsIcon size={15} />
-            <span>Settings</span>
-          </button>
-
-          <div className="flex items-center justify-between p-2.5 rounded-lg bg-[var(--fx-sidebar-hover)] mt-2">
-            <div className="min-w-0 flex-1">
-              <p className="text-[12px] font-bold text-[var(--fx-ink)] truncate leading-tight">{admin.name}</p>
-              <p className="text-[10px] font-medium text-[var(--fx-accent-ink)] truncate tracking-normal capitalize">{admin.role || "Admin"}</p>
-            </div>
-            <button
-              onClick={onSignOut}
-              className="p-1.5 rounded-lg text-[var(--fx-sidebar-ink)] hover:text-[var(--fx-red)] hover:bg-[var(--fx-red-soft)] transition-colors cursor-pointer"
-              title="Sign Out"
-            >
-              <LogOut size={15} />
-            </button>
-          </div>
-        </>
-      }
-    >
-      {(() => {
-        let lastSection: string | undefined;
-        return mainNav.map((item) => {
-          const Icon = item.icon;
-          const isActive = page === item.id;
-          const badge = item.id === "alerts" ? unreadAlerts : item.id === "repichat" ? unreadChats : undefined;
-          const section = (item as { section?: string }).section;
-          const showLabel = section && section !== lastSection;
-          lastSection = section;
-
-          return (
-            <div key={item.id}>
-              {showLabel && (
-                <p className="px-3 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--fx-faint)]">
-                  {section}
-                </p>
-              )}
-              <FxNavItem active={isActive} label={item.label} badge={badge} onClick={() => { setPage(item.id); onClose?.(); }}>
-                <Icon size={15} strokeWidth={2} />
-              </FxNavItem>
-            </div>
-          );
-        });
-      })()}
-    </FxSidebarShell>
+      cta={isClientUser ? undefined : { label: "Generate tags", onClick: () => setPage("qr") }}
+      account={{
+        name: admin.name,
+        email: admin.email,
+        subtitle: admin.role || "Admin",
+        menu: [
+          { label: "Back to site", icon: Globe, onClick: onBack },
+          { label: "Sign out", icon: LogOut, onClick: onSignOut, danger: true },
+        ],
+      }}
+    />
   );
 }

@@ -1,20 +1,3 @@
-there is sidebar also in @componenets.md apply in all dashboard that design best and greate best ui , and make better dashboard ui ux in admin ,  and data proper sync from backend as security spacilist and backend stucture spacalist 
-
-
-
-
-
-
-
-how to optimize this api from razor pay or this was nomral , in clien dashboard http://localhost:5000/api/products
-Request method
-GET api spam no need multiple times to call api ,  
-
-
-
-
-
-
 super admin :- 
 
 
@@ -99,3 +82,7 @@ EXECUTION & DELIVERABLE RULES:
   9. Remaining browser-visible third-party requests (with rationale)
 
   add real map with radius show 
+
+  and one more 
+(node:14272) [MONGOOSE] Warning: mongoose: Duplicate schema index on {"created_at":1} for model "Alert". This is often due to declaring an index using both "index: true" and "schema.index()". MongoDB will not create the duplicate index and options on the duplicate definition (such as expireAfterSeconds or unique) will not be applied. Please remove the duplicate index definition.
+(Use `node --trace-warnings ...` to show where the warning was created)

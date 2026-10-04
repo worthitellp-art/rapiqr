@@ -278,7 +278,7 @@ function renderBody(text: string, isOwn: boolean) {
         target="_blank"
         rel="noopener noreferrer"
         className={`underline underline-offset-2 break-all font-semibold ${
-          isOwn ? "text-[#3D2E00] decoration-[#3D2E00]/40" : "text-[#2B5FD9] decoration-[#2B5FD9]/40"
+          isOwn ? "text-white decoration-white/50" : "text-[#2B5FD9] decoration-[#2B5FD9]/40"
         }`}
       >
         {isMap ? "📍 Open location" : part.length > 42 ? `${part.slice(0, 39)}…` : part}
@@ -317,6 +317,8 @@ export default function RepiChat({
   const [resolvedTitle, setResolvedTitle] = useState(title);
   const [atBottom, setAtBottom] = useState(true);
   const [unseenCount, setUnseenCount] = useState(0);
+  // The visitor's live location: one card that updates in place, never a new message per fix.
+  const [liveLoc, setLiveLoc] = useState<{ lat: number; lng: number; updated_at: string } | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [lightbox, setLightbox] = useState<{ url: string; name?: string | null } | null>(null);
@@ -529,6 +531,11 @@ export default function RepiChat({
       setPeerTyping(false);
     };
 
+    const onLiveLocation = (payload: { sessionId: string; lat: number; lng: number; updated_at: string }) => {
+      if (payload.sessionId !== sessionId) return;
+      setLiveLoc({ lat: payload.lat, lng: payload.lng, updated_at: payload.updated_at });
+    };
+
     const onNewMessage = (msg: ChatMessage) => {
       if (msg.session_id !== sessionId) return;
       upsertMessage(msg);
@@ -536,16 +543,17 @@ export default function RepiChat({
 
       if (msg.sender_type !== mode) {
         if (!atBottomRef.current) setUnseenCount((n) => n + 1);
-        soundNotification.playMessageChime();
         const preview = msg.attachment_url
           ? msg.body
             ? `📷 ${msg.body}`
             : "📷 Photo"
           : msg.body;
-        soundNotification.showBrowserNotification(
-          headerTitleRef.current || "New Chat Message",
-          preview.length > 60 ? `${preview.slice(0, 60)}…` : preview
-        );
+        soundNotification.notifyIncomingMessage({
+          id: msg.id,
+          threadId: msg.session_id,
+          title: headerTitleRef.current || "New Chat Message",
+          body: preview.length > 60 ? `${preview.slice(0, 60)}…` : preview,
+        });
         if (document.visibilityState === "visible") socket.emit("mark_read", { sessionId });
       }
     };
@@ -580,6 +588,7 @@ export default function RepiChat({
     socket.on("typing", onTyping);
     socket.on("read", onRead);
     socket.on("delivered", onDelivered);
+    socket.on("live_location", onLiveLocation);
 
     return () => {
       socket.off("connect", onConnect);
@@ -588,6 +597,7 @@ export default function RepiChat({
       socket.off("typing", onTyping);
       socket.off("read", onRead);
       socket.off("delivered", onDelivered);
+      socket.off("live_location", onLiveLocation);
     };
   }, [ready, sessionId, mode, customerToken, upsertMessage, syncHistory]);
 
@@ -994,6 +1004,16 @@ export default function RepiChat({
         ? subtitle || "Online"
         : "Reconnecting…";
 
+  // Esc closes the chat; when the image lightbox is open it takes Esc first.
+  useEffect(() => {
+    if (!onClose) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape" && !lightbox) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, lightbox]);
+
   const peerInitial = (headerTitle.trim()[0] || "?").toUpperCase();
 
   return (
@@ -1077,7 +1097,8 @@ export default function RepiChat({
               </div>
             </div>
           ) : (
-            <div className="flex flex-col">
+            <div className="flex flex-col w-full sm:max-w-3xl sm:mx-auto">
+              {liveLoc && <LiveLocationCard loc={liveLoc} />}
               {rows.map((row) =>
                 row.kind === "day" ? (
                   <div key={row.key} className="flex justify-center my-3">
@@ -1147,7 +1168,7 @@ export default function RepiChat({
 
         <form
           onSubmit={handleSubmit}
-          className="flex items-end gap-1.5 sm:gap-2 px-2.5 sm:px-3 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:pb-3"
+          className="flex items-end gap-1.5 sm:gap-2 px-2.5 sm:px-3 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:pb-3 w-full sm:max-w-3xl sm:mx-auto"
         >
           <input
             ref={fileInputRef}
@@ -1279,6 +1300,43 @@ interface MessageBubbleProps {
   key?: React.Key;
 }
 
+/**
+ * The visitor's live location, shown as one card that the server updates in place
+ * every few seconds. "Live" while fixes keep arriving; greyed once they stop.
+ */
+function LiveLocationCard({ loc }: { loc: { lat: number; lng: number; updated_at: string } }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const ageSec = Math.max(0, Math.round((Date.now() - new Date(loc.updated_at).getTime()) / 1000));
+  const live = ageSec < 30;
+
+  return (
+    <div className="mb-3 rounded-2xl border border-[#EAEAE5] bg-white p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-[12.5px] font-bold text-[#211922]">
+          <span className={`w-2 h-2 rounded-full ${live ? "bg-emerald-500 animate-pulse" : "bg-gray-300"}`} aria-hidden />
+          {live ? "Live location" : "Location shared"}
+        </span>
+        <span className="text-[10.5px] font-medium text-[#91918C] tabular-nums">
+          {ageSec < 5 ? "just now" : `updated ${ageSec}s ago`}
+        </span>
+      </div>
+      <a
+        href={`https://www.google.com/maps?q=${loc.lat},${loc.lng}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-2 flex items-center justify-center gap-1.5 rounded-xl bg-[#111111] hover:bg-black text-white text-xs font-bold py-2 transition-colors"
+      >
+        Open map
+      </a>
+    </div>
+  );
+}
+
 function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubbleProps) {
   const { msg, isOwn, firstOfGroup, lastOfGroup } = row;
   const attachment = attachmentOf(msg);
@@ -1303,14 +1361,14 @@ function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubble
 
       <div className={`max-w-[82%] sm:max-w-[70%] min-w-0 ${isOwn ? "items-end" : "items-start"} flex flex-col`}>
         <div
-          className={`overflow-hidden rounded-lg transition-opacity ${
+          className={`overflow-hidden rounded-2xl transition-opacity ${
             attachment ? "p-1" : "px-3.5 py-2"
           } ${
             isOwn
-              ? `bg-[#FFF3C4] text-[#3D2E00] ${lastOfGroup ? "rounded-br-sm" : ""} ${msg.pending && !attachment ? "opacity-70" : ""} ${
-                  msg.failed ? "bg-[#FDEAEA]" : ""
+              ? `${msg.failed ? "bg-[#FDEAEA] text-[#9E0A0A]" : "bg-[#111111] text-white"} ${lastOfGroup ? "rounded-br-md" : ""} ${
+                  msg.pending && !attachment ? "opacity-70" : ""
                 }`
-              : `bg-white text-[#211922] border border-[#EAEAE5] ${lastOfGroup ? "rounded-bl-sm" : ""}`
+              : `bg-[#F1F1EE] text-[#211922] ${lastOfGroup ? "rounded-bl-md" : ""}`
           }`}
         >
           {attachment && (
@@ -1357,7 +1415,7 @@ function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubble
 
           <div
             className={`flex items-center gap-1 justify-end ${attachment ? "px-2.5 pb-1 pt-1" : "mt-0.5"} ${
-              isOwn ? "text-[#8A6D00]" : "text-[#91918C]"
+              isOwn && !msg.failed ? "text-white/60" : "text-[#91918C]"
             }`}
           >
             <span className="text-[10px] font-medium tabular-nums">{clockTime(msg.created_at)}</span>
@@ -1381,8 +1439,8 @@ function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubble
 
 function DeliveryTick({ msg }: { msg: UiMessage }) {
   if (msg.failed) return <AlertCircle size={13} className="text-[#9E0A0A]" aria-label="Not sent" />;
-  if (msg.pending) return <Clock size={12} className="text-[#8A6D00]" aria-label="Sending" />;
-  if (msg.read_at) return <CheckCheck size={14} className="text-[#2B5FD9]" aria-label="Read" />;
-  if (msg.delivered_at) return <CheckCheck size={14} className="text-[#8A6D00]" aria-label="Delivered" />;
-  return <Check size={13} className="text-[#8A6D00]" aria-label="Sent" />;
+  if (msg.pending) return <Clock size={12} className="text-white/60" aria-label="Sending" />;
+  if (msg.read_at) return <CheckCheck size={14} className="text-[#7DD3FC]" aria-label="Read" />;
+  if (msg.delivered_at) return <CheckCheck size={14} className="text-white/70" aria-label="Delivered" />;
+  return <Check size={13} className="text-white/70" aria-label="Sent" />;
 }

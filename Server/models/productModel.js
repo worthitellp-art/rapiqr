@@ -419,6 +419,40 @@ class ProductModel {
   }
 
   /**
+   * Scan/alert history across ALL of one owner's stickers in a single query,
+   * newest first. The History tab used to issue one request per sticker (N
+   * round-trips every time it opened); this is one `$in` lookup. Only that
+   * owner's own live stickers are ever matched.
+   */
+  static async getHistoryForUser(userId, limit = 300) {
+    try {
+      if (!userId) return [];
+      const owned = await Sticker.find({ user_id: userId, deleted_at: null }).select('_id').lean();
+      if (owned.length === 0) return [];
+
+      const docs = await Alert.find({ sticker_id: { $in: owned.map((s) => s._id) } })
+        .select('sticker_id type message reporter_phone location status created_at')
+        .sort({ created_at: -1 })
+        .limit(limit)
+        .lean();
+      return docs.map((d) => ({
+        id: String(d._id),
+        sticker_id: d.sticker_id,
+        type: d.type,
+        message: d.message,
+        reporter_phone: d.reporter_phone,
+        location: d.location,
+        status: d.status,
+        created_at: d.created_at,
+      }));
+    } catch (err) {
+      console.error(`ProductModel.getHistoryForUser (${userId}) Error:`, err);
+      logger.error('DB_PRODUCT', `ProductModel.getHistoryForUser failed (${userId})`, err);
+      return [];
+    }
+  }
+
+  /**
    * Scan/alert history for a single sticker, newest first.
    */
   static async getHistory(productId, limit = 100) {

@@ -1,6 +1,9 @@
 const OrderModel = require('../models/orderModel');
 const ShiprocketController = require('./shiprocketController');
 const { logger } = require('../middleware/loggerMiddleware');
+const { sendServerError } = require('../utils/httpErrors');
+const { logAuditEvent } = require('../services/auditService');
+const SecurityEventTypes = require('../utils/securityEventTypes');
 
 /**
  * Stickers themselves are free. Every checkout charges this flat amount,
@@ -188,7 +191,7 @@ class OrderController {
       return res.json({ success: true, data: allOrders });
     } catch (err) {
       logger.error('ORDER_MINE', 'Failed to list user orders', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -229,7 +232,7 @@ class OrderController {
       });
     } catch (err) {
       logger.error('ORDER_TRACK', `Failed to track order: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -281,7 +284,7 @@ class OrderController {
       });
     } catch (err) {
       logger.error('ORDER_TRACK_LOOKUP', 'Failed to lookup order tracking', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -321,7 +324,7 @@ class OrderController {
       return res.json({ success: true, data: refreshed.map(sanitizeOrderDetailsForPublicTracking) });
     } catch (err) {
       logger.error('ORDER_TRACK_BY_PHONE', 'Failed to lookup orders by phone', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -332,7 +335,7 @@ class OrderController {
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('ORDER_LIST', 'Failed to list orders', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -350,7 +353,7 @@ class OrderController {
       return res.json({ success: true, data: updated });
     } catch (err) {
       logger.error('ORDER_STATUS_UPDATE', `Failed to update order status: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -361,10 +364,18 @@ class OrderController {
       const removed = await OrderModel.delete(id);
       if (!removed) return res.status(404).json({ success: false, error: 'Order not found — it may already be deleted.' });
       logger.rowUpdated('orders', id, { action: 'deleted' });
+      await logAuditEvent({
+        eventType: SecurityEventTypes.DATA_DELETED,
+        actorType: 'ADMIN',
+        req,
+        resourceType: 'Order',
+        resourceId: String(id),
+        metadata: { action: 'delete_order' },
+      });
       return res.json({ success: true, message: `Order ${id} deleted successfully` });
     } catch (err) {
       logger.error('ORDER_DELETE', `Failed to delete order: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -373,10 +384,17 @@ class OrderController {
     try {
       await OrderModel.deleteAll();
       logger.event('ORDER', '🗑️', 'All orders cleared by admin');
+      await logAuditEvent({
+        eventType: SecurityEventTypes.DATA_DELETED,
+        actorType: 'ADMIN',
+        req,
+        resourceType: 'Order',
+        metadata: { action: 'delete_all_orders' },
+      });
       return res.json({ success: true, message: 'All orders deleted successfully' });
     } catch (err) {
       logger.error('ORDER_DELETE_ALL', 'Failed to delete all orders', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 }

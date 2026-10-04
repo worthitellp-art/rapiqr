@@ -1,5 +1,6 @@
 const HelplineModel = require('../models/helplineModel');
 const { logger } = require('../middleware/loggerMiddleware');
+const { sendServerError } = require('../utils/httpErrors');
 
 class HelplineController {
   /**
@@ -24,7 +25,7 @@ class HelplineController {
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('HELPLINE_LIST', 'Failed to fetch public helplines', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -69,7 +70,7 @@ class HelplineController {
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('HELPLINE_APPLY', 'Failed to submit provider application', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -82,7 +83,7 @@ class HelplineController {
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('HELPLINE_LIST', 'Failed to fetch helplines', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -97,7 +98,7 @@ class HelplineController {
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('HELPLINE_CREATE', 'Failed to create helpline', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -109,7 +110,7 @@ class HelplineController {
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('HELPLINE_UPDATE', `Failed to update helpline: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -121,7 +122,7 @@ class HelplineController {
       return res.json({ success: true });
     } catch (err) {
       logger.error('HELPLINE_DELETE', `Failed to delete helpline: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 }

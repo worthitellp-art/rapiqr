@@ -1,431 +1,282 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Store, QrCode, ShieldCheck, Plus, CheckCircle2, TrendingUp, 
-  MapPin, Phone, Users, Download, ArrowRight, LogOut, Package,
-  ExternalLink, Sparkles, Copy, Check
-} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Boxes, CheckCircle2, Clock, Globe, LayoutGrid, Loader2, LogOut, MapPin, QrCode, RefreshCw, ScanLine, Store, Tag, XCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { dashboardTranslations } from '../../i18n/dashboardTranslations';
+import { apiClient, DistributorDashboardData } from '../../lib/apiClient';
+import { usePolling } from '../../hooks/usePolling';
 import LanguageSwitcher from '../common/LanguageSwitcher';
 import AppLogo from '../common/AppLogo';
-import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
+import FxSidebar, { FxSidebarItem } from './shared/FxSidebar';
+import FxKpiStrip from './shared/FxKpiStrip';
+import FxTable, { FxTableColumn } from './shared/FxTable';
 
-interface CustomerTag {
-  id: string;
-  customerName: string;
-  phone: string;
-  tagCode: string;
-  type: 'Vehicle' | 'Home Gate' | 'Family';
-  assignedAt: string;
+type TabId = 'overview' | 'stickers';
+type StickerRow = DistributorDashboardData['stickers'][number];
+type ApplicationStatus = 'pending' | 'approved' | 'rejected';
+
+const POLL_MS = 60_000;
+
+const fmtDay = (iso?: string | null) =>
+  iso ? new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
+const rowKeyOf = (s: StickerRow) => `${s.ref}-${s.allocatedAt}`;
+
+const stickerColumns: FxTableColumn<StickerRow>[] = [
+  { key: 'ref', header: 'Sticker', render: (s) => <span className="font-mono font-semibold">{s.ref}</span> },
+  { key: 'type', header: 'Type', render: (s) => <span className="capitalize text-[var(--fx-ink-2)]">{s.category}</span> },
+  {
+    key: 'customer',
+    header: 'Customer',
+    render: (s) => (s.ownerName ? <span className="font-semibold">{s.ownerName}</span> : <span className="text-[var(--fx-faint)]">—</span>),
+  },
+  {
+    key: 'phone',
+    header: 'Phone',
+    render: (s) => (s.ownerPhone ? <span className="font-mono text-[12px]">{s.ownerPhone}</span> : <span className="text-[var(--fx-faint)]">—</span>),
+  },
+  { key: 'activated', header: 'Activated', render: (s) => <span className="text-[12px] text-[var(--fx-ink-2)]">{fmtDay(s.activatedAt)}</span> },
+  { key: 'scans', header: 'Scans', render: (s) => <span className="tabular-nums">{s.scans}</span> },
+  {
+    key: 'status',
+    header: 'Status',
+    align: 'right',
+    render: (s) => (
+      <span
+        className={`inline-flex items-center h-6 px-2 rounded-[var(--fx-radius-pill)] text-[12px] font-semibold ${
+          s.status === 'active' ? 'bg-[var(--fx-green-soft)] text-[var(--fx-green)]' : 'bg-[var(--fx-canvas)] text-[var(--fx-ink-2)]'
+        }`}
+      >
+        {s.status === 'active' ? 'Active' : 'In stock'}
+      </span>
+    ),
+  },
+];
+
+/** What a partner sees when the account isn't an approved distributor (yet). */
+function ApplicationGate({ status, onBack }: { status: ApplicationStatus | null; onBack: () => void }) {
+  const meta = {
+    pending: { icon: Clock, tone: 'bg-[var(--fx-amber-soft)] text-[var(--fx-amber)]', title: 'Application under review' },
+    rejected: { icon: XCircle, tone: 'bg-[var(--fx-red-soft)] text-[var(--fx-red)]', title: 'Application not approved' },
+    // Approved, yet this account was never granted the partner role (the application
+    // was filed before the account existed) — only support can finish linking it.
+    approved: { icon: CheckCircle2, tone: 'bg-[var(--fx-green-soft)] text-[var(--fx-green)]', title: 'Approved — contact support to finish setup' },
+    none: { icon: Store, tone: 'bg-[var(--fx-canvas)] text-[var(--fx-ink-2)]', title: 'No partner application yet' },
+  }[status ?? 'none'];
+  const Icon = meta.icon;
+
+  return (
+    <div className="fx-empty mx-auto max-w-md">
+      <span className={`w-11 h-11 rounded-[var(--fx-radius-control)] flex items-center justify-center ${meta.tone}`}>
+        <Icon size={20} />
+      </span>
+      <p className="text-[14px] font-semibold text-[var(--fx-ink)]">{meta.title}</p>
+      <button onClick={onBack} className="fx-btn fx-btn-secondary mt-1">Back to site</button>
+    </div>
+  );
 }
 
 export default function DistributorDashboard({ onBack }: { onBack: () => void }) {
   const { profile, signOut } = useAuth();
   const { language } = useLanguage();
   const t = dashboardTranslations[language].distributor;
-  const [activeTab, setActiveTab] = useState<'overview' | 'activate' | 'pos'>(() => {
+
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
     try {
-      const saved = localStorage.getItem('repiqr-distributor-active-tab') || localStorage.getItem('namoqr-distributor-active-tab');
-      if (saved && ['overview', 'activate', 'pos'].includes(saved)) {
-        return saved as 'overview' | 'activate' | 'pos';
-      }
+      const saved = localStorage.getItem('repiqr-distributor-active-tab');
+      if (saved === 'overview' || saved === 'stickers') return saved;
     } catch { /* fallback */ }
     return 'overview';
   });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const [data, setData] = useState<DistributorDashboardData | null>(null);
+  const [gate, setGate] = useState<ApplicationStatus | 'none' | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // The old screen saved customer names and phone numbers a partner typed in to
+  // localStorage. Nothing reads them any more — clear them rather than leave
+  // other people's personal data sitting in the browser.
   useEffect(() => {
     try {
-      localStorage.setItem('repiqr-distributor-active-tab', activeTab);
-    } catch { /* fallback */ }
-  }, [activeTab]);
-  
-  // Sample customer activations state
-  const [customerTags, setCustomerTags] = useState<CustomerTag[]>(() => {
-    const saved = localStorage.getItem('namoqr-distributor-assigned-tags');
-    if (saved) return JSON.parse(saved);
-    return [
-      { id: 'ACT-101', customerName: 'Vikram Sharma', phone: '+91 98112 33445', tagCode: 'CL-DIST-01', type: 'Vehicle', assignedAt: new Date(Date.now() - 3600000 * 4).toISOString() },
-      { id: 'ACT-102', customerName: 'Pooja Hegde', phone: '+91 97654 11223', tagCode: 'CL-DIST-02', type: 'Home Gate', assignedAt: new Date(Date.now() - 3600000 * 24).toISOString() },
-    ];
-  });
+      localStorage.removeItem('repiqr-distributor-assigned-tags');
+      localStorage.removeItem('namoqr-distributor-assigned-tags');
+    } catch { /* storage unavailable */ }
+  }, []);
 
-  // Activate new customer tag form
-  const [newCustomer, setNewCustomer] = useState({
-    name: '',
-    phone: '',
-    tagCode: '',
-    type: 'Vehicle' as 'Vehicle' | 'Home Gate' | 'Family',
-  });
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [copiedLink, setCopiedLink] = useState(false);
-
-  const handleAssignTag = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCustomer.name || !newCustomer.phone || !newCustomer.tagCode) return;
-
-    const newTag: CustomerTag = {
-      id: 'ACT-' + Date.now().toString().slice(-4),
-      customerName: newCustomer.name,
-      phone: newCustomer.phone,
-      tagCode: newCustomer.tagCode.toUpperCase(),
-      type: newCustomer.type,
-      assignedAt: new Date().toISOString(),
-    };
-
-    const updated = [newTag, ...customerTags];
-    setCustomerTags(updated);
-    try {
-      localStorage.setItem('repiqr-distributor-assigned-tags', JSON.stringify(updated));
-      localStorage.setItem('namoqr-distributor-assigned-tags', JSON.stringify(updated));
-    } catch {}
-
-    setSuccessMsg(`✓ Tag ${newTag.tagCode} successfully assigned to ${newTag.customerName}! Customer notified.`);
-    setNewCustomer({ name: '', phone: '', tagCode: '', type: 'Vehicle' });
-
-    setTimeout(() => setSuccessMsg(null), 4000);
+  const selectTab = (id: string) => {
+    setActiveTab(id as TabId);
+    try { localStorage.setItem('repiqr-distributor-active-tab', id); } catch { /* UI preference only */ }
   };
 
-  const remainingStock = 300 - customerTags.length;
-  const totalRevenue = customerTags.length * 499;
-  const partnerProfit = Math.round(totalRevenue * 0.6);
+  // Everything here comes from the backend: the partner's application and the stock
+  // an admin allocated to them. (This screen used to show invented customers, a
+  // fixed 300-tag stock and made-up revenue, all kept in localStorage.)
+  const refresh = usePolling(async () => {
+    try {
+      const res = await apiClient.distributors.myDashboard();
+      if (res?.success) {
+        setData(res.data);
+        setGate(null);
+        setError(null);
+      }
+    } catch (err: any) {
+      if (err?.status === 403) {
+        // Not (or no longer) an approved distributor — show where the application stands.
+        const app = await apiClient.distributors.myStatus().catch(() => null);
+        setData(null);
+        setGate((app?.data?.status as ApplicationStatus | undefined) ?? 'none');
+        setError(null);
+      } else {
+        setError(err?.message || 'Could not load your dashboard.');
+        throw err; // lets the poller back off
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, { intervalMs: POLL_MS });
+
+  const items: FxSidebarItem[] = [
+    { id: 'overview', label: 'Overview', icon: LayoutGrid },
+    { id: 'stickers', label: 'Stickers', icon: Tag },
+  ];
+
+  const stats = data?.stats;
+  const activationPct = stats && stats.allocated > 0 ? Math.round((stats.activated / stats.allocated) * 100) : 0;
+  const app = data?.application;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-gray-900 font-sans pb-12">
-      {/* ── Top Header Bar ────────────────────────────────────────── */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={onBack} className="flex items-center gap-2.5 cursor-pointer">
-              <AppLogo variant="light" className="h-7.5 w-auto object-contain" />
-              <div>
-                <span className="font-black text-xs text-[#111111] uppercase tracking-wider block">{t.partnerDesk}</span>
-              </div>
-            </button>
-          </div>
+    <div className="fx-shell h-screen w-full flex overflow-hidden text-[var(--fx-ink)]" style={{ background: 'var(--fx-canvas)' }}>
+      {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={() => setSidebarOpen(false)} aria-hidden="true" />}
 
-          <div className="flex items-center gap-3">
-            <LanguageSwitcher />
+      <FxSidebar
+        storageKey="distributor"
+        items={items}
+        activeId={activeTab}
+        onSelect={selectTab}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        logo={
+          <button onClick={onBack} className="flex items-center gap-2 cursor-pointer group" aria-label="RapiQR home">
+            <AppLogo variant="light" className="h-7 w-auto object-contain transition-transform group-hover:scale-105" />
+          </button>
+        }
+        account={{
+          name: profile?.fullName || t.partnerDesk,
+          email: profile?.email,
+          subtitle: gate ? t.partnerDesk : t.verifiedPartner,
+          tone: gate ? 'neutral' : 'ok',
+          menu: [
+            { label: t.exitToHome, icon: Globe, onClick: onBack },
+            { label: t.logOut, icon: LogOut, onClick: async () => { await signOut(); onBack(); }, danger: true },
+          ],
+        }}
+      />
 
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
-              <ShieldCheck size={14} className="text-emerald-600" />
-              <span>{t.verifiedPartner}: {profile?.fullName || 'City Franchise'}</span>
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <header className="h-[56px] flex-shrink-0 flex items-center gap-3 px-4 sm:px-6 lg:px-8 border-b border-[var(--fx-border)]">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="md:hidden w-8 h-8 flex-shrink-0 rounded-md bg-[var(--fx-surface)] border border-[var(--fx-border)] flex items-center justify-center cursor-pointer"
+            aria-label="Open navigation menu"
+          >
+            <LayoutGrid size={15} />
+          </button>
+          <h1 className="fx-text-heading-brand text-[var(--fx-ink)]">{t.partnerDesk}</h1>
+          <div className="flex-1" />
+          <LanguageSwitcher />
+          <button
+            type="button"
+            onClick={refresh}
+            aria-label="Refresh"
+            title="Refresh"
+            className="w-9 h-9 flex-shrink-0 rounded-[var(--fx-radius-control)] border border-[var(--fx-border)] bg-[var(--fx-surface)] flex items-center justify-center text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] cursor-pointer"
+          >
+            <RefreshCw size={15} />
+          </button>
+        </header>
+
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 pt-6 pb-16 space-y-6">
+          {loading ? (
+            <div className="fx-empty"><Loader2 size={22} className="fx-spin text-[var(--fx-ink-2)]" /></div>
+          ) : gate ? (
+            <ApplicationGate status={gate === 'none' ? null : gate} onBack={onBack} />
+          ) : error && !data ? (
+            <div className="fx-empty" role="alert">
+              <p className="text-[13px] font-semibold text-[var(--fx-red)]">{error}</p>
+              <button onClick={refresh} className="fx-btn fx-btn-secondary mt-1"><RefreshCw size={14} /> Retry</button>
             </div>
-
-            <button
-              onClick={onBack}
-              className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              {t.exitToHome}
-            </button>
-            <button
-              onClick={async () => { await signOut(); onBack(); }}
-              className="p-2 rounded-xl text-red-600 hover:bg-red-50 transition-colors"
-              title={t.logOut}
-            >
-              <LogOut size={16} />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* ── Main Container ───────────────────────────────────────── */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
-        
-        {/* Welcome Banner */}
-        <div className="bg-gradient-to-r from-gray-950 via-gray-900 to-black text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
-          <div className="absolute right-0 top-0 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-          
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-            <div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-white text-gray-950 uppercase tracking-wider mb-3">
-                <Sparkles size={13} /> Verified Master Distributor
-              </span>
-              <h1 className="text-2xl sm:text-3xl font-black">
-                Welcome back, {profile?.fullName || 'Distributor Partner'}!
-              </h1>
-              <p className="text-xs sm:text-sm text-gray-300 mt-1 max-w-xl">
-                Manage your QR sticker inventory, activate tags for retail customers in 5 seconds, and track profit margins.
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={() => setActiveTab('activate')}
-                className="px-5 py-3 rounded-2xl bg-white hover:bg-neutral-100 text-gray-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
-              >
-                <Plus size={16} /> Activate Customer Tag
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* KPI Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-gray-500">Unassigned Inventory</span>
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                <Package size={16} />
-              </div>
-            </div>
-            <div className="text-2xl font-black text-gray-900">{remainingStock} <span className="text-xs font-normal text-gray-400">/ 300 Tags</span></div>
-            <p className="text-[11px] text-gray-500 mt-1">Ready for retail customer activation</p>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-gray-500">Partner Profit Earned</span>
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                <TrendingUp size={16} />
-              </div>
-            </div>
-            <div className="text-2xl font-black text-emerald-600">₹{partnerProfit.toLocaleString()}</div>
-            <p className="text-[11px] text-gray-500 mt-1">60% Profit Margin on activated tags</p>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-gray-500">Customer Tags Linked</span>
-              <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-                <Users size={16} />
-              </div>
-            </div>
-            <div className="text-2xl font-black text-gray-900">{customerTags.length} <span className="text-xs font-normal text-gray-400">Active</span></div>
-            <p className="text-[11px] text-gray-500 mt-1">Assigned to end-users</p>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-gray-500">Exclusive Territory</span>
-              <div className="w-8 h-8 rounded-xl bg-gray-100 text-[#111111] flex items-center justify-center font-bold">
-                <MapPin size={16} />
-              </div>
-            </div>
-            <div className="text-lg font-black text-gray-900 truncate">City Master Lock</div>
-            <p className="text-[11px] text-emerald-600 font-bold mt-1">✓ Franchise Rights Protected</p>
-          </div>
-        </div>
-
-        {/* Tabs Bar */}
-        <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
-          {[
-            { id: 'overview', label: t.tabs.overview, icon: QrCode },
-            { id: 'activate', label: t.tabs.activate, icon: Plus },
-            { id: 'pos', label: t.tabs.pos, icon: Download },
-          ].map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                  isActive
-                    ? 'bg-[#111111] text-white shadow-sm'
-                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <Icon size={15} />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Tab 1: Assigned Tags List */}
-        {activeTab === 'overview' && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="font-extrabold text-base text-gray-900">Your Retail Customer Tags</h3>
-                <p className="text-xs text-gray-500">Tags assigned and activated through your distributor portal.</p>
-              </div>
-              <button
-                onClick={() => setActiveTab('activate')}
-                className="px-3.5 py-2 rounded-xl bg-gray-900 text-white font-bold text-xs flex items-center gap-1.5 hover:bg-gray-800"
-              >
-                <Plus size={14} /> Assign Tag
-              </button>
-            </div>
-
-            {customerTags.length === 0 ? (
-              <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400">
-                <QrCode size={40} className="mx-auto mb-2 text-gray-300" />
-                <p className="font-bold text-sm text-gray-600">No customer tags assigned yet.</p>
-                <p className="text-xs mt-1">Click "Assign New Tag" to activate a QR sticker for your shop buyer.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-gray-100 text-gray-400 font-semibold uppercase tracking-wider text-[10px]">
-                      <th className="pb-3">Customer Name</th>
-                      <th className="pb-3">Phone</th>
-                      <th className="pb-3">Tag Code</th>
-                      <th className="pb-3">Category</th>
-                      <th className="pb-3">Activation Date</th>
-                      <th className="pb-3 text-right">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
-                    {customerTags.map(tag => (
-                      <tr key={tag.id} className="hover:bg-gray-50/50">
-                        <td className="py-3 font-bold text-gray-900">{tag.customerName}</td>
-                        <td className="py-3 font-mono">{tag.phone}</td>
-                        <td className="py-3 font-mono font-bold text-[#111111]">{tag.tagCode}</td>
-                        <td className="py-3">
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-700">
-                            {tag.type}
-                          </span>
-                        </td>
-                        <td className="py-3 text-gray-400">{new Date(tag.assignedAt).toLocaleDateString()}</td>
-                        <td className="py-3 text-right">
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                            Active ✓
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Tab 2: Activate New Tag Form */}
-        {activeTab === 'activate' && (
-          <div className="max-w-2xl bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-            <h3 className="font-extrabold text-base text-gray-900 mb-1">Assign &amp; Activate Customer Tag</h3>
-            <p className="text-xs text-gray-500 mb-6">Instantly link an unallocated QR tag ID to a buyer's vehicle or home in 5 seconds.</p>
-
-            {successMsg && (
-              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold mb-6 flex items-center gap-2">
-                <CheckCircle2 size={18} className="text-emerald-600 flex-shrink-0" />
-                <span>{successMsg}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleAssignTag} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Customer Full Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Anish Kapoor"
-                  value={newCustomer.name}
-                  onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-[#111111]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Customer Phone Number</label>
-                  <PhoneInputWithCountry
-                    required
-                    value={newCustomer.phone}
-                    onChange={full => setNewCustomer({ ...newCustomer, phone: full })}
+          ) : data && stats ? (
+            <>
+              {activeTab === 'overview' && (
+                <>
+                  <FxKpiStrip
+                    cards={[
+                      { key: 'allocated', label: 'Allocated', value: stats.allocated.toLocaleString('en-IN'), icon: <Boxes size={14} /> },
+                      {
+                        key: 'activated',
+                        label: 'Activated',
+                        value: stats.activated.toLocaleString('en-IN'),
+                        tone: 'green',
+                        badge: stats.allocated > 0 ? { text: `${activationPct}%`, tone: 'green' } : undefined,
+                        icon: <CheckCircle2 size={14} />,
+                      },
+                      { key: 'stock', label: 'In stock', value: stats.inStock.toLocaleString('en-IN'), tone: stats.inStock > 0 ? 'amber' : 'neutral', icon: <QrCode size={14} /> },
+                      { key: 'scans', label: 'Scans', value: stats.scans.toLocaleString('en-IN'), icon: <ScanLine size={14} /> },
+                    ]}
                   />
+
+                  {app && (
+                    <div className="fx-card p-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px]">
+                      <span className="inline-flex items-center gap-1.5 font-semibold">
+                        <Store size={14} className="text-[var(--fx-ink-2)]" /> {app.business || t.partnerDesk}
+                      </span>
+                      {app.city && (
+                        <span className="inline-flex items-center gap-1.5 text-[var(--fx-ink-2)]">
+                          <MapPin size={13} /> {app.city}
+                        </span>
+                      )}
+                      {app.tier && <span className="text-[var(--fx-ink-2)]">{app.tier}</span>}
+                      <span className="text-[var(--fx-faint)]">Since {fmtDay(app.approvedAt || app.createdAt)}</span>
+                    </div>
+                  )}
+
+                  {stats.allocated === 0 ? (
+                    <div className="fx-empty">
+                      <Tag size={24} className="text-[var(--fx-faint)]" />
+                      <p className="text-[13.5px] font-semibold text-[var(--fx-ink)]">No stickers allocated yet</p>
+                    </div>
+                  ) : (
+                    <div className="fx-card p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-[15px] font-bold text-[var(--fx-ink)]">Recent activations</h2>
+                        <button onClick={() => selectTab('stickers')} className="text-[12.5px] font-semibold text-[var(--fx-accent)] hover:underline cursor-pointer">
+                          View all
+                        </button>
+                      </div>
+                      <FxTable<StickerRow>
+                        dense
+                        rows={data.stickers.filter((s) => s.status === 'active').slice(0, 5)}
+                        rowKey={rowKeyOf}
+                        emptyState="No activations yet"
+                        columns={stickerColumns.filter((c) => c.key !== 'status' && c.key !== 'type')}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+
+              {activeTab === 'stickers' && (
+                <div className="fx-card overflow-hidden">
+                  <FxTable<StickerRow> rows={data.stickers} rowKey={rowKeyOf} emptyState="No stickers allocated yet" columns={stickerColumns} />
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">QR Sticker Code ID</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. CL-DIST-05"
-                    value={newCustomer.tagCode}
-                    onChange={e => setNewCustomer({ ...newCustomer, tagCode: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-[#111111] font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Tag Application Type</label>
-                <select
-                  value={newCustomer.type}
-                  onChange={e => setNewCustomer({ ...newCustomer, type: e.target.value as any })}
-                  className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-[#111111]"
-                >
-                  <option value="Vehicle">Automobile / Two-Wheeler Safety Tag</option>
-                  <option value="Home Gate">Home Gate / Apartment Security Tag</option>
-                  <option value="Family">Family / Emergency SOS Card</option>
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3.5 rounded-xl font-bold bg-[#111111] text-white text-xs flex items-center justify-center gap-2 hover:bg-black transition-all shadow-md mt-4 cursor-pointer"
-              >
-                <CheckCircle2 size={16} /> Link &amp; Activate Customer Sticker
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* Tab 3: POS Marketing Kits */}
-        {activeTab === 'pos' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="w-12 h-12 rounded-2xl bg-gray-100 text-[#111111] flex items-center justify-center font-bold mb-4">
-                  <Download size={22} />
-                </div>
-                <h4 className="font-extrabold text-sm text-gray-900 mb-1">Acrylic Counter Display Art</h4>
-                <p className="text-xs text-gray-500 leading-relaxed mb-4">
-                  High-res printable tabletop display stand graphic with live scan QR demo.
-                </p>
-              </div>
-              <button
-                onClick={() => alert("Downloading Counter Stand Artwork PDF...")}
-                className="w-full py-2.5 rounded-xl font-bold bg-gray-900 text-white text-xs flex items-center justify-center gap-2 hover:bg-gray-800"
-              >
-                <Download size={14} /> Download PDF Kit
-              </button>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-800 flex items-center justify-center font-bold mb-4">
-                  <Sparkles size={22} />
-                </div>
-                <h4 className="font-extrabold text-sm text-gray-900 mb-1">Retail Banner & Poster Art</h4>
-                <p className="text-xs text-gray-500 leading-relaxed mb-4">
-                  Standee & flex poster graphics for auto accessory shops and society gates.
-                </p>
-              </div>
-              <button
-                onClick={() => alert("Downloading Poster Art Package...")}
-                className="w-full py-2.5 rounded-xl font-bold bg-gray-900 text-white text-xs flex items-center justify-center gap-2 hover:bg-gray-800"
-              >
-                <Download size={14} /> Download Banners (ZIP)
-              </button>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold mb-4">
-                  <Phone size={22} />
-                </div>
-                <h4 className="font-extrabold text-sm text-gray-900 mb-1">Sales Pitch & Demo Guide</h4>
-                <p className="text-xs text-gray-500 leading-relaxed mb-4">
-                  Script to convince vehicle owners & housing society admins in 30 seconds.
-                </p>
-              </div>
-              <button
-                onClick={() => alert("Opening Distributor Sales Playbook...")}
-                className="w-full py-2.5 rounded-xl font-bold bg-gray-900 text-white text-xs flex items-center justify-center gap-2 hover:bg-gray-800"
-              >
-                <Download size={14} /> Read Playbook
-              </button>
-            </div>
-          </div>
-        )}
-
-      </main>
+              )}
+            </>
+          ) : null}
+        </main>
+      </div>
     </div>
   );
 }

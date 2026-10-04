@@ -1411,16 +1411,7 @@ export default function QrCodesPage({
                     setTimeout(() => setToast(null), 3000);
                     return;
                   }
-                  setQrList((prev) => {
-                    const updated = prev.filter((x) => x.id !== targetId);
-                    try {
-                      localStorage.setItem("repiqr-qrlist", JSON.stringify(updated));
-                      localStorage.setItem("namoqr-qrlist", JSON.stringify(updated));
-                    } catch {
-                      /* ignore */
-                    }
-                    return updated;
-                  });
+                  setQrList((prev) => prev.filter((x) => x.id !== targetId));
                   setToast("Sticker deleted from database");
                   setTimeout(() => setToast(null), 2000);
                 }}

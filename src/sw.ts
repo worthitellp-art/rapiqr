@@ -39,7 +39,13 @@ self.addEventListener('push', (event: PushEvent) => {
     data: { url: data.url || '/' },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  // If an owner tab is already open and visible, the in-app chime and toast cover
+  // it — an OS notification on top would just be a second alert for one message.
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (windows.some((client) => client.visibilityState === 'visible')) return;
+    await self.registration.showNotification(title, options);
+  })());
 });
 
 /** Focus an already-open tab and navigate it, or open a fresh one. */

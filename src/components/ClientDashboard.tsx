@@ -39,6 +39,7 @@ import {
   Package,
   Zap,
   Wallet,
+  Globe,
 } from 'lucide-react';
 import { DEFAULT_PRODUCTS, mapApiShopProduct, type ProductItem } from '../data/products';
 
@@ -52,7 +53,7 @@ import AccountSettingsPanel from './dashboard/client/AccountSettingsPanel';
 import SupportLegalPanel from './dashboard/client/SupportLegalPanel';
 import CompleteProfilePopup from './dashboard/client/CompleteProfilePopup';
 import AppLogo from './common/AppLogo';
-import InitialAvatar from './common/InitialAvatar';
+import FxSidebar from './dashboard/shared/FxSidebar';
 import RepiChat from './chat/RepiChat';
 import { apiClient, ChatSession } from '../lib/apiClient';
 import { connectAsOwner } from '../lib/socketClient';
@@ -62,9 +63,9 @@ import { sendMsg91Otp, verifyMsg91Otp, toMsg91Identifier } from '../lib/msg91Wid
 import { stickerRef, useCodesRevealed } from '../lib/codeVisibility';
 import { CodeVisibilityToggleButton } from './dashboard/admin/StickerCodeComponents';
 
-async function getProductsFromDb(): Promise<any[]> {
+async function getProductsFromDb(opts: { sync?: boolean } = {}): Promise<any[]> {
   try {
-    const res = await apiClient.products.list();
+    const res = await apiClient.products.list(opts);
     return res.data || [];
   } catch (err) {
     console.warn('Failed to fetch products:', err);
@@ -132,6 +133,16 @@ async function recoverStickerInDb(stickerId: string): Promise<{ success: boolean
 async function getProductHistoryFromDb(productId: string): Promise<any[]> {
   try {
     const res = await apiClient.products.getHistory(productId);
+    return res.data || [];
+  } catch (err) {
+    console.warn('Failed to fetch sticker history:', err);
+    return [];
+  }
+}
+
+async function getAllHistoryFromDb(): Promise<any[]> {
+  try {
+    const res = await apiClient.products.getAllHistory();
     return res.data || [];
   } catch (err) {
     console.warn('Failed to fetch sticker history:', err);
@@ -308,7 +319,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
         // verifyPhoneOtp already wrote the verified number to the profile and ran the
         // server-side claim. The updatePhoneNumber() call that used to sit here re-sent
         // the number through the unverified PATCH path and re-triggered claiming.
-        const claimed = await loadProducts();
+        const claimed = await loadProducts({ sync: true });
         setOtpStep('input');
         setOtpCode('');
         const count = claimed?.length || res.claimedCount || 0;
@@ -405,12 +416,16 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   const productsFetchedAtRef = useRef(0);
   const productsInFlightRef = useRef(false);
 
-  const loadProducts = useCallback(async () => {
+  // `sync` is for user-driven reloads (the Refresh button, right after phone
+  // verification or linking): it forces the server to re-run sticker
+  // auto-claiming, which it otherwise throttles. Automatic reloads (first load,
+  // tab refocus) leave it off.
+  const loadProducts = useCallback(async (opts: { sync?: boolean } = {}) => {
     productsInFlightRef.current = true;
     // Only show the loading state on the first fetch; background refreshes stay silent.
     if (productsFetchedAtRef.current === 0) setProductsLoading(true);
     try {
-      const rows = await getProductsFromDb();
+      const rows = await getProductsFromDb({ sync: opts.sync });
       const mapped = Array.isArray(rows) ? rows.map(mapProductRow) : [];
 
       if (profile?.id) {
@@ -763,11 +778,12 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     const socket = connectAsOwner(token);
     const onNewMessage = (msg: any) => {
       if (msg.sender_type === 'customer') {
-        soundNotification.playMessageChime();
-        soundNotification.showBrowserNotification(
-          'New Visitor Message',
-          msg.body ? (msg.body.length > 50 ? `${msg.body.slice(0, 50)}…` : msg.body) : 'A visitor sent a message.'
-        );
+        soundNotification.notifyIncomingMessage({
+          id: msg.id,
+          threadId: msg.session_id,
+          title: 'New Visitor Message',
+          body: msg.body ? (msg.body.length > 50 ? `${msg.body.slice(0, 50)}…` : msg.body) : 'A visitor sent a message.',
+        });
         showToast(`💬 Visitor: ${msg.body ? (msg.body.length > 40 ? `${msg.body.slice(0, 40)}…` : msg.body) : 'New message'}`);
         loadOwnerSessions();
       }
@@ -783,22 +799,30 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     };
   }, [loadOwnerSessions, showToast]);
 
+  // Overview's "Recent Scans" card reads the same feed as the History tab, so both
+  // load it — before, only History did, and Overview claimed "No scans recorded"
+  // until the owner happened to open History once.
   useEffect(() => {
-    if (activeTab !== 'history' || products.length === 0) {
-      if (activeTab === 'history' && products.length === 0) setAllHistory([]);
+    const needsHistory = activeTab === 'history' || activeTab === 'overview';
+    if (!needsHistory || products.length === 0) {
+      if (needsHistory && products.length === 0) setAllHistory([]);
       return;
     }
     let cancelled = false;
     (async () => {
       setAllHistoryLoading(true);
-      const results = await Promise.all(
-        products.map(async (p) => {
-          const rows = await getProductHistoryFromDb(p.id);
-          return rows.map((r: any) => ({ ...r, stickerNickname: p.nickname, stickerVehicle: p.vehicleNumber, stickerCode: p.qrCodeId }));
-        })
-      );
+      // One request for every sticker's events (rows carry their sticker_id) —
+      // this used to fan out one request per sticker each time the tab opened.
+      const rows = await getAllHistoryFromDb();
       if (!cancelled) {
-        const merged = results.flat().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        const byId = new Map<string, DashboardSticker>(products.map((p) => [p.id, p] as const));
+        const merged = rows
+          .filter((r: any) => byId.has(r.sticker_id))
+          .map((r: any) => {
+            const p = byId.get(r.sticker_id)!;
+            return { ...r, stickerNickname: p.nickname, stickerVehicle: p.vehicleNumber, stickerCode: p.qrCodeId };
+          })
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         setAllHistory(merged);
         setAllHistoryLoading(false);
       }
@@ -952,7 +976,9 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   }
 
   return (
-    <div className="fx-shell min-h-screen w-full flex flex-col overflow-x-hidden text-[var(--fx-ink)] bg-[var(--fx-canvas)] font-body pb-16">
+    // overflow-x-clip (not -hidden): hidden makes this wrapper a scroll container,
+    // which stops the docked sidebar's `position: sticky` from sticking to the viewport.
+    <div className="fx-shell min-h-screen w-full flex flex-col overflow-x-clip text-[var(--fx-ink)] bg-[var(--fx-canvas)] font-body pb-16">
 
       <div className="flex flex-1 min-h-screen">
         {/* Mobile drawer backdrop — md+ docks the sidebar so it never renders there */}
@@ -964,109 +990,56 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
           />
         )}
 
-        {/* ─── SIDEBAR — light, same canvas family as the page, hairline border ─── */}
-        <aside
-          className={`w-[245px] flex-shrink-0 flex flex-col h-screen fixed left-0 top-0 bottom-0 py-4 px-3 border-r border-[var(--fx-border)] bg-[var(--fx-sidebar-bg)] text-[var(--fx-sidebar-ink)] z-30 transition-all duration-300 ${
-            isMobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
-          }`}
-        >
-          {/* Logo */}
-          <div className="flex items-center justify-between px-2 mb-4 flex-shrink-0">
-            <button onClick={onBack} className="flex items-center gap-2 cursor-pointer group">
-              <AppLogo variant="light" className="h-9 w-auto object-contain transition-transform group-hover:scale-105" />
+        {/* ─── SIDEBAR — the shared dashboard sidebar (see shared/FxSidebar) ─── */}
+        <FxSidebar
+          storageKey="client"
+          items={NAV_ITEMS.map((item) => ({
+            ...item,
+            badge: item.id === 'chat' ? totalUnreadChats : undefined,
+            badgeTone: 'alert' as const,
+          }))}
+          activeId={activeTab}
+          onSelect={(id) => setActiveTab(id as TabId)}
+          isOpen={isMobileSidebarOpen}
+          onClose={() => setIsMobileSidebarOpen(false)}
+          logo={
+            <button onClick={onBack} className="flex items-center gap-2 cursor-pointer group" aria-label="RapiQR home">
+              <AppLogo variant="light" className="h-8 w-auto object-contain transition-transform group-hover:scale-105" />
             </button>
-            <button
-              onClick={() => setIsMobileSidebarOpen(false)}
-              className="md:hidden p-1.5 rounded-lg text-[var(--fx-sidebar-ink)] hover:text-[var(--fx-ink)] hover:bg-[var(--fx-sidebar-hover)] transition-all cursor-pointer"
-              aria-label="Close navigation menu"
-            >
-              <X size={18} />
-            </button>
-          </div>
+          }
+          cta={{ label: 'Get free sticker', onClick: handlePurchaseStickerClick }}
+          widget={
+            // Onboarding progress only matters until it is done.
+            setupPercent < 100 ? (
+              <button
+                type="button"
+                onClick={() => setActiveTab('setup')}
+                className="w-full text-left border border-[var(--fx-border)] rounded-[var(--fx-radius-control)] p-3 bg-[var(--fx-surface)] hover:bg-[var(--fx-sidebar-hover)] transition-colors cursor-pointer"
+              >
+                <span className="flex justify-between items-center text-xs text-[var(--fx-ink)] font-semibold mb-2">
+                  <span>Set up your account</span>
+                  <span className="text-[var(--fx-ink-2)] tabular-nums">{completedSetupCount}/3</span>
+                </span>
+                <span className="block h-[6px] bg-[var(--fx-border)] rounded-full overflow-hidden">
+                  <span className="block h-full bg-[var(--fx-green)] rounded-full transition-all duration-500" style={{ width: `${setupPercent}%` }} />
+                </span>
+              </button>
+            ) : undefined
+          }
+          account={{
+            name: profile?.fullName || 'Client',
+            email: profile?.email,
+            subtitle: isAdminAccount ? 'Fleet admin' : profile?.isPhoneVerified ? 'Phone verified' : 'Phone unverified',
+            tone: isAdminAccount || profile?.isPhoneVerified ? 'ok' : 'warn',
+            menu: [
+              { label: 'Back to site', icon: Globe, onClick: onBack },
+              { label: 'Sign out', icon: LogOut, onClick: handleSignOut, danger: true },
+            ],
+          }}
+        />
 
-          {/* Setup Box Widget */}
-          <div
-            onClick={() => setActiveTab('setup')}
-            className="border border-[var(--fx-border)] rounded-lg p-3 mb-3 bg-[var(--fx-surface)] hover:bg-[var(--fx-sidebar-hover)] transition-colors cursor-pointer"
-          >
-            <div className="flex justify-between items-center text-xs text-[var(--fx-ink)] font-semibold mb-2">
-              <span>Set up your account</span>
-              <span className="text-[var(--fx-green)] font-bold">›</span>
-            </div>
-            <div className="h-[6px] bg-[var(--fx-border)] rounded-full overflow-hidden">
-              <div className="h-full bg-[var(--fx-green)] rounded-full transition-all duration-500" style={{ width: `${setupPercent}%` }} />
-            </div>
-            <div className="text-[11px] text-[var(--fx-sidebar-ink)] mt-1.5">{completedSetupCount}/3 completed</div>
-          </div>
-
-          {/* Nav */}
-          <nav className="flex-1 space-y-1 overflow-y-auto custom-scrollbar-light">
-            {(() => {
-              let lastSection: string | undefined;
-              return NAV_ITEMS.map((item) => {
-                const isActive = activeTab === item.id;
-                const isChat = item.id === 'chat';
-                const showLabel = item.section && item.section !== lastSection;
-                lastSection = item.section;
-                return (
-                  <div key={item.id}>
-                    {showLabel && (
-                      <p className="px-3 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--fx-faint)]">
-                        {item.section}
-                      </p>
-                    )}
-                    <button
-                      onClick={() => { setActiveTab(item.id); setIsMobileSidebarOpen(false); }}
-                      className={`w-full h-[38px] rounded-lg flex items-center justify-between pl-2.5 pr-3 text-[13.5px] transition-all cursor-pointer border-l-2 ${
-                        isActive
-                          ? 'bg-[var(--fx-accent-soft)] text-[var(--fx-ink)] font-semibold border-l-[var(--fx-accent)]'
-                          : 'text-[var(--fx-sidebar-ink)] border-l-transparent hover:bg-[var(--fx-sidebar-hover)] hover:text-[var(--fx-ink)]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <item.icon size={17} />
-                        <span className="truncate">{item.label}</span>
-                      </div>
-                      {isChat && totalUnreadChats > 0 && (
-                        <span className="bg-[var(--fx-accent)] text-white rounded-full text-[10px] font-bold px-2 py-0.5 shrink-0">
-                          {totalUnreadChats}
-                        </span>
-                      )}
-                    </button>
-                  </div>
-                );
-              });
-            })()}
-          </nav>
-
-          {/* Bottom Nav Profile */}
-          <div className="pt-3 border-t border-[var(--fx-border)] space-y-1.5">
-            <div className="flex items-center gap-3 p-2.5 rounded-lg bg-[var(--fx-sidebar-hover)] border border-[var(--fx-border)]">
-              <InitialAvatar
-                name={profile?.fullName}
-                email={profile?.email}
-                size={36}
-                className="border border-[var(--fx-border-strong)] shadow-xs"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-bold text-[var(--fx-ink)] truncate leading-tight">{profile?.fullName || 'Client'}</p>
-                <p className={`text-[11px] truncate font-mono font-medium mt-0.5 ${isAdminAccount || profile?.isPhoneVerified ? 'text-[var(--fx-green)]' : 'text-[var(--fx-amber)]'}`}>
-                  {isAdminAccount ? 'Fleet Admin' : profile?.isPhoneVerified ? '✓ Phone Verified' : '⚠ Phone Unverified'}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleSignOut}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-[var(--fx-red)] hover:bg-[var(--fx-red-soft)] transition-all cursor-pointer"
-            >
-              <LogOut size={15} />
-              <span>Sign Out</span>
-            </button>
-          </div>
-        </aside>
-
-        {/* ─── RIGHT MAIN CONTENT CANVAS (margin-left: 245px) ─── */}
-        <div className="flex-1 md:ml-[245px] min-h-screen flex flex-col min-w-0">
+        {/* ─── MAIN CONTENT CANVAS (the sidebar docks in flow at md+) ─── */}
+        <div className="flex-1 min-h-screen flex flex-col min-w-0">
           
           {/* Top Bar */}
           <header className="h-[62px] flex-shrink-0 bg-[var(--fx-canvas)] border-b border-[var(--fx-border)] flex items-center justify-between gap-2 sm:gap-4 px-3 sm:px-8 lg:px-10 z-20">
@@ -1097,9 +1070,10 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
             <div className="flex items-center gap-1.5 sm:gap-3 text-xs flex-shrink-0">
               <LanguageSwitcher />
 
+              {/* md+ has this action in the sidebar; keep it reachable on phones. */}
               <button
                 onClick={handlePurchaseStickerClick}
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[#111111] hover:bg-black active:scale-[0.99] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                className="md:hidden inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[#111111] hover:bg-black active:scale-[0.99] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
                 aria-label="Get a free sticker"
               >
                 <Plus size={14} />
@@ -1176,7 +1150,6 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b border-[var(--fx-border)] pb-4">
                     <div>
                       <h1 className="text-xl sm:text-2xl font-bold text-[var(--fx-ink)]">Welcome to RapiQR, {profile?.fullName || 'Client'}!</h1>
-                      <p className="text-xs text-[var(--fx-ink-2)] mt-1">Let's start step-by-step to protect your vehicles.</p>
                     </div>
                     <div className="flex items-center gap-3 text-xs">
                       <span className="font-semibold text-[var(--fx-ink)]">{completedSetupCount}/3 completed</span>
@@ -1354,7 +1327,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                         </button>
                         <button
                           onClick={async () => {
-                            const found = await loadProducts();
+                            const found = await loadProducts({ sync: true });
                             showToast(`Refreshed ${found?.length || 0} stickers`);
                           }}
                           className="w-full h-11 border border-[var(--fx-border)] rounded hover:border-[var(--fx-accent)] flex items-center px-3 gap-2.5 text-xs text-[var(--fx-ink)] font-medium hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
@@ -1386,7 +1359,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                         <div className="flex items-center gap-2.5">
                           <CodeVisibilityToggleButton isRevealed={codesRevealed} onToggleVisibility={() => setCodesRevealed(!codesRevealed)} />
                           <button onClick={() => setModal({ type: 'recover' })} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">Recover a sticker</button>
-                          <button onClick={() => loadProducts()} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">Refresh</button>
+                          <button onClick={() => loadProducts({ sync: true })} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">Refresh</button>
                         </div>
                       </div>
 
@@ -1535,11 +1508,8 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                 <div className="flex justify-between items-start flex-wrap gap-4">
                   <div>
                     <h1 className="font-display text-[26px] font-bold text-[var(--fx-ink)]">
-                      Live Visitor Chat Inbox
+                      Chat inbox
                     </h1>
-                    <p className="text-[13.5px] text-[var(--fx-ink-2)] mt-1">
-                      Real-time chat threads from visitors scanning your safety stickers
-                    </p>
                   </div>
                   <button
                     onClick={loadOwnerSessions}
@@ -1551,7 +1521,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                 </div>
 
                 {ownerSessionsLoading ? (
-                  <div className="bg-white border border-[var(--fx-border)] rounded-lg p-16 text-center text-[var(--fx-ink-2)]">
+                  <div className="bg-white border border-[var(--fx-border)] rounded-lg py-10 px-6 text-center text-[var(--fx-ink-2)]">
                     <Loader2 size={32} className="animate-spin mx-auto mb-2 text-[var(--fx-accent)]" />
                     <p className="text-xs font-semibold">Loading live visitor chat sessions...</p>
                   </div>
@@ -1622,23 +1592,20 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   <h1 className="font-display text-[26px] font-bold text-[var(--fx-ink)]">
                     Products
                   </h1>
-                  <p className="text-[13.5px] text-[var(--fx-ink-2)] mt-1">
-                    Your purchase history — every order placed at checkout, with payment status.
-                  </p>
                 </div>
 
                 {myOrdersLoading ? (
-                  <div className="bg-white border border-[var(--fx-border)] rounded-[14px] p-16 text-center text-[var(--fx-faint)]">
+                  <div className="bg-white border border-[var(--fx-border)] rounded-[14px] py-10 px-6 text-center text-[var(--fx-faint)]">
                     <Loader2 size={32} className="animate-spin mx-auto mb-2 text-[var(--fx-accent)]" />
                     <p className="text-[13.5px] font-semibold text-[var(--fx-ink)]">Loading your orders...</p>
                   </div>
                 ) : myOrdersError ? (
-                  <div className="bg-white border border-[var(--fx-border)] rounded-[14px] p-16 text-center text-[var(--fx-faint)]">
+                  <div className="bg-white border border-[var(--fx-border)] rounded-[14px] py-10 px-6 text-center text-[var(--fx-faint)]">
                     <AlertTriangle size={32} className="mx-auto mb-2 text-[#DC2626]" />
                     <p className="text-[13.5px] font-semibold text-[var(--fx-ink)]">{myOrdersError}</p>
                   </div>
                 ) : myOrders.length === 0 ? (
-                  <div className="bg-white border border-[var(--fx-border)] rounded-[14px] p-16 text-center text-[var(--fx-faint)]">
+                  <div className="bg-white border border-[var(--fx-border)] rounded-[14px] py-10 px-6 text-center text-[var(--fx-faint)]">
                     <ShoppingBag size={34} className="mx-auto mb-3 opacity-50 text-[var(--fx-accent)]" />
                     <p className="text-[13.5px] text-[var(--fx-ink)] font-semibold">No orders yet.</p>
                     <p className="text-[12.5px] text-[var(--fx-faint)] mt-1">Purchases you make on the RapiQR store will show up here.</p>
@@ -1787,20 +1754,17 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
               <div className="space-y-6">
                 <div>
                   <h1 className="font-display text-[26px] font-bold text-[var(--fx-ink)]">
-                    Alert History
+                    Alert history
                   </h1>
-                  <p className="text-[13.5px] text-[var(--fx-ink-2)] mt-1">
-                    Log of scan events and responder alerts across your stickers
-                  </p>
                 </div>
 
                 {allHistoryLoading ? (
-                  <div className="bg-white border border-[var(--fx-border)] rounded-[14px] p-16 text-center text-[var(--fx-faint)]">
+                  <div className="bg-white border border-[var(--fx-border)] rounded-[14px] py-10 px-6 text-center text-[var(--fx-faint)]">
                     <Loader2 size={32} className="animate-spin mx-auto mb-2 text-[var(--fx-accent)]" />
                     <p className="text-[13.5px] font-semibold text-[var(--fx-ink)]">Fetching alert history...</p>
                   </div>
                 ) : allHistory.length === 0 ? (
-                  <div className="bg-white border border-[var(--fx-border)] rounded-[14px] p-16 text-center text-[var(--fx-faint)]">
+                  <div className="bg-white border border-[var(--fx-border)] rounded-[14px] py-10 px-6 text-center text-[var(--fx-faint)]">
                     <History size={34} className="mx-auto mb-3 opacity-50 text-[var(--fx-accent)]" />
                     <p className="text-[13.5px] text-[var(--fx-ink)] font-semibold">No alert events recorded yet.</p>
                   </div>
@@ -1831,7 +1795,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
 
             {/* ════ VIEW 4: ACCOUNT SETTINGS ════ */}
             {activeTab === 'settings' && (
-              <AccountSettingsPanel showToast={showToast} onProductsLinked={loadProducts} />
+              <AccountSettingsPanel showToast={showToast} onProductsLinked={() => loadProducts({ sync: true })} />
             )}
 
             {/* ════ VIEW 5: SUPPORT & LEGAL ════ */}
@@ -1847,14 +1811,9 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
 
       {/* ─── LIVE VISITOR CHAT RIGHT-SIDE DRAWER ─── */}
       {selectedChatSession && (
-        <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
-          <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
-            onClick={() => openChatSession(null)}
-          />
-          {/* Edge-to-edge on a phone (dvh keeps the composer clear of the
-              browser chrome), a 26rem drawer from sm up. */}
-          <div className="relative z-10 w-full sm:w-[26rem] max-w-full h-dvh bg-white shadow-2xl flex flex-col sm:border-l border-[var(--fx-border)] animate-slide-in-right">
+        <div className="fixed inset-0 z-50 bg-white animate-fade-in" role="dialog" aria-modal="true" aria-label="Chat">
+          {/* Full window on every screen (dvh keeps the composer clear of the browser chrome). */}
+          <div className="w-full h-dvh flex flex-col overflow-hidden">
             <RepiChat
               key={selectedChatSession.id}
               mode="owner"
@@ -1911,7 +1870,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
             setActiveTab('settings');
             setProfilePopupDismissed(true);
           }}
-          onProductsLinked={loadProducts}
+          onProductsLinked={() => loadProducts({ sync: true })}
         />
       )}
 

@@ -10,6 +10,7 @@ import {
   DistributorApplication,
 } from '../../../lib/distributorService';
 import { apiClient } from '../../../lib/apiClient';
+import { STICKER_CATEGORIES } from '../../../stickerModules';
 import FxKpiStrip from '../shared/FxKpiStrip';
 
 const STATUS_META: Record<DistributorApplication['status'], { label: string; icon: any; color: string; bg: string }> = {
@@ -49,6 +50,34 @@ export default function DistributorsPage({ setToast }: { setToast: (msg: string 
   const [addOpen, setAddOpen] = useState(false);
   const [savingAdd, setSavingAdd] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+
+  // Stock allocation for an approved partner (server picks the stickers).
+  const [alloc, setAlloc] = useState({ count: '', category: '', printedOnly: true });
+  const [allocBusy, setAllocBusy] = useState(false);
+
+  const handleAllocate = async (app: DistributorApplication) => {
+    const count = Number(alloc.count);
+    if (!Number.isInteger(count) || count < 1 || count > 500) {
+      showToast('Enter a quantity from 1 to 500.');
+      return;
+    }
+    setAllocBusy(true);
+    try {
+      const res = await apiClient.distributors.allocate(app.id, {
+        count,
+        category: alloc.category || undefined,
+        printedOnly: alloc.printedOnly,
+      });
+      if (!res?.success) throw new Error(res?.error || 'Allocation failed.');
+      const { allocated, remainingPool } = res.data;
+      showToast(allocated > 0 ? `${allocated} allocated to ${app.userName} · ${remainingPool} left` : 'No matching stickers in stock.');
+      if (allocated > 0) setAlloc((a) => ({ ...a, count: '' }));
+    } catch (err: any) {
+      showToast(err?.message || "Couldn't allocate stickers.");
+    } finally {
+      setAllocBusy(false);
+    }
+  };
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -473,6 +502,53 @@ export default function DistributorsPage({ setToast }: { setToast: (msg: string 
                   </div>
                 ))}
             </div>
+
+            {viewing.status === 'approved' && (
+              <div className="px-6 py-4 border-t border-[var(--fx-border)] space-y-3">
+                <p className="text-[13px] font-semibold">Allocate stickers</p>
+                <div className="flex flex-wrap items-end gap-2">
+                  <div>
+                    <label className="fx-label mb-1.5 block" htmlFor="alloc-count">Qty</label>
+                    <input
+                      id="alloc-count"
+                      type="number"
+                      min={1}
+                      max={500}
+                      inputMode="numeric"
+                      value={alloc.count}
+                      onChange={(e) => setAlloc((a) => ({ ...a, count: e.target.value }))}
+                      className="fx-input w-24"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[140px]">
+                    <label className="fx-label mb-1.5 block" htmlFor="alloc-type">Type</label>
+                    <select
+                      id="alloc-type"
+                      value={alloc.category}
+                      onChange={(e) => setAlloc((a) => ({ ...a, category: e.target.value }))}
+                      className="fx-input"
+                    >
+                      <option value="">Any</option>
+                      {STICKER_CATEGORIES.map((c) => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button onClick={() => handleAllocate(viewing)} disabled={allocBusy} className="fx-btn fx-btn-primary">
+                    {allocBusy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Allocate
+                  </button>
+                </div>
+                <label className="inline-flex items-center gap-2 text-[12.5px] text-[var(--fx-ink-2)] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={alloc.printedOnly}
+                    onChange={(e) => setAlloc((a) => ({ ...a, printedOnly: e.target.checked }))}
+                    className="w-4 h-4 rounded border-[var(--fx-border-strong)] cursor-pointer"
+                  />
+                  Printed only
+                </label>
+              </div>
+            )}
 
             {viewing.status === 'pending' && (
               <div className="px-6 py-4 border-t border-[var(--fx-border)] flex items-center justify-end gap-2">

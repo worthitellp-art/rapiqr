@@ -4,6 +4,30 @@ const UserModel = require('../models/userModel');
 const OrderModel = require('../models/orderModel');
 const { logger } = require('../middleware/loggerMiddleware');
 const { notifyContactsAdded } = require('../services/notificationService');
+const { sendServerError } = require('../utils/httpErrors');
+
+// GET /products also auto-claims unowned stickers (a phone match plus three
+// order lookups — several DB round-trips). It used to do that on EVERY call, so
+// every redundant fetch (tab refocus, a double-mounted effect, a manual refresh)
+// repeated all of it. Claims now run at most once per CLAIM_MIN_GAP_MS per
+// account; flows that expect a fresh claim (post-OTP verification, the explicit
+// Refresh button) pass ?sync=1 to force one.
+const CLAIM_MIN_GAP_MS = 20 * 1000;
+const lastClaimAt = new Map();
+
+function claimsDue(userId, force) {
+  const now = Date.now();
+  const last = lastClaimAt.get(userId) || 0;
+  if (!force && now - last < CLAIM_MIN_GAP_MS) return false;
+
+  lastClaimAt.set(userId, now);
+  if (lastClaimAt.size > 2000) {
+    for (const [id, ts] of lastClaimAt) {
+      if (now - ts > CLAIM_MIN_GAP_MS) lastClaimAt.delete(id);
+    }
+  }
+  return true;
+}
 
 /**
  * Loads the product and verifies the authenticated user owns it (or is admin).
@@ -34,6 +58,12 @@ class ProductController {
    */
   static async getMyProducts(req, res) {
     try {
+      const forceSync = req.query.sync === '1' || req.query.sync === 'true';
+      if (!claimsDue(req.user.id, forceSync)) {
+        const cached = await ProductModel.getAllByUser(req.user.id);
+        return res.json({ success: true, data: cached });
+      }
+
       // ensureProfile rather than findById: an account whose profiles row was never
       // written would otherwise report no phone here, auto-claim nothing, and show an
       // empty dashboard even though its stickers were sitting there waiting.
@@ -114,7 +144,7 @@ class ProductController {
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('PRODUCT_LIST', 'Failed to fetch user products', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -125,7 +155,7 @@ class ProductController {
       return res.json({ success: true, data: product });
     } catch (err) {
       logger.error('PRODUCT_FETCH', `Failed to fetch product: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -178,7 +208,7 @@ class ProductController {
       return res.json({ success: true, data: updated });
     } catch (err) {
       logger.error('PRODUCT_CONTACTS_UPDATE', `Failed to update contacts: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -192,7 +222,7 @@ class ProductController {
       return res.json({ success: true, data: updated });
     } catch (err) {
       logger.error('PRODUCT_DEACTIVATE', `Failed to deactivate product: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -206,7 +236,7 @@ class ProductController {
       return res.json({ success: true, data: updated });
     } catch (err) {
       logger.error('PRODUCT_REACTIVATE', `Failed to reactivate product: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -234,7 +264,7 @@ class ProductController {
       return res.json({ success: true, data: updated });
     } catch (err) {
       logger.error('PRODUCT_TRANSFER', `Failed to transfer product: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -256,7 +286,7 @@ class ProductController {
       return res.json({ success: true });
     } catch (err) {
       logger.error('PRODUCT_DELETE', `Failed to delete product: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -292,7 +322,18 @@ class ProductController {
       return res.json({ success: true, data: result.data });
     } catch (err) {
       logger.error('PRODUCT_RECOVER', `Failed to recover product: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
+    }
+  }
+
+  /** GET /api/products/history — every alert/scan event across the caller's own stickers. */
+  static async getAllHistory(req, res) {
+    try {
+      const data = await ProductModel.getHistoryForUser(req.user.id);
+      return res.json({ success: true, data });
+    } catch (err) {
+      logger.error('PRODUCT_HISTORY_ALL', 'Failed to fetch combined history', err);
+      return sendServerError(res, err);
     }
   }
 
@@ -304,7 +345,7 @@ class ProductController {
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('PRODUCT_HISTORY', `Failed to fetch history: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 }

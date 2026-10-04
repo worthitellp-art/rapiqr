@@ -8,7 +8,8 @@ const smsMessageSchema = new Schema({
   channel: { type: String, enum: ['sms', 'whatsapp'], required: true, index: true },
   to_number: { type: String, default: null },
   event: { type: String, default: null, index: true },
-  status: { type: String, enum: ['sent', 'failed', 'simulated'], default: 'simulated', index: true },
+  // 'held' = deliberately not sent (cooldown / duplicate guard / monthly cap); `error` says why.
+  status: { type: String, enum: ['sent', 'failed', 'simulated', 'held'], default: 'simulated', index: true },
   provider_sid: { type: String, default: null, index: true, sparse: true },
   error: { type: String, default: null },
   body_preview: { type: String, default: null },

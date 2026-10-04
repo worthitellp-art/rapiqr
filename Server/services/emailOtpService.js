@@ -14,7 +14,7 @@ const TTL_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 
 function generateCode() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(Math.floor(1000 + Math.random() * 9000));
 }
 
 function normalize(email) {

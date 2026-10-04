@@ -2,7 +2,7 @@
  * OTP Rate Limiting Utility
  *
  * Per phone number: 3 code sends and 3 failed verifications are allowed, then
- * the relevant action is locked for 4 hours.
+ * the relevant action is locked for 1 hour.
  *  - Send lock   — hit after the 3rd code is sent. The 3rd code is still valid
  *                  and can be verified; only requesting MORE codes is blocked.
  *  - Verify lock — hit after the 3rd wrong code. Blocks verifying AND sending,
@@ -14,7 +14,7 @@
  */
 
 export const MAX_OTP_ATTEMPTS = 3;
-export const OTP_LOCKOUT_MS = 4 * 60 * 60 * 1000; // 4 hours
+export const OTP_LOCKOUT_MS = 60 * 60 * 1000; // 1 hour
 
 export type OtpAction = 'send' | 'verify';
 
@@ -129,7 +129,7 @@ export interface OtpAttemptResult {
 /**
  * Records a code send/resend. Call it only after the send succeeded. When this
  * is the 3rd send, `isLocked` is true: the code just sent is still usable, but
- * no further codes can be requested for 4 hours.
+ * no further codes can be requested for 1 hour.
  */
 export function recordOtpSendAttempt(phone: string): OtpAttemptResult {
   const state = getOtpRateLimitState(phone);
@@ -148,7 +148,7 @@ export function recordOtpSendAttempt(phone: string): OtpAttemptResult {
   };
 }
 
-/** Records a failed verification. The 3rd failure locks verifying and sending for 4 hours. */
+/** Records a failed verification. The 3rd failure locks verifying and sending for 1 hour. */
 export function recordOtpVerifyFailure(phone: string): OtpAttemptResult {
   const state = getOtpRateLimitState(phone);
   const attempts = state.verifyAttempts + 1;

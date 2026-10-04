@@ -58,10 +58,12 @@ export async function updateDistributorApplicationStatus(
   }
 }
 
-export async function getUserDistributorApplication(emailOrPhone?: string): Promise<DistributorApplication | null> {
-  if (!emailOrPhone) return null;
+// `signedInIdentity` only gates the call (no account → nothing to look up): the
+// server resolves the application from the session, never from a client-sent value.
+export async function getUserDistributorApplication(signedInIdentity?: string): Promise<DistributorApplication | null> {
+  if (!signedInIdentity) return null;
   try {
-    const res = await apiClient.distributors.myStatus(emailOrPhone);
+    const res = await apiClient.distributors.myStatus();
     return res.data || null;
   } catch (err) {
     console.warn('Failed to fetch distributor application status:', err);

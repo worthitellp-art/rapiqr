@@ -3,6 +3,10 @@ const { logger } = require('../middleware/loggerMiddleware');
 const { notifyContactsAdded, notifyOwner } = require('../services/notificationService');
 const { verifyOtp } = require('../services/phoneVerificationService');
 const { verifyMsg91WidgetAccessToken } = require('../services/msg91Client');
+const { sendServerError } = require('../utils/httpErrors');
+const { clampLimit } = require('../utils/pagination');
+const { logAuditEvent } = require('../services/auditService');
+const SecurityEventTypes = require('../utils/securityEventTypes');
 
 class QrController {
   /**
@@ -10,13 +14,13 @@ class QrController {
    */
   static async getQrCodes(req, res) {
     try {
-      const limit = parseInt(req.query.limit) || 100;
+      const limit = clampLimit(req.query.limit, { fallback: 100, max: 1000 });
       logger.info('QR_LIST', `Fetching QR code fleet records (limit: ${limit})`);
       const data = await QrModel.getAll(limit);
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('QR_LIST', 'Failed to fetch QR records', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -35,7 +39,7 @@ class QrController {
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('QR_FETCH', `Error fetching QR ID: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -60,7 +64,7 @@ class QrController {
         return res.status(409).json({ success: false, error: err.message });
       }
       logger.error('QR_SAVE', 'Error saving QR Code record', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -84,7 +88,7 @@ class QrController {
         return res.status(409).json({ success: false, error: err.message });
       }
       logger.error('QR_SAVE_V2', 'Error saving id-scheme v2 QR Code record', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -129,7 +133,7 @@ class QrController {
       });
     } catch (err) {
       logger.error('QR_RECOVER_V2', 'Failed to recover QR by code', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -186,7 +190,7 @@ class QrController {
         return res.status(404).json({ success: false, error: err.message });
       }
       logger.error('QR_ACTIVATE', `Failed to activate QR Code: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -213,7 +217,7 @@ class QrController {
       return res.json({ success: true, message: 'Phone number accepted.' });
     } catch (err) {
       logger.error('QR_ACTIVATION_OTP', `Failed to validate activation phone for QR: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -277,7 +281,7 @@ class QrController {
       return res.status(400).json({ success: false, error: 'Invalid or expired verification code — please request a new code.' });
     } catch (err) {
       logger.error('QR_ACTIVATION_OTP_VERIFY', `Failed to verify activation OTP for QR: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -292,7 +296,7 @@ class QrController {
       return res.json({ success: true, data: updated });
     } catch (err) {
       logger.error('QR_SCAN', `Failed to record scan for QR Code: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -310,7 +314,7 @@ class QrController {
       return res.json({ success: true, data: deleted });
     } catch (err) {
       logger.error('QR_DELETE', `Failed to delete QR Code: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -321,10 +325,17 @@ class QrController {
     try {
       await QrModel.deleteAll();
       logger.info('QR_DELETE_ALL', 'All QR codes cleared');
+      await logAuditEvent({
+        eventType: SecurityEventTypes.DATA_DELETED,
+        actorType: 'ADMIN',
+        req,
+        resourceType: 'Sticker',
+        metadata: { action: 'delete_all_stickers' },
+      });
       return res.json({ success: true });
     } catch (err) {
       logger.error('QR_DELETE_ALL', 'Failed to clear all QR codes', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -364,7 +375,7 @@ class QrController {
       return res.json({ success: true, data: result.data });
     } catch (err) {
       logger.error('QR_RESTORE', `Failed to restore QR: ${req.params.id}`, err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -382,7 +393,7 @@ class QrController {
       return res.json({ success: true, data: result });
     } catch (err) {
       logger.error('QR_BULK_LABEL', 'Failed to bulk update labels', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -400,7 +411,7 @@ class QrController {
       return res.json({ success: true, data: result });
     } catch (err) {
       logger.error('QR_BULK_PRINT', 'Failed to bulk update print status', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 }

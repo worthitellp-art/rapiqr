@@ -7,6 +7,7 @@ const { uploadPublicFile } = require('../services/storageService');
 const { notifyOwner } = require('../services/notificationService');
 const pushService = require('../services/pushService');
 const { logger } = require('../middleware/loggerMiddleware');
+const { sendServerError } = require('../utils/httpErrors');
 const { getIo, getOnlineOwners, markDeliveredIfPeerPresent } = require('../sockets/chatSocket');
 
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif'];
@@ -153,7 +154,7 @@ class ChatController {
       return res.json({ success: true, data: broadcast });
     } catch (err) {
       logger.error('CHAT_ATTACHMENT', 'Failed to send chat image', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -218,7 +219,7 @@ class ChatController {
       });
     } catch (err) {
       logger.error('CHAT_START', 'Failed to start chat session', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -236,7 +237,7 @@ class ChatController {
       return res.json({ success: true, data: messages, session });
     } catch (err) {
       logger.error('CHAT_MESSAGES', 'Failed to fetch chat messages', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -274,7 +275,7 @@ class ChatController {
       return res.json({ success: true, data: broadcast });
     } catch (err) {
       logger.error('CHAT_SEND', 'Failed to send chat message', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -284,7 +285,7 @@ class ChatController {
       return res.json({ success: true, data: sessions });
     } catch (err) {
       logger.error('CHAT_INBOX', 'Failed to list owner chat sessions', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -303,7 +304,7 @@ class ChatController {
       return res.json({ success: true });
     } catch (err) {
       logger.error('CHAT_READ', 'Failed to mark chat session read', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -331,7 +332,7 @@ class ChatController {
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('CHAT_ONLINE', 'Failed to list online owners', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -346,7 +347,7 @@ class ChatController {
       return res.json({ success: true, data: updated });
     } catch (err) {
       logger.error('CHAT_CLOSE', 'Failed to close chat session', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 
@@ -363,7 +364,7 @@ class ChatController {
       return res.json({ success: true, message: 'Chat session deleted' });
     } catch (err) {
       logger.error('CHAT_DELETE', 'Failed to delete chat session', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return sendServerError(res, err);
     }
   }
 }

@@ -516,6 +516,25 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   const [activatingQr, setActivatingQr] = useState(false);
   const [alertCooldown, setAlertCooldown] = useState(false);
   const alertCooldownTimerRef = useRef<any>(null);
+  const alertCooldownEndsAtRef = useRef(0);
+  // When the owner's next WhatsApp is allowed, as reported by the server (null = no wait).
+  const [ownerRetryAt, setOwnerRetryAt] = useState<number | null>(null);
+  const [clockNow, setClockNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!ownerRetryAt || ownerRetryAt <= Date.now()) return;
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      setClockNow(now);
+      if (now >= ownerRetryAt) setOwnerRetryAt(null);
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [ownerRetryAt]);
+  const formatCountdown = (ms: number) => {
+    const s = Math.ceil(ms / 1000);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  };
+  // Set synchronously on tap, so a double-tap before React re-renders can't send twice.
+  const alertInFlightRef = useRef(false);
   const [activationError, setActivationError] = useState<string | null>(null);
   const [activeSubMenu, setActiveSubMenu] = useState<"none" | "emergency-main" | "mechanical" | "towing" | "family" | "parking" | "headlights" | "theft" | "flat-tire">("none");
   const [flatTireImage, setFlatTireImage] = useState<string | null>(null);
@@ -713,11 +732,30 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       return [];
     }
   });
+  // Visitor's city, reverse-geocoded from the GPS fix ("" = unknown or denied).
+  const [visitorCity, setVisitorCity] = useState("");
+  const locationAreaKey = location ? `${location.lat.toFixed(2)},${location.lng.toFixed(2)}` : "";
   useEffect(() => {
-    apiClient.helplines.getPublic().then((res) => {
-      if (res.success && Array.isArray(res.data)) setHelplines(res.data);
+    if (!location) return;
+    let cancelled = false;
+    apiClient.geo.reverse(location.lat, location.lng).then((res) => {
+      if (!cancelled) setVisitorCity(res.success ? res.data?.city?.trim() || "" : "");
+    }).catch(() => {
+      if (!cancelled) setVisitorCity("");
+    });
+    return () => { cancelled = true; };
+  }, [locationAreaKey]);
+
+  // Only providers that serve the visitor's city are offered. The server does the
+  // city match; with no known city, only providers that serve every city remain.
+  useEffect(() => {
+    let cancelled = false;
+    apiClient.helplines.getPublic(visitorCity ? { city: visitorCity } : undefined).then((res) => {
+      if (cancelled || !res.success || !Array.isArray(res.data)) return;
+      setHelplines(visitorCity ? res.data : res.data.filter((p: any) => !p.city));
     }).catch(() => { /* keep the localStorage-seeded list on failure */ });
-  }, []);
+    return () => { cancelled = true; };
+  }, [visitorCity]);
 
   // The customer side of RepiChat has no account — it's identified by an opaque
   // token held in localStorage per QR id, the same one <RepiChat/> bootstraps
@@ -740,14 +778,21 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   // in-app RepiChat thread. The visitor never sees the owner's number.
   const sendQuickIssueAlert = async (alertType: string, defaultMessage: string) => {
     if (!qrData) return;
+    if (alertInFlightRef.current) return;
     if (alertCooldown) {
-      showSentToast("Alert already sent — please wait a moment before sending another.", "warning");
+      const waitSec = Math.max(1, Math.ceil((alertCooldownEndsAtRef.current - Date.now()) / 1000));
+      showSentToast(`Alert already sent — you can send another in ${waitSec}s.`, "warning");
       setChatOpen(true);
       return;
     }
+    // Released on a timer rather than at the end of this function, so an early
+    // exception can never leave every later alert silently blocked.
+    alertInFlightRef.current = true;
+    setTimeout(() => { alertInFlightRef.current = false; }, 2000);
     setAlertCooldown(true);
     if (alertCooldownTimerRef.current) clearTimeout(alertCooldownTimerRef.current);
     alertCooldownTimerRef.current = setTimeout(() => setAlertCooldown(false), 20000); // 20s cooldown
+    alertCooldownEndsAtRef.current = Date.now() + 20000;
 
     // Instant feedback the moment the button is tapped — the success/error
     // toast below replaces this one once the send actually completes.
@@ -787,8 +832,10 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
     // 2. Post alert to backend server
     let delivered = true;
+    let smsResult: { sent?: boolean; simulated?: boolean; reason?: string; detail?: string | null; retryAfterSec?: number | null } | null = null;
+    let contactsNotified = 0;
     try {
-      await apiClient.alerts.createAlert({
+      const res = await apiClient.alerts.createAlert({
         qrId: qrData.id,
         qrUrl: qrData.qrUrl,
         latitude: location?.lat || 0,
@@ -803,6 +850,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         customerToken: getChatCustomerToken(),
         type: "emergency",
       });
+      smsResult = res?.smsResult ?? null;
+      contactsNotified = res?.contactsNotified || 0;
     } catch {
       delivered = false;
     }
@@ -810,10 +859,25 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     // 3. WhatsApp is dispatched automatically by the backend (via MSG91) straight
     // to the owner — the visitor never sees the owner's number. Opening
     // api.whatsapp.com here would leak that number, so it is deliberately not done.
-    showSentToast(
-      delivered ? "Message sent to the owner via WhatsApp" : "Couldn't reach the server — please try again.",
-      delivered ? "success" : "error"
-    );
+    // The toast reports what the server actually did, so a held-back WhatsApp
+    // (cooldown) or a failed one is never shown as "sent".
+    if (!delivered) {
+      showSentToast("Couldn't reach the server — please try again.", "error");
+    } else if (smsResult?.sent) {
+      showSentToast(
+        `Message sent to the owner via WhatsApp${contactsNotified > 0 ? ` · ${contactsNotified} emergency contact${contactsNotified === 1 ? "" : "s"} notified` : ""}`,
+        "success"
+      );
+    } else if (smsResult?.simulated) {
+      showSentToast("Saved for the owner — WhatsApp is in test mode.", "warning");
+    } else {
+      // The server's own explanation (cooldown with time left, monthly cap, provider
+      // error) is shown as-is, so the reason is never a guess.
+      const heldBack = smsResult?.reason === "thread_cooldown" || smsResult?.reason === "debounce" || smsResult?.reason === "duplicate";
+      const reason = smsResult?.detail ?? "WhatsApp did not go out and the server gave no reason.";
+      showSentToast(`Saved to the owner's chat. WhatsApp not sent: ${reason}`, heldBack ? "warning" : "error");
+    }
+    if (smsResult?.retryAfterSec) setOwnerRetryAt(Date.now() + smsResult.retryAfterSec * 1000);
 
     setChatInitialMessage(undefined);
     setChatOpen(true);
@@ -860,6 +924,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   // AI Chat Assistant — the conversation itself lives in <AssistantChat/>, which
   // seeds its greeting and suggested questions from the scanned tag's category.
   const [aiChatOpen, setAiChatOpen] = useState(false);
+  // null = not checked yet. The assistant is offered only once the server confirms it can answer.
+  const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
+  useEffect(() => {
+    apiClient.ai.status()
+      .then((res) => setAiAvailable(Boolean(res.success && res.available)))
+      .catch(() => setAiAvailable(false));
+  }, []);
 
   // OTP verification step state (two-step activation flow) — the MSG91 OTP
   // Widget (src/lib/msg91Widget.ts) sends and verifies the code in-browser;
@@ -1047,6 +1118,12 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   const [liveSharing, setLiveSharing] = useState(false);
   const [locationShareBanner, setLocationShareBanner] = useState<string | null>(null);
 
+  // A Share tap before the GPS fix exists asks for location; the share then goes
+  // out by itself once the fix arrives (within this window), so one tap is enough.
+  const sharePendingUntilRef = useRef(0);
+  const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
+    Promise.race([promise, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))]);
+
   const handleShareLocation = async () => {
     if (liveSharing) {
       setLiveSharing(false);
@@ -1056,6 +1133,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     }
 
     if (!location) {
+      sharePendingUntilRef.current = Date.now() + 20000;
+      setLocationShareBanner("Waiting for your location — allow it when your browser asks.");
       requestLocation();
       return;
     }
@@ -1066,7 +1145,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     setLocationSharing(true);
     setLocationShareBanner(null);
     try {
-      const res = await apiClient.alerts.createAlert({
+      const res = await withTimeout(apiClient.alerts.createAlert({
         qrId: qrData.id,
         qrUrl: qrData.qrUrl,
         latitude: location.lat,
@@ -1081,7 +1160,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         // Sent only from the red SOS/accident screen sharing live GPS — this IS
         // the true emergency signal the admin Alerts feed should surface first.
         type: "emergency",
-      });
+      }), 15000);
       const notifiedOwner = Boolean(res.smsResult?.sent);
       const contactsNotified = res.contactsNotified || 0;
       setLiveSharing(true);
@@ -1097,6 +1176,14 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       setTimeout(() => setLocationShareBanner(null), 6000);
     }
   };
+
+  // The GPS fix arrived after a Share tap that was waiting for it: send now.
+  useEffect(() => {
+    if (location && Date.now() < sharePendingUntilRef.current) {
+      sharePendingUntilRef.current = 0;
+      handleShareLocation();
+    }
+  }, [location]);
 
   /* ---- Get Admin Provided Contact Numbers ---- */
   const getTowingContacts = (filterCategory?: string) => {
@@ -1246,9 +1333,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           window.location.href = `tel:${String(provider.phone).replace(/\s/g, "")}`;
           return;
         }
-        flashVariantBanner(
-          `No ${action.who} is configured for this sticker yet — the owner's admin adds providers on the Communication page.`
-        );
+        flashVariantBanner(`${action.who} is not available in your area.`);
         return;
       }
       case "notify":
@@ -2242,6 +2327,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                 onSendMessage={(text) => openChatWithMessage(text)}
                 banner={variantBanner || locationShareBanner}
                 busy={locationSharing || variantBusy}
+                aiAvailable={aiAvailable === true}
               />
             )}
 
@@ -2500,149 +2586,156 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
             {isBespokeCategory && activeSubMenu !== "none" && (
               <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-5 space-y-4">
                 {/* ============ EMERGENCY MAIN BUTTON SUB-MENU (3 BUTTONS) ============ */}
-                {activeSubMenu === "emergency-main" && (
-                  <div className="space-y-4 animate-fade-in">
-                    {/* Header bar with Back button */}
-                    <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-3 shadow-2xs">
-                      <button
-                        onClick={() => setActiveSubMenu("none")}
-                        className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-gray-900 transition-colors bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-xl cursor-pointer"
-                      >
-                        <ArrowLeft size={14} /> Back
-                      </button>
-                      <div className="text-right">
-                        <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5 justify-end">
-                          <ShieldAlert size={16} className="text-red-500" /> Emergency Options
+                {activeSubMenu === "emergency-main" && (() => {
+                  // Service tiles only appear live when a provider serves this
+                  // visitor's area (helplines is already area-filtered). Anything
+                  // else is shown blurred and cannot be tapped.
+                  const ambulance = getAdminContacts("Ambulance")[0] || null;
+                  const familyCount = getTowingContacts().filter((c) => c.role === "Family / Emergency Contact").length + getAdminContacts("Family").length;
+                  const shareTitle = liveSharing
+                    ? "Live location is on"
+                    : locationSharing
+                      ? "Sending your location…"
+                      : location
+                        ? "Share my live location"
+                        : "Allow location to share";
+                  const shareHint = liveSharing
+                    ? "Owner gets an update every 5 seconds · tap to stop"
+                    : locationSharing
+                      ? "Notifying the owner and contacts"
+                      : location
+                        ? "The owner and family get your GPS position"
+                        : "Shares automatically once you allow location";
+                  const quickTile = "flex flex-col items-center justify-center gap-1.5 h-[74px] rounded-2xl text-white shadow-sm transition-transform active:scale-[0.97] cursor-pointer";
+                  const serviceRow = "relative flex items-center gap-3 rounded-2xl border px-3.5 py-3 select-none";
+
+                  return (
+                    <div className="space-y-3 animate-fade-in">
+                      {/* Header */}
+                      <div className="flex items-center justify-between">
+                        <button
+                          onClick={() => setActiveSubMenu("none")}
+                          className="flex items-center gap-1.5 text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-xl cursor-pointer transition-colors"
+                        >
+                          <ArrowLeft size={14} /> Back
+                        </button>
+                        <span className="flex items-center gap-1.5 text-sm font-black text-gray-900">
+                          <ShieldAlert size={16} className="text-red-500" /> Emergency
                         </span>
                       </div>
-                    </div>
 
-                    {/* Emergency Action Buttons */}
-                    <div className="space-y-3">
-                      {/* Button 1: Request Ambulance (from Admin Communication Page) */}
-                      {getAdminContacts("Ambulance").length > 0 ? (
-                        getAdminContacts("Ambulance").map((amb, i) => (
-                          <div
-                            key={`amb-${i}`}
-                            className="w-full bg-gray-100 text-gray-400 rounded-2xl p-4 flex items-center justify-between shadow-2xs"
-                          >
-                            <div className="flex items-center gap-3.5 min-w-0">
-                              <div className="w-11 h-11 rounded-xl bg-gray-200 text-gray-400 flex items-center justify-center font-bold flex-shrink-0">
-                                <Stethoscope size={22} />
-                              </div>
-                              <div className="text-left min-w-0">
-                                <p className="text-sm font-black text-gray-500 tracking-tight">Request Ambulance</p>
-                                <p className="text-[11px] font-medium text-gray-400 truncate">{amb.label}</p>
-                              </div>
-                            </div>
-                            <div className="bg-white text-gray-400 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
-                              <Lock size={12} /> Soon
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
-                          <p className="text-xs font-semibold text-gray-400">No ambulance provider configured</p>
-                          <p className="text-[10px] text-gray-300 mt-0.5">Ask admin to add one in Communication settings</p>
-                        </div>
-                      )}
-
-                      {/* Button 2: Call Family Members */}
-                      {(() => {
-                        const familyContacts = [
-                          ...getTowingContacts().filter((c) => c.role === "Family / Emergency Contact"),
-                          ...getAdminContacts("Family"),
-                        ];
-                        return familyContacts.length > 0 ? (
-                          <button
-                            onClick={() => setActiveSubMenu("family")}
-                            className="w-full bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-green-600/20 active:scale-[0.98] transition-all cursor-pointer"
-                          >
-                            <div className="flex items-center gap-3.5 min-w-0">
-                              <div className="w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold flex-shrink-0">
-                                <User size={22} />
-                              </div>
-                              <div className="text-left min-w-0">
-                                <p className="text-sm font-black text-white tracking-tight">Call Family Members</p>
-                                <p className="text-[11px] font-medium text-white/80">
-                                  {familyContacts.length} contact{familyContacts.length !== 1 ? "s" : ""} available
-                                </p>
-                              </div>
-                            </div>
-                            <div className="bg-white text-emerald-700 font-black text-xs px-3 py-2 rounded-xl shadow-xs flex items-center gap-1 flex-shrink-0">
-                              <PhoneCall size={12} /> CALL
-                            </div>
-                          </button>
-                        ) : (
-                          <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
-                            <p className="text-xs font-semibold text-gray-400">No family contacts configured</p>
-                            <p className="text-[10px] text-gray-300 mt-0.5">Add emergency contacts in your Client Dashboard</p>
-                          </div>
-                        );
-                      })()}
-
-                      {/* WhatsApp / Chat / Assistant / Share — 4 quick actions in a 2x2 grid */}
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <button
-                          onClick={() => {
-                            // sendQuickIssueAlert shows its own "message sent" toast
-                            // once the dispatch actually completes.
-                            sendQuickIssueAlert("Emergency Alert", qrData?.category === "car"
-                              ? "I scanned the RepiQR tag on your car — there is an emergency at the vehicle."
-                              : "I scanned the RepiQR tag on your bike — there is an emergency at the vehicle.");
-                          }}
-                          className="bg-gradient-to-br from-[#22C55E] to-[#15A34A] hover:brightness-105 text-white rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 shadow-md shadow-green-600/20 active:scale-[0.97] transition-all cursor-pointer aspect-square"
-                        >
-                          <div className="w-9 h-9 rounded-xl bg-white/25 ring-1 ring-white/40 flex items-center justify-center">
-                            <WhatsAppSvg size={20} />
-                          </div>
-                          <p className="text-[11px] font-black tracking-tight">WhatsApp</p>
-                        </button>
-
-                        <button
-                          onClick={() => openChatWithMessage("Hi, I scanned your vehicle's RapiQR code and need to contact you.")}
-                          className="bg-gradient-to-br from-indigo-600 to-indigo-800 hover:brightness-105 text-white rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 shadow-md shadow-indigo-600/20 active:scale-[0.97] transition-all cursor-pointer aspect-square"
-                        >
-                          <div className="w-9 h-9 rounded-xl bg-white/25 ring-1 ring-white/40 flex items-center justify-center">
-                            <MessageCircle size={20} />
-                          </div>
-                          <p className="text-[11px] font-black tracking-tight">Chat</p>
-                        </button>
-
-                        <button
-                          onClick={() => setAiChatOpen(true)}
-                          className="bg-gradient-to-br from-purple-600 to-fuchsia-700 hover:brightness-105 text-white rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 shadow-md shadow-purple-600/20 active:scale-[0.97] transition-all cursor-pointer aspect-square"
-                        >
-                          <div className="w-9 h-9 rounded-xl bg-white/25 ring-1 ring-white/40 flex items-center justify-center">
-                            <Bot size={20} />
-                          </div>
-                          <p className="text-[11px] font-black tracking-tight">Ask Repi</p>
-                        </button>
-
-                        <button
-                          onClick={handleShareLocation}
-                          disabled={locationSharing}
-                          className={`rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 active:scale-[0.97] transition-all cursor-pointer disabled:opacity-70 aspect-square text-white shadow-md ${
-                            liveSharing
-                              ? "bg-gradient-to-br from-blue-700 to-blue-900 shadow-blue-700/30"
-                              : "bg-gradient-to-br from-blue-600 to-indigo-700 hover:brightness-105 shadow-blue-600/20"
-                          }`}
-                        >
-                          <div className="w-9 h-9 rounded-xl bg-white/25 ring-1 ring-white/40 flex items-center justify-center">
-                            {locationSharing ? <Loader2 size={20} className="animate-spin" /> : <Navigation size={20} />}
-                          </div>
-                          <p className="text-[11px] font-black tracking-tight">{liveSharing ? "Live — Stop" : "Share"}</p>
-                        </button>
-                      </div>
+                      {/* Primary action: share live location. One tap, one send; the button is
+                          disabled while a send is in flight, so repeat taps can't pile up. */}
+                      <button
+                        onClick={handleShareLocation}
+                        disabled={locationSharing}
+                        className={`w-full rounded-2xl p-4 flex items-center gap-3.5 text-left text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-80 disabled:cursor-wait cursor-pointer ${
+                          liveSharing ? "bg-gradient-to-br from-blue-700 to-blue-900" : "bg-gradient-to-br from-red-500 to-red-700"
+                        }`}
+                      >
+                        <span className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                          {locationSharing ? <Loader2 size={20} className="animate-spin" /> : <Navigation size={20} />}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-black">{shareTitle}</span>
+                          <span className="block text-[11px] font-medium text-white/85 mt-0.5">{shareHint}</span>
+                        </span>
+                      </button>
 
                       {locationShareBanner && (
                         <p className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-1.5">
                           <CheckCircle2 size={13} /> {locationShareBanner}
                         </p>
                       )}
+
+                      {ownerRetryAt && ownerRetryAt > clockNow && (
+                        <p className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                          Owner WhatsApp available again in {formatCountdown(ownerRetryAt - clockNow)}
+                        </p>
+                      )}
+
+                      {/* Quick messages: each tap sends once; sendQuickIssueAlert ignores repeats. */}
+                      <div className="grid grid-cols-3 gap-2.5">
+                        <button
+                          onClick={() => sendQuickIssueAlert("Emergency Alert", qrData?.category === "car"
+                            ? "I scanned the RepiQR tag on your car — there is an emergency at the vehicle."
+                            : "I scanned the RepiQR tag on your bike — there is an emergency at the vehicle.")}
+                          className={`${quickTile} bg-gradient-to-br from-[#22C55E] to-[#15A34A]`}
+                        >
+                          <WhatsAppSvg size={22} />
+                          <span className="text-[11px] font-black leading-none">WhatsApp</span>
+                        </button>
+
+                        <button
+                          onClick={() => openChatWithMessage("Hi, I scanned your vehicle's RapiQR code and need to contact you.")}
+                          className={`${quickTile} bg-gradient-to-br from-indigo-600 to-indigo-800`}
+                        >
+                          <MessageCircle size={22} />
+                          <span className="text-[11px] font-black leading-none">Chat</span>
+                        </button>
+
+                        {aiAvailable === true ? (
+                          <button
+                            onClick={() => setAiChatOpen(true)}
+                            className={`${quickTile} bg-gradient-to-br from-purple-600 to-fuchsia-700`}
+                          >
+                            <Bot size={22} />
+                            <span className="text-[11px] font-black leading-none">Ask Repi</span>
+                          </button>
+                        ) : (
+                          <div aria-disabled="true" className="relative flex flex-col items-center justify-center gap-1.5 h-[74px] rounded-2xl bg-gray-100 border border-gray-200 cursor-not-allowed select-none">
+                            <Bot size={22} className="text-gray-400 blur-[2.5px]" />
+                            <span className="text-[11px] font-black leading-none text-gray-500 blur-[2.5px]">Ask Repi</span>
+                            <span className="absolute inset-0 flex items-center justify-center px-2 text-center text-[10px] font-bold text-gray-700">Assistant unavailable right now</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Services: only what a provider covers in this area is live. */}
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 px-1">Services</p>
+
+                        {ambulance?.phone ? (
+                          <a
+                            href={`tel:${String(ambulance.phone).replace(/\s/g, "")}`}
+                            className={`${serviceRow} bg-red-50 border-red-200 text-red-700 hover:bg-red-100 transition-colors`}
+                          >
+                            <span className="w-9 h-9 rounded-lg bg-red-500 text-white flex items-center justify-center flex-shrink-0"><Stethoscope size={17} /></span>
+                            <span className="min-w-0">
+                              <span className="block text-sm font-black">Call ambulance</span>
+                              <span className="block text-[11px] font-medium text-red-600/80 truncate">{ambulance.label}</span>
+                            </span>
+                          </a>
+                        ) : (
+                          <div aria-disabled="true" className={`${serviceRow} bg-gray-50 border-gray-200 cursor-not-allowed`}>
+                            <span className="w-9 h-9 rounded-lg bg-gray-200 text-gray-400 flex items-center justify-center flex-shrink-0"><Stethoscope size={17} /></span>
+                            <span className="text-sm font-black text-gray-500 blur-[2.5px]">Ambulance</span>
+                            <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-gray-700">Ambulance not available in your area</span>
+                          </div>
+                        )}
+
+                        {familyCount > 0 ? (
+                          <button
+                            onClick={() => setActiveSubMenu("family")}
+                            className={`${serviceRow} w-full bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer text-left`}
+                          >
+                            <span className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center flex-shrink-0"><User size={17} /></span>
+                            <span className="min-w-0">
+                              <span className="block text-sm font-black">Family contacts</span>
+                              <span className="block text-[11px] font-medium text-emerald-700/80">{familyCount} number{familyCount === 1 ? "" : "s"} to call</span>
+                            </span>
+                          </button>
+                        ) : (
+                          <div aria-disabled="true" className={`${serviceRow} bg-gray-50 border-gray-200 cursor-not-allowed`}>
+                            <span className="w-9 h-9 rounded-lg bg-gray-200 text-gray-400 flex items-center justify-center flex-shrink-0"><User size={17} /></span>
+                            <span className="text-sm font-black text-gray-500 blur-[2.5px]">Family contacts</span>
+                            <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-gray-700">No family contacts added yet</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* ============ MECHANIC SUB-MENU ============ */}
                 {activeSubMenu === "mechanical" && (() => {
@@ -2703,8 +2796,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                         </div>
                       ) : (
                         <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
-                          <p className="text-xs font-semibold text-gray-400">No mechanic providers configured</p>
-                          <p className="text-[10px] text-gray-300 mt-0.5">Ask admin to add Mechanic providers in Communication settings</p>
+                          <p className="text-xs font-semibold text-gray-400">Mechanic is not available in your area</p>
                         </div>
                       )}
                     </div>
@@ -2770,8 +2862,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                         </div>
                       ) : (
                         <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
-                          <p className="text-xs font-semibold text-gray-400">No towing providers configured</p>
-                          <p className="text-[10px] text-gray-300 mt-0.5">Ask admin to add Towing providers in Communication settings</p>
+                          <p className="text-xs font-semibold text-gray-400">Tow truck is not available in your area</p>
                         </div>
                       )}
                     </div>
@@ -3316,21 +3407,14 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       {/* RepiChat — real-time in-app chat with the sticker owner (replaces WhatsApp deep links) */}
       {chatOpen && qrData && (
         <div
-          className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center sm:p-4 bg-black/50 sm:backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-50 bg-white animate-fade-in"
           role="dialog"
           aria-modal="true"
           aria-label="Chat with the owner"
-          onClick={() => {
-            setChatOpen(false);
-            setChatInitialMessage(undefined);
-          }}
         >
-          {/* Full-bleed sheet on a phone (dvh, so the mobile browser bars don't
-              clip the composer); a floating card from the sm breakpoint up. */}
-          <div
-            className="w-full h-dvh sm:h-[min(38rem,88vh)] sm:w-auto sm:max-w-md sm:min-w-[24rem] sm:rounded-xl sm:shadow-2xl sm:border sm:border-gray-200 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
+          {/* Full window on every screen (dvh keeps the composer above the mobile
+              browser bars). Close with the back arrow, the X, or Esc. */}
+          <div className="w-full h-dvh overflow-hidden">
             <RepiChat
               mode="customer"
               qrId={qrData.id}

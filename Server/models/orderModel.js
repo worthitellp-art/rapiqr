@@ -15,6 +15,12 @@ function publicStickers(stickers) {
   }));
 }
 
+// Legacy rows were created with the schema default 'pending'; the API speaks
+// only placed | shipped | delivered | cancelled.
+function normalizeStatus(status) {
+  return !status || status === 'pending' ? 'placed' : status;
+}
+
 function toApi(doc) {
   if (!doc) return null;
   return {
@@ -29,7 +35,7 @@ function toApi(doc) {
     total: doc.total,
     paymentMethod: doc.payment_method,
     deliveryMethod: doc.delivery_method,
-    status: doc.status,
+    status: normalizeStatus(doc.status),
     shippingAddress: doc.shipping_address,
     shiprocket: doc.shiprocket || null,
     payment: doc.payment || null,
