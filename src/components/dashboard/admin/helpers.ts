@@ -6,6 +6,20 @@ import repiqrWordmark from "../../../assets/repiqr-wordmark.png";
 const STICKER_SRC = stickerTemplateImg;
 const EDITOR_DISPLAY = { w: 320, h: 200 };
 
+/**
+ * THE QR slot on the sticker template, in the 320x200 editor space (1 unit =
+ * 4.8px of the 1536x960 template). It is a fixed constant — nothing saves or
+ * overrides it, so previews, PNG downloads and PDFs always agree.
+ *
+ * Measured from src/assets/template-sticker.jpeg: the white panel is 452x452px
+ * at (932, 224) with ~45px rounded corners, centred on (1157.5, 449.5); the
+ * sample QR baked into the artwork spans x 970-1350, y 258-638. The QR image is
+ * 422.4px square at (947, 238): centred on the panel within 1px, covers the
+ * whole sample QR with 20px+ to spare, and its white corners stay inside the
+ * rounded panel. If the template artwork changes, re-measure and update this.
+ */
+export const DEFAULT_STICKER_POS: StickerPos = { x: 197.3, y: 49.6, w: 88, h: 88 };
+
 const qrDataUrlCache = new Map<string, string>();
 
 /**

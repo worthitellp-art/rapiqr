@@ -356,13 +356,13 @@ export default function CategoryScanView({
   return (
     <div className="space-y-3 animate-fade-in">
       {/* Hero */}
-      <div className={`${heroGradient} rounded-3xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden space-y-3`}>
+      <div className={`${heroGradient} rounded-xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden space-y-3`}>
         <div className="absolute -right-12 -top-12 w-48 h-48 rounded-full border border-white/10 pointer-events-none" />
         <div className="absolute -right-6 -top-6 w-36 h-36 rounded-full border border-white/10 pointer-events-none" />
 
         <div className="flex items-start justify-between relative z-10 gap-2">
           <div className="min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white mb-2 backdrop-blur-xs">
+            <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-white mb-2 backdrop-blur-xs">
               <Icon name={variant.heroIcon} size={22} className="text-white" />
             </div>
             <h2 className="text-lg sm:text-xl font-black tracking-tight text-white">{variant.title}</h2>
@@ -384,7 +384,7 @@ export default function CategoryScanView({
               key={i}
               disabled={busy}
               onClick={() => onAction(m.action, m.line1 + " " + m.line2)}
-              className="flex flex-col items-center px-1 py-1.5 rounded-xl hover:bg-white/10 active:scale-98 transition-all cursor-pointer disabled:opacity-60"
+              className="flex flex-col items-center px-1 py-1.5 rounded-lg hover:bg-white/10 active:scale-98 transition-all cursor-pointer disabled:opacity-60"
             >
               <Icon name={m.icon} size={16} className="text-white mb-1" />
               <span className="text-[11px] font-bold leading-tight">{m.line1}</span>
@@ -396,7 +396,7 @@ export default function CategoryScanView({
         <button
           disabled={busy}
           onClick={() => onAction({ kind: "notify", text: variant.alert }, "hero")}
-          className={`w-full bg-white hover:bg-gray-50 font-black py-3 px-6 rounded-full flex items-center justify-center gap-3 shadow-md active:scale-98 transition-all cursor-pointer group relative z-10 disabled:opacity-70 ${calm ? "text-[#B45309]" : "text-[#C01515]"}`}
+          className={`w-full bg-white hover:bg-gray-50 font-black py-3 px-6 rounded-lg flex items-center justify-center gap-3 shadow-md active:scale-98 transition-all cursor-pointer group relative z-10 disabled:opacity-70 ${calm ? "text-[#B45309]" : "text-[#C01515]"}`}
         >
           <span className={`w-8 h-8 rounded-full text-white flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0 ${calm ? "bg-[#B45309]" : "bg-[#C01515]"}`}>
             <PhoneCall size={16} className="fill-white text-white" />
@@ -405,12 +405,12 @@ export default function CategoryScanView({
         </button>
 
         {banner && (
-          <p className="relative z-10 text-[11px] font-bold text-white/90 bg-black/15 rounded-xl px-3 py-2">{banner}</p>
+          <p className="relative z-10 text-[11px] font-bold text-white/90 bg-black/15 rounded-lg px-3 py-2">{banner}</p>
         )}
       </div>
 
       {/* Quick actions */}
-      <div className="bg-white rounded-3xl p-3.5 sm:p-4 border border-gray-100 shadow-sm space-y-2.5">
+      <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-gray-100 shadow-sm space-y-2.5">
         <div className="flex items-center justify-between">
           <h3 className="text-sm sm:text-base font-bold text-gray-900">Quick Actions</h3>
           <span className="text-xs text-gray-400 font-normal">Tap on any service</span>
@@ -423,9 +423,9 @@ export default function CategoryScanView({
               <button
                 key={i}
                 onClick={() => changeTile(tile)}
-                className={`group ${tint.bg} border ${tint.ring} rounded-2xl p-2.5 flex flex-col items-center gap-1.5 text-center hover:shadow-md active:scale-98 transition-all cursor-pointer`}
+                className={`group ${tint.bg} border ${tint.ring} rounded-lg p-2.5 flex flex-col items-center gap-1.5 text-center hover:shadow-md active:scale-98 transition-all cursor-pointer`}
               >
-                <span className="w-9 h-9 rounded-xl bg-white/80 flex items-center justify-center shadow-xs">
+                <span className="w-9 h-9 rounded-md bg-white/80 flex items-center justify-center shadow-xs">
                   <Icon name={tile.icon} size={18} className={tint.icon} />
                 </span>
                 <span className={`text-[11px] font-bold text-gray-900 leading-tight ${tint.text} transition-colors`}>
@@ -439,10 +439,10 @@ export default function CategoryScanView({
       </div>
 
       {/* Unified Message Owner & AI Assistant Section */}
-      <div className="bg-white rounded-3xl p-3.5 sm:p-4 border border-gray-100 shadow-sm space-y-3">
+      <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-gray-100 shadow-sm space-y-3">
         {/* Message the owner header */}
         <div className="flex items-center gap-2">
-          <span className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center">
+          <span className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center">
             <MessageCircle size={17} className="text-emerald-600" />
           </span>
           <div className="min-w-0">
@@ -461,12 +461,12 @@ export default function CategoryScanView({
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") send(); }}
               placeholder={variant.placeholder}
-              className="flex-1 min-w-0 border border-gray-200 bg-gray-50 rounded-2xl px-3.5 py-3 text-[12.5px] font-medium text-gray-900 outline-none focus:border-gray-400 transition-colors"
+              className="flex-1 min-w-0 border border-gray-200 bg-gray-50 rounded-lg px-3.5 py-3 text-[12.5px] font-medium text-gray-900 outline-none focus:border-gray-400 transition-colors"
             />
             <button
               onClick={send}
               disabled={busy || !message.trim()}
-              className="flex-none w-12 rounded-2xl bg-gradient-to-br from-[#FF9A1F] to-[#F0562A] text-white flex items-center justify-center shadow-md active:scale-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex-none w-12 rounded-lg bg-gradient-to-br from-[#FF9A1F] to-[#F0562A] text-white flex items-center justify-center shadow-md active:scale-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               aria-label="Send message"
             >
               <Send size={17} />
@@ -482,9 +482,9 @@ export default function CategoryScanView({
         <button
           type="button"
           onClick={() => onAction({ kind: "ask" }, "assistant")}
-          className="w-full bg-gray-50/80 hover:bg-violet-50/60 border border-gray-100 hover:border-violet-200 rounded-2xl p-3 flex items-center gap-3 text-left transition-all active:scale-98 cursor-pointer group"
+          className="w-full bg-gray-50/80 hover:bg-violet-50/60 border border-gray-100 hover:border-violet-200 rounded-lg p-3 flex items-center gap-3 text-left transition-all active:scale-98 cursor-pointer group"
         >
-          <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+          <span className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform">
             <Sparkles size={18} className="text-white" />
           </span>
           <span className="min-w-0 flex-1">

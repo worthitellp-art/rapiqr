@@ -319,7 +319,14 @@ function buildMsg91WhatsAppComponents({ variables = {}, components = {}, body = 
         // is the one place that failure mode can be caught before it ever
         // reaches the API.
         const safeVal = (val === undefined || val === null || String(val).trim() === '') ? 'na' : val;
-        result[key] = { type: 'text', value: stripNewlines(safeVal), ...(parameterName ? { parameter_name: parameterName } : {}) };
+        // A URL button's dynamic part is tagged subtype "url" in the template's
+        // own variable_type (see update-templates/rapi_*.json: button_1).
+        result[key] = {
+          type: 'text',
+          ...(key.startsWith('button_') ? { subtype: 'url' } : {}),
+          value: stripNewlines(safeVal),
+          ...(parameterName ? { parameter_name: parameterName } : {}),
+        };
       } else {
         const formattedKey = key.startsWith('body_') ? key : `body_${key}`;
         const parameterName = deriveParamName(formattedKey);

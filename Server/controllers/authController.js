@@ -552,9 +552,9 @@ class AuthController {
       const code = createEmailOtp(normalizedEmail);
       const result = await sendEmail({
         to: normalizedEmail,
-        subject: 'Your RapiQR sign-in code',
-        html: `<p>Your RapiQR sign-in code is <strong>${code}</strong>. It expires in 5 minutes.</p><p>If you didn't request this, you can safely ignore this email.</p>`,
-        text: `Your RapiQR sign-in code is ${code}. It expires in 5 minutes.`,
+        subject: 'Your RepiQR sign-in code',
+        html: `<p>Your RepiQR sign-in code is <strong>${code}</strong>. It expires in 5 minutes.</p><p>If you didn't request this, you can safely ignore this email.</p>`,
+        text: `Your RepiQR sign-in code is ${code}. It expires in 5 minutes.`,
         event: 'EMAIL_OTP_LOGIN',
       });
 
@@ -777,7 +777,7 @@ class AuthController {
         logger.security('PHONE_ALREADY_LINKED', `Phone already on another account, rejected for ${req.user.email}`);
         return res.status(409).json({
           success: false,
-          error: 'This number is already linked to another RapiQR account. Sign in to that account, or remove the number there first.',
+          error: 'This number is already linked to another RepiQR account. Sign in to that account, or remove the number there first.',
         });
       }
 
@@ -829,7 +829,7 @@ class AuthController {
         logger.security('PHONE_ALREADY_LINKED', `Phone claimed by another account mid-verification for ${req.user.email}`);
         return res.status(409).json({
           success: false,
-          error: 'This number was just linked to another RapiQR account. Only one account can hold a number.',
+          error: 'This number was just linked to another RepiQR account. Only one account can hold a number.',
         });
       }
 
@@ -927,8 +927,8 @@ class AuthController {
         const link = await createResetLink(profile);
         await sendEmail({
           to: profile.email,
-          subject: 'Reset your RapiQR password',
-          html: `<p>Hi ${profile.full_name || ''},</p><p>Click the link below to reset your RapiQR password. This link expires in 1 hour.</p><p><a href="${link}">${link}</a></p><p>If you didn't request this, you can safely ignore this email.</p>`,
+          subject: 'Reset your RepiQR password',
+          html: `<p>Hi ${profile.full_name || ''},</p><p>Click the link below to reset your RepiQR password. This link expires in 1 hour.</p><p><a href="${link}">${link}</a></p><p>If you didn't request this, you can safely ignore this email.</p>`,
           event: 'PASSWORD_RESET_EMAIL',
         });
         logger.security('PASSWORD_RESET_REQUESTED', `Password reset requested for ${profile.email}`);

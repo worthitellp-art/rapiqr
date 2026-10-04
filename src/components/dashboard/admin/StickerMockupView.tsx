@@ -1,25 +1,16 @@
 import React from "react";
 import { QrRecord, StickerPos } from "./types";
-import { qrFullUrl } from "./helpers";
+import { qrFullUrl, DEFAULT_STICKER_POS } from "./helpers";
 import QrCodeImage from "./QrCodeImage";
 import stickerTemplateImg from "../../../assets/template-sticker.jpeg";
 import { getCategoryLabel } from "../../../stickerModules";
 import { Car, Shield, Sparkles, QrCode } from "lucide-react";
+import { stickerRef, useCodesRevealed } from "../../../lib/codeVisibility";
 
 export type StickerViewMode = "physical" | "qr" | "windshield";
 
 const STICKER_SRC = stickerTemplateImg;
 const EDITOR_DISPLAY = { w: 320, h: 200 };
-const DEFAULT_SP: StickerPos = { x: 193, y: 37, w: 110, h: 110 };
-
-function getSavedStickerPos(): StickerPos {
-  try {
-    const saved = localStorage.getItem("repiqr-sticker-pos");
-    if (saved) return JSON.parse(saved);
-  } catch { /* fallback */ }
-  return DEFAULT_SP;
-}
-
 interface StickerMockupViewProps {
   qr: QrRecord;
   mode?: StickerViewMode;
@@ -35,11 +26,13 @@ export default function StickerMockupView({
   className = "",
   showModeBadge = false,
 }: StickerMockupViewProps) {
-  const sp = stickerPos || getSavedStickerPos();
+  const sp = stickerPos || DEFAULT_STICKER_POS;
   const qrFg = qr.fg || "000000";
   const qrBg = qr.bg || "FFFFFF";
   const fullUrl = qrFullUrl(qr.id);
   const categoryLabel = getCategoryLabel((qr.category || "car") as any);
+  const [codesRevealed] = useCodesRevealed();
+  const refText = stickerRef(qr, codesRevealed, categoryLabel);
 
   const qrXPercent = (sp.x / EDITOR_DISPLAY.w) * 100;
   const qrYPercent = (sp.y / EDITOR_DISPLAY.h) * 100;
@@ -63,7 +56,7 @@ export default function StickerMockupView({
             bg={qrBg}
             size={220}
             style={{ width: 200, height: 200, display: "block" }}
-            alt={`QR code for ${qr.id}`}
+            alt="QR code"
           />
           {/* Subtle corner marks */}
           <div className="absolute top-1.5 left-1.5 w-3 h-3 border-t-2 border-l-2 border-indigo-600 rounded-tl-sm pointer-events-none" />
@@ -72,7 +65,7 @@ export default function StickerMockupView({
           <div className="absolute bottom-1.5 right-1.5 w-3 h-3 border-b-2 border-r-2 border-indigo-600 rounded-br-sm pointer-events-none" />
         </div>
         <div className="mt-3 text-center">
-          <span className="font-mono text-xs font-bold text-gray-800 tracking-wider block">{qr.id}</span>
+          <span className="font-mono text-xs font-bold text-gray-800 tracking-wider block">{refText}</span>
           <span className="text-[11px] text-gray-500 font-medium">High-resolution scannable matrix</span>
         </div>
       </div>
@@ -203,7 +196,7 @@ export default function StickerMockupView({
       </div>
 
       <div className="mt-3 flex items-center justify-between w-full text-[11px] text-gray-500">
-        <span className="font-mono font-semibold text-gray-700">{qr.id}</span>
+        <span className="font-mono font-semibold text-gray-700">{refText}</span>
         <span className="inline-flex items-center gap-1 font-medium">
           <Shield size={11} className="text-emerald-600" />
           UV & Weatherproof Vinyl

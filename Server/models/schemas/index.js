@@ -10,7 +10,6 @@ module.exports = {
   ChatSession: require('./ChatSession'),
   ChatMessage: require('./ChatMessage'),
   ShopProduct: require('./ShopProduct'),
-  Template: require('./Template'),
   PushSubscription: require('./PushSubscription'),
   AuditLog: require('./AuditLog'),
 };

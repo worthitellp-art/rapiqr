@@ -181,7 +181,7 @@ export async function sendMsg91Otp(identifier: string): Promise<void> {
         // whitelisted, invalid/expired widget credentials, exhausted SMS
         // balance) — log the raw payload so the real reason is visible in
         // devtools instead of just the generic fallback text below.
-        console.error('MSG91 sendOtp failure:', error);
+        if (import.meta.env.DEV) console.error('MSG91 sendOtp failure:', error);
         reject(new Error(extractMsg91ErrorMessage(error, 'Failed to send the verification code.')));
       }
     );
@@ -206,30 +206,43 @@ export async function verifyMsg91Otp(otp: string): Promise<string> {
         resolve(token);
       },
       (error) => {
-        console.error('MSG91 verifyOtp failure:', error);
+        if (import.meta.env.DEV) console.error('MSG91 verifyOtp failure:', error);
         reject(new Error(extractMsg91ErrorMessage(error, 'Incorrect code — please try again.')));
       }
     );
   });
 }
 
+/** MSG91 retryOtp() takes numeric channel codes, not names — a name like 'text' is rejected. */
+const MSG91_RETRY_CHANNEL = { text: '11', whatsapp: '12', voice: '4' } as const;
+
 /**
  * Resends the OTP, optionally over a different channel. MSG91's widget throws
  * "Channel not provided in retryOtp() method" if this is left undefined, so
  * every caller gets a real channel here even when it doesn't pass one — 'text'
- * (SMS) matches this project's default send channel.
+ * (SMS) matches this project's default send channel. The widget sometimes never
+ * calls back (no active request to retry), so this rejects after a timeout and
+ * lets the caller fall back to a fresh send instead of hanging forever.
  */
-export async function retryMsg91Otp(channel: 'text' | 'voice' | 'whatsapp' = 'text'): Promise<void> {
+export async function retryMsg91Otp(
+  channel: keyof typeof MSG91_RETRY_CHANNEL = 'text',
+  timeoutMs = 10000
+): Promise<void> {
   return new Promise((resolve, reject) => {
     if (typeof window.retryOtp !== 'function') {
       reject(new Error('OTP widget is not ready — request a new code.'));
       return;
     }
+    const timer = setTimeout(() => reject(new Error('Resend timed out.')), timeoutMs);
     window.retryOtp(
-      channel,
-      () => resolve(),
+      MSG91_RETRY_CHANNEL[channel],
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
       (error) => {
-        console.error('MSG91 retryOtp failure:', error);
+        clearTimeout(timer);
+        if (import.meta.env.DEV) console.error('MSG91 retryOtp failure:', error);
         reject(new Error(extractMsg91ErrorMessage(error, 'Failed to resend the code.')));
       }
     );

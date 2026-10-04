@@ -1,4 +1,5 @@
-import { ArrowLeft, ArrowRight, CheckCircle2, QrCode } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, QrCode } from 'lucide-react';
+import { FlowButton } from '../ui/flow-button';
 
 interface PricingPlan {
   id: string;
@@ -83,14 +84,14 @@ export default function PricingPage({ onBack, onOrderNow }: PricingPageProps) {
             return (
               <div
                 key={plan.id}
-                className={`flex flex-col rounded-[1.75rem] p-8 ${
+                className={`flex flex-col rounded-lg p-8 ${
                   featured
                     ? 'bg-[#FFCB56] text-[#0B0B0C] shadow-[0_24px_70px_-36px_rgba(0,0,0,0.45)]'
                     : 'border border-black/10 bg-white text-[#0B0B0C]'
                 }`}
               >
                 {featured && (
-                  <span className="mb-4 inline-block w-fit rounded-full bg-black/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wide">
+                  <span className="mb-4 inline-block w-fit rounded-md bg-black/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wide">
                     Most Popular
                   </span>
                 )}
@@ -106,16 +107,14 @@ export default function PricingPage({ onBack, onOrderNow }: PricingPageProps) {
                     </li>
                   ))}
                 </ul>
-                <button
-                  type="button"
+                <FlowButton
+                  tone={featured ? 'dark' : 'outline'}
+                  fullWidth
                   onClick={onOrderNow}
-                  className={`mt-8 flex cursor-pointer items-center justify-center gap-2 rounded-md py-3.5 text-[13.5px] font-semibold transition-transform hover:-translate-y-0.5 ${
-                    featured ? 'bg-[#0B0B0C] text-white' : 'bg-[#FFCB56] text-[#0B0B0C]'
-                  }`}
+                  className="mt-8"
                 >
                   {plan.cta}
-                  <ArrowRight size={15} />
-                </button>
+                </FlowButton>
               </div>
             );
           })}

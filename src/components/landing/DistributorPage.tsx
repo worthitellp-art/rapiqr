@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Handshake } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Handshake } from 'lucide-react';
+import { FlowButton } from '../ui/flow-button';
 import { useAuth } from '../../context/AuthContext';
 import { saveDistributorApplication, getUserDistributorApplication, DistributorApplication } from '../../lib/distributorService';
 
@@ -158,10 +159,10 @@ export default function DistributorPage({ onBack }: DistributorPageProps) {
 
           <div className="mt-10 space-y-4 border-t border-black/10 pt-7">
             {DISTRIBUTOR_TIERS.map((t) => (
-              <div key={t.id} className="rounded-2xl border border-black/10 bg-white p-5">
+              <div key={t.id} className="rounded-lg border border-black/10 bg-white p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-[15px] font-semibold">{t.name}</h3>
-                  <span className="rounded-full bg-[#FFCB56] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#5B4A17]">
+                  <span className="rounded-md bg-[#FFCB56] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#5B4A17]">
                     {t.badge}
                   </span>
                 </div>
@@ -174,10 +175,10 @@ export default function DistributorPage({ onBack }: DistributorPageProps) {
           </div>
         </section>
 
-        <section className="rounded-[1.75rem] border border-black/10 bg-white p-6 shadow-[0_24px_70px_-36px_rgba(0,0,0,0.45)] sm:p-10">
+        <section className="rounded-lg border border-black/10 bg-white p-6 shadow-[0_24px_70px_-36px_rgba(0,0,0,0.45)] sm:p-10">
           {submitted ? (
             <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+              <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
                 <CheckCircle2 size={30} />
               </div>
               <h2 className="mt-6 text-2xl font-medium tracking-[-0.03em]">Application received</h2>
@@ -185,9 +186,9 @@ export default function DistributorPage({ onBack }: DistributorPageProps) {
                 Thanks, {name}. Our partnerships team will review your {tier.toLowerCase()} inquiry for {city} and
                 contact you on {phone}.
               </p>
-              <button onClick={onBack} className="mt-8 flex cursor-pointer items-center gap-2 rounded-md bg-[#0B0B0C] px-6 py-3.5 text-[13px] font-semibold text-white">
-                Return to home <ArrowRight size={15} className="text-white" />
-              </button>
+              <FlowButton tone="dark" className="mt-8" onClick={onBack}>
+                Return to home
+              </FlowButton>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -198,7 +199,7 @@ export default function DistributorPage({ onBack }: DistributorPageProps) {
               </div>
 
               {existingApp && (
-                <div className="flex items-start gap-2.5 rounded-xl bg-[#FFCB56]/50 p-4 text-[13px] leading-relaxed text-[#5B4A17]">
+                <div className="flex items-start gap-2.5 rounded-md bg-[#FFCB56]/50 p-4 text-[13px] leading-relaxed text-[#5B4A17]">
                   <Handshake size={16} className="mt-0.5 shrink-0" />
                   <span>
                     You already have an application on file for <strong>{existingApp.tier}</strong> — status:{' '}
@@ -209,7 +210,7 @@ export default function DistributorPage({ onBack }: DistributorPageProps) {
 
               <div>
                 <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">Full name *</label>
-                <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" className="w-full rounded-xl border border-black/12 px-4 py-3.5 text-[14px] outline-hidden focus:border-black" />
+                <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" className="w-full rounded-md border border-black/12 px-4 py-3.5 text-[14px] outline-hidden focus:border-black" />
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
@@ -220,7 +221,7 @@ export default function DistributorPage({ onBack }: DistributorPageProps) {
                     value={phone}
                     onChange={(event) => setPhone(event.target.value)}
                     placeholder="10-digit mobile number"
-                    className="w-full rounded-xl border border-black/12 px-4 py-3.5 text-[14px] outline-hidden focus:border-black"
+                    className="w-full rounded-md border border-black/12 px-4 py-3.5 text-[14px] outline-hidden focus:border-black"
                   />
                 </div>
                 <div>
@@ -229,30 +230,30 @@ export default function DistributorPage({ onBack }: DistributorPageProps) {
                     value={city}
                     onChange={(event) => setCity(event.target.value)}
                     placeholder="e.g. Pune"
-                    className="w-full rounded-xl border border-black/12 px-4 py-3.5 text-[14px] outline-hidden focus:border-black"
+                    className="w-full rounded-md border border-black/12 px-4 py-3.5 text-[14px] outline-hidden focus:border-black"
                   />
                 </div>
               </div>
 
               <div>
                 <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">Business type</label>
-                <select value={business} onChange={(event) => setBusiness(event.target.value)} className="w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3.5 text-[14px] outline-hidden focus:border-black">
+                <select value={business} onChange={(event) => setBusiness(event.target.value)} className="w-full cursor-pointer rounded-md border border-black/12 bg-white px-4 py-3.5 text-[14px] outline-hidden focus:border-black">
                   {BUSINESS_OPTIONS.map((b) => <option key={b} value={b}>{b}</option>)}
                 </select>
               </div>
 
               <div>
                 <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">Desired tier</label>
-                <select value={tier} onChange={(event) => setTier(event.target.value)} className="w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3.5 text-[14px] outline-hidden focus:border-black">
+                <select value={tier} onChange={(event) => setTier(event.target.value)} className="w-full cursor-pointer rounded-md border border-black/12 bg-white px-4 py-3.5 text-[14px] outline-hidden focus:border-black">
                   {TIER_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
                 <p className="mt-2 text-[12px] leading-relaxed text-black/50">{selectedTierInfo.margin} — {selectedTierInfo.minUnits}</p>
               </div>
 
-              {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-[13px] text-red-700">{error}</p>}
-              <button type="submit" disabled={!valid || submitting} className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-[#0B0B0C] py-4 text-[14px] font-semibold text-white transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-35">
-                {submitting ? <><Loader2 size={16} className="animate-spin" /> Sending application</> : <>Submit application <ArrowRight size={16} className="text-white" /></>}
-              </button>
+              {error && <p className="rounded-md bg-red-50 px-4 py-3 text-[13px] text-red-700">{error}</p>}
+              <FlowButton type="submit" tone="dark" size="lg" fullWidth loading={submitting} disabled={!valid}>
+                {submitting ? 'Sending application' : 'Submit application'}
+              </FlowButton>
               <p className="text-center text-[11px] text-black/60">No fee to apply. Our partnerships team verifies every inquiry.</p>
             </form>
           )}

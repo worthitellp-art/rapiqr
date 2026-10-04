@@ -170,7 +170,7 @@ class QrController {
       if (Array.isArray(newlyAddedContacts) && newlyAddedContacts.length > 0) {
         notifyContactsAdded({
           contacts: newlyAddedContacts,
-          ownerName: activationData.ownerName || 'A RapiQR user',
+          ownerName: activationData.ownerName || 'A RepiQR user',
           eventId: id,
         }).catch((err) => {
           logger.error('EMERGENCY_CONTACT_NOTIFY', `Failed to notify emergency contacts for ${id}`, err);

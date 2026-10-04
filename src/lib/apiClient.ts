@@ -129,12 +129,43 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
     return data as T;
   } catch (err: any) {
-    // Graceful log for expected fallback endpoints
-    if (process.env.NODE_ENV === 'development') {
-      console.debug(`API endpoint (${endpoint}):`, err.message || err);
-    }
     throw err;
   }
+}
+
+/** Fields the admin can create/edit on a service provider (Communication tab). */
+export interface ProviderInput {
+  category: string;
+  serviceType?: string;
+  categories?: string[];
+  label: string;
+  phone: string;
+  active?: boolean;
+  email?: string | null;
+  whatsapp?: string | null;
+  city?: string | null;
+  country?: string | null;
+  address?: string | null;
+  area?: string | null;
+  state?: string | null;
+  pincode?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  radiusKm?: number | null;
+  notes?: string | null;
+}
+
+/** Structured result of a reverse geocode (see Server/controllers/geoController.js). */
+export interface GeoAddress {
+  address: string;
+  area: string;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+  formatted: string;
+  latitude: number;
+  longitude: number;
 }
 
 export interface ChatMessage {
@@ -1119,22 +1150,6 @@ export const apiClient = {
         method: 'DELETE',
       });
     },
-
-    // Customize page: the saved default QR placement on the sticker template.
-    // Persisted server-side so it's a real shared default, not just whatever
-    // is in one admin's browser localStorage.
-    async getStickerPosition() {
-      return request<{ success: boolean; data: { x: number; y: number; w: number; h: number } | null }>('/admin/sticker-position', {
-        method: 'GET',
-      });
-    },
-
-    async saveStickerPosition(pos: { x: number; y: number; w: number; h: number }) {
-      return request<{ success: boolean; data?: { x: number; y: number; w: number; h: number }; error?: string }>('/admin/sticker-position', {
-        method: 'PUT',
-        body: JSON.stringify(pos),
-      });
-    },
   },
 
   // Live Operational Logs Services
@@ -1197,6 +1212,27 @@ export const apiClient = {
   // Admin-configured helpline directory (Ambulance, Towing, Mechanic, ...).
   // Persisted server-side so the scan page and the masked-call bridge can both
   // resolve them without depending on the admin's own browser localStorage.
+  /**
+   * Geocoding goes through RepiQR's backend (/api/geo/*), never straight from
+   * the browser to a third party — see Server/controllers/geoController.js.
+   */
+  geo: {
+    async reverse(lat: number, lng: number, signal?: AbortSignal) {
+      return request<{ success: boolean; data: GeoAddress }>(`/geo/reverse?lat=${lat}&lng=${lng}`, { method: 'GET', signal });
+    },
+    async forward(query: string, signal?: AbortSignal) {
+      return request<{ success: boolean; data: { latitude: number; longitude: number } }>(
+        `/geo/forward?q=${encodeURIComponent(query)}`,
+        { method: 'GET', signal }
+      );
+    },
+    async pincode(pin: string, signal?: AbortSignal) {
+      return request<{ success: boolean; data: Omit<GeoAddress, 'address' | 'formatted' | 'latitude' | 'longitude'> }>(
+        `/geo/pincode/${encodeURIComponent(pin)}`,
+        { method: 'GET', signal }
+      );
+    },
+  },
   helplines: {
     /**
      * Active providers. With no filters this is the full list, which the scan
@@ -1230,6 +1266,12 @@ export const apiClient = {
       email?: string;
       city?: string;
       country?: string;
+      address?: string;
+      area?: string;
+      state?: string;
+      pincode?: string;
+      latitude?: number;
+      longitude?: number;
       notes?: string;
       whatsapp?: string;
       yearsExperience?: string;
@@ -1245,13 +1287,13 @@ export const apiClient = {
     async getAll() {
       return request<{ success: boolean; data: any[] }>('/helplines', { method: 'GET' });
     },
-    async create(provider: { category: string; serviceType?: string; categories?: string[]; label: string; phone: string; active?: boolean; email?: string | null; city?: string | null; country?: string | null; notes?: string | null }) {
+    async create(provider: ProviderInput) {
       return request<{ success: boolean; data: any }>('/helplines', {
         method: 'POST',
         body: JSON.stringify(provider),
       });
     },
-    async update(id: string, updates: Partial<{ category: string; serviceType: string; categories: string[]; label: string; phone: string; active: boolean; email: string | null; city: string | null; country: string | null; notes: string | null }>) {
+    async update(id: string, updates: Partial<ProviderInput>) {
       return request<{ success: boolean; data: any }>(`/helplines/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(updates),

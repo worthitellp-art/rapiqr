@@ -1,11 +1,11 @@
 /**
  * MSG91 WhatsApp templates catalogue — the SINGLE source of truth.
  *
- * These now mirror the templates actually approved on MSG91 (exported from the
- * dashboard into old-templates-whaspp-usethis/*.json) rather than the earlier
- * button-based designs, which are on hold — none of the approved templates use
- * a WhatsApp button component; a dashboard/maps link is plain body text
- * instead (the `{{link}}` / `{{maps_url}}` placeholders below).
+ * Scan, urgent-alert and chat messages use the three current button templates
+ * (update-templates/rapi_tag_scan.json, rapi_urgent_alert.json,
+ * rapi_new_chat.json). The remaining types (contact-added, safe, activated, OTP)
+ * still use the older approved templates in old-templates-whaspp-usethis/*.json
+ * until a button version exists for them.
  *
  * Rules MSG91/Meta enforce:
  *  - Placeholders use named keys such as `{{label}}` and `{{message}}`.
@@ -58,66 +58,78 @@ function buildMapsLink(latitude, longitude) {
  * }
  */
 const MSG91_TEMPLATES = {
+  // ── Current templates (each has a "Open dashboard" URL button) ─────────────
+  // Names are hardcoded on purpose: Server/.env used to pin
+  // MSG91_WHATSAPP_TEMPLATE_NAME=qr_scan_alert, which silently kept the retired
+  // template alive. Template FILES/names say "rapi_" (Meta locked the old names);
+  // the wording inside the messages says "RepiQR".
+  //
+  // `buttonVariable` names the `data` key that fills the URL button's {{1}}
+  // (the chat session id). MSG91 sends it as component `button_1`.
   QR_SCAN_ALERT: {
-    name: process.env.MSG91_WHATSAPP_TEMPLATE_NAME || 'qr_scan_alert',
+    name: 'rapi_tag_scan',
     audience: 'owner',
-    variables: ['label', 'message', 'link'],
-    defaults: { label: 'your tag', message: 'an issue was reported', link: '' },
-    body: '*🔔 QR Scan Alert*\nYour tag *{{label}}* was just scanned.\nMessage: *{{message}}*\nCheck details and reply here: *{{link}}*\n— RepiQR',
+    variables: ['item_name', 'message'],
+    buttonVariable: 'session',
+    defaults: { item_name: 'your tag', message: 'an issue was reported' },
+    body: '🔔 *RepiQR Scan Alert*\n\nYour tag *{{item_name}}* *was scanned*.\n*Note*: "{{message}}"\n\n_*Tap below to view details and reply 👇*_',
   },
 
-  // No separate owner/button template is approved — reuses the approved
-  // emergency_contact_alert_v2 template (see
-  // old-templates-whaspp-usethis/emergency_contact_alert_v2.json), same as
-  // EMERGENCY_CONTACT_ALERT below. `audience` is documentation only (see
-  // notificationTemplates.js), so sending the owner's copy through the same
-  // approved template name/body is safe.
-  EMERGENCY_ALERT: {
-    name: process.env.MSG91_WHATSAPP_EMERGENCY_TEMPLATE || 'emergency_contact_alert_v2',
-    audience: 'owner',
-    variables: ['label', 'message'],
-    defaults: { label: 'your tag', message: 'an emergency alert was raised' },
-    body: 'RepiQR EMERGENCY NOTIFICATION: an urgent alert was raised on the registered tag "{{label}}". The reporter states: "{{message}}". Please check on this situation immediately.',
-  },
-
-  EMERGENCY_CONTACT_ALERT: {
-    name: process.env.MSG91_WHATSAPP_EMERGENCY_CONTACT_TEMPLATE || 'emergency_contact_alert_v2',
-    audience: 'emergency_contact',
-    variables: ['label', 'message'],
-    defaults: { label: 'a registered tag', message: 'an urgent alert was reported' },
-    body: 'RepiQR EMERGENCY NOTIFICATION: an urgent alert was raised on the registered tag "{{label}}". The reporter states: "{{message}}". Please check on this situation immediately.',
-  },
-
+  // Same template as QR_SCAN_ALERT — the shared maps link rides in `message`.
   LOCATION_SHARED: {
-    name: 'location_shared',
+    name: 'rapi_tag_scan',
     audience: 'owner',
-    variables: ['label', 'maps_url', 'link'],
-    defaults: { label: 'your tag', maps_url: '', link: '' },
-    body: '*📍 Location Shared*\nSomeone has shared their live location for *{{label}}*.\nView the location: *{{maps_url}}*\nCheck details and reply here: *{{link}}*\n— RepiQR Safety',
+    variables: ['item_name', 'message'],
+    buttonVariable: 'session',
+    defaults: { item_name: 'your tag', message: 'live location shared' },
+    body: '🔔 *RepiQR Scan Alert*\n\nYour tag *{{item_name}}* *was scanned*.\n*Note*: "{{message}}"\n\n_*Tap below to view details and reply 👇*_',
+  },
+
+  EMERGENCY_ALERT: {
+    name: 'rapi_urgent_alert',
+    audience: 'owner',
+    variables: ['item_name', 'message'],
+    buttonVariable: 'session',
+    defaults: { item_name: 'your tag', message: 'an emergency alert was raised' },
+    body: '🚨 *Urgent Alert*\n\nAlert reported for *{{item_name}}*:\n"{{message}}"\n\n*_Tap below to reply securely_* 👇',
+  },
+
+  // Emergency contacts get the same urgent template. Their button opens the
+  // RepiQR dashboard (they sign in to see it); there is no thread of their own.
+  EMERGENCY_CONTACT_ALERT: {
+    name: 'rapi_urgent_alert',
+    audience: 'emergency_contact',
+    variables: ['item_name', 'message'],
+    buttonVariable: 'session',
+    defaults: { item_name: 'a registered tag', message: 'an urgent alert was reported' },
+    body: '🚨 *Urgent Alert*\n\nAlert reported for *{{item_name}}*:\n"{{message}}"\n\n*_Tap below to reply securely_* 👇',
   },
 
   CHAT_STARTED: {
-    name: 'chat_started',
+    name: 'rapi_new_chat',
     audience: 'owner',
-    variables: ['label', 'link'],
-    defaults: { label: 'your tag', link: '' },
-    body: 'RepiQR chat alert: a visitor has started a conversation about your tag "{{label}}". They are waiting for your response. Open your dashboard here: {{link}} to view the message and reply securely.',
+    variables: ['item_name', 'message'],
+    buttonVariable: 'session',
+    defaults: { item_name: 'your tag', message: 'A visitor started a chat with you.' },
+    body: '💬 *New Message*\n\nMessage regarding *{{item_name}}*:\n"{{message}}"\n\n*_Tap below to reply securely_* 👇',
   },
 
   CHAT_MESSAGE: {
-    name: 'chat_message',
+    name: 'rapi_new_chat',
     audience: 'owner',
-    variables: ['label', 'link'],
-    defaults: { label: 'your tag', link: '' },
-    body: '*💬 RepiChat – New Message*\nSomeone has sent you a message about your RepiQR tag *{{label}}*.\nTap the link below to view and reply:\n*{{link}}*\n— RepiQR Safety',
+    variables: ['item_name', 'message'],
+    buttonVariable: 'session',
+    defaults: { item_name: 'your tag', message: 'You have a new message.' },
+    body: '💬 *New Message*\n\nMessage regarding *{{item_name}}*:\n"{{message}}"\n\n*_Tap below to reply securely_* 👇',
   },
 
+  // ── Older templates with no button replacement yet ─────────────────────────
   EMERGENCY_CONTACT_ADDED: {
     name: process.env.MSG91_WHATSAPP_CONTACT_ADDED_TEMPLATE || 'emergency_contact_added',
     audience: 'emergency_contact',
     variables: ['contact_name', 'owner_name'],
-    defaults: { contact_name: 'there', owner_name: 'A RapiQR user' },
-    body: 'Hi {{contact_name}}, {{owner_name}} has added you as an emergency contact on their RapiQR safety tag. If they are ever in an emergency, you may be contacted to help. No action is needed right now.',
+    defaults: { contact_name: 'there', owner_name: 'A RepiQR user' },
+    body: 'Hi {{contact_name}}, {{owner_name}} has added you as an emergency contact on their RepiQR safety tag. If they are ever in an emergency, you may be contacted to help. No action is needed right now.',
   },
 
   SAFE_STATUS: {
@@ -146,7 +158,14 @@ const MSG91_TEMPLATES = {
 };
 
 /** Max clip length per variable key (message text tends to run long). */
-const CLIP_MAX = { label: 40, message: 80, contact_name: 40, owner_name: 40 };
+const CLIP_MAX = { label: 40, item_name: 40, message: 160, contact_name: 40, owner_name: 40 };
+
+/** Clipped value for one template variable, falling back to its default — Meta rejects empty params. */
+function resolveValue(template, key, data) {
+  const max = CLIP_MAX[key];
+  const value = max ? clip(data[key], max) : String(data[key] ?? '');
+  return value || (template.defaults || {})[key] || '';
+}
 
 /**
  * Render an MSG91 body with the runtime values filled into {{1}}, {{2}}, ...
@@ -156,20 +175,23 @@ const CLIP_MAX = { label: 40, message: 80, contact_name: 40, owner_name: 40 };
 function renderBody(type, data = {}) {
   const template = MSG91_TEMPLATES[type];
   if (!template) return '';
-  const { body, variables, defaults = {} } = template;
-  return variables.reduce((text, key) => {
-    const max = CLIP_MAX[key];
-    const value = max ? clip(data[key], max) : String(data[key] ?? '');
-    const final = value || defaults[key] || '';
-    return text.replace(new RegExp(`\\{\\{${key}\\}\\}`), final);
-  }, body);
+  return template.variables.reduce(
+    (text, key) => text.replace(new RegExp(`\\{\\{${key}\\}\\}`), resolveValue(template, key, data)),
+    template.body
+  );
 }
 
-/** Named variable map for the WhatsApp template. */
+/**
+ * Named variable map for the WhatsApp template. Templates with a URL button
+ * also get `button_1` (the dynamic part of the URL, e.g. the chat session id);
+ * msg91Client substitutes a placeholder if it's empty.
+ */
 function buildVariables(type, data = {}) {
   const template = MSG91_TEMPLATES[type];
   if (!template) return {};
-  return Object.fromEntries(template.variables.map((key) => [key, String(data[key] ?? '')]));
+  const variables = Object.fromEntries(template.variables.map((key) => [key, resolveValue(template, key, data)]));
+  if (template.buttonVariable) variables.button_1 = String(data[template.buttonVariable] ?? '');
+  return variables;
 }
 
 module.exports = {

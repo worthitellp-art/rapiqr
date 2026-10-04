@@ -216,7 +216,7 @@ export default function ScanPaymentModal({
         </ol>
 
         {/* Card */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-4 sm:p-8">
+        <div className="rounded-xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-4 sm:p-8">
           {/* STEP 1: Owner Details */}
           {activeStepIndex === 0 && (
             <form onSubmit={handleOwnerDetailsSubmit} className="space-y-4 sm:space-y-5">
@@ -529,15 +529,21 @@ export default function ScanPaymentModal({
                 })}
               </div>
 
-              {onAddEmergencyContact && (
-                <button
-                  type="button"
-                  onClick={onAddEmergencyContact}
-                  className="w-full h-11 rounded-lg border border-dashed border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                >
-                  <Plus size={15} />
-                  <span>Add another contact</span>
-                </button>
+              {emergencyContacts.length >= 7 ? (
+                <p className="text-center text-xs font-medium text-slate-500 py-1">
+                  Maximum limit of 7 emergency contacts reached
+                </p>
+              ) : (
+                onAddEmergencyContact && (
+                  <button
+                    type="button"
+                    onClick={onAddEmergencyContact}
+                    className="w-full h-11 rounded-lg border border-dashed border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <Plus size={15} />
+                    <span>Add another contact</span>
+                  </button>
+                )
               )}
 
               {error && (

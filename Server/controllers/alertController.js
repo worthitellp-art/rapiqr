@@ -2,7 +2,7 @@ const AlertModel = require('../models/alertModel');
 const ProductModel = require('../models/productModel');
 const ChatModel = require('../models/chatModel');
 const { notifyOwner, notifyEmergencyContacts } = require('../services/notificationService');
-const { buildDashboardChatLink, buildMapsLink } = require('../services/msg91Templates');
+const { buildMapsLink } = require('../services/msg91Templates');
 const { getIo } = require('../sockets/chatSocket');
 const { logger } = require('../middleware/loggerMiddleware');
 
@@ -19,18 +19,18 @@ const URL_RE = /(https?:\/\/\S+)/;
  */
 function buildAlertChatText(label, rawMessage) {
   if (!rawMessage) {
-    return `RapiQR Alert: someone scanned and reported an issue with ${label}. Open the app for details.`;
+    return `RepiQR Alert: someone scanned and reported an issue with ${label}. Open the app for details.`;
   }
   const msg = String(rawMessage);
   const urlMatch = msg.match(URL_RE);
   if (!urlMatch) {
     const truncated = msg.length > 100 ? `${msg.slice(0, 97)}...` : msg;
-    return `RapiQR Alert on ${label}: "${truncated}"`;
+    return `RepiQR Alert on ${label}: "${truncated}"`;
   }
   const url = urlMatch[0];
   const withoutUrl = (msg.slice(0, urlMatch.index) + msg.slice(urlMatch.index + url.length)).trim();
   const truncated = withoutUrl.length > 100 ? `${withoutUrl.slice(0, 97)}...` : withoutUrl;
-  return truncated ? `RapiQR Alert on ${label}: "${truncated}"\n${url}` : `RapiQR Alert on ${label}\n${url}`;
+  return truncated ? `RepiQR Alert on ${label}: "${truncated}"\n${url}` : `RepiQR Alert on ${label}\n${url}`;
 }
 
 class AlertController {
@@ -77,7 +77,7 @@ class AlertController {
       // uses type "emergency" and notifies as normal.
       if ((product || alertPayload.ownerPhone) && alertPayload.type !== 'location_ping') {
         const ownerPhone = product?.details?.ownerPhone || product?.phone_number || product?.details?.phone || product?.details?.phoneNumber || product?.profiles?.phone_number || alertPayload.ownerPhone;
-        const label = alertPayload.vehicleName || alertPayload.vehicleNumber || product?.name || 'your RapiQR item';
+        const label = alertPayload.vehicleName || alertPayload.vehicleNumber || product?.name || 'your RepiQR item';
         const text = buildAlertChatText(label, alertPayload.message);
 
         // Seed/continue the visitor's RepiChat thread with this alert first, so
@@ -98,33 +98,25 @@ class AlertController {
           }
         }
 
-        // The owner's copy carries a deep link into the dashboard inbox — when a
-        // chat thread exists for this alert, straight into that tab (the
-        // frontend doesn't currently select the specific thread from this
-        // query param, just opens the chat tab). QR_SCAN_ALERT and
-        // LOCATION_SHARED's approved templates print this as plain body text
-        // now (see msg91Templates.js), not a WhatsApp button — a button's
-        // dynamic URL parameter can't be empty, which used to silently fail
-        // the whole send for any alert with no chat session.
-        const dashboardLink = buildDashboardChatLink(chatSessionId);
-
-        // Send WhatsApp alert to the owner using the approved Meta templates
+        // Send WhatsApp alert to the owner using the approved Meta templates.
+        // Each one has an "open dashboard" URL button whose parameter is the
+        // chat session id (msg91Client sends a placeholder when there is none,
+        // since Meta rejects an empty button parameter).
         if (ownerPhone) {
           const isEmergency = alertPayload.type === 'emergency' || alertPayload.type === 'sos';
           const hasGps = Boolean(alertPayload.latitude && alertPayload.longitude);
           const isLocationShare = alertPayload.type === 'location_share' || String(alertPayload.message || '').includes('EMERGENCY GPS LOCATION');
 
+          // `session` fills the template's "open dashboard" URL button.
           let alertType = 'QR_SCAN_ALERT';
-          let alertData = { label, message: alertPayload.message || 'an issue was reported', link: dashboardLink };
+          let alertData = { item_name: label, message: alertPayload.message || 'an issue was reported', session: chatSessionId };
 
           if (hasGps && isLocationShare) {
             alertType = 'LOCATION_SHARED';
-            alertData = { label, maps_url: buildMapsLink(alertPayload.latitude, alertPayload.longitude), link: dashboardLink };
+            alertData = { item_name: label, message: `Live location: ${buildMapsLink(alertPayload.latitude, alertPayload.longitude)}`, session: chatSessionId };
           } else if (isEmergency) {
             alertType = 'EMERGENCY_ALERT';
-            // Reuses the approved emergency_contact_alert_v2 template (no
-            // button component) — see msg91Templates.js EMERGENCY_ALERT.
-            alertData = { label, message: alertPayload.message || 'an urgent alert was reported' };
+            alertData = { item_name: label, message: alertPayload.message || 'an urgent alert was reported', session: chatSessionId };
           }
 
           const result = await notifyOwner({
@@ -139,13 +131,16 @@ class AlertController {
           smsResult = { sent: result.sent && !result.mock, simulated: result.mock || result.status === 'simulated' };
         }
 
+        // The owner already got their own copy above — don't message them again
+        // just because their number is also saved as an emergency contact.
+        const lastTen = (value) => String(value || '').replace(/\D/g, '').slice(-10);
         const emergencyContacts = notifyContacts && Array.isArray(product.details?.emergencyContacts)
-          ? product.details.emergencyContacts
+          ? product.details.emergencyContacts.filter((c) => !ownerPhone || lastTen(c?.phone) !== lastTen(ownerPhone))
           : [];
         if (emergencyContacts.length > 0) {
           const contactResult = await notifyEmergencyContacts({
             contacts: emergencyContacts,
-            data: { label, message: alertPayload.message || 'an issue was reported' },
+            data: { item_name: label, message: alertPayload.message || 'an issue was reported', session: chatSessionId },
             eventId: alertPayload.productId || qrId,
           });
           contactsNotified = contactResult.delivered;

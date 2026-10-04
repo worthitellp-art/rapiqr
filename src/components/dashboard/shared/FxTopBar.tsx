@@ -20,7 +20,7 @@ export function FxSearchInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full pl-9 pr-3 h-[36px] text-[13px] rounded-full border border-[var(--fx-border)] bg-[var(--fx-canvas)] text-[var(--fx-ink)] placeholder-[var(--fx-faint)] outline-none transition-all focus:ring-2 focus:ring-[var(--fx-accent)]/25 focus:border-[var(--fx-accent)]"
+        className="w-full pl-9 pr-3 h-[38px] text-[13px] rounded-[var(--fx-radius-control)] border border-[var(--fx-border)] bg-[var(--fx-canvas)] text-[var(--fx-ink)] placeholder-[var(--fx-faint)] outline-none transition-all focus:ring-2 focus:ring-[var(--fx-accent)]/25 focus:border-[var(--fx-accent)]"
       />
     </div>
   );
@@ -42,7 +42,7 @@ export function FxIconButton({
     <button
       onClick={onClick}
       title={title}
-      className="relative w-9 h-9 flex-shrink-0 rounded-full border border-[var(--fx-border)] bg-[var(--fx-surface)] flex items-center justify-center text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:border-[var(--fx-accent)]/40 transition-colors cursor-pointer"
+      className="relative w-9 h-9 flex-shrink-0 rounded-[var(--fx-radius-control)] border border-[var(--fx-border)] bg-[var(--fx-surface)] flex items-center justify-center text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:border-[var(--fx-accent)]/40 transition-colors cursor-pointer"
     >
       {icon}
       {badge && (
@@ -66,7 +66,7 @@ export function FxAvatarTrigger({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2.5 pl-1 pr-3 h-9 rounded-full border border-[var(--fx-border)] bg-[var(--fx-surface)] hover:border-[var(--fx-accent)]/40 transition-colors cursor-pointer min-w-0"
+      className="flex items-center gap-2.5 pl-1 pr-3 h-9 rounded-[var(--fx-radius-control)] border border-[var(--fx-border)] bg-[var(--fx-surface)] hover:border-[var(--fx-accent)]/40 transition-colors cursor-pointer min-w-0"
     >
       <span className="w-7 h-7 rounded-full bg-[var(--fx-accent)] text-white text-[12px] font-bold flex items-center justify-center flex-shrink-0">
         {initial}

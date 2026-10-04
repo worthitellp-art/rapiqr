@@ -15,6 +15,7 @@ import {
   Check,
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
+import { FlowButton } from '../ui/flow-button';
 
 /* ── Types & Domain Models ─────────────────────────────────────────────────── */
 
@@ -83,7 +84,7 @@ interface StepperProps {
 function TrackingProgressStepper({ order }: StepperProps) {
   if (order.status === 'cancelled') {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center">
+      <div className="rounded-md border border-red-200 bg-red-50 p-4 text-center">
         <div className="text-sm font-bold text-red-800">Order Cancelled</div>
         <p className="mt-1 text-xs text-red-600">
           This order has been cancelled. If payment was deducted, refund processes within 5-7 business days.
@@ -155,7 +156,7 @@ function TrackingOrderSummary({ order }: SummaryProps) {
   const courier = order.shiprocket;
 
   return (
-    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+    <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/70 p-4">
       <div className="flex items-center justify-between border-b border-slate-200 pb-3">
         <div>
           <div className="flex items-center gap-2">
@@ -198,7 +199,7 @@ function TrackingOrderSummary({ order }: SummaryProps) {
       )}
 
       {courier?.awbCode && (
-        <div className="mt-2 rounded-xl bg-white p-3 border border-slate-200 text-xs flex items-center justify-between">
+        <div className="mt-2 rounded-md bg-white p-3 border border-slate-200 text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Truck size={16} className="text-[#111111]" />
             <div>
@@ -239,7 +240,7 @@ interface MilestonesProps {
 function TrackingMilestones({ timeline }: MilestonesProps) {
   if (!timeline || timeline.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">
+      <div className="rounded-md border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">
         <Clock size={18} className="mx-auto mb-1.5 text-slate-400 opacity-80" />
         Detailed scans will appear once the courier scans your parcel at the dispatch hub.
       </div>
@@ -278,11 +279,11 @@ const OrderResultRow: React.FC<{ order: TrackedOrderData; onSelect: () => void }
   return (
     <button
       onClick={onSelect}
-      className="w-full rounded-xl border border-slate-200 bg-white p-3.5 text-left transition-colors hover:border-slate-300 hover:bg-slate-50 cursor-pointer"
+      className="w-full rounded-md border border-slate-200 bg-white p-3.5 text-left transition-colors hover:border-slate-300 hover:bg-slate-50 cursor-pointer"
     >
       <div className="flex items-center justify-between gap-2">
         <span className="font-mono text-sm font-black text-slate-900">{order.id}</span>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${STATUS_PILL[order.status]}`}>
+        <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${STATUS_PILL[order.status]}`}>
           {order.status}
         </span>
       </div>
@@ -377,11 +378,11 @@ export default function TrackOrderModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in font-body">
-      <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full max-w-lg rounded-lg bg-white p-6 sm:p-7 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-[#111111] border border-gray-200">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gray-100 text-[#111111] border border-gray-200">
               <Package size={20} />
             </div>
             <div>
@@ -391,7 +392,7 @@ export default function TrackOrderModal({
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+            className="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
             aria-label="Close"
           >
             <X size={18} />
@@ -410,32 +411,25 @@ export default function TrackOrderModal({
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#111111] focus:outline-none transition-colors"
+              className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#111111] focus:outline-none transition-colors"
             />
           </div>
 
-          <button
-            onClick={() => handleSearch()}
-            disabled={loading}
-            className="w-full py-2.5 rounded-xl bg-slate-950 hover:bg-slate-900 text-white font-extrabold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm"
-          >
+          <FlowButton tone="dark" size="sm" fullWidth loading={loading} onClick={() => handleSearch()}>
             {loading ? (
-              <>
-                <RefreshCw size={14} className="animate-spin text-white" />
-                <span>Searching order records...</span>
-              </>
+              'Searching order records...'
             ) : (
               <>
-                <Search size={14} className="text-white" />
-                <span>Track Delivery Status</span>
+                <Search size={14} />
+                Track Delivery Status
               </>
             )}
-          </button>
+          </FlowButton>
         </div>
 
         {/* Error banner */}
         {errorMessage && (
-          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800 flex items-start gap-2">
+          <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800 flex items-start gap-2">
             <AlertCircle size={16} className="text-red-600 shrink-0 mt-0.5" />
             <span>{errorMessage}</span>
           </div>
@@ -475,7 +469,7 @@ export default function TrackOrderModal({
             <TrackingMilestones timeline={selectedOrder.shiprocket?.timeline} />
 
             {/* Account linking banner if user wants to claim stickers */}
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs space-y-2">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-xs space-y-2">
               <div className="flex items-center gap-2 font-bold text-gray-900">
                 <ShieldCheck size={16} className="text-[#111111]" />
                 <span>Activate Tag Telephony & Emergency Contacts</span>

@@ -13,6 +13,7 @@ export interface DashboardSticker {
   code: string;             // display alias for qrCodeId (kept for legacy call sites)
   category: string;
   nickname: string;
+  vehicleNumber?: string;
   assigned: string;
   status: StickerStatus;
   scans: number;
@@ -71,7 +72,9 @@ export function mapProductRow(row: any): DashboardSticker {
     qrCodeId,
     code: qrCodeId,
     category,
-    nickname: row.name || `${getCategoryLabel(category as any) || 'Safety'} Sticker (${qrCodeId})`,
+    // Never default a name to the sticker ID — IDs stay hidden until "See codes".
+    nickname: row.name || `${getCategoryLabel(category as any) || 'Safety'} Sticker`,
+    vehicleNumber: row.vehicle_number || '',
     assigned: row.assigned_to || 'Self',
     status: computeStatus(row.status, qr.status),
     scans: qr.scans_count ?? row.scans_count ?? 0,

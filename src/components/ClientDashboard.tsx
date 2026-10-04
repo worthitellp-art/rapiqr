@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { dashboardTranslations } from '../i18n/dashboardTranslations';
 import LanguageSwitcher from './common/LanguageSwitcher';
+import { FlowButton } from './ui/flow-button';
+import { ActivityDropdown } from './ui/activity-dropdown';
 import { getCategoryIcon, getCategoryLabel } from '../stickerModules';
 import {
   Bell,
@@ -48,7 +50,6 @@ import PhoneInputWithCountry from './common/PhoneInputWithCountry';
 import EmergencyContactsPanel from './dashboard/client/EmergencyContactsPanel';
 import AccountSettingsPanel from './dashboard/client/AccountSettingsPanel';
 import SupportLegalPanel from './dashboard/client/SupportLegalPanel';
-import PrivacyDataPanel from './dashboard/client/PrivacyDataPanel';
 import CompleteProfilePopup from './dashboard/client/CompleteProfilePopup';
 import AppLogo from './common/AppLogo';
 import InitialAvatar from './common/InitialAvatar';
@@ -58,6 +59,8 @@ import { connectAsOwner } from '../lib/socketClient';
 import { recallOwnerThread, rememberOwnerThread } from '../lib/chatStorage';
 import { soundNotification } from '../utils/soundNotification';
 import { sendMsg91Otp, verifyMsg91Otp, toMsg91Identifier } from '../lib/msg91Widget';
+import { stickerRef, useCodesRevealed } from '../lib/codeVisibility';
+import { CodeVisibilityToggleButton } from './dashboard/admin/StickerCodeComponents';
 
 async function getProductsFromDb(): Promise<any[]> {
   try {
@@ -142,7 +145,7 @@ interface ClientDashboardProps {
   switchToDistributor?: () => void;
 }
 
-type TabId = 'setup' | 'overview' | 'products' | 'chat' | 'contacts' | 'history' | 'settings' | 'privacy' | 'support';
+type TabId = 'setup' | 'overview' | 'products' | 'chat' | 'contacts' | 'history' | 'settings' | 'support';
 
 // `section` groups the flat list in the sidebar (a small uppercase label
 // renders above each run of items sharing a section); items with no
@@ -161,7 +164,6 @@ function buildNavItems(t: typeof dashboardTranslations['en']['client']): {
     { id: 'contacts', label: t.nav.contacts, icon: Users, section: t.navSections.communication },
     { id: 'history', label: t.nav.history, icon: History, section: t.navSections.communication },
     { id: 'settings', label: t.nav.settings, icon: Settings, section: t.navSections.account },
-    { id: 'privacy', label: t.nav.privacy, icon: ShieldCheck, section: t.navSections.account },
     { id: 'support', label: t.nav.support, icon: LifeBuoy, section: t.navSections.account },
   ];
 }
@@ -369,7 +371,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
       if (hash.includes('tab=products')) return 'products';
       if (hash.includes('tab=settings')) return 'settings';
       const saved = localStorage.getItem('repiqr-client-active-tab') || localStorage.getItem('namoqr-client-active-tab');
-      if (saved && ['setup', 'overview', 'products', 'chat', 'contacts', 'history', 'settings', 'privacy', 'support'].includes(saved)) {
+      if (saved && ['setup', 'overview', 'products', 'chat', 'contacts', 'history', 'settings', 'support'].includes(saved)) {
         return saved as TabId;
       }
     } catch { /* fallback */ }
@@ -385,6 +387,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const [products, setProducts] = useState<DashboardSticker[]>([]);
+  const [codesRevealed, setCodesRevealed] = useCodesRevealed();
   const [productsLoading, setProductsLoading] = useState(true);
 
   // Stickers that used to be in the list and silently disappeared (admin
@@ -397,8 +400,15 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   const [removedStickers, setRemovedStickers] = useState<{ id: string; qrCodeId: string; nickname: string }[]>([]);
   const [recoveringId, setRecoveringId] = useState<string | null>(null);
 
+  // Last time /products was fetched, and whether a fetch is in flight — lets the
+  // focus/visibility refresh below skip redundant calls.
+  const productsFetchedAtRef = useRef(0);
+  const productsInFlightRef = useRef(false);
+
   const loadProducts = useCallback(async () => {
-    setProductsLoading(true);
+    productsInFlightRef.current = true;
+    // Only show the loading state on the first fetch; background refreshes stay silent.
+    if (productsFetchedAtRef.current === 0) setProductsLoading(true);
     try {
       const rows = await getProductsFromDb();
       const mapped = Array.isArray(rows) ? rows.map(mapProductRow) : [];
@@ -423,6 +433,8 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
       setProducts(mapped);
       return mapped;
     } finally {
+      productsFetchedAtRef.current = Date.now();
+      productsInFlightRef.current = false;
       setProductsLoading(false);
     }
   }, [profile?.id, profile?.phoneNumber]);
@@ -434,12 +446,21 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   useEffect(() => {
     if (!profile) return;
     loadProducts();
-    // Admin fleet deletions are hard deletes with no push notification to the
-    // client — without a periodic re-fetch, a sticker admin removed keeps
-    // showing here until the client happens to manually refresh or reload the
-    // page. Poll so a deletion (or any other admin-side change) syncs on its own.
-    const interval = setInterval(loadProducts, 15000);
-    return () => clearInterval(interval);
+    // No interval polling: a timer hit /products every few seconds for the whole
+    // session. Admin-side deletions still sync — re-fetch when the user comes
+    // back to the tab, at most once a minute.
+    const MIN_GAP_MS = 60_000;
+    const refreshIfStale = () => {
+      if (document.visibilityState !== 'visible' || productsInFlightRef.current) return;
+      if (Date.now() - productsFetchedAtRef.current < MIN_GAP_MS) return;
+      loadProducts();
+    };
+    document.addEventListener('visibilitychange', refreshIfStale);
+    window.addEventListener('focus', refreshIfStale);
+    return () => {
+      document.removeEventListener('visibilitychange', refreshIfStale);
+      window.removeEventListener('focus', refreshIfStale);
+    };
   }, [profile?.id, profile?.phoneNumber, loadProducts]);
 
   const [drawerProductId, setDrawerProductId] = useState<string | null>(null);
@@ -773,7 +794,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
       const results = await Promise.all(
         products.map(async (p) => {
           const rows = await getProductHistoryFromDb(p.id);
-          return rows.map((r: any) => ({ ...r, stickerNickname: p.nickname, stickerCode: p.qrCodeId }));
+          return rows.map((r: any) => ({ ...r, stickerNickname: p.nickname, stickerVehicle: p.vehicleNumber, stickerCode: p.qrCodeId }));
         })
       );
       if (!cancelled) {
@@ -1363,6 +1384,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                       <div className="flex justify-between items-center mb-3">
                         <h3 className="text-xs font-semibold text-[var(--fx-ink)]">My Safety Stickers ({products.length})</h3>
                         <div className="flex items-center gap-2.5">
+                          <CodeVisibilityToggleButton isRevealed={codesRevealed} onToggleVisibility={() => setCodesRevealed(!codesRevealed)} />
                           <button onClick={() => setModal({ type: 'recover' })} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">Recover a sticker</button>
                           <button onClick={() => loadProducts()} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">Refresh</button>
                         </div>
@@ -1379,20 +1401,19 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                             <p className="font-bold text-sm text-[var(--fx-ink)]">No Safety Stickers Linked Yet</p>
                             <p className="text-[11px] text-[var(--fx-ink-2)] mt-0.5">Get your free sticker to create your vehicle plate.</p>
                           </div>
-                          <button
-                            onClick={handlePurchaseStickerClick}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-black hover:bg-zinc-800 active:scale-[0.99] text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
-                          >
+                          <FlowButton tone="dark" size="sm" onClick={handlePurchaseStickerClick}>
                             <Plus size={14} /> Get Free Sticker
-                          </button>
+                          </FlowButton>
                         </div>
                       ) : (
                         <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
                           {products.slice(0, 4).map((p) => (
                             <div key={p.id} className="p-3 border border-[var(--fx-border)] rounded-md bg-[var(--fx-canvas)] flex items-center justify-between gap-2">
                               <div>
-                                <p className="font-bold text-xs text-[var(--fx-ink)]">{p.qrCodeId}</p>
-                                <p className="text-[11px] text-[var(--fx-ink-2)] font-medium">{p.nickname || p.vehicleNumber || 'Vehicle Tag'}</p>
+                                <p className="font-bold text-xs text-[var(--fx-ink)]">{stickerRef(p, codesRevealed, p.nickname || 'Vehicle Tag')}</p>
+                                {codesRevealed && p.nickname && (
+                                  <p className="text-[11px] text-[var(--fx-ink-2)] font-medium">{p.nickname}</p>
+                                )}
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <button
@@ -1419,8 +1440,8 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                           {removedStickers.map((s) => (
                             <div key={s.id} className="p-2.5 border border-[#FBE3B8] bg-[#FFFBF2] rounded-md flex items-center justify-between gap-2">
                               <div className="min-w-0">
-                                <p className="text-[11px] font-bold text-[#8A5A00] truncate">{s.nickname || s.qrCodeId} no longer shows here</p>
-                                <p className="text-[10px] text-[#A67C1F] font-mono truncate">{s.qrCodeId}</p>
+                                <p className="text-[11px] font-bold text-[#8A5A00] truncate">{s.nickname || 'A sticker'} no longer shows here</p>
+                                {codesRevealed && <p className="text-[10px] text-[#A67C1F] font-mono truncate">{s.qrCodeId}</p>}
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
                                 <button
@@ -1482,31 +1503,27 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
 
                 </div>
 
-                {/* Recent Scans Log */}
+                {/* Recent scans — expands into the latest scan events */}
                 <div className="pt-2">
-                  <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4">
-                    <div className="flex justify-between items-center mb-3">
-                      <h3 className="text-xs font-semibold text-[var(--fx-ink)]">Recent Scans Log</h3>
-                      <button onClick={() => setActiveTab('history')} className="text-xs text-[var(--fx-accent)] hover:underline">Full Log</button>
-                    </div>
-                    <div className="space-y-2 mt-3">
-                      {allHistory.slice(0, 2).map((h, i) => (
-                        <div key={i} className="border border-[var(--fx-border)] rounded p-2.5 flex items-center gap-3">
-                          <div className="border-l-4 border-[var(--fx-accent-soft)] bg-[var(--fx-canvas)] px-2 py-1 text-center text-xs font-bold min-w-[50px]">
-                            {new Date(h.created_at).getDate()}
-                            <small className="block text-[9px] font-normal uppercase">{new Date(h.created_at).toLocaleDateString('en-US', { month: 'short' })}</small>
-                          </div>
-                          <div className="text-xs min-w-0 flex-1">
-                            <p className="font-semibold text-[var(--fx-ink)] truncate">{h.stickerCode} scanned</p>
-                            <p className="text-[10px] text-[var(--fx-ink-2)]">{h.event_type || 'Vehicle QR Scan Recorded'}</p>
-                          </div>
-                        </div>
-                      ))}
-                      {allHistory.length === 0 && (
-                        <p className="text-xs text-[var(--fx-ink-2)] py-6 text-center">No scan events recorded recently.</p>
-                      )}
-                    </div>
-                  </div>
+                  <ActivityDropdown
+                    title="Recent Scans"
+                    subtitle={
+                      allHistory.length > 0
+                        ? `${allHistory.length} scan event${allHistory.length === 1 ? '' : 's'}`
+                        : 'No scans recorded yet'
+                    }
+                    icon={<QrCode className="h-5 w-5" />}
+                    items={allHistory.slice(0, 5).map((h, i) => ({
+                      id: h.id ?? i,
+                      icon: <QrCode className="h-4 w-4" />,
+                      title: `${codesRevealed ? h.stickerCode : (h.stickerVehicle || h.stickerNickname || 'Sticker')} scanned`,
+                      description: h.event_type || 'Vehicle QR scan recorded',
+                      time: new Date(h.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+                    }))}
+                    emptyText="No scan events recorded recently."
+                    action={{ label: 'Full log', onClick: () => setActiveTab('history') }}
+                    defaultOpen
+                  />
                 </div>
 
               </div>
@@ -1800,7 +1817,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                       <tbody className="divide-y divide-[var(--fx-border)]">
                         {allHistory.map((h, i) => (
                           <tr key={i} className="hover:bg-[var(--fx-canvas)]">
-                            <td className="px-6 py-3 font-display font-semibold text-[15px]">{h.stickerCode}</td>
+                            <td className="px-6 py-3 font-display font-semibold text-[15px]">{codesRevealed ? h.stickerCode : (h.stickerVehicle || h.stickerNickname || 'Sticker')}</td>
                             <td className="px-3 py-3 text-xs">{h.event_type || 'Scan Recorded'}</td>
                             <td className="px-3 py-3 font-mono text-xs text-[var(--fx-faint)]">{new Date(h.created_at).toLocaleString('en-IN')}</td>
                           </tr>
@@ -1815,11 +1832,6 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
             {/* ════ VIEW 4: ACCOUNT SETTINGS ════ */}
             {activeTab === 'settings' && (
               <AccountSettingsPanel showToast={showToast} onProductsLinked={loadProducts} />
-            )}
-
-            {/* ════ VIEW: PRIVACY & DATA ════ */}
-            {activeTab === 'privacy' && (
-              <PrivacyDataPanel showToast={showToast} />
             )}
 
             {/* ════ VIEW 5: SUPPORT & LEGAL ════ */}

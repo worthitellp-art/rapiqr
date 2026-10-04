@@ -1,12 +1,15 @@
-﻿import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   ShoppingBag, Search, Truck, CheckCircle2, XCircle, Clock,
-  Phone, Mail, MapPin, IndianRupee, Trash2, AlertTriangle, Loader2,
+  Phone, Mail, MapPin, Trash2, AlertTriangle, Loader2,
   RefreshCw, ExternalLink, Plus, ArrowUp, ArrowDown, ArrowUpDown,
-  ChevronLeft, ChevronRight, X, Tag, Copy
+  ChevronLeft, ChevronRight, X, Tag
 } from "lucide-react";
 import { apiClient, OrderTracking } from "../../../lib/apiClient";
 import { fmtDateTime } from "./helpers";
+import FxKpiStrip from "../shared/FxKpiStrip";
+import { CodeVisibilityToggleButton } from "./StickerCodeComponents";
+import { useCodesRevealed } from "../../../lib/codeVisibility";
 
 interface OrderItem { name: string; qty: number; price: number }
 interface OrderPayment {
@@ -20,8 +23,6 @@ interface OrderPayment {
 interface OrderSticker {
   id: string;
   category: string;
-  qrUrl?: string;
-  recoveryCode?: string;
   itemName?: string | null;
 }
 interface Order {
@@ -45,16 +46,16 @@ interface Order {
 }
 
 const PAYMENT_META: Record<OrderPayment["status"], { label: string; color: string; bg: string }> = {
-  created: { label: "Awaiting Payment", color: "text-[#B54708]", bg: "bg-[#FEF6E7]" },
-  paid: { label: "Paid", color: "text-[#16A34A]", bg: "bg-[#F0FDF4]" },
-  failed: { label: "Failed", color: "text-[#EF4444]", bg: "bg-[#FEF2F2]" },
+  created: { label: "Awaiting Payment", color: "text-[var(--fx-amber)]", bg: "bg-[var(--fx-amber-soft)]" },
+  paid: { label: "Paid", color: "text-[var(--fx-green)]", bg: "bg-[var(--fx-green-soft)]" },
+  failed: { label: "Failed", color: "text-[var(--fx-red)]", bg: "bg-[var(--fx-red-soft)]" },
 };
 
 const STATUS_META: Record<Order["status"], { label: string; icon: any; color: string; bg: string }> = {
-  placed: { label: "Placed", icon: Clock, color: "text-[#B54708]", bg: "bg-[#FEF6E7]" },
+  placed: { label: "Placed", icon: Clock, color: "text-[var(--fx-amber)]", bg: "bg-[var(--fx-amber-soft)]" },
   shipped: { label: "Shipped", icon: Truck, color: "text-[var(--fx-accent-ink)]", bg: "bg-[var(--fx-accent-soft)]" },
-  delivered: { label: "Delivered", icon: CheckCircle2, color: "text-[#16A34A]", bg: "bg-[#F0FDF4]" },
-  cancelled: { label: "Cancelled", icon: XCircle, color: "text-[#EF4444]", bg: "bg-[#FEF2F2]" },
+  delivered: { label: "Delivered", icon: CheckCircle2, color: "text-[var(--fx-green)]", bg: "bg-[var(--fx-green-soft)]" },
+  cancelled: { label: "Cancelled", icon: XCircle, color: "text-[var(--fx-red)]", bg: "bg-[var(--fx-red-soft)]" },
 };
 
 const NEXT_STATUS: Record<Order["status"], Order["status"] | null> = {
@@ -82,6 +83,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
   const [searchQuery, setSearchQuery] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "createdAt", dir: "desc" });
   const [page, setPage] = useState(1);
+  const [codesRevealed, setCodesRevealed] = useCodesRevealed();
   const PAGE_SIZE = 8;
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -89,7 +91,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
 
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ type: "single"; order: Order } | { type: "all" } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: "single"; order: Order } | { type: "all" } | { type: "bulk" } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [shipping, setShipping] = useState(false);
   const [refreshingTrack, setRefreshingTrack] = useState(false);
@@ -237,7 +239,11 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
         showToast(res?.message || "Failed to delete order.");
       }
     } catch (err: any) {
+      // Close the popup and re-sync with the server so a stale row can't sit
+      // there looking undeletable.
+      setDeleteConfirm(null);
       showToast(err?.message || "Failed to delete order.");
+      loadOrders();
     } finally {
       setDeleting(false);
     }
@@ -311,6 +317,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
     if (selectedOrder && selected.has(selectedOrder.id)) setSelectedOrder(null);
     setSelected(new Set());
     setBulkBusy(false);
+    setDeleteConfirm(null);
     showToast(`${ok} order${ok === 1 ? "" : "s"} deleted.`);
   };
 
@@ -400,7 +407,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
   const Badge = ({ meta }: { meta: { label: string; icon: any; color: string; bg: string } }) => {
     const Icon = meta.icon;
     return (
-      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide whitespace-nowrap ${meta.bg} ${meta.color}`}>
+      <span className={`fx-score-badge fx-text-label-caps gap-1.5 whitespace-nowrap ${meta.bg} ${meta.color}`}>
         <Icon size={12} />
         {meta.label}
       </span>
@@ -408,42 +415,36 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
   };
 
   return (
+    <>
     <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-6 sm:space-y-7 text-[var(--fx-ink)] font-body relative" style={{ background: "var(--fx-canvas)" }}>
       {/* ── Page header ─────────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-11 h-11 rounded-md bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center shrink-0">
-            <ShoppingBag size={21} />
-          </div>
-          <div className="min-w-0">
-            <h1 className="font-display text-[24px] font-bold text-[var(--fx-ink)] leading-tight tracking-[-0.5px] flex items-center gap-2.5">
-              Orders
-              <span className="inline-flex items-center px-2.5 h-6 rounded-full bg-[var(--fx-canvas)] text-[var(--fx-ink-2)] text-[11px] font-bold">
-                {totalCount} record{totalCount === 1 ? "" : "s"}
-              </span>
-            </h1>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <div className="inline-flex items-center gap-2 px-3.5 h-10 rounded-lg bg-[#FEF6E7] text-[#B54708] text-[12px] font-semibold">
-            <Clock size={14} />
-            <span className="font-mono font-bold">{placedCount}</span> Awaiting Shipment
-          </div>
-          <div className="inline-flex items-center gap-2 px-3.5 h-10 rounded-lg bg-[#F0FDF4] text-[#16A34A] text-[12px] font-semibold">
-            <IndianRupee size={14} />
-            <span className="font-mono font-bold">₹{revenue.toLocaleString("en-IN")}</span> Revenue
-          </div>
-          <button onClick={openNewOrder} className="fx-btn fx-btn-primary">
-            <Plus size={15} strokeWidth={2.5} />
-            New Order
+      <div className="flex items-center gap-3">
+        <h1 className="fx-text-heading-page text-[var(--fx-ink)]">Orders</h1>
+        <div className="flex-1" />
+        {orders.length > 0 && (
+          <button onClick={() => setDeleteConfirm({ type: "all" })} className="fx-btn fx-btn-danger">
+            <Trash2 size={15} />
+            Delete all
           </button>
-        </div>
+        )}
+        <button onClick={openNewOrder} className="fx-btn fx-btn-primary">
+          <Plus size={15} strokeWidth={2.5} />
+          New Order
+        </button>
       </div>
 
+      {/* ── KPI strip ───────────────────────────────────────────────── */}
+      <FxKpiStrip
+        cards={[
+          { key: "total", label: "Total Orders", value: totalCount },
+          { key: "awaiting", label: "Awaiting Shipment", value: placedCount, tone: "amber" },
+          { key: "revenue", label: "Revenue", value: `₹${revenue.toLocaleString("en-IN")}`, tone: "green" },
+        ]}
+      />
+
       {/* ── Toolbar: tabs + search ──────────────────────────────────── */}
-      <div className="bg-white border border-[var(--fx-border)] rounded-md shadow-[0_1px_2px_rgba(24,24,27,0.05)] p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 overflow-x-auto -mx-1 px-1">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="relative flex items-center gap-1 overflow-x-auto no-scrollbar border-b border-[var(--fx-border)] -mb-px">
           {STATUS_TABS.map((tab) => {
             const count = tab.key === "all" ? totalCount : orders.filter((o) => o.status === tab.key).length;
             const active = filter === tab.key;
@@ -451,12 +452,13 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
               <button
                 key={tab.key}
                 onClick={() => setFilter(tab.key)}
-                className={`flex items-center gap-1.5 h-10 px-4 rounded-[10px] text-[12px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  active ? "bg-[var(--fx-accent)] text-white shadow-sm shadow-[var(--fx-accent)]/25" : "text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] hover:text-[var(--fx-ink)]"
+                className={`relative flex items-center gap-2 h-10 px-3.5 fx-text-label-tab transition-colors whitespace-nowrap cursor-pointer ${
+                  active ? "text-[var(--fx-ink)]" : "text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)]"
                 }`}
               >
                 {tab.label}
-                <span className={`text-[10px] font-bold font-mono ${active ? "text-white/80" : "text-[var(--fx-faint)]"}`}>{count}</span>
+                <span className="inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-[6px] bg-[var(--fx-canvas)] fx-text-label-score text-[var(--fx-ink-2)]">{count}</span>
+                {active && <span className="absolute left-0 right-0 bottom-0 h-[2px] bg-[var(--fx-accent)]" />}
               </button>
             );
           })}
@@ -469,7 +471,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
             placeholder="Search by order ID, name, email, phone..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 h-10 text-[12.5px] rounded-[10px] border border-[var(--fx-border)] bg-[var(--fx-canvas)] text-[var(--fx-ink)] placeholder-[var(--fx-faint)] outline-none transition-all focus:border-[var(--fx-accent-ink)] focus:bg-white focus:ring-[3px] focus:ring-[var(--fx-accent)]/[0.30]"
+            className="fx-input pl-10"
           />
         </div>
       </div>
@@ -497,9 +499,9 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
               <CheckCircle2 size={13} /> Mark as Delivered
             </button>
             <button
-              onClick={bulkDelete}
+              onClick={() => setDeleteConfirm({ type: "bulk" })}
               disabled={bulkBusy}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[10px] text-[12px] font-bold text-[#EF4444] bg-white border border-[#FECACA] hover:bg-[#FEF2F2] transition-all cursor-pointer disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[10px] text-[12px] font-bold text-[var(--fx-red)] bg-white border border-[var(--fx-red)] hover:bg-[var(--fx-red-soft)] transition-all cursor-pointer disabled:opacity-40"
             >
               {bulkBusy ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />} Delete
             </button>
@@ -514,10 +516,10 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
       )}
 
       {/* ── Main: table + inspector ─────────────────────────────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-        <div className="xl:col-span-8 space-y-4 min-w-0">
+      <div className="w-full">
+        <div className="w-full space-y-4 min-w-0">
           {/* Table */}
-          <div className="bg-white border border-[var(--fx-border)] rounded-md shadow-[0_1px_2px_rgba(24,24,27,0.05)] overflow-hidden">
+          <div className="bg-white border border-[var(--fx-border)] rounded-md shadow-[0_1px_2px_rgba(24,24,27,0.05)] overflow-hidden w-full">
             {loading ? (
               <div className="p-16 text-center space-y-3">
                 <div className="w-12 h-12 rounded-md bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center mx-auto">
@@ -527,7 +529,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
               </div>
             ) : loadError ? (
               <div className="p-16 text-center space-y-3">
-                <div className="w-12 h-12 rounded-md bg-[#FEF2F2] text-[#EF4444] flex items-center justify-center mx-auto">
+                <div className="w-12 h-12 rounded-md bg-[var(--fx-red-soft)] text-[var(--fx-red)] flex items-center justify-center mx-auto">
                   <XCircle size={22} />
                 </div>
                 <p className="font-bold text-[13px] text-[var(--fx-ink)]">Couldn't load orders.</p>
@@ -554,14 +556,14 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
               <>
                 <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-[var(--fx-canvas)] border-b border-[var(--fx-border)] text-[10px] font-bold uppercase tracking-wide text-[var(--fx-ink-2)]">
+                      <tr className="bg-[var(--fx-surface)] border-b border-[var(--fx-border)] fx-text-body-regular text-[var(--fx-ink-2)]">
                         <th className="px-4 py-3 w-10">
                           <input
                             type="checkbox"
                             checked={pageAllSelected}
                             onChange={togglePageAll}
                             title="Select all orders on this page"
-                            className="w-4 h-4 rounded border-[#D0D5DD] text-[var(--fx-accent-ink)] cursor-pointer"
+                            className="w-4 h-4 rounded border-[var(--fx-border-strong)] text-[var(--fx-accent-ink)] cursor-pointer"
                           />
                         </th>
                         {sortTh("name", "Customer")}
@@ -593,7 +595,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                                 checked={isBulkSelected}
                                 onChange={() => toggleRow(order.id)}
                                 title="Select this order"
-                                className="w-4 h-4 rounded border-[#D0D5DD] text-[var(--fx-accent-ink)] cursor-pointer"
+                                className="w-4 h-4 rounded border-[var(--fx-border-strong)] text-[var(--fx-accent-ink)] cursor-pointer"
                               />
                             </td>
                             <td className="px-4 py-3.5">
@@ -643,73 +645,89 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                                 )}
                                 <button
                                   onClick={() => setDeleteConfirm({ type: "single", order })}
-                                  className="flex items-center justify-center w-8 h-8 rounded-[8px] text-[var(--fx-faint)] hover:text-[#EF4444] hover:bg-[#FEF2F2] transition-colors cursor-pointer"
+                                  className="flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[11px] font-bold text-[var(--fx-red)] bg-[var(--fx-red-soft)] border border-[var(--fx-red)] hover:brightness-95 transition cursor-pointer"
                                   title="Delete this order"
                                 >
-                                  <Trash2 size={14} />
+                                  <Trash2 size={12} />
+                                  Delete
                                 </button>
                               </div>
                             </td>
                           </tr>
                         );
                       })}
-                   </tbody>
-                 </table>
+                    </tbody>
+                  </table>
 
-                 {/* Pagination footer */}
-                <div className="px-4 py-3 border-t border-[var(--fx-border)] bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <span className="text-[11.5px] text-[var(--fx-ink-2)]">
-                    Showing <span className="font-bold text-[var(--fx-ink)]">{filteredOrders.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}</span>–
-                    <span className="font-bold text-[var(--fx-ink)]">{Math.min(page * PAGE_SIZE, filteredOrders.length)}</span> of{" "}
-                    <span className="font-bold text-[var(--fx-ink)]">{filteredOrders.length}</span> orders
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      className="flex items-center justify-center w-9 h-9 rounded-[10px] border border-[var(--fx-border)] bg-white text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                      aria-label="Previous page"
-                    >
-                      <ChevronLeft size={15} />
-                    </button>
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => {
-                      const show = totalPages <= 7 || Math.abs(n - page) <= 1 || n === 1 || n === totalPages;
-                      if (!show) return n === totalPages - 1 || n === 2 ? <span key={n} className="px-1 text-[12px] text-[var(--fx-faint)]">…</span> : null;
-                      return (
+                  {/* Pagination footer — only when 2 or more pages */}
+                  {totalPages > 1 && (
+                    <div className="px-4 py-3 border-t border-[var(--fx-border)] bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <span className="text-[11.5px] text-[var(--fx-ink-2)]">
+                        Showing <span className="font-bold text-[var(--fx-ink)]">{filteredOrders.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}</span>–
+                        <span className="font-bold text-[var(--fx-ink)]">{Math.min(page * PAGE_SIZE, filteredOrders.length)}</span> of{" "}
+                        <span className="font-bold text-[var(--fx-ink)]">{filteredOrders.length}</span> orders
+                      </span>
+                      <div className="flex items-center gap-1.5">
                         <button
-                          key={n}
-                          onClick={() => setPage(n)}
-                          className={`flex items-center justify-center min-w-9 h-9 px-2.5 rounded-[10px] text-[12px] font-semibold transition-all cursor-pointer ${
-                            page === n ? "bg-[var(--fx-accent)] text-white shadow-xs" : "text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]"
-                          }`}
+                          onClick={() => setPage((p) => Math.max(1, p - 1))}
+                          disabled={page === 1}
+                          className="flex items-center justify-center w-9 h-9 rounded-[10px] border border-[var(--fx-border)] bg-white text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          aria-label="Previous page"
                         >
-                          {n}
+                          <ChevronLeft size={15} />
                         </button>
-                      );
-                    })}
-                    <button
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={page === totalPages}
-                      className="flex items-center justify-center w-9 h-9 rounded-[10px] border border-[var(--fx-border)] bg-white text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                      aria-label="Next page"
-                    >
-                      <ChevronRight size={15} />
-                    </button>
-                  </div>
-                </div>
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => {
+                          const show = totalPages <= 7 || Math.abs(n - page) <= 1 || n === 1 || n === totalPages;
+                          if (!show) return n === totalPages - 1 || n === 2 ? <span key={n} className="px-1 text-[12px] text-[var(--fx-faint)]">…</span> : null;
+                          return (
+                            <button
+                              key={n}
+                              onClick={() => setPage(n)}
+                              className={`flex items-center justify-center min-w-9 h-9 px-2.5 rounded-[10px] text-[12px] font-semibold transition-all cursor-pointer ${
+                                page === n ? "bg-[var(--fx-accent)] text-white shadow-xs" : "text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]"
+                              }`}
+                            >
+                              {n}
+                            </button>
+                          );
+                        })}
+                        <button
+                          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                          disabled={page === totalPages}
+                          className="flex items-center justify-center w-9 h-9 rounded-[10px] border border-[var(--fx-border)] bg-white text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          aria-label="Next page"
+                        >
+                          <ChevronRight size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
               </>
             )}
           </div>
         </div>
 
         {/* ── Details Inspector ─────────────────────────────────────── */}
-        <div className="xl:col-span-4 bg-white border border-[var(--fx-border)] rounded-md shadow-[0_1px_2px_rgba(24,24,27,0.05)] sticky top-6 min-w-0">
-          <div className="px-6 py-4 border-b border-[var(--fx-border)] flex items-center justify-between gap-3">
-            <h3 className="font-display font-semibold text-[14.5px] text-[var(--fx-ink)]">Order Inspector</h3>
-            {selectedOrder && <span className="text-[11px] font-mono font-bold text-[var(--fx-accent-ink)] bg-[var(--fx-accent-soft)] px-2 py-0.5 rounded-md">{selectedOrder.id}</span>}
-          </div>
+        {selectedOrder && (
+          <div className="fixed inset-0 z-50 flex justify-end">
+            <div className="absolute inset-0 bg-[var(--fx-ink)]/40 backdrop-blur-[2px] animate-fade-in" onClick={() => setSelectedOrder(null)} />
+            <div className="relative h-full w-full max-w-[460px] overflow-y-auto bg-white border-l border-[var(--fx-border)] shadow-2xl min-w-0">
+            <div className="sticky top-0 z-10 bg-white px-6 py-4 border-b border-[var(--fx-border)] flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h3 className="font-display font-semibold text-[14.5px] text-[var(--fx-ink)]">Order Inspector</h3>
+                <span className="text-[11px] font-mono font-bold text-[var(--fx-accent-ink)] bg-[var(--fx-accent-soft)] px-2 py-0.5 rounded-md">{selectedOrder.id}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedOrder(null)}
+                className="p-1.5 rounded-md text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] cursor-pointer transition-colors"
+                title="Close Inspector"
+                aria-label="Close Inspector"
+              >
+                <X size={16} />
+              </button>
+            </div>
 
-          {selectedOrder ? (
             <div className="p-6 space-y-5 text-[12px]">
               <div>
                 <label className="text-[10px] font-bold text-[var(--fx-ink-2)] uppercase tracking-wide block mb-1.5">Customer</label>
@@ -736,7 +754,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                       <>
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[var(--fx-ink-2)]">Status</span>
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${pMeta.bg} ${pMeta.color}`}>{pMeta.label}</span>
+                          <span className={`fx-score-badge fx-text-label-caps ${pMeta.bg} ${pMeta.color}`}>{pMeta.label}</span>
                         </div>
                         {p?.razorpayPaymentId && (
                           <div className="flex items-center justify-between gap-2">
@@ -808,24 +826,20 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
               <div>
                 <label className="text-[10px] font-bold text-[var(--fx-ink-2)] uppercase tracking-wide flex items-center gap-1.5 mb-1.5">
                   <Tag size={11} /> Auto-Generated Stickers
+                  <span className="ml-auto normal-case tracking-normal">
+                    <CodeVisibilityToggleButton isRevealed={codesRevealed} onToggleVisibility={() => setCodesRevealed(!codesRevealed)} />
+                  </span>
                 </label>
                 {selectedOrder.stickers && selectedOrder.stickers.length > 0 ? (
                   <div className="bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-[10px] divide-y divide-[var(--fx-border)] overflow-hidden">
                     {selectedOrder.stickers.map((s) => (
                       <div key={s.id} className="flex items-center justify-between gap-2 p-3">
                         <div className="min-w-0">
-                          <div className="font-mono text-[11px] font-bold text-[var(--fx-ink)] truncate">{s.id}</div>
-                          <div className="text-[11px] text-[var(--fx-ink-2)] capitalize">{s.category}{s.itemName ? ` · ${s.itemName}` : ""}</div>
+                          <div className="font-mono text-[11px] font-bold text-[var(--fx-ink)] truncate">
+                            {codesRevealed ? s.id : (s.itemName || s.category)}
+                          </div>
+                          <div className="text-[11px] text-[var(--fx-ink-2)] capitalize">{s.category}</div>
                         </div>
-                        {s.recoveryCode && (
-                          <button
-                            className="fx-icon-btn flex items-center gap-1 text-[11px] font-mono font-semibold text-[var(--fx-ink)] bg-white border border-[var(--fx-border)] rounded-md px-2 py-1 flex-shrink-0"
-                            title="Copy recovery code"
-                            onClick={() => navigator.clipboard?.writeText(s.recoveryCode || "")}
-                          >
-                            {s.recoveryCode} <Copy size={11} />
-                          </button>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -861,7 +875,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                     {selectedOrder.shiprocket.currentStatus && (
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[var(--fx-ink-2)]">Courier Status</span>
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)]">
+                        <span className="fx-score-badge fx-text-label-caps bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)]">
                           {selectedOrder.shiprocket.currentStatus}
                         </span>
                       </div>
@@ -877,7 +891,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                        <div className="pt-2.5 mt-1 border-t border-[var(--fx-border)] space-y-2.5">
                         {[...selectedOrder.shiprocket.timeline].reverse().map((ev, i) => (
                           <div key={`${ev.status}-${ev.at}-${i}`} className="flex gap-2.5">
-                            <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${i === 0 ? "bg-[var(--fx-accent-ink)]" : "bg-[#D5D6D9]"}`} />
+                            <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${i === 0 ? "bg-[var(--fx-accent-ink)]" : "bg-[var(--fx-border-strong)]"}`} />
                             <div className="min-w-0">
                               <div className="text-[12px] font-semibold text-[var(--fx-ink)]">{ev.status}</div>
                               <div className="text-[11px] text-[var(--fx-faint)] font-mono truncate">
@@ -914,7 +928,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                 ) : selectedOrder.status === "cancelled" ? (
                   <p className="text-[12px] text-[var(--fx-faint)]">This order was cancelled — no shipment to book.</p>
                 ) : selectedOrder.payment?.status !== "paid" && selectedOrder.paymentMethod !== "cod" ? (
-                  <p className="text-[12px] text-[#B54708] bg-[#FEF6E7] rounded-[10px] p-3">
+                  <p className="text-[12px] text-[var(--fx-amber)] bg-[var(--fx-amber-soft)] rounded-[10px] p-3">
                     Payment hasn't been confirmed yet. Book the shipment once this order shows as Paid (or switch it to COD).
                   </p>
                 ) : (
@@ -929,7 +943,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                 )}
 
                 {shipError && (
-                  <p className="text-[12px] text-[#EF4444] bg-[#FEF2F2] rounded-[10px] p-3 leading-relaxed">{shipError}</p>
+                  <p className="text-[12px] text-[var(--fx-red)] bg-[var(--fx-red-soft)] rounded-[10px] p-3 leading-relaxed">{shipError}</p>
                 )}
               </div>
 
@@ -960,20 +974,18 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                 <button
                   type="button"
                   onClick={() => setDeleteConfirm({ type: "single", order: selectedOrder })}
-                  className="w-full flex items-center justify-center gap-1.5 h-10 rounded-[10px] text-[12px] font-bold text-[#EF4444] bg-[#FEF2F2] hover:bg-[#FFE4E6] border border-[#FECACA] transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-center gap-1.5 h-10 rounded-[10px] text-[12px] font-bold text-[var(--fx-red)] bg-[var(--fx-red-soft)] hover:bg-[var(--fx-red-soft)] border border-[var(--fx-red)] transition-colors cursor-pointer"
                 >
                   <Trash2 size={14} />
                   Delete Order Record
                 </button>
               </div>
             </div>
-          ) : (
-            <div className="py-20 px-6 text-center text-[var(--fx-faint)] text-[12.5px]">
-              Select any order row to inspect items, shipping details, and update fulfillment status.
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
+
 
       {/* ── New Order Modal ─────────────────────────────────────────── */}
       {newOrderOpen && (
@@ -1037,7 +1049,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                       <input type="text" value={it.name} onChange={(e) => updateItem(i, "name", e.target.value)} placeholder="Item name" className="fx-input flex-1 min-w-0" />
                       <input type="number" min={1} value={it.qty} onChange={(e) => updateItem(i, "qty", Math.max(1, Number(e.target.value) || 1))} title="Quantity" className="fx-input w-16 text-center" />
                       <input type="number" min={0} step="1" value={it.price} onChange={(e) => updateItem(i, "price", Number(e.target.value) || 0)} placeholder="₹" title="Unit price" className="fx-input w-24 font-mono" />
-                      <button onClick={() => setDraft((d) => ({ ...d, items: d.items.filter((_, idx) => idx !== i) }))} disabled={draft.items.length === 1} className="flex items-center justify-center w-9 h-9 rounded-[8px] text-[var(--fx-faint)] hover:text-[#EF4444] hover:bg-[#FEF2F2] transition-colors cursor-pointer disabled:opacity-40" aria-label="Remove item">
+                      <button onClick={() => setDraft((d) => ({ ...d, items: d.items.filter((_, idx) => idx !== i) }))} disabled={draft.items.length === 1} className="flex items-center justify-center w-9 h-9 rounded-[8px] text-[var(--fx-faint)] hover:text-[var(--fx-red)] hover:bg-[var(--fx-red-soft)] transition-colors cursor-pointer disabled:opacity-40" aria-label="Remove item">
                         <X size={14} />
                       </button>
                     </div>
@@ -1094,11 +1106,17 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
               </div>
               <div>
                 <h3 className="font-display text-[15px] font-bold text-[var(--fx-ink)] leading-snug">
-                  {deleteConfirm.type === "all" ? "Delete All Orders?" : `Delete Order ${deleteConfirm.order.id}?`}
+                  {deleteConfirm.type === "all"
+                    ? "Delete All Orders?"
+                    : deleteConfirm.type === "bulk"
+                    ? `Delete ${selected.size} selected order${selected.size === 1 ? "" : "s"}?`
+                    : `Delete Order ${deleteConfirm.order.id}?`}
                 </h3>
                 <p className="text-[12.5px] text-[var(--fx-ink-2)] mt-1 leading-relaxed">
                   {deleteConfirm.type === "all"
                     ? "This will permanently delete all order records from the database. This action cannot be undone."
+                    : deleteConfirm.type === "bulk"
+                    ? "The selected order records will be permanently deleted. This action cannot be undone."
                     : `Are you sure you want to delete the order record for "${deleteConfirm.order.name}" (₹${deleteConfirm.order.total.toLocaleString("en-IN")})?`}
                 </p>
               </div>
@@ -1108,7 +1126,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
               <button
                 type="button"
                 onClick={() => setDeleteConfirm(null)}
-                disabled={deleting}
+                disabled={deleting || bulkBusy}
                 className="px-4 h-10 rounded-[10px] text-[12.5px] font-semibold text-[var(--fx-ink-2)] bg-[var(--fx-canvas)] hover:bg-[var(--fx-border)] transition-colors cursor-pointer disabled:opacity-50"
               >
                 Cancel
@@ -1117,18 +1135,20 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                 type="button"
                 onClick={() => {
                   if (deleteConfirm.type === "all") handleDeleteAll();
+                  else if (deleteConfirm.type === "bulk") bulkDelete();
                   else handleDeleteSingle(deleteConfirm.order.id);
                 }}
-                disabled={deleting}
-                className="px-4 h-10 rounded-[10px] text-[12.5px] font-bold text-white bg-[var(--fx-red)] hover:bg-[#A32C24] transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                disabled={deleting || bulkBusy}
+                className="px-4 h-10 rounded-[10px] text-[12.5px] font-bold text-white bg-[var(--fx-red)] hover:bg-[var(--fx-red)] transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
               >
-                {deleting && <Loader2 size={13} className="animate-spin" />}
-                <span>{deleting ? "Deleting..." : deleteConfirm.type === "all" ? "Yes, Delete All" : "Yes, Delete"}</span>
+                {(deleting || bulkBusy) && <Loader2 size={13} className="animate-spin" />}
+                <span>{deleting || bulkBusy ? "Deleting..." : deleteConfirm.type === "all" ? "Yes, Delete All" : "Yes, Delete"}</span>
               </button>
             </div>
           </div>
         </div>
       )}
     </div>
+    </>
   );
 }

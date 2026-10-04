@@ -322,12 +322,12 @@ function MainAppContent() {
           onBackHome={() => navigateTo('landing')}
           onSuccess={() => {
             setAuthPrefillEmail('');
-            const pendingIntent = localStorage.getItem('namoqr-pending-distributor-intent');
-            if (pendingIntent) {
-              navigateTo('landing');
-            } else {
-              navigateTo('dashboard');
-            }
+            try {
+              localStorage.removeItem('namoqr-pending-distributor-intent');
+              localStorage.setItem('repiqr-current-page', 'dashboard');
+              localStorage.setItem('namoqr-current-page', 'dashboard');
+            } catch { /* ignore */ }
+            navigateTo('dashboard');
           }}
         />
       </Suspense>

@@ -2,7 +2,6 @@ const UserModel = require('../models/userModel');
 const ProductModel = require('../models/productModel');
 const MessageModel = require('../models/messageModel');
 const LogModel = require('../models/logModel');
-const TemplateModel = require('../models/templateModel');
 const QrModel = require('../models/qrModel');
 const Sticker = require('../models/schemas/Sticker');
 const { logger, maskPhone, maskEmail } = require('../middleware/loggerMiddleware');
@@ -212,8 +211,8 @@ class AdminController {
 
       const emailResult = await sendEmail({
         to: profile.email,
-        subject: 'RapiQR — Password Reset Requested by Support',
-        html: `<p>Hi ${profile.full_name || ''},</p><p>Our support team triggered a password reset for your RapiQR account on your behalf. Click the link below to set a new password:</p><p><a href="${actionLink}">${actionLink}</a></p><p>If you did not contact support, you can ignore this email.</p>`,
+        subject: 'RepiQR — Password Reset Requested by Support',
+        html: `<p>Hi ${profile.full_name || ''},</p><p>Our support team triggered a password reset for your RepiQR account on your behalf. Click the link below to set a new password:</p><p><a href="${actionLink}">${actionLink}</a></p><p>If you did not contact support, you can ignore this email.</p>`,
         event: 'ADMIN_PASSWORD_RESET_EMAIL',
       });
 
@@ -345,39 +344,6 @@ class AdminController {
       return res.json({ success: true, message: 'All messages deleted successfully', data: result });
     } catch (err) {
       logger.error('ADMIN_MESSAGE_DELETE_ALL', 'Failed to delete all messages', err);
-      return res.status(500).json({ success: false, error: err.message });
-    }
-  }
-
-  /**
-   * Customize page: the saved default QR placement on the sticker template.
-   * GET /api/admin/sticker-position
-   */
-  static async getStickerPosition(req, res) {
-    try {
-      const data = await TemplateModel.getDefaultStickerPosition();
-      return res.json({ success: true, data });
-    } catch (err) {
-      logger.error('ADMIN_STICKER_POSITION_GET', 'Failed to fetch default sticker position', err);
-      return res.status(500).json({ success: false, error: err.message });
-    }
-  }
-
-  /**
-   * PUT /api/admin/sticker-position
-   */
-  static async saveStickerPosition(req, res) {
-    try {
-      const { x, y, w, h } = req.body || {};
-      const pos = { x: Number(x), y: Number(y), w: Number(w), h: Number(h) };
-      if (Object.values(pos).some((n) => !Number.isFinite(n))) {
-        return res.status(400).json({ success: false, error: 'x, y, w and h must all be numbers' });
-      }
-
-      const data = await TemplateModel.setDefaultStickerPosition(pos);
-      return res.json({ success: true, data });
-    } catch (err) {
-      logger.error('ADMIN_STICKER_POSITION_SAVE', 'Failed to save default sticker position', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

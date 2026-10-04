@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap');
 @import "tailwindcss";
 
 /* ── Brand Color Tokens ───────────────────────────────────────────────────── */
@@ -6,38 +6,42 @@
   --repiqr-yellow: #111111;
 }
 
-/* ── Inter & Bespoke Typography ───────────────────────────────────────────────
-   Inter is the primary geometric typeface for clean minimal application forms. */
+/* ── Typography & Editorial Serif (Craft + Podia Design System) ──────────── */
 @theme {
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-inter: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-serif: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Newsreader", Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-heading: "Plus Jakarta Sans", "Inter", sans-serif;
+  --font-editorial: "Newsreader", Georgia, serif;
   --color-repiqr-yellow: #111111;
 
-  /* One theme, one accent — neutral/monochrome palette */
-  --color-cream: #FAFAFA;
-  --color-cream-deep: #F0F0F0;
-  --color-paper: #FFFFFF;
-  --color-ink: #111111;
-  --color-ink-soft: #6B7280;
-  --color-ink-faint: #9CA3AF;
-  --color-yellow: #111111;
-  --color-yellow-deep: #000000;
+  /* One theme, one accent — clean modern neutral slate palette */
+  --color-cream: #ffffff;
+  --color-cream-deep: #f8fafc;
+  --color-paper: #ffffff;
+  --color-ink: #0f172a;
+  --color-ink-soft: #64748b;
+  --color-ink-faint: #94a3b8;
+  --color-yellow: #0f172a;
+  --color-yellow-deep: #020617;
   --color-yellow-deeper: #000000;
-  --color-orange: #111111;
-  --color-orange-deep: #000000;
+  --color-orange: #0f172a;
+  --color-orange-deep: #020617;
   --color-orange-deeper: #000000;
-  --color-green: #16A34A;
-  --color-green-soft: #ECFDF3;
-  --color-line: rgba(17,17,17,0.11);
+  --color-green: #10b981;
+  --color-green-soft: #f0fdf4;
+  --color-line: rgba(15,23,42,0.08);
   --color-line-dark: rgba(255,255,255,0.12);
 }
 
-/* Typography utilities configured with Inter */
-.font-display { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-weight: 700; letter-spacing: -0.01em; }
-.font-title { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-weight: 600; }
+/* Typography utilities configured with Inter, Plus Jakarta Sans, and Newsreader */
+.font-display { font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-weight: 700; letter-spacing: -0.01em; }
+.font-title { font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-weight: 600; }
 .font-mono { font-family: 'Inter', ui-monospace, monospace; font-variant-numeric: normal; }
 .font-body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+.font-serif { font-family: 'Newsreader', Georgia, Cambria, 'Times New Roman', Times, serif; font-feature-settings: "kern", "liga", "clig", "calt"; }
+.font-editorial { font-family: 'Newsreader', Georgia, serif; font-feature-settings: "kern", "liga", "clig", "calt"; }
+.font-heading { font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 
 * { box-sizing: border-box; }
 
@@ -305,37 +309,53 @@ button, input, select, textarea {
    `.fx-shell` (mounted once on each dashboard's root), mirrored at `:root`
    below so nothing renders with an undefined variable before mount. */
 .fx-shell {
-  --fx-canvas: #FAFAFA;
+  /* Yu Studio CRM token set — near-black-and-white, colour reserved for
+     status/score/trend meaning only. See dash-design.md for the source spec. */
+  --fx-canvas: #F5F7F9;
   --fx-surface: #FFFFFF;
-  --fx-sidebar-bg: #FFFFFF;
-  --fx-sidebar-hover: #F5F5F5;
-  --fx-sidebar-ink: #6B7280;
-  --fx-border: #E5E7EB;
-  --fx-border-strong: #D1D5DB;
-  --fx-ink: #111111;
-  --fx-ink-2: #6B7280;
-  --fx-faint: #9CA3AF;
-  --fx-accent: #111111;
-  --fx-accent-ink: #000000;
-  --fx-accent-soft: #F3F4F6;
-  --fx-green: #16A34A;
-  --fx-green-soft: #ECFDF3;
-  --fx-red: #DC2626;
-  --fx-red-soft: #FEF2F2;
-  --fx-amber: #EA580C;
-  --fx-amber-soft: #FFF7ED;
+  --fx-sidebar-bg: #F5F7F9;
+  --fx-sidebar-hover: #EFF1F3;
+  --fx-sidebar-ink: #4E525A;
+  --fx-border: #E2E4E6;
+  --fx-border-strong: #D2D5D9;
+  --fx-ink: #0D0F14;
+  --fx-ink-2: #4E525A;
+  --fx-faint: #9BA0A6;
+  --fx-accent: #17191F;
+  --fx-accent-hover: #262A32;
+  --fx-accent-ink: #17191F;
+  --fx-accent-soft: #EFF1F3;
+  --fx-green: #147A3A;
+  --fx-green-soft: #E2F4E6;
+  --fx-red: #B42318;
+  --fx-red-soft: #FDE8E5;
+  --fx-amber: #A66A08;
+  --fx-amber-soft: #FBF0DA;
+  --fx-lime: #457F19;
+  --fx-lime-soft: #ECF5DA;
   --fx-blue: #2563EB;
   --fx-blue-soft: #EFF6FF;
-  --fx-radius-card: 8px;
-  --fx-radius-tile: 8px;
-  --fx-radius-control: 8px;
-  --fx-radius-pill: 8px;
-  --fx-shadow-pop: 0 12px 28px rgba(31,27,22,0.12), 0 2px 6px rgba(31,27,22,0.06);
+  --fx-online: #07B93B;
+  --fx-radius-check: 5px;
+  --fx-radius-card: 12px;
+  --fx-radius-tile: 10px;
+  --fx-radius-control: 10px;
+  --fx-radius-pill: 7px;
+  --fx-radius-surface: 14px;
+  --fx-shadow-raised: 0 2px 5px rgba(13,15,20,.08), 0 1px 1px rgba(13,15,20,.05);
+  --fx-shadow-pop: 0 12px 32px -4px rgba(13,15,20,.22), 0 2px 6px rgba(13,15,20,.10);
 
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-feature-settings: "cv11", "ss01";
   font-variant-numeric: normal;
-  background: var(--fx-canvas);
+  background: var(--fx-surface);
   color: var(--fx-ink);
+}
+
+.fx-shell button,
+.fx-shell a,
+.fx-shell [role="button"] {
+  transition: background-color 120ms ease-out, color 120ms ease-out, border-color 120ms ease-out;
 }
 
 .fx-shell .font-mono,
@@ -363,59 +383,60 @@ button, input, select, textarea {
   border-radius: var(--fx-radius-card);
 }
 
-/* Buttons — white background and black text, minimal border */
+/* Buttons — near-black primary, minimal border, restrained motion */
 .fx-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 44px;
-  padding: 0 18px;
+  height: 38px;
+  padding: 0 14px;
   border-radius: var(--fx-radius-control);
   font-family: inherit;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1;
-  border: 1px solid #D1D5DB;
+  letter-spacing: -0.1px;
+  border: 1px solid var(--fx-border-strong);
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .05s ease;
+  flex-shrink: 0;
+  transition: background-color .12s ease-out, border-color .12s ease-out, color .12s ease-out, box-shadow .12s ease-out, transform .05s ease;
 }
 .fx-btn:active:not(:disabled) { transform: scale(0.98); }
 .fx-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .fx-btn-primary {
-  background: #FFFFFF;
-  color: #000000;
-  border-color: #D1D5DB;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  background: var(--fx-accent);
+  color: #FFFFFF;
+  border-color: var(--fx-accent);
 }
 .fx-btn-primary:hover:not(:disabled) {
-  background: #F9FAFB;
-  border-color: #000000;
-  color: #000000;
+  background: var(--fx-accent-hover);
+  border-color: var(--fx-accent-hover);
+  color: #FFFFFF;
 }
 
 .fx-btn-secondary {
-  background: var(--fx-surface);
-  border-color: var(--fx-border-strong);
-  color: var(--fx-ink);
+  background: var(--fx-canvas);
+  border-color: var(--fx-border);
+  color: var(--fx-ink-2);
 }
-.fx-btn-secondary:hover:not(:disabled) { background: var(--fx-canvas); }
+.fx-btn-secondary:hover:not(:disabled) { background: var(--fx-sidebar-hover); color: var(--fx-ink); }
 
 .fx-btn-ghost { background: transparent; color: var(--fx-ink-2); border-color: transparent; }
 .fx-btn-ghost:hover:not(:disabled) { background: var(--fx-canvas); color: var(--fx-ink); }
 
-.fx-btn-danger { background: var(--fx-red); color: #FFFFFF; border-color: transparent; }
-.fx-btn-danger:hover:not(:disabled) { background: #A32C24; }
+.fx-btn-danger { background: var(--fx-red); color: #FFFFFF; border-color: var(--fx-red); }
+.fx-btn-danger:hover:not(:disabled) { background: #8f1c12; border-color: #8f1c12; }
 
 .fx-btn-soft { background: var(--fx-accent-soft); color: var(--fx-accent-ink); border-color: transparent; }
-.fx-btn-soft:hover:not(:disabled) { background: #E5E7EB; }
+.fx-btn-soft:hover:not(:disabled) { background: var(--fx-sidebar-hover); }
 
-/* Inputs / selects / textareas — 44px tall, 8px radius. */
+/* Inputs / selects / textareas — 38px tall, control radius. */
 .fx-input, .fx-select {
   width: 100%;
-  height: 44px;
+  height: 38px;
   padding: 0 14px;
   border-radius: var(--fx-radius-control);
   border: 1px solid var(--fx-border-strong);
@@ -428,8 +449,8 @@ button, input, select, textarea {
 }
 .fx-input::placeholder { color: var(--fx-faint); }
 .fx-input:focus, .fx-select:focus {
-  border-color: #000000;
-  box-shadow: 0 0 0 1px #000000;
+  border-color: var(--fx-accent);
+  box-shadow: 0 0 0 1px var(--fx-accent);
 }
 .fx-textarea {
   width: 100%;
@@ -540,12 +561,13 @@ button, input, select, textarea {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 5px 11px;
+  height: 24px;
+  padding: 0 9px;
   border-radius: var(--fx-radius-pill);
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  line-height: 1;
   white-space: nowrap;
 }
 .fx-pill-dot { width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0; }
@@ -556,14 +578,14 @@ button, input, select, textarea {
   gap: 6px;
   height: 32px;
   padding: 0 13px;
-  border-radius: 999px;
+  border-radius: var(--fx-radius-control);
   font-size: 12.5px;
   font-weight: 600;
   border: 1px solid var(--fx-border-strong);
   background: var(--fx-surface);
   color: var(--fx-ink-2);
   cursor: pointer;
-  transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+  transition: background-color .12s ease-out, color .12s ease-out, border-color .12s ease-out;
 }
 .fx-chip:hover { color: var(--fx-ink); }
 .fx-chip-active {
@@ -594,12 +616,11 @@ button, input, select, textarea {
 .fx-th {
   padding: 12px 16px;
   text-align: left;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: -0.1px;
   color: var(--fx-ink-2);
-  background: var(--fx-canvas);
+  background: var(--fx-surface);
   border-bottom: 1px solid var(--fx-border);
   white-space: nowrap;
 }
@@ -635,7 +656,7 @@ tbody .fx-tr:last-child .fx-td { border-bottom: none; }
   width: 100%;
   background: var(--fx-surface);
   border: 1px solid var(--fx-border);
-  border-radius: 16px;
+  border-radius: var(--fx-radius-card);
   padding: 24px;
   box-shadow: var(--fx-shadow-pop);
   color: var(--fx-ink);
@@ -679,7 +700,7 @@ tbody .fx-tr:last-child .fx-td { border-bottom: none; }
   padding: 2px 8px;
   border-radius: 6px;
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 18px;
   white-space: nowrap;
   background: var(--fx-canvas);
@@ -785,11 +806,14 @@ tbody .fx-tr:last-child .fx-td { border-bottom: none; }
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 64px 24px;
+  gap: 6px;
+  padding: 24px;
+  max-height: 200px;
   background: var(--fx-surface);
   border: 1px dashed var(--fx-border);
-  border-radius: 12px;
+  border-radius: var(--fx-radius-card);
 }
+.fx-empty svg { width: 28px; height: 28px; }
 
 .fx-spin { animation: fx-spin .8s linear infinite; }
 .fx-spin-inline { display: inline-block; animation: fx-spin .8s linear infinite; }
@@ -798,30 +822,61 @@ tbody .fx-tr:last-child .fx-td { border-bottom: none; }
 /* ── fx-* fallback mirror — same values, at :root, so anything rendering
    outside `.fx-shell` (e.g. before mount) never hits an undefined variable. */
 :root {
-  --fx-canvas: #FAFAFA;
+  --fx-canvas: #F5F7F9;
   --fx-surface: #FFFFFF;
-  --fx-sidebar-bg: #FFFFFF;
-  --fx-sidebar-hover: #F5F5F5;
-  --fx-sidebar-ink: #6B7280;
-  --fx-border: #E5E7EB;
-  --fx-border-strong: #D1D5DB;
-  --fx-ink: #111111;
-  --fx-ink-2: #6B7280;
-  --fx-faint: #9CA3AF;
-  --fx-accent: #111111;
-  --fx-accent-ink: #000000;
-  --fx-accent-soft: #F3F4F6;
-  --fx-green: #16A34A;
-  --fx-green-soft: #ECFDF3;
-  --fx-red: #DC2626;
-  --fx-red-soft: #FEF2F2;
-  --fx-amber: #EA580C;
-  --fx-amber-soft: #FFF7ED;
+  --fx-sidebar-bg: #F5F7F9;
+  --fx-sidebar-hover: #EFF1F3;
+  --fx-sidebar-ink: #4E525A;
+  --fx-border: #E2E4E6;
+  --fx-border-strong: #D2D5D9;
+  --fx-ink: #0D0F14;
+  --fx-ink-2: #4E525A;
+  --fx-faint: #9BA0A6;
+  --fx-accent: #17191F;
+  --fx-accent-hover: #262A32;
+  --fx-accent-ink: #17191F;
+  --fx-accent-soft: #EFF1F3;
+  --fx-green: #147A3A;
+  --fx-green-soft: #E2F4E6;
+  --fx-red: #B42318;
+  --fx-red-soft: #FDE8E5;
+  --fx-amber: #A66A08;
+  --fx-amber-soft: #FBF0DA;
+  --fx-lime: #457F19;
+  --fx-lime-soft: #ECF5DA;
   --fx-blue: #2563EB;
   --fx-blue-soft: #EFF6FF;
+  --fx-online: #07B93B;
+  --fx-radius-check: 0px;
   --fx-radius-card: 0px;
   --fx-radius-tile: 0px;
   --fx-radius-control: 0px;
   --fx-radius-pill: 0px;
-  --fx-shadow-pop: 0 12px 28px rgba(31,27,22,0.12), 0 2px 6px rgba(31,27,22,0.06);
+  --fx-radius-surface: 0px;
+  --fx-shadow-raised: 0 2px 5px rgba(13,15,20,.08), 0 1px 1px rgba(13,15,20,.05);
+  --fx-shadow-pop: 0 12px 32px -4px rgba(13,15,20,.22), 0 2px 6px rgba(13,15,20,.10);
 }
+
+/* ── Yu Studio CRM type scale — half-pixel sizes are intentional, do not
+   round them. Opt in per element where the dashboard wants this exact
+   typographic voice (page titles, KPI numbers, table labels). */
+.fx-text-kpi-value { font-weight: 600; font-size: 31.5px; line-height: 38px; letter-spacing: -0.4px; }
+.fx-text-heading-page { font-weight: 600; font-size: 23.5px; line-height: 30px; letter-spacing: -0.3px; }
+.fx-text-heading-brand { font-weight: 600; font-size: 16px; line-height: 22px; letter-spacing: -0.25px; }
+.fx-text-body-large { font-weight: 400; font-size: 16px; line-height: 22px; }
+.fx-text-body-medium { font-weight: 500; font-size: 14px; line-height: 20px; letter-spacing: -0.25px; }
+.fx-text-body-regular { font-weight: 400; font-size: 14px; line-height: 20px; letter-spacing: -0.1px; }
+.fx-text-body-small { font-weight: 400; font-size: 12.5px; line-height: 18px; }
+.fx-text-label-tab { font-weight: 500; font-size: 14px; line-height: 20px; letter-spacing: -0.15px; }
+.fx-text-label-score { font-weight: 500; font-size: 13px; line-height: 18px; }
+.fx-text-label-caps { font-weight: 500; font-size: 12px; line-height: 16px; letter-spacing: 0.5px; text-transform: uppercase; }
+
+/* Score tiers — 1–2 poor, 3–5 fair, 6–8 good, 9–10 excellent. */
+.fx-score-badge {
+  display: inline-flex; align-items: center; height: 26px; padding: 4px 6px;
+  border-radius: var(--fx-radius-pill); font-weight: 500; font-size: 13px; line-height: 18px; white-space: nowrap;
+}
+.fx-score-poor { background: var(--fx-red-soft); color: var(--fx-red); }
+.fx-score-fair { background: var(--fx-amber-soft); color: var(--fx-amber); }
+.fx-score-good { background: var(--fx-lime-soft); color: var(--fx-lime); }
+.fx-score-excellent { background: var(--fx-green-soft); color: var(--fx-green); }

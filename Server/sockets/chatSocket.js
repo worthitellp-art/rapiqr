@@ -6,7 +6,6 @@ const ProductModel = require('../models/productModel');
 const { notifyOwner } = require('../services/notificationService');
 const pushService = require('../services/pushService');
 
-const APP_URL = process.env.APP_URL || 'https://rapiqr.worthitellp.workers.dev';
 
 let io = null;
 
@@ -224,7 +223,7 @@ function initChatSocket(httpServer, allowedOrigins) {
             notifyOwner({
               type: 'CHAT_MESSAGE',
               ownerPhone: product.details.ownerPhone,
-              data: { label, message: text, link: `${APP_URL}/#/dashboard?tab=chat&session=${sessionId}` },
+              data: { item_name: label, message: text, session: sessionId },
               eventId: sessionId,
             }).catch(() => { /* best effort */ });
           }

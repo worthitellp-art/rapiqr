@@ -1,6 +1,20 @@
 const Order = require('./schemas/Order');
 const { logger } = require('../middleware/loggerMiddleware');
 
+/**
+ * Order stickers are stored with their plaintext recovery code and QR payload
+ * (needed internally to print/restore). Neither may leave the server in an
+ * order response — buyers get it from the printed sticker, admins through the
+ * on-demand reveal endpoint — so API consumers only ever see id/category/name.
+ */
+function publicStickers(stickers) {
+  return (Array.isArray(stickers) ? stickers : []).map((s) => ({
+    id: s.id,
+    category: s.category,
+    itemName: s.itemName || null,
+  }));
+}
+
 function toApi(doc) {
   if (!doc) return null;
   return {
@@ -19,7 +33,7 @@ function toApi(doc) {
     shippingAddress: doc.shipping_address,
     shiprocket: doc.shiprocket || null,
     payment: doc.payment || null,
-    stickers: doc.stickers || [],
+    stickers: publicStickers(doc.stickers),
     createdAt: doc.created_at,
   };
 }
@@ -194,9 +208,10 @@ class OrderModel {
     return OrderModel.attachShiprocketInfo(id, merged, newStatus);
   }
 
+  /** Returns true only if an order was actually removed. */
   static async delete(id) {
-    await Order.findByIdAndDelete(id);
-    return true;
+    const removed = await Order.findByIdAndDelete(id);
+    return Boolean(removed);
   }
 
   static async deleteAll() {
@@ -312,3 +327,4 @@ class OrderModel {
 }
 
 module.exports = OrderModel;
+module.exports.publicStickers = publicStickers;

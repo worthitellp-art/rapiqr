@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import { useLocalStorage } from "./useLocalStorage";
 import { QrRecord, Template, StickerPos } from "./types";
-import { qrFullUrl } from "./helpers";
+import { qrFullUrl, DEFAULT_STICKER_POS } from "./helpers";
 import { Menu } from "lucide-react";
 import Sidebar from "./Sidebar";
 import QuickLookModal from "./QuickLookModal";
@@ -36,7 +36,9 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
   const fontCss = "'Pinterest Sans', 'Pin Sans', ui-sans-serif, system-ui";
   const [templates, setTemplates] = useLocalStorage<Template[]>("repiqr-templates", []);
   const [qrList, setQrList] = useLocalStorage<QrRecord[]>("repiqr-qrlist", []);
-  const [stickerPos, setStickerPos] = useLocalStorage<StickerPos>("repiqr-sticker-pos", { x: 193, y: 37, w: 110, h: 110 });
+  // The QR slot is fixed to the template's panel — not a saved/per-admin setting,
+  // so no stale localStorage or server value can ever push it out of place.
+  const stickerPos = DEFAULT_STICKER_POS;
   // Shared with both the main fleet table (read) and the Print Sheet modal
   // (read/write) so marking a sticker printed in one place is reflected in
   // the other immediately — see PrintSheetModal/usePrintSheetState.
@@ -129,6 +131,8 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
           bg: r.bg_color || "FFFFFF",
           ownerPhone: r.owner_phone || undefined,
           ownerName: r.owner_name || undefined,
+          vehicleNumber: r.vehicle_number || undefined,
+          activatedAt: r.activated_at || undefined,
           labelName: r.label_name || undefined,
           labelColor: r.label_color || undefined,
           isPrinted: Boolean(r.is_printed),
@@ -148,18 +152,6 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
     sync();
     const interval = setInterval(sync, 15000);
     return () => clearInterval(interval);
-  }, [isAdmin]);
-
-  // Default sticker QR placement was localStorage-only, so "Save Default
-  // Position" never actually became a shared default — it only stuck in the
-  // admin's own browser and reverted to the hardcoded fallback on another
-  // device, a fresh login, or cleared site data. Fetch the real saved value
-  // from the backend once on mount and let it win over the local cache.
-  useEffect(() => {
-    if (!isAdmin) return;
-    apiClient.admin.getStickerPosition().then((res) => {
-      if (res?.data) setStickerPos(res.data);
-    }).catch(() => { /* fall back to the local cache */ });
   }, [isAdmin]);
 
   const admin = {
@@ -261,7 +253,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
           {page === "customize" && (
             <CustomizePage
               templates={templates} setTemplates={setTemplates}
-              stickerPos={stickerPos} setStickerPos={setStickerPos}
+              stickerPos={stickerPos}
               setToast={setToast}
               openPrintSheet={() => handleOpenPrintSheet()}
             />

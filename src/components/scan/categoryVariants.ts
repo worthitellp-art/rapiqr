@@ -440,7 +440,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Tell the owner it is here", style: "wa", action: { kind: "notify", text: "Your bicycle has been standing in the same spot for days — is it lost?" } },
           { label: "Add what you can see", style: "ghost", action: { kind: "write" } },
-          { label: "Call RepiQR support · 1800 123 4567", style: "ghost", action: { kind: "call", number: "1800 123 4567", who: "RepiQR support", via: "support" } },
+          { label: "Call RepiQR support · +91 93137 19720", style: "ghost", action: { kind: "call", number: "+919313719720", who: "RepiQR support", via: "public" } },
         ],
       },
     ],
@@ -816,7 +816,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "Use 112 instead if anyone is in danger",
         ],
         actions: [
-          { label: "Call RepiQR support · 1800 123 4567", style: "primary", action: { kind: "call", number: "1800 123 4567", who: "RepiQR support", via: "support" } },
+          { label: "Call RepiQR support · +91 93137 19720", style: "primary", action: { kind: "call", number: "+919313719720", who: "RepiQR support", via: "public" } },
           { label: "Describe the problem", style: "ghost", action: { kind: "write" } },
           { label: "Call Emergency (all services) · 112", style: "ghost", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
         ],
@@ -1005,7 +1005,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         ],
         actions: [
           { label: "Ask them to block the card", style: "wa", action: { kind: "notify", text: "I have your access card — please deactivate it now, I will return the card itself." } },
-          { label: "Call RepiQR support · 1800 123 4567", style: "primary", action: { kind: "call", number: "1800 123 4567", who: "RepiQR support", via: "support" } },
+          { label: "Call RepiQR support · +91 93137 19720", style: "primary", action: { kind: "call", number: "+919313719720", who: "RepiQR support", via: "public" } },
           { label: "Write a message instead", style: "ghost", action: { kind: "write" } },
         ],
       },
@@ -1177,7 +1177,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "A misused tag can be disabled within the hour",
         ],
         actions: [
-          { label: "Call RepiQR support · 1800 123 4567", style: "primary", action: { kind: "call", number: "1800 123 4567", who: "RepiQR support", via: "support" } },
+          { label: "Call RepiQR support · +91 93137 19720", style: "primary", action: { kind: "call", number: "+919313719720", who: "RepiQR support", via: "public" } },
           { label: "Describe the problem", style: "ghost", action: { kind: "write" } },
           { label: "Call Emergency (all services) · 112", style: "ghost", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
         ],
@@ -1196,7 +1196,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Ask the RepiQR assistant", style: "ghost", action: { kind: "ask" } },
           { label: "Message the owner", style: "wa", action: { kind: "notify", text: undefined } },
-          { label: "Call RepiQR support · 1800 123 4567", style: "ghost", action: { kind: "call", number: "1800 123 4567", who: "RepiQR support", via: "support" } },
+          { label: "Call RepiQR support · +91 93137 19720", style: "ghost", action: { kind: "call", number: "+919313719720", who: "RepiQR support", via: "public" } },
         ],
       },
     ],
@@ -1782,7 +1782,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Find the baggage desk", style: "blue", action: { kind: "maps", query: "airline baggage service desk" } },
           { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your bag is at the airline baggage desk here — please claim it with your flight number." } },
-          { label: "Call RepiQR support · 1800 123 4567", style: "ghost", action: { kind: "call", number: "1800 123 4567", who: "RepiQR support", via: "support" } },
+          { label: "Call RepiQR support · +91 93137 19720", style: "ghost", action: { kind: "call", number: "+919313719720", who: "RepiQR support", via: "public" } },
         ],
       },
       {
@@ -1908,7 +1908,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
         actions: [
           { label: "Find the baggage desk", style: "blue", action: { kind: "maps", query: "airline baggage service desk" } },
           { label: "Alert the owner on WhatsApp", style: "wa", action: { kind: "notify", text: "Your travel pouch is at the airline desk here — please claim it with your flight number." } },
-          { label: "Call RepiQR support · 1800 123 4567", style: "ghost", action: { kind: "call", number: "1800 123 4567", who: "RepiQR support", via: "support" } },
+          { label: "Call RepiQR support · +91 93137 19720", style: "ghost", action: { kind: "call", number: "+919313719720", who: "RepiQR support", via: "public" } },
         ],
       },
       {
@@ -2205,7 +2205,7 @@ export const CATEGORY_VARIANTS: Record<ProductCategory, CategoryVariant> = {
           "Use 112 instead if anyone is in danger",
         ],
         actions: [
-          { label: "Call RepiQR support · 1800 123 4567", style: "primary", action: { kind: "call", number: "1800 123 4567", who: "RepiQR support", via: "support" } },
+          { label: "Call RepiQR support · +91 93137 19720", style: "primary", action: { kind: "call", number: "+919313719720", who: "RepiQR support", via: "public" } },
           { label: "Describe the problem", style: "ghost", action: { kind: "write" } },
           { label: "Call Emergency (all services) · 112", style: "ghost", action: { kind: "call", number: "112", who: "Emergency (all services)", via: "public" } },
         ],

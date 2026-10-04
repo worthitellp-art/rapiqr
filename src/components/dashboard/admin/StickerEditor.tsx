@@ -15,7 +15,6 @@ export default function StickerEditor({
   openPrintSheet,
 }: {
   stickerPos: StickerPos;
-  setStickerPos?: (p: StickerPos) => void;
   setToast: (msg: string | null) => void;
   openPrintSheet?: () => void;
 }) {

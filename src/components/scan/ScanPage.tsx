@@ -1665,8 +1665,17 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   };
 
   /* ---- Emergency Contacts step: add / edit / remove rows ---- */
+  const MAX_EMERGENCY_CONTACTS = 7;
+
   const addEmergencyContactRow = () => {
-    setEmergencyContacts((prev) => [...prev, { id: makeContactId(), name: "", relationship: "", phone: "" }]);
+    setContactsError(null);
+    setEmergencyContacts((prev) => {
+      if (prev.length >= MAX_EMERGENCY_CONTACTS) {
+        setContactsError("Maximum 7 emergency contacts allowed.");
+        return prev;
+      }
+      return [...prev, { id: makeContactId(), name: "", relationship: "", phone: "" }];
+    });
   };
 
   const updateEmergencyContact = (id: string, field: "name" | "relationship" | "phone", value: string) => {
@@ -1675,6 +1684,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   };
 
   const removeEmergencyContact = (id: string) => {
+    setContactsError(null);
     setEmergencyContacts((prev) => (prev.length > 1 ? prev.filter((c) => c.id !== id) : prev));
   };
 
@@ -1699,7 +1709,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       if (!imported.length) return;
       setEmergencyContacts((prev) => {
         const blankOnly = prev.length === 1 && !prev[0].name.trim() && !prev[0].phone.trim();
-        return blankOnly ? imported : [...prev, ...imported];
+        const merged = blankOnly ? imported : [...prev, ...imported];
+        return merged.slice(0, MAX_EMERGENCY_CONTACTS);
       });
       setContactsError(null);
     } catch {
@@ -1707,13 +1718,30 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     }
   };
 
-  // Require at least one valid contact to continue; "Skip for now" bypasses this.
+  // Require at least one valid contact to continue; verify each contact member's phone number first
   const handleFinishEmergencyContacts = () => {
+    for (let i = 0; i < emergencyContacts.length; i++) {
+      const c = emergencyContacts[i];
+      const hasName = !!c.name.trim();
+      const hasPhone = !!c.phone.trim();
+      if (hasName || hasPhone) {
+        if (!hasName) {
+          setContactsError(`Please enter a name for Contact #${i + 1}.`);
+          return;
+        }
+        if (!isValidContactPhone(c.phone)) {
+          setContactsError(`Please enter a valid 10-digit mobile number for ${c.name.trim()}.`);
+          return;
+        }
+      }
+    }
+
     const validContacts = emergencyContacts.filter((c) => c.name.trim() && isValidContactPhone(c.phone));
     if (validContacts.length === 0) {
-      setContactsError("Add at least one contact (name + valid phone), or click Skip for now.");
+      setContactsError("Add at least one contact (name + valid 10-digit mobile), or click Skip for now.");
       return;
     }
+    setContactsError(null);
     handleRegisterSubmit(pendingVerified);
   };
 
@@ -1923,9 +1951,9 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         {/* ============ LOCATION REQUEST ============ */}
         {phase === "location-request" && (
           <div className="w-full flex items-center justify-center py-6 animate-fade-in">
-            <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 sm:p-8 text-center space-y-5">
+            <div className="w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-100 p-6 sm:p-8 text-center space-y-5">
               {/* Soft Cream Icon Box */}
-              <div className="w-20 h-20 rounded-2xl bg-gray-100 border border-gray-200 flex items-center justify-center text-[#111111] mx-auto shadow-inner">
+              <div className="w-16 h-16 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-[#111111] mx-auto shadow-inner">
                 <MapPin size={38} className="text-[#111111]" />
               </div>
 

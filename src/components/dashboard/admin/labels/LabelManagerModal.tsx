@@ -26,6 +26,7 @@ export default function LabelManagerModal({
   const [color, setColor] = useState("#6366F1");
   const [customColor, setCustomColor] = useState("#6366F1");
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<StickerLabel | null>(null);
 
   if (!isOpen) return null;
 
@@ -269,7 +270,7 @@ export default function LabelManagerModal({
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDelete(lbl.id)}
+                          onClick={() => setPendingDelete(lbl)}
                           className="p-1.5 text-red-400 hover:text-red-600 rounded hover:bg-red-50 transition-colors cursor-pointer"
                           title="Delete Label"
                         >
@@ -294,6 +295,43 @@ export default function LabelManagerModal({
             Done
           </button>
         </div>
+
+        {pendingDelete && (
+          <div
+            className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-black/40"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPendingDelete(null);
+            }}
+          >
+            <div
+              className="bg-white rounded-xl border border-gray-200 p-5 max-w-xs w-full shadow-xl space-y-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-sm font-bold text-gray-900">Delete label “{pendingDelete.name}”?</h3>
+              <p className="text-xs text-gray-500">It will be removed from the label list.</p>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setPendingDelete(null)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDelete(pendingDelete.id);
+                    setPendingDelete(null);
+                  }}
+                  className="px-3 py-1.5 text-xs font-bold rounded-md bg-red-600 text-white hover:bg-red-700 cursor-pointer"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

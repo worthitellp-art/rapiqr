@@ -1,4 +1,7 @@
 import { useState } from "react";
+import QRCode from "qrcode";
+import { getCategoryLabel } from "../../../stickerModules";
+import { stickerRef, useCodesRevealed } from "../../../lib/codeVisibility";
 import { X, Printer, Sparkles, QrCode, Car, Download } from "lucide-react";
 import CopyLinkButton from "./CopyLinkButton";
 import { QrRecord, Template, StickerPos } from "./types";
@@ -21,22 +24,20 @@ export default function QuickLookModal({
   stickerPos,
   onOpenPrintSheet,
 }: QuickLookModalProps) {
-  const [isCodesRevealed, setIsCodesRevealed] = useState(false);
+  const [isCodesRevealed, setIsCodesRevealed] = useCodesRevealed();
   const [viewMode, setViewMode] = useState<StickerViewMode>("physical");
 
   if (!qr) return null;
 
-  const displayCode = qr.id;
+  const displayCode = stickerRef(qr, isCodesRevealed, getCategoryLabel((qr.category || "car") as any));
   const displayLabel = qr.vehicleName ? `${qr.vehicleName}` : "FLEET TAG CODE";
 
-  const handleDownloadQr = () => {
-    // Generate simple SVG/data download for the QR code
-    const url = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(qrFullUrl(qr.id))}`;
+  // Rendered locally — the sticker URL is never sent to a third-party QR service.
+  const handleDownloadQr = async () => {
+    const url = await QRCode.toDataURL(qrFullUrl(qr.id), { width: 500, margin: 2 });
     const a = document.createElement("a");
     a.href = url;
     a.download = `rapiqr-${qr.id}.png`;
-    a.target = "_blank";
-    a.rel = "noreferrer";
     a.click();
   };
 
@@ -139,7 +140,7 @@ export default function QuickLookModal({
               </span>
               <CodeVisibilityToggleButton
                 isRevealed={isCodesRevealed}
-                onToggleVisibility={() => setIsCodesRevealed((prev) => !prev)}
+                onToggleVisibility={() => setIsCodesRevealed(!isCodesRevealed)}
               />
             </div>
 

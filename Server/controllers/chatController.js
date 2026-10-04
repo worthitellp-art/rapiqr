@@ -5,7 +5,6 @@ const User = require('../models/schemas/User');
 const ProductModel = require('../models/productModel');
 const { uploadPublicFile } = require('../services/storageService');
 const { notifyOwner } = require('../services/notificationService');
-const { buildDashboardChatLink } = require('../services/msg91Templates');
 const pushService = require('../services/pushService');
 const { logger } = require('../middleware/loggerMiddleware');
 const { getIo, getOnlineOwners, markDeliveredIfPeerPresent } = require('../sockets/chatSocket');
@@ -65,9 +64,8 @@ async function fanOutMessage(session, message, isOwner, previewText) {
       notifyOwner({
         type: 'CHAT_MESSAGE',
         ownerPhone: product.details.ownerPhone,
-        // The approved chat_message template only has label/link body
-        // variables — no button, no message preview (see msg91Templates.js).
-        data: { label, link: buildDashboardChatLink(session.id) },
+        // rapi_new_chat: item name + message preview, button opens this thread.
+        data: { item_name: label, message: previewText, session: session.id },
         eventId: session.id,
       }).catch((err) => logger.error('CHAT_MESSAGE', 'Failed to notify owner', err));
     }
@@ -206,7 +204,7 @@ class ChatController {
         notifyOwner({
           type: 'CHAT_STARTED',
           ownerPhone,
-          data: { label: vehicleLabel || 'your RapiQR item', link: buildDashboardChatLink(session.id) },
+          data: { item_name: vehicleLabel || 'your RepiQR item', session: session.id },
           eventId: session.id,
         }).catch((err) => logger.error('CHAT_STARTED', 'Failed to notify owner of new chat', err));
       }

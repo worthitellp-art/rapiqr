@@ -25,6 +25,12 @@ function toApi(doc) {
     email: doc.email || null,
     city: doc.city || null,
     country: doc.country || null,
+    address: doc.address || null,
+    area: doc.area || null,
+    state: doc.state || null,
+    pincode: doc.pincode || null,
+    latitude: doc.latitude ?? null,
+    longitude: doc.longitude ?? null,
     notes: doc.notes || null,
     whatsapp: doc.whatsapp || null,
     years_experience: doc.years_experience || null,
@@ -34,6 +40,22 @@ function toApi(doc) {
     created_at: doc.created_at,
   };
 }
+
+/**
+ * What the unauthenticated scan page needs to dial a provider — nothing more.
+ * Email, notes, experience, street address and coordinates stay admin-only.
+ */
+function toPublicApi(full) {
+  const { id, category, label, phone, active, service_type, categories, city, country, whatsapp, radius_km, availability } = full;
+  return { id, category, label, phone, active, service_type, categories, city, country, whatsapp, radius_km, availability };
+}
+
+/** Trims client-supplied coordinates to a real number or null. */
+const toCoord = (value, limit) => {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) && Math.abs(n) <= limit ? n : null;
+};
+const toText = (value, max = 200) => (value ? String(value).trim().slice(0, max) || null : null);
 
 class HelplineModel {
   /**
@@ -81,7 +103,7 @@ class HelplineModel {
         // shows to visitors whose (reverse-geocoded) city matches it.
         if (cityNeedle && row.city && row.city.trim().toLowerCase() !== cityNeedle) return false;
         return true;
-      });
+      }).map(toPublicApi);
     } catch (err) {
       console.error('HelplineModel.getActive Error:', err);
       logger.error('DB_HELPLINE', 'HelplineModel.getActive failed', err);
@@ -100,7 +122,7 @@ class HelplineModel {
     }
   }
 
-  static async create({ category, serviceType, categories, label, phone, active = true, email, city, country, notes, whatsapp, yearsExperience, radiusKm, serviceAreas, availability }) {
+  static async create({ category, serviceType, categories, label, phone, active = true, email, city, country, address, area, state, pincode, latitude, longitude, notes, whatsapp, yearsExperience, radiusKm, serviceAreas, availability }) {
     const doc = await Communication.create({
       category,
       label,
@@ -111,6 +133,12 @@ class HelplineModel {
       email: email || null,
       city: city || null,
       country: country || null,
+      address: toText(address, 300),
+      area: toText(area),
+      state: toText(state),
+      pincode: toText(pincode, 12),
+      latitude: toCoord(latitude, 90),
+      longitude: toCoord(longitude, 180),
       notes: notes || null,
       whatsapp: whatsapp || null,
       years_experience: yearsExperience || null,
@@ -134,6 +162,12 @@ class HelplineModel {
     if (updates.email !== undefined) payload.email = updates.email;
     if (updates.city !== undefined) payload.city = updates.city;
     if (updates.country !== undefined) payload.country = updates.country;
+    if (updates.address !== undefined) payload.address = toText(updates.address, 300);
+    if (updates.area !== undefined) payload.area = toText(updates.area);
+    if (updates.state !== undefined) payload.state = toText(updates.state);
+    if (updates.pincode !== undefined) payload.pincode = toText(updates.pincode, 12);
+    if (updates.latitude !== undefined) payload.latitude = toCoord(updates.latitude, 90);
+    if (updates.longitude !== undefined) payload.longitude = toCoord(updates.longitude, 180);
     if (updates.notes !== undefined) payload.notes = updates.notes;
     if (updates.whatsapp !== undefined) payload.whatsapp = updates.whatsapp;
     if (updates.yearsExperience !== undefined) payload.years_experience = updates.yearsExperience;

@@ -38,7 +38,7 @@ class HelplineController {
    */
   static async apply(req, res) {
     try {
-      const { category, serviceType, categories, label, phone, email, city, country, notes, whatsapp, yearsExperience, radiusKm, serviceAreas, availability } = req.body || {};
+      const { category, serviceType, categories, label, phone, email, city, country, address, area, state, pincode, latitude, longitude, notes, whatsapp, yearsExperience, radiusKm, serviceAreas, availability } = req.body || {};
       if (!category || !label || !phone) {
         return res.status(400).json({ success: false, error: 'category, label and phone are required' });
       }
@@ -51,6 +51,12 @@ class HelplineController {
         email,
         city,
         country,
+        address,
+        area,
+        state,
+        pincode,
+        latitude,
+        longitude,
         notes,
         whatsapp,
         yearsExperience,
@@ -82,11 +88,11 @@ class HelplineController {
 
   static async create(req, res) {
     try {
-      const { category, serviceType, categories, label, phone, active, email, city, country, notes, whatsapp, yearsExperience, radiusKm, serviceAreas, availability } = req.body || {};
+      const { category, serviceType, categories, label, phone, active, email, city, country, address, area, state, pincode, latitude, longitude, notes, whatsapp, yearsExperience, radiusKm, serviceAreas, availability } = req.body || {};
       if (!category || !label || !phone) {
         return res.status(400).json({ success: false, error: 'category, label and phone are required' });
       }
-      const data = await HelplineModel.create({ category, serviceType, categories, label, phone, active, email, city, country, notes, whatsapp, yearsExperience, radiusKm, serviceAreas, availability });
+      const data = await HelplineModel.create({ category, serviceType, categories, label, phone, active, email, city, country, address, area, state, pincode, latitude, longitude, notes, whatsapp, yearsExperience, radiusKm, serviceAreas, availability });
       logger.rowInserted('communication', data.id, { category, label });
       return res.json({ success: true, data });
     } catch (err) {

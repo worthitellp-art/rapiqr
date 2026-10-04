@@ -16,7 +16,11 @@ import {
   Search,
 } from "lucide-react";
 import { QrRecord, Template, SystemAlertItem } from "./types";
+import { CodeVisibilityToggleButton } from "./StickerCodeComponents";
+import { stickerRef, useCodesRevealed } from "../../../lib/codeVisibility";
+import { getCategoryLabel } from "../../../stickerModules";
 import { apiClient } from "../../../lib/apiClient";
+import ConfirmModal from "./ConfirmModal";
 
 interface AlertsPageProps {
   qrList: QrRecord[];
@@ -74,7 +78,9 @@ export default function AlertsPage({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [expandedAlertId, setExpandedAlertId] = useState<string | null>(null);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [localSearch, setLocalSearch] = useState(searchQuery);
+  const [codesRevealed, setCodesRevealed] = useCodesRevealed();
 
   useEffect(() => {
     setLocalSearch(searchQuery);
@@ -148,8 +154,7 @@ export default function AlertsPage({
     }
   };
 
-  const handleDelete = async (alertId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDelete = async (alertId: string) => {
     const rawId = alertId.replace(/^report-/, "");
     try {
       if (isAdmin) {
@@ -199,7 +204,7 @@ export default function AlertsPage({
         id: `report-${report.id}`,
         category: isTrueEmergency ? "emergency" : "assistance",
         title: isTrueEmergency ? "SOS Emergency" : formattedType,
-        subtitle: report.product_label || report.license_plate || report.qr_code_id || "Vehicle",
+        subtitle: report.product_label || report.license_plate || (codesRevealed ? report.qr_code_id : "") || "Vehicle",
         timestamp: report.created_at || new Date().toISOString(),
         status: report.status === "resolved" ? "resolved" : "unread",
         qrId: report.qr_code_id,
@@ -213,19 +218,19 @@ export default function AlertsPage({
       });
     });
 
+    // Activation alerts: only stickers a client has successfully activated, and
+    // only Sticker ID | status | phone — no failed attempts, codes or metadata.
     qrList
-      .filter((qr) => qr.status === "inactive" || qr.status === "pending")
+      .filter((qr) => qr.status === "active" && (qr.ownerPhone || qr.phoneNumber))
       .forEach((qr) => {
         list.push({
           id: `activation-${qr.id}`,
           category: "activation",
-          title: "Pending Activation",
-          subtitle: qr.id,
-          timestamp: qr.createdAt,
+          title: "Activated Successfully",
+          subtitle: stickerRef(qr, codesRevealed, getCategoryLabel((qr.category || "car") as any)),
+          timestamp: qr.activatedAt || qr.createdAt,
           status: "active",
-          qrId: qr.id,
-          vehicleName: qr.vehicleName,
-          vehicleNumber: qr.vehicleNumber,
+          reporterPhone: qr.ownerPhone || qr.phoneNumber,
         });
       });
 
@@ -237,7 +242,7 @@ export default function AlertsPage({
           id: `scan-${qr.id}`,
           category: "scan",
           title: "Tag Scanned",
-          subtitle: `${qr.id} (${qr.scans} scans)`,
+          subtitle: `${stickerRef(qr, codesRevealed, getCategoryLabel((qr.category || "car") as any))} (${qr.scans} scans)`,
           timestamp: qr.createdAt,
           status: "info",
           qrId: qr.id,
@@ -254,7 +259,7 @@ export default function AlertsPage({
     });
 
     return list;
-  }, [incidentReports, qrList]);
+  }, [incidentReports, qrList, codesRevealed]);
 
   const counts = useMemo(() => {
     const total = unifiedAlerts.length;
@@ -333,7 +338,7 @@ export default function AlertsPage({
             { key: "all", label: "All", count: counts.total },
             { key: "emergency", label: "SOS", count: counts.emergency, red: counts.emergency > 0 },
             { key: "assistance", label: "Assistance", count: counts.assistance },
-            { key: "activation", label: "Pending", count: counts.activation },
+            { key: "activation", label: "Activated", count: counts.activation },
             { key: "scan", label: "Scans", count: counts.scan },
           ].map((tab) => {
             const active = selectedCategory === tab.key;
@@ -367,6 +372,11 @@ export default function AlertsPage({
           })}
         </div>
 
+        <CodeVisibilityToggleButton
+          isRevealed={codesRevealed}
+          onToggleVisibility={() => setCodesRevealed(!codesRevealed)}
+        />
+
         {/* Small Search */}
         <div className="relative w-full sm:w-44 flex-shrink-0">
           <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -393,6 +403,8 @@ export default function AlertsPage({
             const isResolved = alert.status === "resolved";
             const isEmergency = alert.category === "emergency";
             const isReport = alert.id.startsWith("report-");
+            // Activation rows are a fixed "Sticker ID | status | phone" line — nothing to expand.
+            const isActivation = alert.category === "activation";
 
             // Category styling
             let dotColor = "bg-purple-500";
@@ -417,12 +429,21 @@ export default function AlertsPage({
               >
                 {/* Compact Row */}
                 <div
-                  onClick={() => setExpandedAlertId(isExpanded ? null : alert.id)}
-                  className="px-3 py-2 flex items-center gap-2.5 cursor-pointer text-xs select-none"
+                  onClick={isActivation ? undefined : () => setExpandedAlertId(isExpanded ? null : alert.id)}
+                  className={`px-3 py-2 flex items-center gap-2.5 text-xs select-none ${isActivation ? "" : "cursor-pointer"}`}
                 >
                   <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor}`} />
 
                   {/* Title & info snippet */}
+                  {isActivation ? (
+                    <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+                      <span className="font-mono font-bold text-gray-900">{alert.subtitle}</span>
+                      <span className="text-gray-300">|</span>
+                      <span className="font-semibold text-emerald-700">{alert.title}</span>
+                      <span className="text-gray-300">|</span>
+                      <span className="font-mono text-gray-600">{alert.reporterPhone}</span>
+                    </div>
+                  ) : (
                   <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-gray-900 whitespace-nowrap">{alert.title}</span>
                     <span className="text-gray-400 font-mono text-[11px] truncate">{alert.subtitle}</span>
@@ -432,6 +453,7 @@ export default function AlertsPage({
                       </span>
                     )}
                   </div>
+                  )}
 
                   {/* Status & Time */}
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -451,7 +473,7 @@ export default function AlertsPage({
 
                     {/* Fast actions on hover / mobile */}
                     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      {alert.reporterPhone && (
+                      {alert.reporterPhone && !isActivation && (
                         <a
                           href={`tel:${alert.reporterPhone}`}
                           className="p-1 text-gray-400 hover:text-indigo-600 rounded transition-colors"
@@ -487,7 +509,10 @@ export default function AlertsPage({
                       {isReport && (
                         <button
                           type="button"
-                          onClick={(e) => handleDelete(alert.id, e)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingDeleteId(alert.id);
+                          }}
                           className="p-1 text-gray-400 hover:text-red-600 rounded transition-colors cursor-pointer"
                           title="Delete"
                         >
@@ -496,9 +521,11 @@ export default function AlertsPage({
                       )}
                     </div>
 
-                    <span className="text-gray-300">
-                      {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                    </span>
+                    {!isActivation && (
+                      <span className="text-gray-300">
+                        {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -546,6 +573,16 @@ export default function AlertsPage({
           })
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={!!pendingDeleteId}
+        title="Delete this alert?"
+        message="This alert will be permanently removed."
+        onConfirm={() => {
+          if (pendingDeleteId) handleDelete(pendingDeleteId);
+        }}
+        onClose={() => setPendingDeleteId(null)}
+      />
 
       {/* Clear Confirmation Modal */}
       {confirmClearAll && (

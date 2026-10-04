@@ -168,7 +168,7 @@ class ProductController {
       if (Array.isArray(newlyAddedContacts) && newlyAddedContacts.length > 0) {
         notifyContactsAdded({
           contacts: newlyAddedContacts,
-          ownerName: updated.name || 'A RapiQR user',
+          ownerName: updated.name || 'A RepiQR user',
           eventId: product.id,
         }).catch((err) => {
           logger.error('EMERGENCY_CONTACT_NOTIFY', `Failed to notify emergency contacts for ${product.id}`, err);
@@ -225,7 +225,7 @@ class ProductController {
 
       const targetProfile = await UserModel.findByEmail(targetEmail);
       if (!targetProfile) {
-        return res.status(404).json({ success: false, error: 'No RapiQR account found for that email. The recipient must sign up first.' });
+        return res.status(404).json({ success: false, error: 'No RepiQR account found for that email. The recipient must sign up first.' });
       }
 
       const updated = await ProductModel.transfer(product.id, targetProfile.id, targetProfile.full_name);

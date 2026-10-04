@@ -3,7 +3,6 @@ import { QrRecord, StickerPos } from "../types";
 import { useLocalStorage } from "../useLocalStorage";
 import { apiClient } from "../../../../lib/apiClient";
 import {
-  PRINT_SHEET_CONSTANTS,
   ADMIN_STICKERS_PER_PAGE,
   generateStickerPagePreviewBlob,
   generateStickerBatchPdfBlob,
@@ -288,7 +287,6 @@ export function usePrintSheetState({
         stickerPos,
         recoveryCodeMap,
         copies,
-        PRINT_SHEET_CONSTANTS.DEFAULT_DPI,
         (progressInfo) => {
           setExportProgress({
             isVisible: true,

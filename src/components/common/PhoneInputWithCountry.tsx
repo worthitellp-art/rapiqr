@@ -102,21 +102,21 @@ export default function PhoneInputWithCountry({
 
   return (
     <div className="flex flex-col w-full">
-      <div className={`flex items-center h-11 bg-white border border-gray-300 rounded-lg overflow-visible focus-within:border-black focus-within:ring-1 focus-within:ring-black transition-all ${disabled ? 'opacity-60 cursor-not-allowed' : ''} ${className}`}>
+      <div className={`flex items-center h-11 bg-white border border-gray-300 rounded-md overflow-visible focus-within:border-black focus-within:ring-1 focus-within:ring-black transition-all ${disabled ? 'opacity-60 cursor-not-allowed' : ''} ${className}`}>
         {/* Country Code Dropdown */}
         <div className="relative h-full" ref={dropdownRef}>
           <button
             type="button"
             disabled={disabled}
             onClick={() => setDropdownOpen((o) => !o)}
-            className="flex items-center gap-1.5 bg-gray-50 h-full text-xs font-semibold text-gray-800 px-3 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-100 rounded-l-[7px]"
+            className="flex items-center gap-1.5 bg-gray-50 h-full text-xs font-semibold text-gray-800 px-3 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-100 rounded-l-[5px]"
           >
             <FlagIcon iso={selectedCountryInfo.iso} />
             <span>{selectedCountryInfo.code}</span>
           </button>
 
           {dropdownOpen && (
-            <ul className="absolute z-20 top-full left-0 mt-1 w-48 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+            <ul className="absolute z-20 top-full left-0 mt-1 w-48 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg py-1">
               {COUNTRY_CODES.map((c) => (
                 <li key={c.code}>
                   <button

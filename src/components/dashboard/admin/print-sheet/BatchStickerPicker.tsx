@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { Search, Check, Printer, Tag, Filter } from "lucide-react";
 import { QrRecord } from "../types";
 import LabelBadge from "../labels/LabelBadge";
+import { stickerRef, useCodesRevealed } from "../../../../lib/codeVisibility";
 
 interface BatchStickerPickerProps {
   availableStickers: QrRecord[];
@@ -25,6 +26,7 @@ export default function BatchStickerPicker({
   onTogglePrinted,
 }: BatchStickerPickerProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [codesRevealed] = useCodesRevealed();
   const [labelFilter, setLabelFilter] = useState("all");
   const [printFilter, setPrintFilter] = useState<"all" | "unprinted" | "printed">("all");
 
@@ -184,7 +186,8 @@ export default function BatchStickerPicker({
               const isSelected = selectedStickerIds.has(sticker.id);
               const isPrinted = printedStickerIds.has(sticker.id) || sticker.isPrinted;
               const isBlocked = !isSelected && atCap;
-              const identifier = sticker.vehicleNumber || sticker.vehicleName || sticker.id;
+              const mainRef = stickerRef(sticker, codesRevealed, (sticker.category || "car").toString());
+              const identifier = sticker.vehicleName || "";
 
               return (
                 <div
@@ -212,14 +215,14 @@ export default function BatchStickerPicker({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-1">
                         <span className="font-mono text-[11px] font-bold text-slate-900 truncate">
-                          {sticker.id}
+                          {mainRef}
                         </span>
                         <span className="text-[10px] uppercase font-bold text-slate-500">
                           {sticker.category || "car"}
                         </span>
                       </div>
 
-                      {identifier !== sticker.id && (
+                      {identifier && identifier !== mainRef && (
                         <p className="text-xs text-slate-700 font-medium truncate mt-0.5">{identifier}</p>
                       )}
 

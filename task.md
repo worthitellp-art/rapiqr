@@ -1,27 +1,15 @@
-  
-
-
-Rules of genreating the sheet for the stickers 
-
- - must selection based do not direct collect
- -Widht-4inch
-Hight-2.5 inch this si the sticker size of the single sticker 
-- always give in pdf with possiible storage area inside the pdf use the all space and no chnage sticker size that type of logic 
-- user can genreate bulk prints in single pdf like 50 sheets in single pdf or less sheet and 50 stickers , user can put 50 sticker genreate then it will automaticlly align in pdf and genreeate 1 pdf with recovery codes inside pdf 
+there is sidebar also in @componenets.md apply in all dashboard that design best and greate best ui , and make better dashboard ui ux in admin ,  and data proper sync from backend as security spacilist and backend stucture spacalist 
 
 
 
-  
-  
-  remove option to delete the sticker if you want to delete the sticker request to the super admin , super admin can delete but 1 by 1 not all and it wills how popup for confirmation , 
 
 
-  only 2 view mod in admin pannel inside qr codes tab , 
 
-  reduce radius redesign the admin pannel commponenets make godd ui feels good , remove top side top bar from admin pannel , 
 
- 
-  remove delete all button  / cear all button remove from it .
+how to optimize this api from razor pay or this was nomral , in clien dashboard http://localhost:5000/api/products
+Request method
+GET api spam no need multiple times to call api ,  
+
 
 
 
@@ -58,3 +46,56 @@ Include a mechanism or middleware that sends a mock security alert (e.g., loggin
 
 Please write this using [INSERT YOUR CHOSEN LANGUAGE/FRAMEWORK HERE, e.g., Node.js with Express and PostgreSQL, or Python with FastAPI and SQLAlchemy]. Keep the code clean, fully commented, and production-ready.
 
+
+
+
+
+Role: Senior Full-Stack Security Engineer working directly on the existing RepiQR codebase.
+
+Objective: Perform a production security and UI cleanup pass without redesigning the app or altering business logic. Inspect the architecture first, implement changes cleanly within the existing setup, and maintain full app functionality (QR scanning, routing, activation, recovery, auth, dashboard, emergency flows, Workers SPA routing).
+
+TASKS:
+
+1. Hide Sensitive Data & Secrets:
+   - Remove activation/recovery codes, hashes, secrets, and internal database IDs from user-facing screens, API responses, client state, localStorage/sessionStorage, URLs, and console logs.
+   - Keep only minimum required data per screen without breaking sticker activation, recovery, or management.
+
+2. Secure Third-Party APIs & Credentials:
+   - Audit all external frontend API calls. Move all secret-dependent or sensitive calls to RepiQR Backend/Worker proxies (Frontend → RepiQR Backend/Worker → Third-Party API).
+   - Remove private keys, secrets, and hardcoded credentials from frontend code, VITE/React envs, assets, and build outputs. Keep secrets exclusively in server-side environment variables.
+   - Retain only legitimate public browser configs.
+
+3. Fix "Join Us" Current Location:
+   - On explicit user action, request geolocation (lat/long) and reverse-geocode server-side if an API key is required.
+   - Dynamically populate full address, area/locality, city, state, PIN/postal code, and country. Do not hardcode location data.
+   - Safely handle loading, timeouts, permission denials, and geocoding failures. No background tracking.
+
+4. Update Support Number:
+   - Update RepiQR's support number across the app to: 9313719720 (do not alter user/customer numbers).
+
+5. Simplify Activation Alerts:
+   - Clean up the activation alerts UI to display ONLY successfully activated client stickers.
+   - Restrict alert data strictly to: Sticker ID | Status | Phone Number (e.g., `QR805ERB | Activated Successfully | +91XXXXXXXXXX`).
+   - Remove all failed attempts, activation/recovery codes, hashes, IDs, and metadata.
+
+6. Codebase & Security Cleanup:
+   - Search for hardcoded secrets, sensitive variables, and active API calls (`fetch`, `axios`, etc.).
+   - Strip production `console.log`, `console.debug`, and `console.table` statements containing internal or sensitive data.
+   - Audit endpoints to ensure backend APIs trim unnecessary database fields and adhere to the principle of least-data exposure.
+   - Safely remove genuinely unused components, pages, hooks, utilities, assets, dependencies, and dead code after verifying imports/routes.
+
+EXECUTION & DELIVERABLE RULES:
+- Trace current code before modifying. Do not invent mock APIs, unnecessary abstractions, or fake security layer obfuscation.
+- Run type-checking, linting, and production build checks; resolve any issues introduced.
+- Provide ONLY a concise summary upon completion containing:
+  1. Changed files
+  2. Removed files
+  3. APIs moved server-side
+  4. Security exposures fixed
+  5. Join Us location fix summary
+  6. Support number update locations
+  7. Alerts changes summary
+  8. Build/test results
+  9. Remaining browser-visible third-party requests (with rationale)
+
+  add real map with radius show 

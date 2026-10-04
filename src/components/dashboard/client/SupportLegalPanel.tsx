@@ -1,9 +1,9 @@
-﻿import React, { useState } from 'react';
-import { ShieldCheck, Phone, Mail, FileText, Scale, AlertOctagon, Loader2, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Phone, Mail, FileText, AlertOctagon, Loader2, X } from 'lucide-react';
 import { apiClient } from '../../../lib/apiClient';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
 
-const SUPPORT_PHONE = '+91 98765 43210';
+const SUPPORT_PHONE = '+91 9313719720';
 const SUPPORT_EMAIL = 'support@rapiqr.com';
 
 function LegalModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
@@ -14,7 +14,7 @@ function LegalModal({ title, onClose, children }: { title: string; onClose: () =
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6 border border-gray-100 max-h-[85vh] overflow-y-auto"
+        className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 border border-gray-100 max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
@@ -94,7 +94,7 @@ function ReportModal({
 }
 
 export default function SupportLegalPanel({ showToast }: { showToast: (msg: string) => void }) {
-  const [openModal, setOpenModal] = useState<'privacy' | 'terms' | 'lost' | 'fraud' | null>(null);
+  const [openModal, setOpenModal] = useState<'lost' | 'fraud' | null>(null);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -104,66 +104,39 @@ export default function SupportLegalPanel({ showToast }: { showToast: (msg: stri
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div className="bg-white border border-[var(--fx-border)] rounded-2xl p-6 space-y-4">
+        <div className="bg-white border border-[var(--fx-border)] rounded-xl p-6 space-y-4">
           <h3 className="font-bold text-sm text-[var(--fx-ink)]">Customer Support</h3>
           <a href={`tel:${SUPPORT_PHONE.replace(/\s/g, '')}`} className="flex items-center gap-3 text-sm font-semibold text-[var(--fx-ink)] hover:text-[var(--fx-ink)]">
-            <span className="w-9 h-9 rounded-xl bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><Phone size={15} /></span>
+            <span className="w-9 h-9 rounded-lg bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><Phone size={15} /></span>
             {SUPPORT_PHONE}
           </a>
           <a href={`mailto:${SUPPORT_EMAIL}`} className="flex items-center gap-3 text-sm font-semibold text-[var(--fx-ink)] hover:text-[var(--fx-ink)]">
-            <span className="w-9 h-9 rounded-xl bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><Mail size={15} /></span>
+            <span className="w-9 h-9 rounded-lg bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><Mail size={15} /></span>
             {SUPPORT_EMAIL}
           </a>
           <div className="flex gap-2 pt-2">
-            <button onClick={() => setOpenModal('lost')} className="flex-1 py-2.5 rounded-xl bg-[var(--fx-amber-soft)] hover:bg-[var(--fx-amber-soft)] text-[var(--fx-amber)] text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5">
+            <button onClick={() => setOpenModal('lost')} className="flex-1 py-2 rounded-lg bg-[var(--fx-amber-soft)] hover:bg-[var(--fx-amber-soft)] text-[var(--fx-amber)] text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5">
               <AlertOctagon size={13} /> Report Lost Sticker
             </button>
-            <button onClick={() => setOpenModal('fraud')} className="flex-1 py-2.5 rounded-xl bg-[#FEE2E2] hover:bg-[#FECACA] text-[#DC2626] text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5">
+            <button onClick={() => setOpenModal('fraud')} className="flex-1 py-2 rounded-lg bg-[#FEE2E2] hover:bg-[#FECACA] text-[#DC2626] text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5">
               <AlertOctagon size={13} /> Report Fraud
             </button>
           </div>
         </div>
 
-        <div className="bg-white border border-[var(--fx-border)] rounded-2xl p-6 space-y-4">
+        <div className="bg-white border border-[var(--fx-border)] rounded-xl p-6 space-y-4">
           <h3 className="font-bold text-sm text-[var(--fx-ink)]">Legal</h3>
-          <button onClick={() => setOpenModal('privacy')} className="w-full flex items-center gap-3 text-sm font-semibold text-[var(--fx-ink)] hover:text-[var(--fx-ink)] cursor-pointer">
-            <span className="w-9 h-9 rounded-xl bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><FileText size={15} /></span>
-            Privacy Policy
-          </button>
-          <button onClick={() => setOpenModal('terms')} className="w-full flex items-center gap-3 text-sm font-semibold text-[var(--fx-ink)] hover:text-[var(--fx-ink)] cursor-pointer">
-            <span className="w-9 h-9 rounded-xl bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><Scale size={15} /></span>
-            Terms of Service
-          </button>
-          <div className="bg-[#DCFCE7] rounded-xl p-3.5 border border-emerald-200 flex items-center gap-2.5 mt-2">
-            <ShieldCheck size={16} className="text-[#16A34A] flex-shrink-0" />
-            <p className="text-[11px] text-[#166534] leading-relaxed">Your data is encrypted at rest and in transit. Emergency calls are masked and never expose your real number.</p>
-          </div>
-        </div>
-      </div>
-
-      {openModal === 'privacy' && (
-        <LegalModal title="Privacy Policy" onClose={() => setOpenModal(null)}>
-          <p>RapiQR collects only what's needed to protect you and your belongings: your name, phone/email, the emergency contacts you add, and scan/alert activity tied to your stickers.</p>
-          <p>We never display your real phone number to anyone who scans your sticker — all calls are routed anonymously through a masked line. Location shared during an emergency scan is sent only to you, the owner.</p>
-          <p>Your data is never sold. It's used solely to operate the RapiQR safety network and is encrypted at rest and in transit.</p>
           <a
             href="/privacy"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-block font-bold text-[var(--fx-accent-ink)] underline hover:text-[var(--fx-accent)]"
+            className="w-full flex items-center gap-3 text-sm font-semibold text-[var(--fx-ink)] hover:text-[var(--fx-ink)]"
           >
-            Read the full Privacy Policy →
+            <span className="w-9 h-9 rounded-lg bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><FileText size={15} /></span>
+            Privacy Policy
           </a>
-        </LegalModal>
-      )}
-
-      {openModal === 'terms' && (
-        <LegalModal title="Terms of Service" onClose={() => setOpenModal(null)}>
-          <p>By activating a RapiQR sticker, you agree to keep the emergency contact details on your account accurate and up to date.</p>
-          <p>RapiQR provides a scan-and-alert notification service — it is not a substitute for emergency services (police, ambulance, fire). Always contact local emergency services directly in a life-threatening situation.</p>
-          <p>Stickers may be deactivated, transferred to another account, or replaced at any time from your dashboard. Misuse of the anonymous calling/alerting system to harass sticker owners is prohibited and may result in account suspension.</p>
-        </LegalModal>
-      )}
+        </div>
+      </div>
 
       {openModal === 'lost' && <ReportModal type="lost" onClose={() => setOpenModal(null)} showToast={showToast} />}
       {openModal === 'fraud' && <ReportModal type="fraud" onClose={() => setOpenModal(null)} showToast={showToast} />}

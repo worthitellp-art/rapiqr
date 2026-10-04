@@ -34,7 +34,7 @@ async function main() {
   const result = await sendSmsOtp({
     to: `+91${mobile}`,
     code,
-    body: `Your RapiQR phone verification code is ${code}. It expires in 5 minutes.`,
+    body: `Your RepiQR phone verification code is ${code}. It expires in 5 minutes.`,
     event: 'PHONE_VERIFY_SMS',
   });
   console.log('Result:', JSON.stringify(result, null, 2));

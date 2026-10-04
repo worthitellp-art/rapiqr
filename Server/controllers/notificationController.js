@@ -34,21 +34,21 @@ class NotificationController {
 
       const confirmation = await sendEmail({
         to: ownerEmail,
-        subject: 'Your RapiQR sticker is now active!',
+        subject: 'Your RepiQR sticker is now active!',
         event: 'ACTIVATION_CONFIRMATION_EMAIL',
         html: `
           <p>Hi ${name},</p>
-          <p>Your RapiQR sticker <strong>${qrId}</strong> is now active! It's protecting you with instant scan-and-alert notifications.</p>
+          <p>Your RepiQR sticker <strong>${qrId}</strong> is now active! It's protecting you with instant scan-and-alert notifications.</p>
           <p>You can manage it, update your emergency contacts, and view scan history anytime on your dashboard:</p>
           <p><a href="${dashboardUrl}">${dashboardUrl}</a></p>
-          <p>— The RapiQR Team</p>
+          <p>— The RepiQR Team</p>
         `,
-        text: `Hi ${name}, your RapiQR sticker ${qrId} is now active! You can manage it on your dashboard: ${dashboardUrl}`,
+        text: `Hi ${name}, your RepiQR sticker ${qrId} is now active! You can manage it on your dashboard: ${dashboardUrl}`,
       });
 
       const sample = await sendEmail({
         to: ownerEmail,
-        subject: 'What a responder sees when your RapiQR sticker is scanned',
+        subject: 'What a responder sees when your RepiQR sticker is scanned',
         event: 'SAMPLE_TEST_SCAN_EMAIL',
         html: `
           <p>Hi ${name},</p>
@@ -59,7 +59,7 @@ class NotificationController {
             <li>Your live location is shared with you (the owner) the moment someone scans and requests help</li>
           </ul>
           <p>Nothing here reveals your personal contact number directly — all calls are routed anonymously.</p>
-          <p>— The RapiQR Team</p>
+          <p>— The RepiQR Team</p>
         `,
         text: `Preview: this is what a responder sees when they scan your ${category || 'car'} sticker — your emergency contacts (masked), quick emergency options, and anonymous call routing.`,
       });

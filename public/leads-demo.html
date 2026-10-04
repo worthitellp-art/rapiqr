@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leads — Yu Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{
+    --color-neutral-0:#FFFFFF;
+    --color-neutral-50:#F5F7F9;
+    --color-neutral-100:#EFF1F3;
+    --color-neutral-200:#E2E4E6;
+    --color-neutral-350:#D2D5D9;
+    --color-neutral-400:#9BA0A6;
+    --color-neutral-600:#4E525A;
+    --color-neutral-700:#3B3F4B;
+    --color-neutral-850:#1B1E28;
+    --color-neutral-900:#0D0F14;
+    --color-neutral-1000:#1A1D25;
+    --color-ink-900:#17191F;
+    --color-ink-800:#262A32;
+    --red-50:#FDE8E5; --red-700:#B42318;
+    --amber-50:#FBF0DA; --amber-700:#A66A08;
+    --lime-50:#ECF5DA; --lime-700:#457F19;
+    --green-50:#E2F4E6; --green-700:#147A3A;
+    --green-400:#07B93B;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;overflow-x:hidden;}
+  body{
+    font-family:'Inter',sans-serif;
+    font-feature-settings:"cv11","ss01";
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    background:var(--color-neutral-0);
+    color:var(--color-neutral-900);
+  }
+  *:focus-visible{outline:2px solid var(--color-ink-900);outline-offset:2px;}
+
+  .text-kpi-value{font-weight:600;font-size:31.5px;line-height:38px;letter-spacing:-0.4px;}
+  .text-heading-page{font-weight:600;font-size:23.5px;line-height:30px;letter-spacing:-0.3px;}
+  .text-heading-brand{font-weight:600;font-size:16px;line-height:22px;letter-spacing:-0.25px;}
+  .text-body-large{font-weight:400;font-size:16px;line-height:22px;}
+  .text-body-medium{font-weight:500;font-size:14px;line-height:20px;letter-spacing:-0.25px;}
+  .text-body-regular{font-weight:400;font-size:14px;line-height:20px;letter-spacing:-0.1px;}
+  .text-body-small{font-weight:400;font-size:12.5px;line-height:18px;}
+  .text-label-tab{font-weight:500;font-size:14px;line-height:20px;letter-spacing:-0.15px;}
+  .text-label-score{font-weight:500;font-size:13px;line-height:18px;}
+  .text-label-caps{font-weight:500;font-size:12px;line-height:16px;letter-spacing:0.5px;text-transform:uppercase;}
+
+  .shadow-raised{box-shadow:0 2px 5px rgba(13,15,20,.08),0 1px 1px rgba(13,15,20,.05);}
+  .shadow-floating{box-shadow:0 12px 32px -4px rgba(13,15,20,.22),0 2px 6px rgba(13,15,20,.10);}
+
+  .hairline-b{border-bottom:1px solid var(--color-neutral-200);}
+  .hairline-r{border-right:1px solid var(--color-neutral-200);}
+  .hairline-l{border-left:1px solid var(--color-neutral-200);}
+
+  button,a,.nav-item,.view-toggle-btn{
+    transition:background-color 120ms ease-out,color 120ms ease-out;
+    cursor:pointer;
+  }
+
+  #root-flex,#app-main,.min-w-0-flex{min-width:0;}
+
+  /* ---------- buttons ---------- */
+  .btn-primary{
+    background:var(--color-ink-900);color:var(--color-neutral-0);
+    border-radius:10px;height:38px;padding:0 12px;display:inline-flex;align-items:center;gap:8px;
+    border:none;font:inherit;white-space:nowrap;flex-shrink:0;
+  }
+  .btn-primary:hover{background:var(--color-ink-800);}
+  .btn-secondary{
+    background:var(--color-neutral-50);color:var(--color-neutral-600);
+    border-radius:10px;height:36px;padding:0 12px 0 8px;display:inline-flex;align-items:center;gap:8px;
+    border:none;font:inherit;white-space:nowrap;flex-shrink:0;
+  }
+  .btn-secondary:hover{background:var(--color-neutral-100);}
+  .icon-btn{
+    background:transparent;border:none;color:var(--color-neutral-600);
+    display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;
+  }
+  .icon-btn svg{width:16px;height:16px;}
+  .icon-btn:hover{color:var(--color-neutral-900);}
+
+  /* ---------- status / score / trend ---------- */
+  .status-badge{
+    display:inline-flex;align-items:center;height:23px;padding:0 8px;border-radius:7px;
+    background:var(--color-neutral-0);border:1px solid var(--color-neutral-350);color:var(--color-neutral-600);
+    white-space:nowrap;
+  }
+  .score-badge{
+    display:inline-flex;align-items:center;height:26px;padding:4px 6px;border-radius:7px;white-space:nowrap;
+  }
+  .tier-poor{background:var(--red-50);color:var(--red-700);}
+  .tier-fair{background:var(--amber-50);color:var(--amber-700);}
+  .tier-good{background:var(--lime-50);color:var(--lime-700);}
+  .tier-excellent{background:var(--green-50);color:var(--green-700);}
+  .trend-chip{display:inline-flex;align-items:center;height:26px;border-radius:7px;padding:0 8px;gap:8px;white-space:nowrap;}
+  .trend-up{background:var(--green-50);color:var(--green-700);}
+  .trend-down{background:var(--red-50);color:var(--red-700);}
+  .trend-chip svg{width:16px;height:16px;}
+
+  /* ---------- checkbox ---------- */
+  .cb{
+    appearance:none;flex-shrink:0;width:18px;height:18px;border-radius:5px;
+    background:var(--color-neutral-100);position:relative;margin:0;display:inline-block;
+  }
+  .cb-on-sidebar{background:var(--color-neutral-100);}
+  .cb:checked{background:var(--color-ink-900);}
+  .cb:checked::after{
+    content:"";position:absolute;inset:0;margin:auto;
+    width:10px;height:8px;
+    background:no-repeat center/contain;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+  }
+  .cb-indeterminate{background:var(--color-ink-900);position:relative;}
+  .cb-indeterminate::after{
+    content:"";position:absolute;left:50%;top:50%;width:10px;height:2px;background:#fff;
+    transform:translate(-50%,-50%);border-radius:1px;
+  }
+
+  /* ---------- search fields ---------- */
+  .search-sidebar{
+    width:244px;height:38px;border-radius:10px;background:var(--color-neutral-100);
+    display:flex;align-items:center;gap:8px;padding:0 0 0 12px;position:relative;
+  }
+  .search-sidebar input{
+    border:none;background:transparent;outline:none;font:inherit;color:var(--color-neutral-900);
+    width:100%;padding-right:38px;
+  }
+  .search-sidebar input::placeholder{color:var(--color-neutral-400);}
+  .kbd-chip{
+    position:absolute;right:8px;top:50%;transform:translateY(-50%);
+    width:26px;height:20px;border-radius:6px;background:var(--color-neutral-0);
+    color:var(--color-neutral-400);display:flex;align-items:center;justify-content:center;
+  }
+  .search-toolbar{
+    width:283px;height:38px;border-radius:10px;background:var(--color-neutral-50);
+    display:flex;align-items:center;gap:8px;padding:0 0 0 9px;flex-shrink:0;
+  }
+  .search-toolbar input{
+    border:none;background:transparent;outline:none;font:inherit;color:var(--color-neutral-900);width:100%;
+  }
+  .search-toolbar input::placeholder{color:var(--color-neutral-400);}
+  .search-icon-only{
+    width:40px;height:38px;border-radius:10px;background:var(--color-neutral-100);
+    display:none;align-items:center;justify-content:center;border:none;color:var(--color-neutral-600);
+  }
+
+  /* ---------- sidebar ---------- */
+  #sidebar{
+    width:280px;min-width:280px;max-width:280px;flex-shrink:0;
+    background:var(--color-neutral-50);border-right:1px solid var(--color-neutral-200);
+    height:100vh;display:flex;flex-direction:column;
+  }
+  .sb-inner{width:244px;margin:0 auto;padding-top:19px;flex:1;display:flex;flex-direction:column;min-width:0;}
+  .brand-block{height:48px;display:flex;align-items:center;position:relative;flex-shrink:0;}
+  .brand-logo{
+    width:48px;height:48px;border-radius:14px;background:var(--color-neutral-1000);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .brand-text{margin-left:13px;display:flex;flex-direction:column;justify-content:center;min-width:0;}
+  .brand-chevron{position:absolute;right:0;top:50%;transform:translateY(-50%);color:var(--color-neutral-400);display:flex;}
+  .brand-chevron svg{width:16px;height:16px;}
+
+  .nav-list{margin-top:21px;display:flex;flex-direction:column;gap:4px;}
+  .nav-item{
+    height:38px;border-radius:10px;padding:0 12px;display:flex;align-items:center;gap:8px;
+    color:var(--color-neutral-600);background:transparent;border:none;width:100%;text-align:left;font:inherit;
+  }
+  .nav-item:hover{background:rgba(0,0,0,0.03);}
+  .nav-item svg{width:16px;height:16px;color:var(--color-neutral-600);flex-shrink:0;}
+  .nav-item .nav-label{color:var(--color-neutral-600);flex:1;white-space:nowrap;}
+  .nav-item.active{background:var(--color-neutral-0);color:var(--color-neutral-900);}
+  .nav-item.active svg{color:var(--color-neutral-900);}
+  .nav-item.active .nav-label{color:var(--color-neutral-900);}
+  .nav-chip{
+    width:29px;height:20px;border-radius:6px;background:var(--color-neutral-0);color:var(--color-neutral-600);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+
+  .user-block{margin-top:auto;margin-bottom:19px;display:flex;align-items:center;gap:13px;flex-shrink:0;}
+  .avatar{
+    width:40px;height:40px;border-radius:50%;background:var(--color-neutral-200);
+    display:flex;align-items:center;justify-content:center;color:var(--color-neutral-600);
+    font-size:13px;font-weight:600;position:relative;flex-shrink:0;margin-left:4px;
+  }
+  .online-dot{
+    position:absolute;right:-2px;bottom:-2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;display:flex;align-items:center;justify-content:center;
+  }
+  .online-dot::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--color-green-400,#07B93B);}
+  .user-text{display:flex;flex-direction:column;min-width:0;}
+  .user-text .name{color:var(--color-neutral-900);}
+  .user-text .email{color:var(--color-neutral-400);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  /* ---------- main sections ---------- */
+  main{flex:1;min-width:0;}
+  .section-row{display:flex;align-items:center;padding:0 18px;}
+  #header-row{height:67px;}
+  #header-row .fill{flex:1;min-width:0;}
+  .header-icons{display:flex;align-items:center;gap:22px;flex-shrink:0;}
+
+  .kpi-strip{height:112px;}
+  .kpi-scroll{display:flex;width:100%;overflow:hidden;}
+  .kpi-card{
+    width:290px;min-width:290px;height:111px;position:relative;flex-shrink:0;
+  }
+  .kpi-card.has-divider{border-left:1px solid var(--color-neutral-200);}
+  .kpi-label{position:absolute;left:20.8px;top:19.8px;color:var(--color-neutral-600);}
+  .kpi-value-row{position:absolute;left:20.8px;top:53px;display:flex;align-items:center;gap:10px;}
+  .kpi-spark{position:absolute;right:18.5px;top:44px;}
+
+  .tabs-row{height:55px;}
+  .tabs-scroll{display:flex;align-items:stretch;height:100%;overflow:hidden;position:relative;padding-left:20px;}
+  .tab{
+    height:100%;display:flex;align-items:center;background:transparent;border:none;font:inherit;
+    color:var(--color-neutral-600);white-space:nowrap;flex-shrink:0;
+  }
+  .tab.active{color:var(--color-neutral-900);}
+  .tab-chip{
+    margin-left:4.4px;width:37px;height:26px;border-radius:7px;background:var(--color-neutral-50);
+    color:var(--color-neutral-600);display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .tab-indicator{position:absolute;left:20px;bottom:0;width:89px;height:2px;background:var(--color-ink-900);}
+
+  .toolbar{height:93px;padding:29px 18px 26px 18px;display:flex;align-items:center;}
+  .toolbar .fill{flex:1;min-width:0;}
+  .toolbar-icons{display:flex;align-items:center;flex-shrink:0;}
+  .toolbar-icons .icon-btn:not(:last-child){margin-right:42px;}
+  .view-toggles{display:flex;align-items:center;flex-shrink:0;}
+  .view-toggle-btn{background:transparent;border:none;color:var(--color-neutral-400);display:flex;}
+  .view-toggle-btn.active{color:var(--color-neutral-900);}
+  .view-toggle-btn svg{width:16px;height:16px;}
+  .toolbar-actions{display:flex;align-items:center;gap:12px;flex-shrink:0;}
+
+  /* ---------- table ---------- */
+  .table-scroll-container{width:100%;}
+  table{border-collapse:collapse;width:100%;}
+  .table-min-width{min-width:1160px;}
+  thead th{
+    height:33px;text-align:left;font-weight:400;font-size:14px;line-height:20px;letter-spacing:-0.1px;
+    color:var(--color-neutral-600);border-bottom:1px solid var(--color-neutral-200);vertical-align:middle;
+  }
+  tbody tr{height:61.5px;}
+  tbody td{border-bottom:1px solid var(--color-neutral-200);vertical-align:middle;}
+  tbody tr:hover{background:var(--color-neutral-50);}
+  td.col-select,th.col-select{padding-left:19px;padding-right:0;}
+  td.col-actions,th.col-actions{padding-right:18px;padding-left:0;}
+  td.col-score{padding-top:3px;}
+  .cell-primary{color:var(--color-neutral-900);}
+  .cell-secondary{color:var(--color-neutral-600);}
+  .sr-only{
+    position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0,0,0,0);white-space:nowrap;border:0;
+  }
+
+  /* ---------- mobile drawer / overlay ---------- */
+  #overlay{
+    position:fixed;inset:0;background:rgba(13,15,20,0.4);z-index:40;display:none;
+  }
+  #overlay.active{display:block;}
+  #hamburger-btn{display:none;}
+
+  /* ===================== RESPONSIVE ===================== */
+
+  /* 1024–1279: table scrolls horizontally, toolbar gaps tighten, kpi/tabs scroll */
+  @media (max-width:1279px){
+    .table-scroll-container{overflow-x:auto;}
+    .toolbar-icons .icon-btn:not(:last-child){margin-right:20px;}
+    .view-toggles{gap:20px;}
+    .kpi-scroll,.tabs-scroll{overflow-x:auto;scrollbar-width:none;}
+    .kpi-scroll::-webkit-scrollbar,.tabs-scroll::-webkit-scrollbar{display:none;}
+  }
+  @media (min-width:1280px){
+    .view-toggles > *:not(:last-child){margin-right:36px;}
+  }
+
+  /* 768–1023: sidebar collapses to 72px icon rail */
+  @media (min-width:768px) and (max-width:1023px){
+    #sidebar.sidebar-collapsed{
+      width:72px!important;min-width:72px!important;max-width:72px!important;
+    }
+    #sidebar.sidebar-collapsed .sb-inner{width:40px;padding-top:19px;}
+    #sidebar.sidebar-collapsed .brand-block{justify-content:center;}
+    #sidebar.sidebar-collapsed .brand-text,
+    #sidebar.sidebar-collapsed .brand-chevron,
+    #sidebar.sidebar-collapsed .nav-label,
+    #sidebar.sidebar-collapsed .nav-chip,
+    #sidebar.sidebar-collapsed .user-text,
+    #sidebar.sidebar-collapsed .search-sidebar-full{display:none!important;}
+    #sidebar.sidebar-collapsed .search-sidebar{display:none;}
+    #sidebar.sidebar-collapsed .search-icon-only{display:flex;}
+    #sidebar.sidebar-collapsed .nav-item{
+      width:40px;height:38px;justify-content:center;padding:0;gap:0;
+    }
+    #sidebar.sidebar-collapsed .user-block{justify-content:center;margin-left:0;}
+    #sidebar.sidebar-collapsed .avatar{margin-left:0;}
+  }
+
+  /* <768: off-canvas drawer */
+  @media (max-width:767px){
+    #sidebar{
+      position:fixed;left:-280px;top:0;bottom:0;z-index:50;
+      transition:left 300ms ease-out;
+    }
+    #sidebar.active{left:0;}
+    #hamburger-btn{display:inline-flex;}
+    .header-icons .util-icon{display:none;}
+    .kpi-scroll{overflow-x:auto;scroll-snap-type:x mandatory;}
+    .kpi-card{scroll-snap-align:start;}
+    .sticky-col-1{position:sticky;left:0;z-index:20;background:#fff;}
+    .sticky-col-2{position:sticky;left:66px;z-index:20;background:#fff;}
+    tr:hover .sticky-col-1,tr:hover .sticky-col-2{background-color:var(--color-neutral-50);}
+  }
+</style>
+</head>
+<body>
+
+<div id="root-flex" class="flex" style="min-height:100vh;">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside id="sidebar">
+    <div class="sb-inner">
+
+      <div class="brand-block">
+        <div class="brand-logo">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18 L12 4 L20 18 Z"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="text-heading-brand">Yu Studio</span>
+          <span class="text-body-regular" style="color:var(--color-neutral-400);">Plus plan</span>
+        </div>
+        <div class="brand-chevron">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 10 12 6 17 10"/><polyline points="7 14 12 18 17 14"/></svg>
+        </div>
+      </div>
+
+      <div class="search-sidebar" style="margin-top:37px;">
+        <span class="icon-btn" style="color:var(--color-neutral-400);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+        <input type="text" placeholder="Search" aria-label="Search">
+        <span class="kbd-chip text-body-small">/</span>
+      </div>
+      <button class="search-icon-only" aria-label="Search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+
+      <nav class="nav-list" aria-label="Primary">
+        <button class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>
+          <span class="nav-label text-body-regular">Dashboard</span>
+        </button>
+        <button class="nav-item active" aria-current="page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
+          <span class="nav-label text-body-regular">Leads</span>
+        </button>
+        <button class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v13H8l-4 4Z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/></svg>
+          <span class="nav-label text-body-regular">Messages</span>
+          <span class="nav-chip text-label-score">4</span>
+        </button>
+        <button class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="1.5"/><rect x="9" y="2" width="6" height="3" rx="1"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+          <span class="nav-label text-body-regular">Orders</span>
+        </button>
+        <button class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3.5"/><circle cx="17" cy="9" r="3"/><path d="M2.5 20v-1a5 5 0 0 1 5-5h1a5 5 0 0 1 5 5v1"/><path d="M14.5 14.3A4.8 4.8 0 0 1 21 19v1"/></svg>
+          <span class="nav-label text-body-regular">Customers</span>
+        </button>
+        <button class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l16-7-4 16-5-6-6-3Z"/></svg>
+          <span class="nav-label text-body-regular">Feedback</span>
+          <span class="nav-chip text-label-score">1</span>
+        </button>
+        <button class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.8 2.1c-.8.5-1.3 1-1.3 2.1"/><line x1="12" y1="17" x2="12" y2="17.1"/></svg>
+          <span class="nav-label text-body-regular">Help Center</span>
+        </button>
+        <button class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+          <span class="nav-label text-body-regular">Settings</span>
+        </button>
+      </nav>
+
+      <div class="user-block">
+        <div class="avatar">SZ<span class="online-dot"></span></div>
+        <div class="user-text">
+          <span class="text-heading-brand name">Stephen Z.</span>
+          <span class="text-body-regular email">Stephen@yustudio.design</span>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- ===================== MAIN ===================== -->
+  <main class="flex-1" style="min-width:0;display:flex;flex-direction:column;">
+
+    <!-- Header -->
+    <div id="header-row" class="section-row hairline-b">
+      <button id="hamburger-btn" class="icon-btn" aria-label="Open navigation" aria-expanded="false" style="margin-right:14px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <h1 class="text-heading-page" style="margin:0;">Leads</h1>
+      <div class="fill"></div>
+      <div class="header-icons">
+        <button class="icon-btn util-icon" aria-label="Info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12" y2="8.1"/></svg></button>
+        <button class="icon-btn util-icon" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+        <button class="icon-btn util-icon" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 3.5-1 5-2 7h16c-1-2-2-3.5-2-7"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0"/></svg></button>
+      </div>
+      <button class="btn-primary text-body-regular" style="margin-left:16px;">Share</button>
+    </div>
+
+    <!-- KPI strip -->
+    <div class="kpi-strip hairline-b">
+      <div class="kpi-scroll">
+        <div class="kpi-card">
+          <span class="kpi-label text-body-regular">New Leads</span>
+          <div class="kpi-value-row">
+            <span class="text-kpi-value">151</span>
+            <span class="trend-chip trend-up text-label-score">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg>19%
+            </span>
+          </div>
+          <svg class="kpi-spark" width="82" height="34" viewBox="0 0 82 34">
+            <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#17191F" stop-opacity="0.12"/><stop offset="100%" stop-color="#17191F" stop-opacity="0"/></linearGradient></defs>
+            <path d="M0,28 L12,24 L24,26 L36,15 L48,18 L60,8 L72,10 L82,3 L82,34 L0,34 Z" fill="url(#g1)"/>
+            <polyline points="0,28 12,24 24,26 36,15 48,18 60,8 72,10 82,3" fill="none" stroke="#17191F" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="kpi-card has-divider">
+          <span class="kpi-label text-body-regular">Qualified Leads</span>
+          <div class="kpi-value-row">
+            <span class="text-kpi-value">59</span>
+            <span class="trend-chip trend-up text-label-score">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg>19%
+            </span>
+          </div>
+          <svg class="kpi-spark" width="82" height="34" viewBox="0 0 82 34">
+            <defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#17191F" stop-opacity="0.12"/><stop offset="100%" stop-color="#17191F" stop-opacity="0"/></linearGradient></defs>
+            <path d="M0,20 L12,26 L24,14 L36,19 L48,10 L60,16 L72,6 L82,9 L82,34 L0,34 Z" fill="url(#g2)"/>
+            <polyline points="0,20 12,26 24,14 36,19 48,10 60,16 72,6 82,9" fill="none" stroke="#17191F" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="kpi-card has-divider">
+          <span class="kpi-label text-body-regular">Avg Response Time</span>
+          <div class="kpi-value-row">
+            <span class="text-kpi-value">1h 3m</span>
+            <span class="trend-chip trend-up text-label-score">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg>19%
+            </span>
+          </div>
+          <svg class="kpi-spark" width="82" height="34" viewBox="0 0 82 34">
+            <defs><linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#17191F" stop-opacity="0.12"/><stop offset="100%" stop-color="#17191F" stop-opacity="0"/></linearGradient></defs>
+            <path d="M0,25 L12,20 L24,22 L36,12 L48,16 L60,7 L72,13 L82,4 L82,34 L0,34 Z" fill="url(#g3)"/>
+            <polyline points="0,25 12,20 24,22 36,12 48,16 60,7 72,13 82,4" fill="none" stroke="#17191F" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="kpi-card has-divider">
+          <span class="kpi-label text-body-regular">Hot Leads</span>
+          <div class="kpi-value-row">
+            <span class="text-kpi-value">23</span>
+            <span class="trend-chip trend-down text-label-score">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 7 9 13 13 9 21 18"/><polyline points="15 18 21 18 21 12"/></svg>19%
+            </span>
+          </div>
+          <svg class="kpi-spark" width="82" height="34" viewBox="0 0 82 34">
+            <defs><linearGradient id="g4" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#17191F" stop-opacity="0.12"/><stop offset="100%" stop-color="#17191F" stop-opacity="0"/></linearGradient></defs>
+            <path d="M0,5 L12,10 L24,9 L36,16 L48,14 L60,22 L72,20 L82,28 L82,34 L0,34 Z" fill="url(#g4)"/>
+            <polyline points="0,5 12,10 24,9 36,16 48,14 60,22 72,20 82,28" fill="none" stroke="#17191F" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs-row hairline-b" style="position:relative;">
+      <div class="tabs-scroll">
+        <button class="tab active text-label-tab" style="padding:0 14px 0 16.6px;">All<span class="tab-chip text-label-score">426</span></button>
+        <button class="tab text-label-tab" style="padding:0 22.45px 0 24.8px;">Favourite</button>
+        <button class="tab text-label-tab" style="padding:0 21.5px 0 22.45px;">New</button>
+        <button class="tab text-label-tab" style="padding:0 25.45px 0 21.5px;">Assigned to me</button>
+        <button class="tab text-label-tab" style="padding:0 22.5px 0 25.45px;">Overdue</button>
+        <button class="tab text-label-tab" style="padding:0 14px 0 22.5px;">Hot</button>
+      </div>
+      <div class="tab-indicator"></div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="search-toolbar">
+        <span class="icon-btn" style="color:var(--color-neutral-400);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+        <input type="text" placeholder="Search leads" aria-label="Search leads">
+      </div>
+      <div class="toolbar-icons" style="margin-left:22px;">
+        <button class="icon-btn" aria-label="Filter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M7 12h10M10 19h4"/></svg></button>
+        <button class="icon-btn" aria-label="Sort"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="4" x2="8" y2="20"/><polyline points="5 7 8 4 11 7"/><line x1="16" y1="20" x2="16" y2="4"/><polyline points="19 17 16 20 13 17"/></svg></button>
+        <button class="icon-btn" aria-label="View options"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="7" cy="18" r="2"/></svg></button>
+      </div>
+      <div class="fill"></div>
+      <div class="view-toggles">
+        <button class="view-toggle-btn active" aria-label="List view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg></button>
+        <button class="view-toggle-btn" aria-label="Grid view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg></button>
+      </div>
+      <div class="toolbar-actions" style="margin-left:24px;">
+        <button class="btn-secondary text-body-regular"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M7 16a4 4 0 0 1-1-7.9A5 5 0 0 1 16 7a4.5 4.5 0 0 1 1 8.9"/><polyline points="9 15 12 12 15 15"/><line x1="12" y1="12" x2="12" y2="21"/></svg>Import</button>
+        <button class="btn-secondary text-body-regular"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M7 16a4 4 0 0 1-1-7.9A5 5 0 0 1 16 7a4.5 4.5 0 0 1 1 8.9"/><polyline points="9 15 12 18 15 15"/><line x1="12" y1="18" x2="12" y2="9"/></svg>Export</button>
+        <button class="btn-primary text-body-regular"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add lead</button>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-scroll-container">
+      <table class="table-min-width">
+        <colgroup>
+          <col style="width:66px">
+          <col style="width:155px">
+          <col style="width:149px">
+          <col>
+          <col style="width:130px">
+          <col style="width:120px">
+          <col style="width:95px">
+          <col style="width:74px">
+          <col style="width:125px">
+          <col style="width:34px">
+        </colgroup>
+        <thead>
+          <tr>
+            <th scope="col" class="col-select">
+              <label for="select-all" class="sr-only">Select all leads</label>
+              <input type="checkbox" id="select-all" class="cb cb-indeterminate">
+            </th>
+            <th scope="col">Customer</th>
+            <th scope="col">Company</th>
+            <th scope="col">Email</th>
+            <th scope="col">Status</th>
+            <th scope="col">Manager</th>
+            <th scope="col">Source</th>
+            <th scope="col">Score</th>
+            <th scope="col">Created</th>
+            <th scope="col" class="col-actions"></th>
+          </tr>
+        </thead>
+        <tbody id="leads-tbody">
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<div id="overlay" aria-hidden="true"></div>
+
+<script>
+  const DOTS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>';
+
+  function tier(score){
+    if(score<=2) return 'tier-poor';
+    if(score<=5) return 'tier-fair';
+    if(score<=8) return 'tier-good';
+    return 'tier-excellent';
+  }
+
+  const leads = [
+    {name:'Emma Johansson',company:'Nordic Soft AB',email:'emma@nordicsoft.io',status:'HOT',manager:'Jacob Müller',source:'Website',score:9,created:'Dec 08, 2025',checked:false},
+    {name:'Ethan Wilson',company:'Travel Ventures',email:'ethan@travelventures.com',status:'OPEN',manager:'Olivia Davis',source:'LinkedIn',score:6,created:'Dec 07, 2025',checked:false},
+    {name:'Isabella Hernandez',company:'Design Studios',email:'isabella@designstudios.net',status:'NEW',manager:'Liam Johnson',source:'X',score:4,created:'Dec 06, 2025',checked:false},
+    {name:'William Lee',company:'AI Dynamics',email:'w.lee@aidynamics.com',status:'HOT',manager:'James Smith',source:'Facebook',score:7,created:'Dec 05, 2025',checked:true},
+    {name:'Sophia Martinez',company:'EcoTech Solutions',email:'sophia@ecotech.io',status:'QUALIFIED',manager:'Olivia Davis',source:'Instagram',score:6,created:'Dec 04, 2025',checked:false},
+    {name:'Ava Clark',company:'Smart Homes Inc.',email:'ava@smarthomes.com',status:'IN PROGRESS',manager:'Noah Garcia',source:'Website',score:1,created:'Dec 03, 2025',checked:false},
+    {name:'Lily Walker',company:'Foodie Connect',email:'walker@foodieconnect.com',status:'NEW',manager:'Zoe Lewis',source:'Instagram',score:6,created:'Dec 02, 2025',checked:true},
+    {name:'James Young',company:'Fashion Trendz',email:'j.young@fashiontrendz.com',status:'PENDING',manager:'Oliver Hall',source:'LinkedIn',score:5,created:'Dec 02, 2025',checked:true},
+    {name:'Mason Allen',company:'Virtual Reality Co.',email:'mason@vrco.io',status:'QUALIFIED',manager:'Emily King',source:'Facebook',score:9,created:'Dec 01, 2025',checked:false},
+    {name:'Jack Robinson',company:'Gaming Hub',email:'jack@gaminghub.gg',status:'OPEN',manager:'Mia Brown',source:'X',score:7,created:'Dec 01, 2025',checked:false},
+    {name:'David Ramirez',company:'IronGate Logistics',email:'david@irongate.com',status:'OPEN',manager:'Ella Turner',source:'Referral',score:4,created:'Dec 01, 2025',checked:false}
+  ];
+
+  const tbody = document.getElementById('leads-tbody');
+  leads.forEach((l,i)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="col-select">
+        <label for="sel-${i}" class="sr-only">Select ${l.name}</label>
+        <input type="checkbox" id="sel-${i}" class="cb" ${l.checked?'checked':''}>
+      </td>
+      <td class="text-body-medium cell-primary">${l.name}</td>
+      <td class="text-body-regular cell-secondary">${l.company}</td>
+      <td class="text-body-regular cell-secondary">${l.email}</td>
+      <td><span class="status-badge text-label-caps">${l.status}</span></td>
+      <td class="text-body-medium cell-primary">${l.manager}</td>
+      <td class="text-body-regular cell-secondary">${l.source}</td>
+      <td class="col-score"><span class="score-badge text-label-score ${tier(l.score)}">${l.score}/10</span></td>
+      <td class="text-body-regular cell-secondary">${l.created}</td>
+      <td class="col-actions"><button class="icon-btn" style="color:var(--color-neutral-400);" aria-label="More actions for ${l.name}">${DOTS_ICON}</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // mobile drawer
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('overlay');
+  const hamburger = document.getElementById('hamburger-btn');
+
+  function openDrawer(){
+    sidebar.classList.add('active');
+    overlay.classList.add('active');
+    hamburger.setAttribute('aria-expanded','true');
+  }
+  function closeDrawer(){
+    sidebar.classList.remove('active');
+    overlay.classList.remove('active');
+    hamburger.setAttribute('aria-expanded','false');
+  }
+  hamburger.addEventListener('click', ()=>{
+    sidebar.classList.contains('active') ? closeDrawer() : openDrawer();
+  });
+  overlay.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape') closeDrawer();
+  });
+
+  // tablet icon-rail collapse
+  function applyCollapse(){
+    const w = window.innerWidth;
+    if(w >= 768 && w <= 1023){
+      sidebar.classList.add('sidebar-collapsed');
+    } else {
+      sidebar.classList.remove('sidebar-collapsed');
+    }
+    if(w >= 768){
+      closeDrawer();
+    }
+  }
+  applyCollapse();
+  window.addEventListener('resize', applyCollapse);
+
+  // mobile sticky columns on table
+  function applySticky(){
+    const isMobile = window.innerWidth <= 767;
+    document.querySelectorAll('tbody tr').forEach(tr=>{
+      const cells = tr.children;
+      if(isMobile){
+        cells[0].classList.add('sticky-col-1');
+        cells[1].classList.add('sticky-col-2');
+      } else {
+        cells[0].classList.remove('sticky-col-1');
+        cells[1].classList.remove('sticky-col-2');
+      }
+    });
+    const headRow = document.querySelector('thead tr');
+    if(headRow){
+      if(isMobile){
+        headRow.children[0].classList.add('sticky-col-1');
+        headRow.children[1].classList.add('sticky-col-2');
+      } else {
+        headRow.children[0].classList.remove('sticky-col-1');
+        headRow.children[1].classList.remove('sticky-col-2');
+      }
+    }
+  }
+  applySticky();
+  window.addEventListener('resize', applySticky);
+</script>
+</body>
+</html>

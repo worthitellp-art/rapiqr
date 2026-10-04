@@ -74,13 +74,13 @@ export default function OrderInvoiceModal({
       <div className="absolute inset-0" onClick={onClose} />
 
       {/* Modal Card Container */}
-      <div className="relative z-10 w-full max-w-3xl max-h-[92vh] flex flex-col rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden text-slate-900">
+      <div className="relative z-10 w-full max-w-3xl max-h-[92vh] flex flex-col rounded-lg bg-white shadow-2xl border border-slate-200 overflow-hidden text-slate-900">
         {/* Top Control Bar */}
         <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/90 px-5 py-3.5 sm:px-6">
           <div className="flex items-center gap-2 text-sm font-black text-slate-900">
             <FileText size={18} className="text-[#111111]" />
             <span id="invoice-modal-title">Tax Invoice Preview</span>
-            <span className="hidden sm:inline-block rounded-md bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-900">
+            <span className="hidden sm:inline-block rounded-sm bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-900">
               #{invoiceNumber}
             </span>
           </div>
@@ -89,7 +89,7 @@ export default function OrderInvoiceModal({
             <button
               type="button"
               onClick={onPrintInvoice}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-800 shadow-xs"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-800 shadow-xs"
               title="Print or save as PDF"
             >
               <Printer size={14} className="text-white" />
@@ -98,7 +98,7 @@ export default function OrderInvoiceModal({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl bg-slate-200/80 text-slate-600 transition-colors hover:bg-slate-300 hover:text-slate-900"
+              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-slate-200/80 text-slate-600 transition-colors hover:bg-slate-300 hover:text-slate-900"
               aria-label="Close invoice preview"
             >
               <X size={17} />
@@ -115,7 +115,7 @@ export default function OrderInvoiceModal({
                 <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-950">
                   RAPI<span className="text-[#111111]">QR</span>
                 </span>
-                <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-800 tracking-wider">
+                <span className="rounded-sm bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-800 tracking-wider">
                   OFFICIAL TAX INVOICE
                 </span>
               </div>
@@ -146,7 +146,7 @@ export default function OrderInvoiceModal({
 
           {/* Customer & Order Metadata */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 space-y-1">
+            <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4 space-y-1">
               <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
                 Billed &amp; Shipped To
               </div>
@@ -163,7 +163,7 @@ export default function OrderInvoiceModal({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 space-y-1">
+            <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4 space-y-1">
               <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
                 Order &amp; Payment Status
               </div>
@@ -190,7 +190,7 @@ export default function OrderInvoiceModal({
           </div>
 
           {/* Line Items Table */}
-          <div className="rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="rounded-lg border border-slate-200 overflow-hidden">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-900 text-white text-[11px] uppercase tracking-wider">
@@ -241,7 +241,7 @@ export default function OrderInvoiceModal({
               </p>
             </div>
 
-            <div className="w-full sm:w-72 space-y-1.5 rounded-2xl bg-slate-50 p-4 border border-slate-200 text-xs">
+            <div className="w-full sm:w-72 space-y-1.5 rounded-lg bg-slate-50 p-4 border border-slate-200 text-xs">
               <div className="flex justify-between text-slate-600">
                 <span>Taxable Base:</span>
                 <span className="font-semibold text-slate-800">
@@ -287,14 +287,14 @@ export default function OrderInvoiceModal({
           <button
             type="button"
             onClick={onClose}
-            className="cursor-pointer rounded-lg border border-gray-300 hover:border-black bg-white hover:bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-700 transition-colors"
+            className="cursor-pointer rounded-md border border-gray-300 hover:border-black bg-white hover:bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-700 transition-colors"
           >
             Close
           </button>
           <button
             type="button"
             onClick={onPrintInvoice}
-            className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-white hover:bg-gray-50 border border-gray-300 hover:border-black px-4 py-2 text-xs font-semibold text-black transition-colors shadow-xs"
+            className="flex cursor-pointer items-center gap-1.5 rounded-md bg-white hover:bg-gray-50 border border-gray-300 hover:border-black px-4 py-2 text-xs font-semibold text-black transition-colors shadow-xs"
           >
             <Download size={14} />
             <span>Download / Print Invoice</span>

@@ -28,6 +28,14 @@ const MONTHLY_LIMIT_PER_TYPE = 10;
 const RECENT_SENDS = new Map();
 const ANTI_SPAM_COOLDOWN_MS = 30 * 1000;
 
+// Identical-message guard. The owner copy and the emergency-contact copy of an
+// alert use different notification types (so the per-type cooldown above can't
+// see them as duplicates) but render the SAME text — when the owner's own number
+// is also saved as an emergency contact they got the alert twice. Keyed on
+// recipient (last 10 digits, so "+91…" and "…" match) + template + final text.
+const RECENT_BODIES = new Map();
+const DUPLICATE_WINDOW_MS = 60 * 1000;
+
 // OTP is a login/verification code, never subject to the notification quota —
 // capping it could lock a client out of their own account.
 const UNLIMITED_TYPES = new Set(['OTP']);
@@ -65,6 +73,23 @@ async function notify({ type, to, data = {}, eventId = null }) {
     if (RECENT_SENDS.size > 1000) {
       for (const [k, time] of RECENT_SENDS.entries()) {
         if (now - time > ANTI_SPAM_COOLDOWN_MS * 2) RECENT_SENDS.delete(k);
+      }
+    }
+  }
+
+  // Checked and recorded synchronously (before any await) so two sends racing
+  // for the same recipient can't both slip through.
+  if (!UNLIMITED_TYPES.has(type)) {
+    const dupKey = `${String(to).replace(/\D/g, '').slice(-10)}|${template.templateName}|${buildBody(type, data)}`;
+    const now = Date.now();
+    if (now - (RECENT_BODIES.get(dupKey) || 0) < DUPLICATE_WINDOW_MS) {
+      logger.warn('NOTIFY', `Skipped duplicate ${type} to ${to} — identical message already sent in the last minute.`);
+      return { sent: true, mock: false, status: 'duplicate_suppressed', note: 'Identical message already sent.' };
+    }
+    RECENT_BODIES.set(dupKey, now);
+    if (RECENT_BODIES.size > 1000) {
+      for (const [k, time] of RECENT_BODIES.entries()) {
+        if (now - time > DUPLICATE_WINDOW_MS) RECENT_BODIES.delete(k);
       }
     }
   }
@@ -139,7 +164,7 @@ const notifyContactsAdded = ({ contacts = [], ownerName, eventId = null }) => {
       notify({
         type: 'EMERGENCY_CONTACT_ADDED',
         to: c.phone,
-        data: { contact_name: c.name || 'there', owner_name: ownerName || 'A RapiQR user' },
+        data: { contact_name: c.name || 'there', owner_name: ownerName || 'A RepiQR user' },
         eventId,
       })
     )

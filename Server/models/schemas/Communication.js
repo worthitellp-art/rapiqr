@@ -10,6 +10,14 @@ const communicationSchema = new Schema({
   email: { type: String, default: null },
   city: { type: String, default: null },
   country: { type: String, default: null },
+  // Base location captured by "Join us" (GPS + server-side reverse geocode) —
+  // admin-only; never returned by the public provider list.
+  address: { type: String, default: null },
+  area: { type: String, default: null },
+  state: { type: String, default: null },
+  pincode: { type: String, default: null },
+  latitude: { type: Number, default: null },
+  longitude: { type: Number, default: null },
   notes: { type: String, default: null },
   // Structured coverage/availability, collected by the "Join us" partner
   // onboarding flow so a future matching system can query on them directly

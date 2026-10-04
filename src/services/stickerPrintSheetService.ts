@@ -1,6 +1,6 @@
 import type { jsPDF as JsPDF } from "jspdf";
 import { QrRecord, StickerPos } from "../components/dashboard/admin/types";
-import { generateQrDataUrl, qrFullUrl } from "../components/dashboard/admin/helpers";
+import { generateQrDataUrl, qrFullUrl, DEFAULT_STICKER_POS } from "../components/dashboard/admin/helpers";
 import stickerTemplateImg from "../assets/template-sticker.jpeg";
 
 // Physical die-cut sticker size — fixed, never derived or scaled to fit a
@@ -59,7 +59,7 @@ export const PRINT_SHEET_CONSTANTS = {
   REFERENCE_EDITOR_WIDTH: 320,
   REFERENCE_EDITOR_HEIGHT: 200,
   QR_RESOLUTION_PIXELS: 2048,
-  DEFAULT_STICKER_POS: { x: 193, y: 37, w: 110, h: 110 } as StickerPos,
+  DEFAULT_STICKER_POS: DEFAULT_STICKER_POS as StickerPos,
 } as const;
 
 export interface SheetPrintConfig {
@@ -359,53 +359,26 @@ const A4_HEIGHT_INCHES = 11.69;
 export const ADMIN_STICKERS_PER_PAGE = 1;
 
 /**
- * Renders the 4x2.5in sticker artwork at ultra-high print press quality (600 DPI, 2400×1500px).
- * Uses lossless PNG encoding with high image smoothing quality for razor-sharp QR codes and micro-details.
+ * Raw bytes of the sticker template JPEG. The PDF embeds these untouched (jsPDF
+ * passes a JPEG straight through), so the artwork is never resampled or
+ * re-compressed — the template prints exactly as designed, at its native
+ * resolution (1536×960 over 4×2.5in ≈ 384 DPI).
  */
-async function renderStickerArtworkDataUrl(
-  record: QrRecord,
-  position: StickerPos,
-  dpi = 600
-): Promise<string> {
-  const stickerTemplate = await loadStickerTemplate();
-
-  const stickerWidthPx = Math.round(STICKER_WIDTH_INCHES * dpi);
-  const stickerHeightPx = Math.round(STICKER_HEIGHT_INCHES * dpi);
-
-  const canvas = document.createElement("canvas");
-  canvas.width = stickerWidthPx;
-  canvas.height = stickerHeightPx;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return "";
-
-  // Enable highest quality image smoothing
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-
-  const scaleX = stickerWidthPx / PRINT_SHEET_CONSTANTS.REFERENCE_EDITOR_WIDTH;
-  const scaleY = stickerHeightPx / PRINT_SHEET_CONSTANTS.REFERENCE_EDITOR_HEIGHT;
-
-  // Draw sticker template at full 300 DPI resolution
-  ctx.drawImage(stickerTemplate, 0, 0, stickerWidthPx, stickerHeightPx);
-
-  // Generate and draw ultra high-resolution QR code
-  const qrDataUrl = await generateQrDataUrl(
-    qrFullUrl(record.id),
-    record.fg || "000000",
-    record.bg || "FFFFFF",
-    PRINT_SHEET_CONSTANTS.QR_RESOLUTION_PIXELS
-  );
-  const qrImage = await loadHtmlImage(qrDataUrl);
-  ctx.drawImage(
-    qrImage,
-    position.x * scaleX,
-    position.y * scaleY,
-    position.w * scaleX,
-    position.h * scaleY
-  );
-
-  // Return lossless PNG for 100% pixel-perfect print clarity with zero compression artifacts
-  return canvas.toDataURL("image/png");
+let cachedTemplateBytesPromise: Promise<Uint8Array> | null = null;
+function loadStickerTemplateBytes(): Promise<Uint8Array> {
+  if (!cachedTemplateBytesPromise) {
+    cachedTemplateBytesPromise = fetch(stickerTemplateImg)
+      .then((response) => {
+        if (!response.ok) throw new Error(`Sticker template failed to load (${response.status})`);
+        return response.arrayBuffer();
+      })
+      .then((buffer) => new Uint8Array(buffer))
+      .catch((err) => {
+        cachedTemplateBytesPromise = null; // let a retry re-fetch instead of replaying the failure
+        throw err;
+      });
+  }
+  return cachedTemplateBytesPromise;
 }
 
 /**
@@ -501,7 +474,7 @@ function appendRecoveryManifestPages(
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
-    doc.text("RapiQR Recovery Code Manifest", marginIn, cursorY);
+    doc.text("RepiQR Recovery Code Manifest", marginIn, cursorY);
     cursorY += headerHeightIn;
 
     doc.setFont("courier", "normal");
@@ -524,135 +497,96 @@ export interface PrintProgressInfo {
 
 export type PrintProgressCallback = (info: PrintProgressInfo) => void;
 
+// A QR only needs ~1.1in of the sticker; 768px there is ~700 DPI — far past what
+// a press resolves — and keeps every embedded QR small and quick to encode
+// (about half the build time of 1024px for a large batch).
+const QR_PDF_PIXELS = 768;
+const TEMPLATE_PDF_ALIAS = "repiqr-sticker-template";
+
 /**
- * Bulk PDF export — generates standard A4 pages with 1 single 4x2.5in sticker
- * centered on each page with crisp vector corner crop marks.
- * Embeds optimized sticker artwork (97% memory savings) and yields to the
- * event loop so large batches compile instantly without "Invalid string length" errors.
+ * Bulk PDF export — one A4 page per sticker, the 4x2.5in sticker centered.
+ *
+ * Quality + size: the template JPEG is embedded ONCE, byte-for-byte, and reused
+ * by every page; only each sticker's own QR is added on top, as a crisp
+ * image (QR_PDF_PIXELS). Nothing is re-rasterised, so the artwork stays exactly as designed and
+ * a 500-sticker PDF is a few MB instead of hundreds. Pages are built one at a
+ * time (yielding to the event loop) so large batches never freeze the tab.
  */
 export async function generateStickerBatchPdfBlob(
   records: QrRecord[],
   position: StickerPos,
   recoveryCodeMap: Record<string, string | null | undefined> = {},
   copies = 1,
-  dpi = 600,
   onProgress?: PrintProgressCallback
 ): Promise<Blob | null> {
   if (records.length === 0) return null;
 
   const total = records.length;
-  onProgress?.({
-    current: 0,
-    total,
-    percent: 5,
-    stage: "Preparing sticker templates…",
-  });
-
-  // Yield to let the progress modal display immediately
-  await new Promise((resolve) => setTimeout(resolve, 30));
-
-  const stickerDataUrls: string[] = [];
-  for (let index = 0; index < total; index++) {
-    const record = records[index];
-    const currentNum = index + 1;
-    const renderPercent = Math.round(5 + (index / total) * 70);
-
-    onProgress?.({
-      current: currentNum,
-      total,
-      percent: renderPercent,
-      stage: `Rendering sticker ${record.id} (${currentNum}/${total})…`,
-      stickerId: record.id,
-    });
-
-    // Yield to the event loop so the progress bar animates fluidly
-    await new Promise((resolve) => setTimeout(resolve, 8));
-
-    const stickerDataUrl = await renderStickerArtworkDataUrl(record, position, dpi);
-    stickerDataUrls.push(stickerDataUrl);
-  }
-
-  onProgress?.({
-    current: total,
-    total,
-    percent: 80,
-    stage: "Compiling PDF document pages…",
-  });
-
-  await new Promise((resolve) => setTimeout(resolve, 20));
-
-  const { jsPDF } = await import("jspdf");
   const safeCopies = Math.max(1, Math.round(copies) || 1);
+  const totalPages = total * safeCopies;
+  const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  // Exact centered coordinates on standard A4 page
+  onProgress?.({ current: 0, total, percent: 5, stage: "Preparing sticker template…" });
+  await tick(30); // let the progress modal paint
+
+  const [{ jsPDF }, templateBytes] = await Promise.all([import("jspdf"), loadStickerTemplateBytes()]);
+
+  // Exact centered coordinates on the A4 page, and the QR's box inside the sticker.
   const stickerX = (A4_WIDTH_INCHES - STICKER_WIDTH_INCHES) / 2;
   const stickerY = (A4_HEIGHT_INCHES - STICKER_HEIGHT_INCHES) / 2;
+  const inchesPerEditorX = STICKER_WIDTH_INCHES / PRINT_SHEET_CONSTANTS.REFERENCE_EDITOR_WIDTH;
+  const inchesPerEditorY = STICKER_HEIGHT_INCHES / PRINT_SHEET_CONSTANTS.REFERENCE_EDITOR_HEIGHT;
+  const qrX = stickerX + position.x * inchesPerEditorX;
+  const qrY = stickerY + position.y * inchesPerEditorY;
+  const qrW = position.w * inchesPerEditorX;
+  const qrH = position.h * inchesPerEditorY;
 
-  let doc: InstanceType<typeof jsPDF> | null = null;
-  const totalPagesToEmbed = stickerDataUrls.length * safeCopies;
-  let pagesEmbedded = 0;
+  const doc = new jsPDF({
+    unit: "in",
+    format: [A4_WIDTH_INCHES, A4_HEIGHT_INCHES],
+    orientation: "portrait",
+    compress: true,
+  });
 
+  let pageNumber = 0;
   for (let copyIndex = 0; copyIndex < safeCopies; copyIndex++) {
-    for (const stickerDataUrl of stickerDataUrls) {
-      if (!doc) {
-        doc = new jsPDF({
-          unit: "in",
-          format: [A4_WIDTH_INCHES, A4_HEIGHT_INCHES],
-          orientation: "portrait",
-          compress: true,
-        });
-      } else {
-        doc.addPage([A4_WIDTH_INCHES, A4_HEIGHT_INCHES], "portrait");
-      }
+    for (let index = 0; index < total; index++) {
+      const record = records[index];
+      if (pageNumber > 0) doc.addPage([A4_WIDTH_INCHES, A4_HEIGHT_INCHES], "portrait");
+      pageNumber++;
 
-      // Draw lossless high-resolution sticker artwork in the center of the A4 page
-      doc.addImage(
-        stickerDataUrl,
-        "PNG",
-        stickerX,
-        stickerY,
-        STICKER_WIDTH_INCHES,
-        STICKER_HEIGHT_INCHES,
-        undefined,
-        "FAST"
+      // Same alias on every page → the template is stored once in the file.
+      doc.addImage(templateBytes, "JPEG", stickerX, stickerY, STICKER_WIDTH_INCHES, STICKER_HEIGHT_INCHES, TEMPLATE_PDF_ALIAS, "NONE");
+
+      // Per-sticker QR (cached by generateQrDataUrl); alias = sticker id so extra copies reuse it.
+      const qrDataUrl = await generateQrDataUrl(
+        qrFullUrl(record.id),
+        record.fg || "000000",
+        record.bg || "FFFFFF",
+        QR_PDF_PIXELS
       );
+      doc.addImage(qrDataUrl, "PNG", qrX, qrY, qrW, qrH, `qr-${record.id}`, "FAST");
 
-      pagesEmbedded++;
-
-      if (pagesEmbedded % 5 === 0 || pagesEmbedded === totalPagesToEmbed) {
-        const compilePercent = Math.round(80 + (pagesEmbedded / totalPagesToEmbed) * 16);
+      if (pageNumber % 4 === 0 || pageNumber === totalPages) {
         onProgress?.({
-          current: total,
+          current: Math.min(total, pageNumber),
           total,
-          percent: compilePercent,
-          stage: `Compiling PDF page ${pagesEmbedded} of ${totalPagesToEmbed}…`,
+          percent: Math.round(5 + (pageNumber / totalPages) * 90),
+          stage: `Building page ${pageNumber} of ${totalPages} (${record.id})…`,
+          stickerId: record.id,
         });
-        await new Promise((resolve) => setTimeout(resolve, 5));
+        await tick(); // yield so the bar animates and the tab stays responsive
       }
     }
   }
 
-  if (!doc) return null;
-
-  onProgress?.({
-    current: total,
-    total,
-    percent: 98,
-    stage: "Finalizing recovery codes & PDF package…",
-  });
-
+  onProgress?.({ current: total, total, percent: 97, stage: "Adding recovery-code list…" });
+  await tick(10);
   appendRecoveryManifestPages(doc, records, recoveryCodeMap);
 
   const outputBlob = doc.output("blob");
-
-  onProgress?.({
-    current: total,
-    total,
-    percent: 100,
-    stage: "PDF ready! Starting download…",
-  });
-
-  await new Promise((resolve) => setTimeout(resolve, 250));
+  onProgress?.({ current: total, total, percent: 100, stage: "PDF ready! Starting download…" });
+  await tick(250);
 
   return outputBlob;
 }

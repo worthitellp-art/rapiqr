@@ -3,16 +3,30 @@ import {
   ArrowLeft,
   Loader2,
   Phone,
-  ShieldCheck,
   CheckCircle2,
   AlertCircle,
-  ArrowRight,
   RotateCcw,
+  Clock,
 } from 'lucide-react';
 import AppLogo from '../common/AppLogo';
+import { FlowButton } from '../ui/flow-button';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
 import { useAuth } from '../../context/AuthContext';
 import { sendMsg91Otp, verifyMsg91Otp, retryMsg91Otp, toMsg91Identifier } from '../../lib/msg91Widget';
+import {
+  checkOtpRateLimit,
+  recordOtpSendAttempt,
+  recordOtpVerifyFailure,
+  clearOtpRateLimit,
+  formatRemainingTime,
+  MAX_OTP_ATTEMPTS,
+} from '../../lib/otpRateLimit';
+import { useOtpLock } from '../../lib/useOtpLock';
+
+const sendLockedMessage = (time: string) =>
+  `You've used all ${MAX_OTP_ATTEMPTS} code requests. For your security, new codes are locked for 4 hours — try again in ${time}.`;
+const verifyLockedMessage = (time: string) =>
+  `Too many incorrect codes (${MAX_OTP_ATTEMPTS}/${MAX_OTP_ATTEMPTS}). For your security, verification is locked for 4 hours — try again in ${time}.`;
 
 interface AuthPageProps {
   initialMode?: 'login' | 'signup';
@@ -38,6 +52,14 @@ export default function AuthPage({
   const [successMessage, setSuccessMessage] = useState('');
   const [countdown, setCountdown] = useState(0);
 
+  // Active phone number
+  const activePhone = phoneNumber || phoneDigits;
+
+  // sendLockMs: no more codes can be requested. verifyLockMs: no more guesses
+  // (and no new codes either — sendLockMs covers that case too).
+  const { sendLockMs, verifyLockMs, refresh: refreshLock } = useOtpLock(activePhone);
+  const bannerLockMs = step === 'otp' ? verifyLockMs : sendLockMs;
+
   // Countdown timer for resending OTP
   useEffect(() => {
     if (countdown <= 0) return;
@@ -57,9 +79,11 @@ export default function AuthPage({
         setSuccessMessage('Signed in with Google! Loading dashboard…');
         localStorage.setItem('rapiqr-phone-number-filled', 'true');
         localStorage.setItem('rapiqr-phone-asked-once', 'true');
+        localStorage.setItem('repiqr-current-page', 'dashboard');
+        localStorage.setItem('namoqr-current-page', 'dashboard');
         setTimeout(() => {
           onSuccess();
-        }, 400);
+        }, 250);
       } else if (res.error) {
         setErrorMessage(res.error);
       }
@@ -81,19 +105,37 @@ export default function AuthPage({
       return;
     }
 
+    const finalPhone = phoneNumber || clean;
+
+    // Check rate limit (3 codes, then a 4 hour lock)
+    const rateStatus = checkOtpRateLimit(finalPhone, 'send');
+    if (rateStatus.isLocked) {
+      refreshLock();
+      setErrorMessage(rateStatus.verifyAttempts >= MAX_OTP_ATTEMPTS
+        ? verifyLockedMessage(rateStatus.remainingTimeStr)
+        : sendLockedMessage(rateStatus.remainingTimeStr));
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const finalPhone = phoneNumber || clean;
-      // Backend pre-flight (format/ownership checks) first, THEN actually ask
-      // MSG91's widget to send the code — the pre-flight alone never sends
-      // anything, it only clears the way for the widget call below.
+      // Backend pre-flight (format/ownership checks) first
       const res = await sendPhoneLoginOtp(finalPhone);
       if (!res.success) {
         setErrorMessage(res.error || 'Failed to send verification code. Please try again.');
         return;
       }
       await sendMsg91Otp(toMsg91Identifier(finalPhone));
-      setSuccessMessage(res.message || 'Verification code sent to your phone.');
+
+      // Record the send. The 3rd code is still valid, so we move on to the OTP
+      // step either way — only further requests get locked.
+      const attemptResult = recordOtpSendAttempt(finalPhone);
+      refreshLock();
+      setSuccessMessage(
+        attemptResult.isLocked
+          ? 'Code sent. That was your last code request — new codes are locked for 4 hours.'
+          : `Verification code sent to your phone. (${attemptResult.attempts} of ${MAX_OTP_ATTEMPTS} requests used)`
+      );
       setStep('otp');
       setCountdown(30);
     } catch (err: any) {
@@ -108,6 +150,14 @@ export default function AuthPage({
     setErrorMessage('');
     setSuccessMessage('');
 
+    const finalPhone = phoneNumber || phoneDigits;
+    const rateStatus = checkOtpRateLimit(finalPhone, 'verify');
+    if (rateStatus.isLocked) {
+      refreshLock();
+      setErrorMessage(verifyLockedMessage(rateStatus.remainingTimeStr));
+      return;
+    }
+
     const trimmedOtp = otpCode.trim();
     if (!trimmedOtp || trimmedOtp.length < 4) {
       setErrorMessage('Please enter the verification code.');
@@ -116,31 +166,89 @@ export default function AuthPage({
 
     setIsSubmitting(true);
     try {
-      // The widget verifies the code with MSG91 directly and hands back an
-      // access token; the backend re-verifies that token server-to-server —
-      // this app never checks the OTP itself.
       const accessToken = await verifyMsg91Otp(trimmedOtp);
       const res = await verifyPhoneLoginOtp(phoneNumber, accessToken);
       if (res.success) {
+        // Clear rate limiting upon successful login
+        clearOtpRateLimit(finalPhone);
         setSuccessMessage('Verified successfully! Loading dashboard…');
         localStorage.setItem('rapiqr-phone-number-filled', 'true');
         localStorage.setItem('rapiqr-phone-asked-once', 'true');
+        localStorage.setItem('repiqr-current-page', 'dashboard');
+        localStorage.setItem('namoqr-current-page', 'dashboard');
         setTimeout(() => {
           onSuccess();
-        }, 400);
+        }, 250);
       } else {
-        setErrorMessage(res.error || 'Invalid verification code. Please try again.');
+        // Record failed attempt
+        const failResult = recordOtpVerifyFailure(finalPhone);
+        refreshLock();
+        if (failResult.isLocked) {
+          setErrorMessage(verifyLockedMessage(failResult.remainingTimeStr));
+        } else {
+          const remainingTries = MAX_OTP_ATTEMPTS - failResult.attempts;
+          setErrorMessage(
+            `${res.error || 'Invalid verification code.'} (${remainingTries} attempt${remainingTries !== 1 ? 's' : ''} remaining before a 4-hour lock)`
+          );
+        }
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Verification failed. Please try again.');
+      // Record failed attempt on error
+      const failResult = recordOtpVerifyFailure(finalPhone);
+      refreshLock();
+      if (failResult.isLocked) {
+        setErrorMessage(verifyLockedMessage(failResult.remainingTimeStr));
+      } else {
+        const remainingTries = MAX_OTP_ATTEMPTS - failResult.attempts;
+        setErrorMessage(
+          `${err.message || 'Verification failed. Please try again.'} (${remainingTries} attempt${remainingTries !== 1 ? 's' : ''} remaining before a 4-hour lock)`
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleResendOtp = async () => {
-    if (countdown > 0 || isSubmitting) return;
-    await handleSendOtp();
+    if (countdown > 0 || isSubmitting || sendLockMs > 0) return;
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    const finalPhone = phoneNumber || phoneDigits;
+    const rateStatus = checkOtpRateLimit(finalPhone, 'send');
+    if (rateStatus.isLocked) {
+      refreshLock();
+      setErrorMessage(sendLockedMessage(rateStatus.remainingTimeStr));
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Try MSG91's retryOtp first (reuses the live request); if the widget has
+      // no active request, errors, or never answers, start a fresh send instead.
+      try {
+        await retryMsg91Otp('text');
+      } catch (retryErr) {
+        console.warn('retryMsg91Otp failed, falling back to a fresh send:', retryErr);
+        const res = await sendPhoneLoginOtp(finalPhone);
+        if (!res.success) throw new Error(res.error || 'Failed to resend the code. Please try again.');
+        await sendMsg91Otp(toMsg91Identifier(finalPhone));
+      }
+
+      const attemptResult = recordOtpSendAttempt(finalPhone);
+      refreshLock();
+      setOtpCode('');
+      setSuccessMessage(
+        attemptResult.isLocked
+          ? 'New code sent. That was your last code request — new codes are locked for 4 hours.'
+          : `New verification code sent. (${attemptResult.attempts} of ${MAX_OTP_ATTEMPTS} requests used)`
+      );
+      setCountdown(30);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to resend code. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -186,6 +294,22 @@ export default function AuthPage({
                 : `We sent a verification code to ${phoneNumber}`}
             </p>
           </div>
+
+          {/* Lockout Cooldown Notice */}
+          {bannerLockMs > 0 && (
+            <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold flex items-start gap-2.5">
+              <Clock size={16} className="shrink-0 mt-0.5 text-amber-700" />
+              <div>
+                <p className="font-bold text-amber-900">Locked for 4 hours</p>
+                <p className="text-[11.5px] text-amber-800 mt-0.5 leading-relaxed">
+                  {step === 'otp'
+                    ? `${MAX_OTP_ATTEMPTS} incorrect codes entered.`
+                    : `${MAX_OTP_ATTEMPTS} attempts used.`}{' '}
+                  Try again in <span className="font-bold font-mono">{formatRemainingTime(bannerLockMs)}</span>.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Error Message */}
           {errorMessage && (
@@ -268,23 +392,23 @@ export default function AuthPage({
                   />
                 </div>
 
-                <button
+                <FlowButton
                   type="submit"
-                  disabled={isSubmitting || isGoogleSubmitting || phoneDigits.length < 10}
-                  className="w-full py-3 px-4 rounded-xl bg-white text-black border border-gray-300 hover:border-black font-semibold text-sm transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 active:scale-[0.99]"
+                  fullWidth
+                  loading={isSubmitting}
+                  disabled={isGoogleSubmitting || phoneDigits.length < 10 || sendLockMs > 0}
                 >
                   {isSubmitting ? (
+                    'Sending Code…'
+                  ) : sendLockMs > 0 ? (
                     <>
-                      <Loader2 size={16} className="animate-spin text-black" />
-                      <span>Sending Code…</span>
+                      <Clock size={15} className="text-amber-700" />
+                      Locked · {formatRemainingTime(sendLockMs)}
                     </>
                   ) : (
-                    <>
-                      <span>Send Verification Code</span>
-                      <ArrowRight size={16} />
-                    </>
+                    'Send Verification Code'
                   )}
-                </button>
+                </FlowButton>
               </form>
             </div>
           ) : (
@@ -304,28 +428,29 @@ export default function AuthPage({
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     placeholder="Enter code"
                     autoFocus
-                    className="w-full text-center tracking-[0.4em] font-mono text-xl py-3 px-4 rounded-xl bg-white border border-gray-300 focus:border-black focus:ring-1 focus:ring-black outline-none transition-all text-gray-900 placeholder:text-gray-300"
+                    disabled={verifyLockMs > 0}
+                    className="w-full text-center tracking-[0.4em] font-mono text-xl py-3 px-4 rounded-xl bg-white border border-gray-300 focus:border-black focus:ring-1 focus:ring-black outline-none transition-all text-gray-900 placeholder:text-gray-300 disabled:bg-gray-100"
                   />
                 </div>
               </div>
 
-              <button
+              <FlowButton
                 type="submit"
-                disabled={isSubmitting || otpCode.trim().length < 4}
-                className="w-full py-3 px-4 rounded-xl bg-white text-black border border-gray-300 hover:border-black font-semibold text-sm transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 active:scale-[0.99]"
+                fullWidth
+                loading={isSubmitting}
+                disabled={otpCode.trim().length < 4 || verifyLockMs > 0}
               >
                 {isSubmitting ? (
+                  'Verifying Code…'
+                ) : verifyLockMs > 0 ? (
                   <>
-                    <Loader2 size={16} className="animate-spin text-black" />
-                    <span>Verifying Code…</span>
+                    <Clock size={15} className="text-amber-700" />
+                    Locked ({formatRemainingTime(verifyLockMs)})
                   </>
                 ) : (
-                  <>
-                    <ShieldCheck size={16} />
-                    <span>Verify &amp; Enter Dashboard</span>
-                  </>
+                  'Verify & Enter Dashboard'
                 )}
-              </button>
+              </FlowButton>
 
               <div className="flex items-center justify-between pt-2 text-xs">
                 <button
@@ -344,11 +469,17 @@ export default function AuthPage({
                 <button
                   type="button"
                   onClick={handleResendOtp}
-                  disabled={countdown > 0 || isSubmitting}
+                  disabled={countdown > 0 || isSubmitting || sendLockMs > 0}
                   className="text-gray-700 hover:text-black font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1"
                 >
                   <RotateCcw size={12} />
-                  <span>{countdown > 0 ? `Resend in ${countdown}s` : 'Resend Code'}</span>
+                  <span>
+                    {sendLockMs > 0
+                      ? `No more codes · ${formatRemainingTime(sendLockMs)}`
+                      : countdown > 0
+                      ? `Resend in ${countdown}s`
+                      : 'Resend Code'}
+                  </span>
                 </button>
               </div>
             </form>

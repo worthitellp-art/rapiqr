@@ -5,6 +5,7 @@ import type { DashboardSticker, EmergencyContact } from './types';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
 import { getCategoryIcon } from '../../../stickerModules';
 import { generateRepeatedStickerSheetBlob, downloadSheetBlob, PRINT_SHEET_CONSTANTS } from '../../../services/stickerPrintSheetService';
+import { DEFAULT_STICKER_POS } from '../admin/helpers';
 import type { QrRecord } from '../admin/types';
 import repiqrWordmark from '../../../assets/repiqr-wordmark.png';
 
@@ -24,7 +25,7 @@ function ModalShell({
       onClick={onClose}
     >
       <div
-        className={`bg-white rounded-3xl shadow-2xl w-full ${maxWidth} p-6 border border-gray-100 max-h-[88vh] overflow-y-auto`}
+        className={`bg-white rounded-xl shadow-2xl w-full ${maxWidth} p-6 border border-gray-100 max-h-[88vh] overflow-y-auto`}
         style={{ animation: 'modalIn 0.25s cubic-bezier(0.34,1.56,0.64,1)' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -129,23 +130,60 @@ export function EditContactsModal({
     sticker.contacts.length > 0 ? sticker.contacts : [{ name: '', phone: '' }]
   );
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const MAX_EMERGENCY_CONTACTS = 7;
 
   const updateContact = (idx: number, field: 'name' | 'phone', value: string) => {
     setContacts((prev) => prev.map((c, i) => (i === idx ? { ...c, [field]: value } : c)));
+    setError(null);
   };
-  const removeContact = (idx: number) => setContacts((prev) => prev.filter((_, i) => i !== idx));
-  const addContact = () => setContacts((prev) => [...prev, { name: '', phone: '' }]);
+  const removeContact = (idx: number) => {
+    setContacts((prev) => prev.filter((_, i) => i !== idx));
+    setError(null);
+  };
+  const addContact = () => {
+    if (contacts.length >= MAX_EMERGENCY_CONTACTS) {
+      setError(`Maximum limit of ${MAX_EMERGENCY_CONTACTS} emergency contacts reached.`);
+      return;
+    }
+    setContacts((prev) => [...prev, { name: '', phone: '' }]);
+    setError(null);
+  };
 
   const handleSave = async () => {
-    setSaving(true);
+    setError(null);
     const cleaned = contacts.filter((c) => c.name.trim() || c.phone.trim());
-    await onSave(cleaned);
-    setSaving(false);
+
+    // Validate each contact's phone number first
+    for (let i = 0; i < cleaned.length; i++) {
+      const c = cleaned[i];
+      const name = c.name.trim();
+      const phoneDigits = c.phone.replace(/\D/g, '');
+
+      if (!name) {
+        setError(`Please enter a name for contact #${i + 1}.`);
+        return;
+      }
+      if (phoneDigits.length < 10) {
+        setError(`Please enter a valid 10-digit mobile number for ${name}.`);
+        return;
+      }
+    }
+
+    setSaving(true);
+    try {
+      await onSave(cleaned);
+    } catch {
+      setError('Failed to save contacts. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <ModalShell onClose={onClose}>
-      <ModalHeader title={`Emergency Contacts — ${sticker.nickname}`} onClose={onClose} />
+      <ModalHeader title={`Emergency Contacts — ${sticker.nickname} (${contacts.length}/${MAX_EMERGENCY_CONTACTS})`} onClose={onClose} />
       <div className="space-y-3">
         {contacts.map((c, idx) => (
           <div key={idx} className="flex gap-2 items-start">
@@ -167,17 +205,26 @@ export function EditContactsModal({
             <button
               onClick={() => removeContact(idx)}
               title="Remove contact"
-              className="w-9 h-9 flex-shrink-0 rounded-xl bg-[#FEE2E2] text-[#DC2626] hover:bg-[#FECACA] flex items-center justify-center cursor-pointer mt-0.5"
+              className="w-9 h-9 flex-shrink-0 rounded-lg bg-[#FEE2E2] text-[#DC2626] hover:bg-[#FECACA] flex items-center justify-center cursor-pointer mt-0.5 transition-colors"
             >
               <Trash2 size={14} />
             </button>
           </div>
         ))}
+
+        {error && (
+          <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs font-medium text-red-700">
+            {error}
+          </div>
+        )}
+
         <button
           onClick={addContact}
-          className="w-full py-2.5 rounded-xl border border-dashed border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] flex items-center justify-center gap-1.5 cursor-pointer"
+          disabled={contacts.length >= MAX_EMERGENCY_CONTACTS}
+          className="w-full py-2.5 rounded-lg border border-dashed border-[var(--fx-border)] text-xs font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          <Plus size={14} /> Add Contact
+          <Plus size={14} />
+          {contacts.length >= MAX_EMERGENCY_CONTACTS ? 'Maximum 7 Contacts Reached' : 'Add Contact'}
         </button>
       </div>
       <div className="flex gap-3 mt-6">
@@ -501,9 +548,11 @@ export function QrCodeModal({
         <div className="flex items-center gap-2 bg-[var(--fx-canvas)] border border-[var(--fx-border)] px-3.5 py-1.5 rounded-full">
           <span className="text-sm">{getCategoryIcon(sticker.category as any) || '🏷️'}</span>
           <span className="font-bold text-xs text-[var(--fx-ink)]">{sticker.nickname}</span>
-          <span className="text-[10px] font-bold text-[var(--fx-ink-2)] bg-[var(--fx-canvas)] px-2 py-0.5 rounded-full">
-            {sticker.code || sticker.qrCodeId}
-          </span>
+          {sticker.vehicleNumber && (
+            <span className="text-[10px] font-bold text-[var(--fx-ink-2)] bg-[var(--fx-canvas)] px-2 py-0.5 rounded-full">
+              {sticker.vehicleNumber}
+            </span>
+          )}
         </div>
 
         {/* QR Code Container */}
@@ -570,8 +619,7 @@ export function QrCodeModal({
                   fg: '000000',
                   bg: 'FFFFFF',
                 };
-                const pos = { x: 193, y: 37, w: 110, h: 110 };
-                const blob = await generateRepeatedStickerSheetBlob(rec, pos);
+                const blob = await generateRepeatedStickerSheetBlob(rec, DEFAULT_STICKER_POS);
                 if (blob) {
                   downloadSheetBlob(blob, `repiqr-print-sheet-12x18-${rec.id}.png`);
                   onShowToast(`12×18″ print sheet (${PRINT_SHEET_CONSTANTS.STICKERS_PER_SHEET} stickers) downloaded`);

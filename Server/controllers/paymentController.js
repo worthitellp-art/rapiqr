@@ -243,7 +243,8 @@ class PaymentController {
         if (matchedOrder) {
           try {
             const stickers = await OrderModel.generateStickersForOrder(matchedOrder.id);
-            matchedOrder = { ...matchedOrder, stickers };
+            // Raw minted records carry the recovery code — only id/category/name go to the browser.
+            matchedOrder = { ...matchedOrder, stickers: OrderModel.publicStickers(stickers) };
 
             // Auto-provision user account using checkout phone number if not already logged in
             const checkoutPhone = matchedOrder.phone ? String(matchedOrder.phone).trim() : '';

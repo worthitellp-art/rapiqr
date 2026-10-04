@@ -12,8 +12,6 @@ import {
   ShoppingBag,
   Clock,
   AlertCircle,
-  LocateFixed,
-  Loader2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiClient } from '../../lib/apiClient';
@@ -26,6 +24,7 @@ import { buildOrderInvoice, printOrderInvoice } from '../../services/invoiceServ
 import OrderInvoiceModal from './OrderInvoiceModal';
 import DashboardAccessModal from './DashboardAccessModal';
 import { BALANCE_TOPUP_AMOUNT } from '../../data/products';
+import { FlowButton } from '../ui/flow-button';
 
 /**
  * Last-resort local receipt when the backend order API is unreachable —
@@ -204,8 +203,6 @@ export default function CheckoutPage({
     'idle' | 'looking' | 'found' | 'not-found'
   >('idle');
   const [delivery, setDelivery] = useState<'standard' | 'express'>('standard');
-  const [locating, setLocating] = useState(false);
-  const [locateError, setLocateError] = useState('');
   const [error, setError] = useState('');
 
   // Razorpay's own checkout modal already presents every payment method
@@ -252,14 +249,13 @@ export default function CheckoutPage({
     setPincodeStatus('looking');
     const t = setTimeout(async () => {
       try {
-        const res = await fetch(`https://api.postalpincode.in/pincode/${digits}`);
-        const data = await res.json();
-        const office =
-          data?.[0]?.Status === 'Success' ? data[0].PostOffice?.[0] : null;
+        // Looked up by RepiQR's backend, not directly from the browser.
+        const res = await apiClient.geo.pincode(digits);
         if (cancelled) return;
-        if (office) {
-          setCity(office.District || office.Name || '');
-          setState(office.State || '');
+        const d = res.data;
+        if (d.city || d.area) {
+          setCity(d.city || d.area || '');
+          setState(d.state || '');
           setPincodeStatus('found');
         } else {
           setPincodeStatus('not-found');
@@ -273,50 +269,6 @@ export default function CheckoutPage({
       clearTimeout(t);
     };
   }, [pincode]);
-
-  /**
-   * "Use current location" — browser geolocation + a free, keyless reverse
-   * geocoding lookup (BigDataCloud's client API). Fills city/state/pincode
-   * and a best-effort locality line; the house/flat number still needs the
-   * customer's own input since reverse geocoding can't know that.
-   */
-  const handleUseCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      setLocateError('Location is not supported on this device/browser.');
-      return;
-    }
-    setLocating(true);
-    setLocateError('');
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const { latitude, longitude } = pos.coords;
-          const res = await fetch(
-            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
-          );
-          const data = await res.json();
-          const foundCity = data.city || data.locality || data.principalSubdivision || '';
-          const foundState = data.principalSubdivision || '';
-          const locality = [data.locality, data.localityInfo?.administrative?.[0]?.name]
-            .filter((v, i, arr) => v && arr.indexOf(v) === i)
-            .join(', ');
-          if (foundCity) setCity(foundCity);
-          if (foundState) setState(foundState);
-          if (data.postcode) setPincode(String(data.postcode).replace(/\D/g, '').slice(0, 6));
-          if (locality && !address.trim()) setAddress(locality);
-        } catch {
-          setLocateError("Couldn't determine your address — please enter it manually.");
-        } finally {
-          setLocating(false);
-        }
-      },
-      () => {
-        setLocateError('Location permission denied — please enter your address manually.');
-        setLocating(false);
-      },
-      { timeout: 10000 }
-    );
-  };
 
   const cleanDigits = (v: string) => (v || '').replace(/\D/g, '');
 
@@ -797,21 +749,17 @@ export default function CheckoutPage({
 
         {/* ── EMPTY CART STATE ── */}
         {cart.length === 0 && step !== 'success' && (
-          <div className="max-w-md mx-auto my-16 p-8 bg-white rounded-2xl border border-gray-200 shadow-sm text-center">
-            <div className="w-14 h-14 rounded-xl bg-gray-100 text-[#111111] flex items-center justify-center mx-auto mb-4">
+          <div className="max-w-md mx-auto my-16 p-8 bg-white rounded-lg border border-gray-200 shadow-sm text-center">
+            <div className="w-14 h-14 rounded-md bg-gray-100 text-[#111111] flex items-center justify-center mx-auto mb-4">
               <ShoppingBag size={26} />
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-2">Your Cart is Empty</h3>
             <p className="text-sm text-gray-500 mb-6">
               Add a weatherproof smart QR safety tag to protect your vehicle, pet, or valuable assets.
             </p>
-            <button
-              onClick={onBack}
-              className="w-full py-3 rounded-lg bg-[#111111] hover:bg-black text-white font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <span>Browse Products</span>
-              <ArrowRight size={16} />
-            </button>
+            <FlowButton tone="dark" fullWidth onClick={onBack}>
+              Browse Products
+            </FlowButton>
           </div>
         )}
 
@@ -823,7 +771,7 @@ export default function CheckoutPage({
             <div className="lg:col-span-7 space-y-4">
 
               {/* Free Sticker Banner */}
-              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start gap-3">
+              <div className="p-4 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start gap-3">
                 <CheckCircle2 size={20} className="text-emerald-600 shrink-0 mt-0.5" />
                 <div className="min-w-0">
                   <p className="font-bold text-sm sm:text-base">Your sticker is free!</p>
@@ -838,7 +786,7 @@ export default function CheckoutPage({
 
               {/* Guest Account Banner */}
               {!isLoggedIn && (
-                <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-xs sm:text-sm flex items-center justify-between gap-3">
+                <div className="p-3.5 rounded-md bg-gray-50 border border-gray-200 text-gray-900 text-xs sm:text-sm flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <User size={16} className="text-[#111111] shrink-0" />
                     <span>Quick guest checkout — no password required.</span>
@@ -856,7 +804,7 @@ export default function CheckoutPage({
               <form onSubmit={handleSubmit} className="space-y-5">
 
                 {/* ── 1. Contact Information ── */}
-                <div className="space-y-4 rounded-[28px] border border-[#14120C]/8 bg-white p-6 sm:p-7 shadow-[0_12px_40px_-15px_rgba(20,18,12,0.05)]">
+                <div className="space-y-4 rounded-lg border border-[#14120C]/8 bg-white p-6 sm:p-7 shadow-[0_12px_40px_-15px_rgba(20,18,12,0.05)]">
                   <div className="flex items-center gap-3 pb-3 border-b border-[#14120C]/6">
                     <span className="w-6 h-6 rounded-full bg-[#14120C] text-white text-xs font-bold flex items-center justify-center">
                       1
@@ -878,7 +826,7 @@ export default function CheckoutPage({
                         aria-label="Full Name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full h-11 px-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
+                        className="w-full h-11 px-3.5 rounded-md border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
                       />
                     </div>
 
@@ -904,38 +852,23 @@ export default function CheckoutPage({
                         placeholder="e.g. rahul@example.com (optional)"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full h-11 pl-10 pr-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
+                        className="w-full h-11 pl-10 pr-3.5 rounded-md border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* ── 2. Shipping Address ── */}
-                <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-6 sm:p-7 shadow-xs">
-                  <div className="flex items-center justify-between gap-3 pb-3 border-b border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 rounded-full bg-black text-white text-xs font-bold flex items-center justify-center">
-                        2
-                      </span>
-                      <div>
-                        <h2 className="font-semibold text-sm sm:text-base text-gray-900">Shipping Address</h2>
-                        <p className="text-xs text-gray-500">Physical stickers delivered in 2–3 business days across India</p>
-                      </div>
+                <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-6 sm:p-7 shadow-xs">
+                  <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+                    <span className="w-6 h-6 rounded-full bg-black text-white text-xs font-bold flex items-center justify-center">
+                      2
+                    </span>
+                    <div>
+                      <h2 className="font-semibold text-sm sm:text-base text-gray-900">Shipping Address</h2>
+                      <p className="text-xs text-gray-500">Physical stickers delivered in 2–3 business days across India</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleUseCurrentLocation}
-                      disabled={locating}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 cursor-pointer disabled:opacity-60 transition-colors"
-                    >
-                      {locating ? <Loader2 size={13} className="animate-spin text-gray-500" /> : <LocateFixed size={13} />}
-                      <span>{locating ? 'Locating…' : 'Use location'}</span>
-                    </button>
                   </div>
-
-                  {locateError && (
-                    <p className="text-xs text-red-600 font-medium -mt-1">{locateError}</p>
-                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-1.5">
@@ -948,7 +881,7 @@ export default function CheckoutPage({
                         placeholder="Flat 402, Green Heights, Opp. City Park"
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
-                        className="w-full h-11 pl-10 pr-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
+                        className="w-full h-11 pl-10 pr-3.5 rounded-md border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
                       />
                     </div>
                   </div>
@@ -967,7 +900,7 @@ export default function CheckoutPage({
                         onChange={(e) =>
                           setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))
                         }
-                        className="w-full h-11 px-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
+                        className="w-full h-11 px-3.5 rounded-md border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
                       />
                       {pincodeStatus === 'looking' && (
                         <span className="text-xs text-gray-500 mt-1 block">
@@ -1010,21 +943,17 @@ export default function CheckoutPage({
 
                 {/* Error Banner */}
                 {error && (
-                  <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm font-medium flex items-center gap-3">
+                  <div className="p-4 rounded-md bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm font-medium flex items-center gap-3">
                     <AlertCircle size={18} className="shrink-0 text-red-500" />
                     <span>{error}</span>
                   </div>
                 )}
 
                 {/* Submit Action */}
-                <button
-                  type="submit"
-                  className="w-full h-11 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-sm shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-[0.99] group"
-                >
-                  <span>Pay ₹{total} &amp; Add to Balance</span>
-                  <Lock size={15} className="text-black" />
-                  <ArrowRight size={16} className="text-black transition-transform group-hover:translate-x-0.5" />
-                </button>
+                <FlowButton type="submit" tone="dark" fullWidth>
+                  <Lock size={14} />
+                  Pay ₹{total} &amp; Add to Balance
+                </FlowButton>
 
                 <p className="text-center text-xs text-gray-500 leading-relaxed">
                   By proceeding you agree to RepiQR Terms of Service &amp; Privacy Policy. Free replacement within 7 days.
@@ -1035,14 +964,14 @@ export default function CheckoutPage({
 
             {/* ── RIGHT COLUMN: FINAL BILLING SUMMARY (5 COLS) ── */}
             <div className="lg:col-span-5">
-              <div className="sticky top-24 space-y-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-xs">
+              <div className="sticky top-24 space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-xs">
 
                 <div className="flex items-center justify-between pb-3.5 border-b border-gray-100">
                   <div className="flex items-center gap-2 font-semibold text-gray-900 text-base">
                     <Lock size={16} className="text-gray-900" />
                     <span>Order Summary</span>
                   </div>
-                  <span className="text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-full">
+                  <span className="text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-md">
                     {cart.reduce((s, i) => s + i.qty, 0)} Items
                   </span>
                 </div>
@@ -1052,12 +981,12 @@ export default function CheckoutPage({
                   {cart.map((item) => (
                     <div
                       key={item.product.id}
-                      className="p-3 rounded-2xl bg-white border border-[#14120C]/6 flex items-center gap-3 shadow-xs"
+                      className="p-3 rounded-lg bg-white border border-[#14120C]/6 flex items-center gap-3 shadow-xs"
                     >
                       <img
                         src={item.product.img}
                         alt={item.product.name}
-                        className="w-12 h-12 rounded-xl object-cover border border-[#14120C]/8 shrink-0 bg-[#FAFAF8]"
+                        className="w-12 h-12 rounded-md object-cover border border-[#14120C]/8 shrink-0 bg-[#FAFAF8]"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-[13px] text-[#14120C] truncate">
@@ -1065,7 +994,7 @@ export default function CheckoutPage({
                         </div>
                         <div className="text-[11px] text-[#14120C]/50 font-semibold mt-0.5">Qty: {item.qty}</div>
                       </div>
-                      <div className="font-bold text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                      <div className="font-bold text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
                         FREE
                       </div>
                     </div>
@@ -1076,11 +1005,11 @@ export default function CheckoutPage({
                 <div className="space-y-2.5 pt-4 border-t border-[#14120C]/8 text-[13px]">
                   <div className="flex items-center justify-between text-[#14120C]/70 font-medium">
                     <span>Stickers</span>
-                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full text-xs">FREE</span>
+                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md text-xs">FREE</span>
                   </div>
                   <div className="flex items-center justify-between text-[#14120C]/70 font-medium">
                     <span>Delivery (2-3 Days)</span>
-                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full text-xs">FREE</span>
+                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md text-xs">FREE</span>
                   </div>
                   <div className="flex items-center justify-between text-[#14120C]/70 font-medium">
                     <span>Balance top-up</span>
@@ -1115,7 +1044,7 @@ export default function CheckoutPage({
 
         {/* ── STEP: PROCESSING MODAL ── */}
         {step === 'processing' && (
-          <div className="max-w-md mx-auto my-16 p-8 bg-white rounded-2xl border border-gray-200 shadow-lg text-center space-y-3.5">
+          <div className="max-w-md mx-auto my-16 p-8 bg-white rounded-lg border border-gray-200 shadow-lg text-center space-y-3.5">
             <div className="w-14 h-14 rounded-full border-4 border-[#111111] border-t-transparent animate-spin mx-auto" />
             <h3 className="text-lg font-bold text-gray-950">Processing Payment Securely</h3>
             <p className="text-sm text-gray-500">
@@ -1126,8 +1055,8 @@ export default function CheckoutPage({
 
         {/* ── STEP: SUCCESS CONFIRMATION ── */}
         {step === 'success' && (
-          <div className="max-w-xl mx-auto my-10 p-6 sm:p-8 bg-white rounded-2xl border border-gray-200 shadow-xs text-center space-y-5">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto">
+          <div className="max-w-xl mx-auto my-10 p-6 sm:p-8 bg-white rounded-lg border border-gray-200 shadow-xs text-center space-y-5">
+            <div className="w-14 h-14 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto">
               <CheckCircle2 size={30} />
             </div>
 
@@ -1160,7 +1089,7 @@ export default function CheckoutPage({
                     <button
                       key={s.id}
                       onClick={() => onRegisterSticker(s.id)}
-                      className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-between gap-2 cursor-pointer shadow-xs"
+                      className="w-full py-2.5 px-4 rounded-md bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-between gap-2 cursor-pointer shadow-xs"
                     >
                       <span className="capitalize">Register {cleanName} Tag</span>
                       <ArrowRight size={13} />
@@ -1172,40 +1101,26 @@ export default function CheckoutPage({
 
             {recognized ? (
               <div className="flex flex-col sm:flex-row gap-2">
-                <button
-                  onClick={onViewDashboard}
-                  className="flex-1 py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-                >
-                  <span>Open Client Dashboard</span>
-                  <ArrowRight size={13} />
-                </button>
+                <FlowButton tone="dark" size="sm" className="flex-1" onClick={onViewDashboard}>
+                  Open Client Dashboard
+                </FlowButton>
                 {onTrackOrder && (
-                  <button
-                    onClick={() => onTrackOrder(orderId, phone.trim())}
-                    className="py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black font-semibold text-xs border border-gray-300 hover:border-black transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                  >
+                  <FlowButton size="sm" onClick={() => onTrackOrder(orderId, phone.trim())}>
                     <Truck size={13} />
-                    <span>Track Order</span>
-                  </button>
+                    Track Order
+                  </FlowButton>
                 )}
               </div>
             ) : (
               <div className="flex flex-col sm:flex-row gap-2">
-                <button
-                  onClick={() => setDashboardAccessOpen(true)}
-                  className="flex-1 py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-                >
-                  <span>Access Dashboard</span>
-                  <ArrowRight size={13} />
-                </button>
+                <FlowButton tone="dark" size="sm" className="flex-1" onClick={() => setDashboardAccessOpen(true)}>
+                  Access Dashboard
+                </FlowButton>
                 {onTrackOrder && (
-                  <button
-                    onClick={() => onTrackOrder(orderId, phone.trim())}
-                    className="py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                  >
+                  <FlowButton size="sm" onClick={() => onTrackOrder(orderId, phone.trim())}>
                     <Truck size={13} />
-                    <span>Track Order</span>
-                  </button>
+                    Track Order
+                  </FlowButton>
                 )}
               </div>
             )}

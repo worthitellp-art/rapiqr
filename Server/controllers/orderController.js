@@ -358,7 +358,8 @@ class OrderController {
   static async delete(req, res) {
     try {
       const { id } = req.params;
-      await OrderModel.delete(id);
+      const removed = await OrderModel.delete(id);
+      if (!removed) return res.status(404).json({ success: false, error: 'Order not found — it may already be deleted.' });
       logger.rowUpdated('orders', id, { action: 'deleted' });
       return res.json({ success: true, message: `Order ${id} deleted successfully` });
     } catch (err) {

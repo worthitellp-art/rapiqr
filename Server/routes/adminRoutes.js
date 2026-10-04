@@ -19,8 +19,6 @@ router.post('/stickers/reveal-recovery-codes', AdminController.revealRecoveryCod
 router.get('/messages/stats', AdminController.getMessageStats);
 router.get('/messages', AdminController.listMessages);
 router.delete('/messages', AdminController.deleteAllMessages);
-router.get('/sticker-position', AdminController.getStickerPosition);
-router.put('/sticker-position', AdminController.saveStickerPosition);
 
 router.get('/privacy/grievances', PrivacyController.adminListGrievances);
 router.patch('/privacy/grievances/:id', PrivacyController.adminUpdateGrievance);

@@ -1,20 +1,24 @@
 ﻿import type React from "react";
 import { useState } from "react";
-import { Tag, Plus, Info, Layers, ScanLine, Boxes } from "lucide-react";
+import { Tag, Plus, Layers, ScanLine, Boxes } from "lucide-react";
 import StatusPill from "./StatusPill";
 import { QrRecord, Template } from "./types";
 import { fmtDate } from "./helpers";
 import QrRowActions from "./QrRowActions";
 import ConfirmModal from "./ConfirmModal";
+import { CodeVisibilityToggleButton } from "./StickerCodeComponents";
+import { stickerRef, useCodesRevealed } from "../../../lib/codeVisibility";
 import { apiClient } from "../../../lib/apiClient";
 import FxAssetCard, { FxAssetTile } from "../shared/FxAssetCard";
 import FxTodoList, { FxTodoItem } from "../shared/FxTodoList";
 import FxStatTile from "../shared/FxStatTile";
 import FxCalendarWidget from "../shared/FxCalendarWidget";
-import FxActivityLog, { FxActivityItem } from "../shared/FxActivityLog";
+import { ActivityDropdown } from "../../ui/activity-dropdown";
+import type { ActivityItem } from "../../ui/activity-dropdown";
 import FxTransactionsTable, { FxTableColumn } from "../shared/FxTransactionsTable";
 import { FxAvatarTrigger, FxIconButton } from "../shared/FxTopBar";
-import { Bell } from "lucide-react";
+import FxKpiStrip from "../shared/FxKpiStrip";
+import { Bell, CheckCircle2, QrCode } from "lucide-react";
 
 interface OverviewPageProps {
   qrList: QrRecord[];
@@ -60,17 +64,13 @@ export default function OverviewPage({
 }: OverviewPageProps) {
   const [deleteTarget, setDeleteTarget] = useState<QrRecord | null>(null);
   const [tableSearch, setTableSearch] = useState("");
-
-  const firstName = (admin?.name || "Admin").trim().split(/\s+/)[0];
-  const todayStr = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
+  const [codesRevealed, setCodesRevealed] = useCodesRevealed();
+  const refOf = (q: QrRecord) => stickerRef(q, codesRevealed, `${(q.category || "car").charAt(0).toUpperCase()}${(q.category || "car").slice(1)} tag`);
 
   // Exact Real Data Calculations (No Mock Data / Fallbacks)
   const activeTags = qrList.filter((q) => q.status === "active" || Boolean((q.ownerPhone || (q as any).phone)?.trim()));
   const totalScans = qrList.reduce((sum, q) => sum + (q.scans || 0), 0);
   const inactiveCount = qrList.length - activeTags.length;
-  const totalTagsCount = qrList.length || 1;
 
   const categoriesMap = qrList.reduce((acc, q) => {
     const cat = (q.category || "car").toLowerCase();
@@ -105,37 +105,38 @@ export default function OverviewPage({
     percent: activePct,
   }));
 
-  const activityItems: FxActivityItem[] = [...qrList]
+  const activityItems: ActivityItem[] = [...qrList]
     .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
     .slice(0, 5)
-    .map((q, i) => {
+    .map((q) => {
       const phone = q.ownerPhone || q.phoneNumber || (q as any).phone;
       const isActivated = Boolean(phone && String(phone).trim());
-      const colors = ["var(--fx-accent)", "var(--fx-ink-2)", "var(--fx-amber)", "var(--fx-green)", "var(--fx-accent-ink)"];
       return {
         id: q.id,
-        avatar: q.id.slice(0, 2).toUpperCase(),
-        avatarBg: colors[i % colors.length],
-        title: `${q.id} tag ${isActivated ? "activated" : "created"}`,
-        subtitle: isActivated ? `Assigned to ${phone}` : `${q.category || "car"} · Unassigned`,
+        icon: isActivated ? <CheckCircle2 size={16} /> : <QrCode size={16} />,
+        title: `${refOf(q)} ${isActivated ? "activated" : "created"}`,
+        description: isActivated ? `Assigned to ${phone}` : `${q.category || "car"} · Unassigned`,
         time: timeAgo(q.createdAt),
       };
     });
 
   const tableRows = qrList
-    .filter((q) => !tableSearch || q.id.toLowerCase().includes(tableSearch.toLowerCase()))
+    .filter((q) => {
+      const needle = tableSearch.trim().toLowerCase();
+      return !needle || q.id.toLowerCase().includes(needle) || (q.vehicleNumber || "").toLowerCase().includes(needle);
+    })
     .slice(0, 8);
 
   const tableColumns: FxTableColumn<QrRecord>[] = [
     {
       key: "id",
-      label: "Tag ID",
+      label: codesRevealed ? "Tag ID" : "Vehicle",
       render: (q) => (
         <div className="flex items-center gap-2.5">
           <span className="w-8 h-8 rounded-full bg-[var(--fx-accent-soft)] text-[var(--fx-accent-ink)] flex items-center justify-center text-[10.5px] font-bold flex-shrink-0">
-            {q.id.slice(0, 2).toUpperCase()}
+            {refOf(q).slice(0, 2).toUpperCase()}
           </span>
-          <span className="fx-display text-[13.5px] text-[var(--fx-ink)]">{q.id}</span>
+          <span className="fx-display text-[13.5px] text-[var(--fx-ink)]">{refOf(q)}</span>
         </div>
       ),
     },
@@ -174,59 +175,31 @@ export default function OverviewPage({
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-16 space-y-6">
-      {/* ── Greeting header ─────────────────────────── */}
-      <div className="flex items-start justify-between flex-wrap gap-4">
-        <div>
-          <p className="text-[12px] font-medium text-[var(--fx-faint)] mb-1">{todayStr}</p>
-          <h1 className="fx-display text-[28px] text-[var(--fx-ink)] leading-tight">
-            Hello {firstName}, {greeting}
-          </h1>
-          <p className="text-[13px] text-[var(--fx-ink-2)] mt-0.5">Let's check your fleet.</p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <FxIconButton icon={<Bell size={15} />} onClick={() => setPage("alerts")} title="Alerts" badge={inactiveCount > 0} />
-          <FxAvatarTrigger name={admin?.name || "Admin"} role={admin?.role} />
-          <button
-            onClick={() => setPage("qr")}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[var(--fx-accent)] text-white font-bold text-[13px] hover:bg-[var(--fx-accent-ink)] transition-all cursor-pointer shadow-sm"
-          >
-            <Plus size={15} /> Generate Tags
-          </button>
-        </div>
+      {/* ── Page header ─────────────────────────────── */}
+      <div className="flex items-center gap-3">
+        <h1 className="fx-text-heading-page text-[var(--fx-ink)]">Overview</h1>
+        <div className="flex-1" />
+        <CodeVisibilityToggleButton isRevealed={codesRevealed} onToggleVisibility={() => setCodesRevealed(!codesRevealed)} />
+        <FxIconButton icon={<Bell size={15} />} onClick={() => setPage("alerts")} title="Alerts" badge={inactiveCount > 0} />
+        <FxAvatarTrigger name={admin?.name || "Admin"} role={admin?.role} />
+        <button onClick={() => setPage("qr")} className="fx-btn fx-btn-primary">
+          <Plus size={15} /> Generate Tags
+        </button>
       </div>
 
-      {/* ── Top 3-column stat strip ─────────────────── */}
-      <div className="fx-card p-6 grid grid-cols-1 sm:grid-cols-3 gap-6 divide-y sm:divide-y-0 sm:divide-x divide-[var(--fx-border)]">
-        <div className="sm:pr-6 pt-2 sm:pt-0">
-          <div className="flex items-center justify-between text-[12px] font-semibold text-[var(--fx-ink-2)] mb-1">
-            <span>Total Registered Tags</span>
-            <Info size={13} className="text-[var(--fx-faint)]" />
-          </div>
-          <div className="fx-display text-[30px] text-[var(--fx-ink)]">{qrList.length}</div>
-          <p className="text-[11px] text-[var(--fx-faint)] font-medium mt-1">Total plates generated</p>
-        </div>
-
-        <div className="sm:px-6 pt-4 sm:pt-0">
-          <div className="flex items-center justify-between text-[12px] font-semibold text-[var(--fx-ink-2)] mb-1">
-            <span>Active Fleet Tags</span>
-            <Info size={13} className="text-[var(--fx-faint)]" />
-          </div>
-          <div className="fx-display text-[30px] text-[var(--fx-ink)]">{activeTags.length}</div>
-          <p className="text-[11px] text-[var(--fx-green)] font-medium mt-1">
-            {((activeTags.length / totalTagsCount) * 100).toFixed(1)}% of total fleet
-          </p>
-        </div>
-
-        <div className="sm:pl-6 pt-4 sm:pt-0">
-          <div className="flex items-center justify-between text-[12px] font-semibold text-[var(--fx-ink-2)] mb-1">
-            <span>Total Fleet Scans</span>
-            <Info size={13} className="text-[var(--fx-faint)]" />
-          </div>
-          <div className="fx-display text-[30px] text-[var(--fx-ink)]">{totalScans}</div>
-          <p className="text-[11px] text-[var(--fx-amber)] font-medium mt-1">Masked scan connections</p>
-        </div>
-      </div>
+      {/* ── KPI strip ─────────────────────────────────── */}
+      <FxKpiStrip
+        cards={[
+          { key: "total", label: "Total Registered Tags", value: qrList.length },
+          {
+            key: "active",
+            label: "Active Fleet Tags",
+            value: activeTags.length,
+            tone: "green",
+          },
+          { key: "scans", label: "Total Fleet Scans", value: totalScans, tone: "amber" },
+        ]}
+      />
 
       {/* ── Main split: content + right rail ─────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -276,7 +249,15 @@ export default function OverviewPage({
 
           <FxCalendarWidget />
 
-          <FxActivityLog title="Activity Log" items={activityItems} onViewAll={() => setPage("qr")} />
+          <ActivityDropdown
+            title="Activity Log"
+            subtitle={`${activityItems.length} recent tag event${activityItems.length === 1 ? "" : "s"}`}
+            icon={<Bell className="h-5 w-5" />}
+            items={activityItems}
+            emptyText="No recent activity."
+            action={{ label: "View all", onClick: () => setPage("qr") }}
+            defaultOpen
+          />
         </div>
       </div>
 

@@ -27,7 +27,7 @@ exports.chat = async (req, res) => {
 
     const systemMessage = {
       role: 'system',
-      content: `You are RapiQR Safety AI Assistant assisting a user who scanned vehicle QR tag ${vehicleNumber || 'QR Tag'}. Help with wrong parking, emergency medical first aid, towing, or owner contact. Be concise, practical, direct, and polite.`
+      content: `You are RepiQR Safety AI Assistant assisting a user who scanned vehicle QR tag ${vehicleNumber || 'QR Tag'}. Help with wrong parking, emergency medical first aid, towing, or owner contact. Be concise, practical, direct, and polite.`
     };
 
     for (const model of FREE_MODELS) {
@@ -37,7 +37,7 @@ exports.chat = async (req, res) => {
           headers: {
             Authorization: `Bearer ${apiKey}`,
             'HTTP-Referer': process.env.FRONTEND_URL || 'https://rapiqr.worthitellp.workers.dev',
-            'X-Title': 'RapiQR Emergency AI Assistant',
+            'X-Title': 'RepiQR Emergency AI Assistant',
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ model, messages: [systemMessage, ...messages] })
@@ -52,7 +52,7 @@ exports.chat = async (req, res) => {
 
     return res.json({
       success: true,
-      reply: 'I am RapiQR Safety AI Assistant. How can I help you contact the vehicle owner or arrange emergency help?'
+      reply: 'I am RepiQR Safety AI Assistant. How can I help you contact the vehicle owner or arrange emergency help?'
     });
   } catch (err) {
     logger.error('AI_CHAT', 'Failed to process AI chat request', err);
