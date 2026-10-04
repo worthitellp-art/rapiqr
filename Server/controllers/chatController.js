@@ -9,10 +9,21 @@ const pushService = require('../services/pushService');
 const { logger } = require('../middleware/loggerMiddleware');
 const { sendServerError } = require('../utils/httpErrors');
 const { getIo, getOnlineOwners, markDeliveredIfPeerPresent } = require('../sockets/chatSocket');
+const { createChatLoginLink } = require('../services/loginLinkService');
 
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif'];
 /** Post-compression ceiling. The client downscales before upload; this is the backstop. */
 const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
+
+/**
+ * The value an owner's WhatsApp "Open Chat" button carries: a one-time login
+ * token (see loginLinkService) so it signs them in from any browser. Falls back
+ * to the bare session id only when there is no owner to sign in.
+ */
+async function ownerButtonValue(ownerId, sessionId) {
+  if (!ownerId) return sessionId;
+  return createChatLoginLink({ userId: ownerId, sessionId }).catch(() => sessionId);
+}
 
 async function isOwnerOfSession(req, session) {
   if (!req.user) return false;
@@ -66,7 +77,7 @@ async function fanOutMessage(session, message, isOwner, previewText) {
         type: 'CHAT_MESSAGE',
         ownerPhone: product.details.ownerPhone,
         // rapi_new_chat: item name + message preview, button opens this thread.
-        data: { item_name: label, message: previewText, session: session.id },
+        data: { item_name: label, message: previewText, session: await ownerButtonValue(ownerId, session.id) },
         eventId: session.id,
       }).catch((err) => logger.error('CHAT_MESSAGE', 'Failed to notify owner', err));
     }
@@ -205,7 +216,7 @@ class ChatController {
         notifyOwner({
           type: 'CHAT_STARTED',
           ownerPhone,
-          data: { item_name: vehicleLabel || 'your RepiQR item', session: session.id },
+          data: { item_name: vehicleLabel || 'your RepiQR item', session: await ownerButtonValue(ownerId, session.id) },
           eventId: session.id,
         }).catch((err) => logger.error('CHAT_STARTED', 'Failed to notify owner of new chat', err));
       }
