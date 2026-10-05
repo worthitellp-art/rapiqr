@@ -9,11 +9,12 @@ const {
   verifyMsg91Otp,
 } = require('./msg91Client');
 const MessageModel = require('../models/messageModel');
+const { WHATSAPP_ERROR_CODES, createWhatsAppError } = require('../utils/whatsappErrorCatalog');
 
 // While validating live delivery, only these event types are allowed to hit
 // external networks. Override with SMS_LIVE_EVENTS / WHATSAPP_LIVE_EVENTS in Server/.env (comma-separated).
 const LIVE_SMS_EVENTS = new Set(
-  (process.env.SMS_LIVE_EVENTS || 'CHAT_START_SMS,ALERT_SMS,ALERT_SMS_CONTACT,PHONE_VERIFY_SMS,ACTIVATION_OTP_SMS,SMS_OTP,PHONE_LOGIN_OTP')
+  (process.env.SMS_LIVE_EVENTS || 'CHAT_START_SMS,ALERT_SMS,ALERT_SMS_CONTACT,PHONE_VERIFY_SMS,ACTIVATION_OTP_SMS,SMS_OTP,PHONE_LOGIN_OTP,PASSWORD_RESET_SMS')
     .split(',')
     .map((e) => e.trim())
     .filter(Boolean)
@@ -240,19 +241,40 @@ async function sendWhatsApp({
   languageCode,
   templateNamespace,
 }) {
-  if (!to) return { sent: false, simulated: false, reason: 'no_recipient' };
+  if (!to) {
+    const errorObj = createWhatsAppError({
+      code: WHATSAPP_ERROR_CODES.NO_RECIPIENT_PHONE,
+      source: 'client',
+      whatFailed: 'Recipient mobile number is missing',
+      whyFailed: 'No recipient was provided for this WhatsApp dispatch.',
+      safeNextAction: 'Configure an owner phone number on this sticker or use in-app chat.',
+    });
+    return { sent: false, simulated: false, reason: 'no_recipient', error: errorObj };
+  }
 
   const isLiveEligible = LIVE_WHATSAPP_EVENTS.has(event) || event.startsWith('NOTIFY_') || !process.env.WHATSAPP_LIVE_EVENTS;
   const provider = resolveWhatsAppProvider();
 
   // If not eligible for live send or no provider credentials configured
   if (!isLiveEligible || provider === 'simulated') {
+    const isUnconfigured = provider === 'simulated';
     const reason = !isLiveEligible
-      ? ` ("${event}" isn't in WHATSAPP_LIVE_EVENTS)`
-      : ' (configure MSG91_WHATSAPP_INTEGRATED_NUMBER or TWILIO_WHATSAPP_NUMBER in Server/.env to send for real)';
-    logger.external(event, `[SIMULATED] Would send WhatsApp to ${to}: "${body}"${reason}`, { to, body });
-    MessageModel.record({ channel: 'whatsapp', to: Array.isArray(to) ? to.join(',') : to, event, status: 'simulated', body });
-    return { sent: false, simulated: true };
+      ? `Event "${event}" is not included in WHATSAPP_LIVE_EVENTS`
+      : 'Neither MSG91_WHATSAPP_INTEGRATED_NUMBER nor TWILIO_WHATSAPP_NUMBER is configured in Server/.env';
+    
+    const structuredSim = createWhatsAppError({
+      code: isUnconfigured ? WHATSAPP_ERROR_CODES.MSG91_NUMBER_NOT_INTEGRATED : WHATSAPP_ERROR_CODES.RATE_LIMIT_DEBOUNCE,
+      source: 'app',
+      whatFailed: isUnconfigured ? 'WhatsApp gateway not configured' : 'Event restricted to simulation',
+      whyFailed: reason,
+      safeNextAction: isUnconfigured 
+        ? 'Admin action: Configure MSG91_WHATSAPP_INTEGRATED_NUMBER and MSG91_AUTH_KEY in Server/.env.' 
+        : 'Enable this event in WHATSAPP_LIVE_EVENTS in Server/.env.',
+    });
+
+    logger.external(event, `[SIMULATED] Would send WhatsApp to ${to}: "${body}" (${reason})`, { to, body });
+    MessageModel.record({ channel: 'whatsapp', to: Array.isArray(to) ? to.join(',') : to, event, status: 'simulated', body, error: reason });
+    return { sent: false, simulated: true, reason, error: structuredSim };
   }
 
   // Testing mode: redirect real sends to a fixed test number if set
@@ -282,16 +304,28 @@ async function sendWhatsApp({
       if (msg91Res.success) {
         logger.external(event, `MSG91 WhatsApp sent to ${recipient}`, { to: recipient, sid: msg91Res.messageId });
         MessageModel.record({ channel: 'whatsapp', to: recipient, event, status: 'sent', sid: msg91Res.messageId, body: outboundBody });
-        return { sent: true, simulated: false, sid: msg91Res.messageId };
+        return { sent: true, simulated: false, sid: msg91Res.messageId, error: null };
       }
 
+      const rawErrMsg = typeof msg91Res.error === 'object' && msg91Res.error?.error?.whyFailed
+        ? msg91Res.error.error.whyFailed
+        : (typeof msg91Res.error === 'string' ? msg91Res.error : JSON.stringify(msg91Res.error));
+
       logger.error(event, `MSG91 WhatsApp to ${recipient} failed`, msg91Res.error);
-      MessageModel.record({ channel: 'whatsapp', to: recipient, event, status: 'failed', error: msg91Res.error, body: outboundBody });
-      return { sent: false, simulated: false, error: msg91Res.error };
+      MessageModel.record({ channel: 'whatsapp', to: recipient, event, status: 'failed', error: rawErrMsg, body: outboundBody });
+      return { sent: false, simulated: false, error: msg91Res.error, sid: null, reason: 'provider_rejected' };
     } catch (err) {
       logger.error(event, `Exception while sending MSG91 WhatsApp to ${recipient}`, err);
+      const catchErr = createWhatsAppError({
+        code: WHATSAPP_ERROR_CODES.HTTP_SERVER_ERROR,
+        source: 'app',
+        whatFailed: 'Internal exception in WhatsApp dispatch',
+        whyFailed: err.message || 'Unexpected exception during MSG91 request.',
+        safeNextAction: 'Check server logs for the stack trace. The alert has been logged in the system.',
+        technicalDetails: { originalError: err.message, stack: err.stack },
+      });
       MessageModel.record({ channel: 'whatsapp', to: recipient, event, status: 'failed', error: err.message, body: outboundBody });
-      return { sent: false, simulated: false, error: err.message };
+      return { sent: false, simulated: false, error: catchErr, sid: null };
     }
   }
 
@@ -311,16 +345,31 @@ async function sendWhatsApp({
       if (result.status >= 200 && result.status < 300) {
         logger.external(event, `Twilio WhatsApp sent to ${recipient}`, { to: recipient, sid: result.body.sid });
         MessageModel.record({ channel: 'whatsapp', to: recipient, event, status: 'sent', sid: result.body.sid, body: outboundBody });
-        return { sent: true, simulated: false, sid: result.body.sid };
+        return { sent: true, simulated: false, sid: result.body.sid, error: null };
       }
 
       logger.error(event, `Twilio WhatsApp to ${recipient} failed`, result.body);
+      const twilioErr = createWhatsAppError({
+        code: WHATSAPP_ERROR_CODES.PROVIDER_REJECTED,
+        source: 'msg91',
+        whatFailed: 'Twilio WhatsApp delivery rejected',
+        whyFailed: result.body?.message || 'Twilio rejected the WhatsApp outbound dispatch.',
+        safeNextAction: 'Check Twilio console delivery logs.',
+        technicalDetails: { rawResponse: result.body, statusCode: result.status },
+      });
       MessageModel.record({ channel: 'whatsapp', to: recipient, event, status: 'failed', error: result.body?.message || 'Twilio WhatsApp failed', body: outboundBody });
-      return { sent: false, simulated: false, error: result.body?.message || 'Twilio WhatsApp failed' };
+      return { sent: false, simulated: false, error: twilioErr, sid: null };
     } catch (err) {
       logger.error(event, `Failed to send Twilio WhatsApp to ${recipient}`, err);
+      const twilioCatchErr = createWhatsAppError({
+        code: WHATSAPP_ERROR_CODES.NETWORK_CONNECTION_FAILED,
+        source: 'app',
+        whatFailed: 'Failed to connect to Twilio API',
+        whyFailed: err.message,
+        safeNextAction: 'Check network connectivity to Twilio.',
+      });
       MessageModel.record({ channel: 'whatsapp', to: recipient, event, status: 'failed', error: err.message, body: outboundBody });
-      return { sent: false, simulated: false, error: err.message };
+      return { sent: false, simulated: false, error: twilioCatchErr, sid: null };
     }
   }
 

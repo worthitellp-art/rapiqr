@@ -22,7 +22,7 @@ interface AppLogoProps {
 export default function AppLogo({
   variant = "light",
   className = "h-8 w-auto object-contain",
-  alt = "RapiQR Logo",
+  alt = "RepiQR Logo",
 }: AppLogoProps) {
   let logoSrc = logoLightBg;
 

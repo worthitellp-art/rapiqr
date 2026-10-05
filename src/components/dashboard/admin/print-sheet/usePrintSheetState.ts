@@ -268,9 +268,19 @@ export function usePrintSheetState({
     }
   }, []);
 
+  const cancelExportRef = useRef(false);
+
+  const handleCancelExport = useCallback(() => {
+    cancelExportRef.current = true;
+    setIsExporting(false);
+    setExportProgress((prev) => ({ ...prev, isVisible: false }));
+    onShowToast?.("PDF export cancelled.");
+  }, [onShowToast]);
+
   const handleExportPdf = useCallback(async (copies = 1) => {
     if (!hasValidSelection) return;
 
+    cancelExportRef.current = false;
     setIsExporting(true);
     setExportProgress({
       isVisible: true,
@@ -282,18 +292,25 @@ export function usePrintSheetState({
 
     try {
       const recoveryCodeMap = await resolveRecoveryCodes(selectedStickerRecords);
+      if (cancelExportRef.current) return;
+
       const pdfBlob = await generateStickerBatchPdfBlob(
         selectedStickerRecords,
         stickerPos,
         recoveryCodeMap,
         copies,
         (progressInfo) => {
-          setExportProgress({
-            isVisible: true,
-            ...progressInfo,
-          });
-        }
+          if (!cancelExportRef.current) {
+            setExportProgress({
+              isVisible: true,
+              ...progressInfo,
+            });
+          }
+        },
+        () => cancelExportRef.current
       );
+
+      if (cancelExportRef.current) return;
       if (!pdfBlob) throw new Error("Could not create sticker PDF");
 
       const dateStr = new Date().toISOString().slice(0, 10);
@@ -303,8 +320,10 @@ export function usePrintSheetState({
         copies > 1 ? `PDF downloaded — ${copies} copies of ${totalPages} page${totalPages > 1 ? "s" : ""}.` : "PDF downloaded."
       );
     } catch (exportError) {
-      console.error("Failed to generate sticker PDF:", exportError);
-      onShowToast?.("Could not generate the PDF. Please try again.");
+      if (!cancelExportRef.current) {
+        console.error("Failed to generate sticker PDF:", exportError);
+        onShowToast?.("Could not generate the PDF. Please try again.");
+      }
     } finally {
       setIsExporting(false);
       setExportProgress((prev) => ({ ...prev, isVisible: false }));
@@ -332,5 +351,6 @@ export function usePrintSheetState({
     handleNextPage,
     handlePreviousPage,
     handleExportPdf,
+    handleCancelExport,
   };
 }

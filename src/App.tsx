@@ -177,6 +177,26 @@ function MainAppContent() {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   };
 
+  // Sync browser top tab bar title with RepiQR brand and current page
+  useEffect(() => {
+    const pageTitles: Partial<Record<AppPage, string>> = {
+      landing: 'RepiQR - Smart Safety QR Tags',
+      dashboard: 'RepiQR - Dashboard',
+      scan: 'RepiQR - Emergency Safety Tag',
+      distributor: 'RepiQR - Franchise & Distributor Partner',
+      checkout: 'RepiQR - Secure Checkout',
+      join: 'RepiQR - Join Our Network',
+      'become-partner': 'RepiQR - Partner Program',
+      pricing: 'RepiQR - Safety Tag Pricing',
+      login: 'RepiQR - Sign In',
+      register: 'RepiQR - Create Account',
+      privacy: 'RepiQR - Privacy Policy',
+    };
+    if (pageTitles[page]) {
+      document.title = pageTitles[page]!;
+    }
+  }, [page]);
+
   // After auth loads or on signout: if on dashboard/distributor but not logged in → send to landing & reset dashboardMode
   useEffect(() => {
     if (loading) return; // wait for the session restore to resolve

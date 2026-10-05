@@ -517,7 +517,8 @@ export async function generateStickerBatchPdfBlob(
   position: StickerPos,
   recoveryCodeMap: Record<string, string | null | undefined> = {},
   copies = 1,
-  onProgress?: PrintProgressCallback
+  onProgress?: PrintProgressCallback,
+  shouldCancel?: () => boolean
 ): Promise<Blob | null> {
   if (records.length === 0) return null;
 
@@ -527,9 +528,13 @@ export async function generateStickerBatchPdfBlob(
   const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
   onProgress?.({ current: 0, total, percent: 5, stage: "Preparing sticker template…" });
-  await tick(30); // let the progress modal paint
+  await tick(30); // let the progress widget paint
+
+  if (shouldCancel?.()) return null;
 
   const [{ jsPDF }, templateBytes] = await Promise.all([import("jspdf"), loadStickerTemplateBytes()]);
+
+  if (shouldCancel?.()) return null;
 
   // Exact centered coordinates on the A4 page, and the QR's box inside the sticker.
   const stickerX = (A4_WIDTH_INCHES - STICKER_WIDTH_INCHES) / 2;
@@ -551,6 +556,8 @@ export async function generateStickerBatchPdfBlob(
   let pageNumber = 0;
   for (let copyIndex = 0; copyIndex < safeCopies; copyIndex++) {
     for (let index = 0; index < total; index++) {
+      if (shouldCancel?.()) return null;
+
       const record = records[index];
       if (pageNumber > 0) doc.addPage([A4_WIDTH_INCHES, A4_HEIGHT_INCHES], "portrait");
       pageNumber++;
@@ -576,12 +583,17 @@ export async function generateStickerBatchPdfBlob(
           stickerId: record.id,
         });
         await tick(); // yield so the bar animates and the tab stays responsive
+        if (shouldCancel?.()) return null;
       }
     }
   }
 
+  if (shouldCancel?.()) return null;
+
   onProgress?.({ current: total, total, percent: 97, stage: "Adding recovery-code list…" });
   await tick(10);
+  if (shouldCancel?.()) return null;
+
   appendRecoveryManifestPages(doc, records, recoveryCodeMap);
 
   const outputBlob = doc.output("blob");

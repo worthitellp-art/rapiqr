@@ -9,8 +9,6 @@ const userSchema = new Schema({
   phone_number: { type: String, default: null, index: true },
   avatar_url: { type: String, default: null },
   role: { type: String, enum: ['user', 'admin', 'distributor'], default: 'user' },
-  subscription_plan: { type: String, default: 'free' },
-  is_subscribed: { type: Boolean, default: false },
   metadata: {
     phone_verified: { type: Boolean, default: false },
     phone_verified_at: { type: Date, default: null },

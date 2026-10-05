@@ -4,6 +4,8 @@ import { CarFront, Eye, Smartphone } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import stickerArt from '../../assets/template-sticker.jpeg';
 import carCrashIcon from '../../assets/car-crash-3d.png';
+import { useLanguage } from '../../context/LanguageContext';
+import { landingTranslations } from '../../i18n/landingTranslations';
 
 /**
  * Hero visual: the real RepiQR sticker floating in the middle, with routed
@@ -28,9 +30,8 @@ const LINE_BASE = '#d3d0c9';
 const LINE_PULSE = '#161616';
 
 interface Callout {
-  id: string;
+  id: 'scan' | 'family' | 'report';
   icon: LucideIcon;
-  text: string;
   /**
    * Routed connector: H/V runs joined by quarter-circle corners (Q). It starts
    * at the callout and ends INSIDE the sticker's bounds — the sticker is drawn
@@ -51,7 +52,6 @@ const CALLOUTS: Callout[] = [
     // Rises out of the sticker's top edge, turns right, runs into the phone chip.
     id: 'scan',
     icon: Smartphone,
-    text: 'Scan and connect directly from your smartphone.',
     path: 'M 506 210 V 118 Q 506 102 522 102 H 626',
     box: { x: 650, y: 184, w: 140 },
     chip: { x: 654, y: 102 },
@@ -61,7 +61,6 @@ const CALLOUTS: Callout[] = [
     // Leaves the car chip, steps down in an S-curve, runs into the left edge.
     id: 'family',
     icon: CarFront,
-    text: 'Keep family informed in an emergency.',
     path: 'M 100 254 H 136 Q 152 254 152 270 V 296 Q 152 312 168 312 H 240',
     box: { x: 96, y: 376, w: 184 },
     chip: { x: 72, y: 254 },
@@ -72,7 +71,6 @@ const CALLOUTS: Callout[] = [
     // Straight vertical up into the sticker's bottom edge.
     id: 'report',
     icon: Eye,
-    text: 'Report suspicious activity around the vehicle',
     path: 'M 292 490 V 360',
     box: { x: 218, y: 516, w: 252 },
     delay: 0.65,
@@ -124,6 +122,8 @@ function StickerCard({ className = '' }: { className?: string }) {
 export default function HeroStickerShowcase() {
   const reduceMotion = useReducedMotion();
   const animated = !reduceMotion;
+  const { language } = useLanguage();
+  const t = landingTranslations[language].heroShowcase;
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -241,7 +241,7 @@ export default function HeroStickerShowcase() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: c.delay + 0.1, duration: 0.45 }}
                 >
-                  {c.text}
+                  {t[c.id]}
                 </motion.p>
               </div>
             );
@@ -285,7 +285,7 @@ export default function HeroStickerShowcase() {
                     <Icon size={19} strokeWidth={1.8} />
                   </span>
                 )}
-                <span className="font-mono text-[12.5px] font-bold leading-snug text-neutral-950">{c.text}</span>
+                <span className="font-mono text-[12.5px] font-bold leading-snug text-neutral-950">{t[c.id]}</span>
               </motion.li>
             );
           })}

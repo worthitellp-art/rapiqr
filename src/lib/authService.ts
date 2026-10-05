@@ -5,8 +5,6 @@ export interface UserProfileData {
   phoneNumber?: string;
   avatarUrl?: string;
   role: 'user' | 'admin';
-  subscriptionPlan?: string;
-  isSubscribed?: boolean;
   twoFactorEnabled?: boolean;
   isPhoneVerified?: boolean;
 }

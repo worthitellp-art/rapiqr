@@ -1,4 +1,4 @@
-import { LayoutGrid, Plus, PhoneCall, Bell, Users, Printer, Store, ShoppingBag, MessageCircle, Send, Package } from "lucide-react";
+import { LayoutGrid, QrCode, PhoneCall, Bell, Users, Printer, Store, ShoppingBag, MessageCircle, Send, Package, Star } from "lucide-react";
 
 export const FONT_OPTIONS = [
   { id: "Pinterest Sans", label: "Pinterest Sans", css: "'Pinterest Sans', 'Pin Sans', ui-sans-serif, system-ui" },
@@ -7,24 +7,18 @@ export const FONT_OPTIONS = [
   { id: "JetBrains Mono", label: "JetBrains Mono", css: "'JetBrains Mono', ui-monospace, monospace" },
 ];
 
-// Admin's own nav — deliberately excludes "repichat": the system admin doesn't
-// run per-sticker conversations, they just need to see which owners are
-// online (see the "Online Now" widget on the Overview page).
-//
-// `section` groups the flat list in the sidebar (Sidebar.tsx renders a small
-// uppercase label above each run of items sharing a section); items with no
-// `section` render ungrouped at the top, above every labeled group.
 export const NAV_ITEMS = [
-  { id: "overview", label: "Dashboard", icon: LayoutGrid },
-  { id: "qr", label: "QR Codes", icon: Plus, section: "Fleet" },
-  { id: "orders", label: "Orders", icon: ShoppingBag, section: "Fleet" },
-  { id: "distributors", label: "Distributors", icon: Store, section: "Fleet" },
+  { id: "overview", label: "Overview", icon: LayoutGrid },
+  { id: "qr", label: "QR Stickers", icon: QrCode, section: "Fleet & Operations" },
+  { id: "orders", label: "Orders", icon: ShoppingBag, section: "Fleet & Operations" },
+  { id: "distributors", label: "Distributors", icon: Store, section: "Fleet & Operations" },
+  { id: "reviews", label: "Reviews", icon: Star, section: "Fleet & Operations" },
   { id: "communication", label: "Communication", icon: PhoneCall, section: "Engagement" },
   { id: "messages", label: "Message Manager", icon: Send, section: "Engagement" },
   { id: "alerts", label: "Alerts", icon: Bell, section: "Engagement" },
-  { id: "users", label: "Users", icon: Users, section: "Manage" },
-  { id: "products", label: "Shop Products", icon: Package, section: "Manage" },
-  { id: "customize", label: "Sticker & Print", icon: Printer, section: "Manage" },
+  { id: "users", label: "Users", icon: Users, section: "Management" },
+  { id: "products", label: "Shop Products", icon: Package, section: "Management" },
+  { id: "customize", label: "Sticker & Print", icon: Printer, section: "Management" },
 ];
 
 // Client (sticker owner) only nav item — their link into the RepiChat inbox.

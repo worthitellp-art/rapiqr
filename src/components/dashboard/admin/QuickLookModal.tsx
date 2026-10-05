@@ -2,11 +2,11 @@ import { useState } from "react";
 import QRCode from "qrcode";
 import { getCategoryLabel } from "../../../stickerModules";
 import { stickerRef, useCodesRevealed } from "../../../lib/codeVisibility";
-import { X, Printer, Sparkles, QrCode, Car, Download } from "lucide-react";
+import { X, Printer, Download } from "lucide-react";
 import CopyLinkButton from "./CopyLinkButton";
 import { QrRecord, Template, StickerPos } from "./types";
 import { MaskedCodeDisplay, CodeVisibilityToggleButton } from "./StickerCodeComponents";
-import StickerMockupView, { StickerViewMode } from "./StickerMockupView";
+import StickerMockupView from "./StickerMockupView";
 import { qrFullUrl } from "./helpers";
 import LabelBadge from "./labels/LabelBadge";
 
@@ -25,7 +25,8 @@ export default function QuickLookModal({
   onOpenPrintSheet,
 }: QuickLookModalProps) {
   const [isCodesRevealed, setIsCodesRevealed] = useCodesRevealed();
-  const [viewMode, setViewMode] = useState<StickerViewMode>("physical");
+  // Only the first 2 view options: Sticker ("physical") and QR Code ("qr")
+  const [viewMode, setViewMode] = useState<"physical" | "qr">("physical");
 
   if (!qr) return null;
 
@@ -48,26 +49,26 @@ export default function QuickLookModal({
       onClick={onClose}
     >
       <div
-        className="bg-white border border-gray-200 w-full max-w-md rounded-lg overflow-hidden text-gray-900 relative font-body shadow-[0_20px_50px_rgba(0,0,0,0.2)]"
+        className="bg-white border border-gray-200/90 w-full max-w-md rounded-xl overflow-hidden text-gray-900 relative font-body shadow-[0_20px_50px_rgba(0,0,0,0.18)]"
         style={{ animation: "modalIn 0.22s cubic-bezier(0.16, 1, 0.3, 1)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Top Header & Close Button */}
-        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100">
-          <div className="min-w-0">
+        {/* Top Header */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-white">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
-              <h3 className="text-sm font-bold text-gray-900 truncate">{displayLabel}</h3>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+              <h3 className="text-sm font-semibold text-gray-900 truncate tracking-tight">{displayLabel}</h3>
             </div>
-            <div className="flex items-center gap-2 flex-wrap mt-1">
-              <span className="font-mono text-[11px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md font-semibold inline-block">
+            <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+              <span className="font-mono text-[11px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium inline-block">
                 {displayCode}
               </span>
               {qr.labelName && (
                 <LabelBadge name={qr.labelName} color={qr.labelColor} size="xs" />
               )}
               {qr.isPrinted && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-1.5 py-0.5 rounded-full">
                   <Printer size={10} /> Printed
                 </span>
               )}
@@ -75,52 +76,38 @@ export default function QuickLookModal({
           </div>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-lg hover:bg-gray-100 text-gray-500 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-7 h-7 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 flex items-center justify-center transition-colors cursor-pointer ml-3 flex-shrink-0"
             aria-label="Close modal"
           >
             <X size={16} />
           </button>
         </div>
 
-        {/* View Mode Switcher Pills */}
-        <div className="px-5 pt-3 pb-2 bg-gray-50/70 border-b border-gray-100 flex items-center justify-between">
-          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">View Mode</span>
-          <div className="inline-flex bg-gray-200/80 p-0.5 rounded-lg text-xs font-semibold text-gray-600">
+        {/* View Mode Segmented Tabs — First 2 View Options Only */}
+        <div className="px-5 py-2.5 bg-gray-50/70 border-b border-gray-100 flex items-center justify-between">
+          <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">View Mode</span>
+          <div className="inline-flex bg-gray-200/60 p-0.5 rounded-lg text-xs font-medium">
             <button
               type="button"
               onClick={() => setViewMode("physical")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md transition-all cursor-pointer ${
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === "physical"
-                  ? "bg-white text-gray-900 shadow-xs font-bold"
-                  : "hover:text-gray-900"
+                  ? "bg-white text-gray-900 shadow-2xs"
+                  : "text-gray-500 hover:text-gray-800"
               }`}
             >
-              <Sparkles size={12} className={viewMode === "physical" ? "text-amber-500" : ""} />
-              <span>Sticker</span>
+              Sticker
             </button>
             <button
               type="button"
               onClick={() => setViewMode("qr")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md transition-all cursor-pointer ${
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === "qr"
-                  ? "bg-white text-gray-900 shadow-xs font-bold"
-                  : "hover:text-gray-900"
+                  ? "bg-white text-gray-900 shadow-2xs"
+                  : "text-gray-500 hover:text-gray-800"
               }`}
             >
-              <QrCode size={12} className={viewMode === "qr" ? "text-indigo-600" : ""} />
-              <span>QR Code</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("windshield")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md transition-all cursor-pointer ${
-                viewMode === "windshield"
-                  ? "bg-white text-gray-900 shadow-xs font-bold"
-                  : "hover:text-gray-900"
-              }`}
-            >
-              <Car size={12} className={viewMode === "windshield" ? "text-blue-500" : ""} />
-              <span>Windshield</span>
+              QR Code
             </button>
           </div>
         </div>
@@ -132,10 +119,10 @@ export default function QuickLookModal({
 
         {/* Bottom Details & Controls */}
         <div className="px-5 pb-5 pt-1 space-y-3">
-          {/* Security Codes Box with See / Hide Toggle */}
-          <div className="p-3 bg-gray-50 border border-gray-200 rounded-md space-y-2">
+          {/* Security Codes Box */}
+          <div className="p-3 bg-gray-50/80 border border-gray-200/80 rounded-lg space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
                 Security Codes
               </span>
               <CodeVisibilityToggleButton
@@ -144,7 +131,7 @@ export default function QuickLookModal({
               />
             </div>
 
-            <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-gray-200/70">
+            <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-gray-200/60">
               <span className="text-[11px] text-gray-600 font-medium">Unique ID</span>
               <MaskedCodeDisplay
                 codeValue={qr.id}
@@ -153,7 +140,7 @@ export default function QuickLookModal({
               />
             </div>
 
-            <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-gray-200/70">
+            <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-gray-200/60">
               <span className="text-[11px] text-gray-600 font-medium">Recovery Code</span>
               <MaskedCodeDisplay
                 codeValue={qr.recoveryCode || ""}
@@ -165,6 +152,7 @@ export default function QuickLookModal({
             </div>
           </div>
 
+          {/* Action Buttons */}
           <div className="space-y-2">
             <CopyLinkButton qrId={qr.id} />
 
@@ -172,7 +160,7 @@ export default function QuickLookModal({
               <button
                 type="button"
                 onClick={handleDownloadQr}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-gray-300 bg-white text-gray-800 text-xs font-bold hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-2xs cursor-pointer active:scale-95"
                 title="Download high-resolution QR image"
               >
                 <Download size={13} />
@@ -186,7 +174,7 @@ export default function QuickLookModal({
                     onClose();
                     onOpenPrintSheet(qr);
                   }}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition-colors shadow-2xs cursor-pointer"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-50 border border-indigo-200/80 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition-colors shadow-2xs cursor-pointer active:scale-95"
                   title="Print this sticker"
                 >
                   <Printer size={13} />
@@ -197,7 +185,7 @@ export default function QuickLookModal({
           </div>
         </div>
       </div>
-      <style>{`@keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(6px); } to { opacity: 1; transform: scale(1) translateY(0); } }`}</style>
+      <style>{`@keyframes modalIn { from { opacity: 0; transform: scale(0.96) translateY(4px); } to { opacity: 1; transform: scale(1) translateY(0); } }`}</style>
     </div>
   );
 }

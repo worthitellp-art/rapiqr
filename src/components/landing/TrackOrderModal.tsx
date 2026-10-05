@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { FlowButton } from '../ui/flow-button';
+import { useLanguage } from '../../context/LanguageContext';
+import { orderTranslations } from '../../i18n/orderTranslations';
 
 /* ── Types & Domain Models ─────────────────────────────────────────────────── */
 
@@ -59,12 +61,16 @@ export interface TrackOrderModalProps {
   onOpenDashboard?: () => void;
 }
 
-const ORDER_STEPS = [
-  { id: 'placed', label: 'Placed', description: 'Order received' },
-  { id: 'confirmed', label: 'Confirmed', description: 'Payment verified' },
-  { id: 'shipped', label: 'Shipped', description: 'Courier picked up' },
-  { id: 'delivered', label: 'Delivered', description: 'At your address' },
-];
+type TrackOrderModalCopy = typeof orderTranslations['en']['trackOrderModal'];
+
+function buildOrderSteps(t: TrackOrderModalCopy) {
+  return [
+    { id: 'placed', label: t.steps.placed, description: t.steps.placedDesc },
+    { id: 'confirmed', label: t.steps.confirmed, description: t.steps.confirmedDesc },
+    { id: 'shipped', label: t.steps.shipped, description: t.steps.shippedDesc },
+    { id: 'delivered', label: t.steps.delivered, description: t.steps.deliveredDesc },
+  ];
+}
 
 /* ── Pure Helper Functions ─────────────────────────────────────────────────── */
 
@@ -79,26 +85,28 @@ function determineActiveStepIndex(order: TrackedOrderData): number {
 
 interface StepperProps {
   order: TrackedOrderData;
+  t: TrackOrderModalCopy;
 }
 
-function TrackingProgressStepper({ order }: StepperProps) {
+function TrackingProgressStepper({ order, t }: StepperProps) {
   if (order.status === 'cancelled') {
     return (
       <div className="rounded-md border border-red-200 bg-red-50 p-4 text-center">
-        <div className="text-sm font-bold text-red-800">Order Cancelled</div>
+        <div className="text-sm font-bold text-red-800">{t.cancelledTitle}</div>
         <p className="mt-1 text-xs text-red-600">
-          This order has been cancelled. If payment was deducted, refund processes within 5-7 business days.
+          {t.cancelledDescription}
         </p>
       </div>
     );
   }
 
   const activeIndex = determineActiveStepIndex(order);
+  const orderSteps = buildOrderSteps(t);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        {ORDER_STEPS.map((step, index) => {
+        {orderSteps.map((step, index) => {
           const isDone = index <= activeIndex;
           const isCurrent = index === activeIndex;
 
@@ -141,9 +149,10 @@ function TrackingProgressStepper({ order }: StepperProps) {
 
 interface SummaryProps {
   order: TrackedOrderData;
+  t: TrackOrderModalCopy;
 }
 
-function TrackingOrderSummary({ order }: SummaryProps) {
+function TrackingOrderSummary({ order, t }: SummaryProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopyOrderId = () => {
@@ -170,7 +179,7 @@ function TrackingOrderSummary({ order }: SummaryProps) {
             </button>
           </div>
           <span className="text-[11px] text-slate-500">
-            Placed on {order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-IN') : 'Recent'}
+            {t.placedOnPrefix}{order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-IN') : t.recent}
           </span>
         </div>
         <div className="text-right">
@@ -178,7 +187,7 @@ function TrackingOrderSummary({ order }: SummaryProps) {
             ₹{(order.total || 0).toLocaleString('en-IN')}
           </span>
           <span className="block text-[10px] font-medium text-emerald-600 uppercase tracking-wide">
-            {order.paymentStatus === 'paid' ? 'Paid Online' : 'Payment Pending'}
+            {order.paymentStatus === 'paid' ? t.paidOnline : t.paymentPending}
           </span>
         </div>
       </div>
@@ -186,13 +195,13 @@ function TrackingOrderSummary({ order }: SummaryProps) {
       {buyer && (
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div>
-            <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Recipient</span>
+            <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">{t.recipientLabel}</span>
             <p className="font-semibold text-slate-800">{buyer.firstName} ({buyer.phone})</p>
           </div>
           <div>
-            <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Destination</span>
+            <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">{t.destinationLabel}</span>
             <p className="font-semibold text-slate-800">
-              {buyer.city ? `${buyer.city}, ${buyer.state}` : 'Dispatched to address'}
+              {buyer.city ? `${buyer.city}, ${buyer.state}` : t.dispatchedToAddress}
             </p>
           </div>
         </div>
@@ -204,9 +213,9 @@ function TrackingOrderSummary({ order }: SummaryProps) {
             <Truck size={16} className="text-[#111111]" />
             <div>
               <p className="font-semibold text-slate-900">
-                {courier.courierName || 'Expedited Courier'}
+                {courier.courierName || t.expeditedCourier}
               </p>
-              <p className="font-mono text-[11px] text-slate-500">AWB: {courier.awbCode}</p>
+              <p className="font-mono text-[11px] text-slate-500">{t.awbLabel} {courier.awbCode}</p>
             </div>
           </div>
           {courier.trackingUrl && (
@@ -216,7 +225,7 @@ function TrackingOrderSummary({ order }: SummaryProps) {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-[11px] font-bold text-[#111111] hover:underline"
             >
-              <span>Live Courier</span>
+              <span>{t.liveCourier}</span>
               <ExternalLink size={12} />
             </a>
           )}
@@ -235,21 +244,22 @@ interface MilestonesProps {
     location?: string;
     at?: string;
   }>;
+  t: TrackOrderModalCopy;
 }
 
-function TrackingMilestones({ timeline }: MilestonesProps) {
+function TrackingMilestones({ timeline, t }: MilestonesProps) {
   if (!timeline || timeline.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">
         <Clock size={18} className="mx-auto mb-1.5 text-slate-400 opacity-80" />
-        Detailed scans will appear once the courier scans your parcel at the dispatch hub.
+        {t.milestonesEmptyState}
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Dispatch Activity</h4>
+      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">{t.dispatchActivityTitle}</h4>
       <div className="space-y-3 border-l-2 border-slate-200 pl-4">
         {timeline.map((event, index) => (
           <div key={index} className="relative">
@@ -275,7 +285,7 @@ const STATUS_PILL: Record<TrackedOrderData['status'], string> = {
   cancelled: 'bg-red-50 text-red-700',
 };
 
-const OrderResultRow: React.FC<{ order: TrackedOrderData; onSelect: () => void }> = ({ order, onSelect }) => {
+const OrderResultRow: React.FC<{ order: TrackedOrderData; onSelect: () => void; t: TrackOrderModalCopy }> = ({ order, onSelect, t }) => {
   return (
     <button
       onClick={onSelect}
@@ -288,7 +298,7 @@ const OrderResultRow: React.FC<{ order: TrackedOrderData; onSelect: () => void }
         </span>
       </div>
       <div className="mt-1.5 flex items-center justify-between text-xs text-slate-500">
-        <span>{order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-IN') : 'Recent'}</span>
+        <span>{order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-IN') : t.recent}</span>
         <span className="font-bold text-slate-900">₹{(order.total || 0).toLocaleString('en-IN')}</span>
       </div>
     </button>
@@ -304,6 +314,8 @@ export default function TrackOrderModal({
   initialContact = '',
   onOpenDashboard,
 }: TrackOrderModalProps) {
+  const { language } = useLanguage();
+  const t = orderTranslations[language].trackOrderModal;
   const [phone, setPhone] = useState(initialContact);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -335,7 +347,7 @@ export default function TrackOrderModal({
     const digits = raw.replace(/\D/g, '');
 
     if (digits.length < 10) {
-      setErrorMessage('Please enter a valid 10-digit phone number.');
+      setErrorMessage(t.errorInvalidPhone);
       return;
     }
 
@@ -353,15 +365,15 @@ export default function TrackOrderModal({
         setSelectedOrder(preselect || (results.length === 1 ? results[0] : null));
       } else {
         setOrders([]);
-        setErrorMessage(response.error || 'No orders found for this phone number.');
+        setErrorMessage(response.error || t.errorNoOrdersFound);
       }
     } catch (error: any) {
       setOrders([]);
-      setErrorMessage(error?.message || 'Unable to connect to order tracking service.');
+      setErrorMessage(error?.message || t.errorConnectionFailed);
     } finally {
       setLoading(false);
     }
-  }, [phone, initialOrderId]);
+  }, [phone, initialOrderId, t]);
 
   // Auto-search once if we already know the phone number when the modal opens
   useEffect(() => {
@@ -386,14 +398,14 @@ export default function TrackOrderModal({
               <Package size={20} />
             </div>
             <div>
-              <h3 className="text-base sm:text-lg font-black text-slate-900">Track Safety Tag Order</h3>
-              <p className="text-xs text-slate-500">Live order status and dispatch updates</p>
+              <h3 className="text-base sm:text-lg font-black text-slate-900">{t.modalTitle}</h3>
+              <p className="text-xs text-slate-500">{t.modalSubtitle}</p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
-            aria-label="Close"
+            aria-label={t.closeAria}
           >
             <X size={18} />
           </button>
@@ -403,11 +415,11 @@ export default function TrackOrderModal({
         <div className="mt-5 space-y-3">
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-              Phone Number
+              {t.phoneLabel}
             </label>
             <input
               type="tel"
-              placeholder="10-digit mobile number used at checkout"
+              placeholder={t.phonePlaceholder}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -417,11 +429,11 @@ export default function TrackOrderModal({
 
           <FlowButton tone="dark" size="sm" fullWidth loading={loading} onClick={() => handleSearch()}>
             {loading ? (
-              'Searching order records...'
+              t.searching
             ) : (
               <>
                 <Search size={14} />
-                Track Delivery Status
+                {t.trackButton}
               </>
             )}
           </FlowButton>
@@ -439,10 +451,10 @@ export default function TrackOrderModal({
         {orders.length > 1 && !selectedOrder && (
           <div className="mt-5 space-y-2 animate-fade-in">
             <p className="text-xs font-bold text-slate-600">
-              Found {orders.length} orders for this number — select one:
+              {t.foundOrdersMessage(orders.length)}
             </p>
             {orders.map((order) => (
-              <OrderResultRow key={order.id} order={order} onSelect={() => setSelectedOrder(order)} />
+              <OrderResultRow key={order.id} order={order} onSelect={() => setSelectedOrder(order)} t={t} />
             ))}
           </div>
         )}
@@ -455,27 +467,27 @@ export default function TrackOrderModal({
                 onClick={() => setSelectedOrder(null)}
                 className="text-[11px] font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
               >
-                ← Back to all {orders.length} orders
+                {t.backToAllOrders(orders.length)}
               </button>
             )}
 
             {/* Stepper */}
-            <TrackingProgressStepper order={selectedOrder} />
+            <TrackingProgressStepper order={selectedOrder} t={t} />
 
             {/* Order Card */}
-            <TrackingOrderSummary order={selectedOrder} />
+            <TrackingOrderSummary order={selectedOrder} t={t} />
 
             {/* Milestones */}
-            <TrackingMilestones timeline={selectedOrder.shiprocket?.timeline} />
+            <TrackingMilestones timeline={selectedOrder.shiprocket?.timeline} t={t} />
 
             {/* Account linking banner if user wants to claim stickers */}
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-xs space-y-2">
               <div className="flex items-center gap-2 font-bold text-gray-900">
                 <ShieldCheck size={16} className="text-[#111111]" />
-                <span>Activate Tag Telephony & Emergency Contacts</span>
+                <span>{t.activateTagTitle}</span>
               </div>
               <p className="text-gray-700 leading-relaxed text-[11px]">
-                Sign in with the phone number used for this order to program your vehicle plate, link emergency responders, and manage private masked calls.
+                {t.activateTagDescription}
               </p>
               {onOpenDashboard && (
                 <button
@@ -485,7 +497,7 @@ export default function TrackOrderModal({
                   }}
                   className="mt-1 font-bold text-gray-900 hover:underline cursor-pointer flex items-center gap-1"
                 >
-                  <span>Go to Client Dashboard</span>
+                  <span>{t.goToDashboard}</span>
                   <span>→</span>
                 </button>
               )}

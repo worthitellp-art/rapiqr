@@ -37,6 +37,7 @@ async function send({ to, body, type, templateName, variables = [], languageCode
     status: result.sent ? 'sent' : result.simulated ? 'simulated' : 'failed',
     providerMessageId: result.sid || null,
     error: result.error || null,
+    reason: result.reason || null,
   };
 }
 

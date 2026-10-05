@@ -433,10 +433,27 @@ export const apiClient = {
       });
     },
 
-    async changePassword(currentPassword: string, newPassword: string) {
-      return request<{ success: boolean; message?: string }>('/auth/change-password', {
+    async changePassword(currentPasswordOrPayload: string | { currentPassword?: string; newPassword: string; phoneNumber?: string; otpCode?: string }, maybeNewPassword?: string) {
+      const payload = typeof currentPasswordOrPayload === 'string'
+        ? { currentPassword: currentPasswordOrPayload, newPassword: maybeNewPassword! }
+        : currentPasswordOrPayload;
+      return request<{ success: boolean; message?: string; error?: string }>('/auth/change-password', {
         method: 'POST',
-        body: JSON.stringify({ currentPassword, newPassword }),
+        body: JSON.stringify(payload),
+      });
+    },
+
+    async sendPasswordResetPhoneOtp(phoneNumber?: string) {
+      return request<{ success: boolean; message?: string; error?: string }>('/auth/phone-password-reset/send', {
+        method: 'POST',
+        body: JSON.stringify({ phoneNumber }),
+      });
+    },
+
+    async resetPasswordWithPhoneOtp(payload: { phoneNumber: string; code: string; newPassword: string }) {
+      return request<{ success: boolean; message?: string; error?: string }>('/auth/phone-password-reset/verify', {
+        method: 'POST',
+        body: JSON.stringify(payload),
       });
     },
 
@@ -671,9 +688,7 @@ export const apiClient = {
       });
     },
 
-    // Owner self-service recover — ID only, no recovery code. Only works for
-    // a sticker whose user_id still matches the signed-in account (survives
-    // a soft-delete either the owner or an admin performed).
+   
     async recover(productId: string) {
       return request<{ success: boolean; data?: any; error?: string }>(`/products/${productId}/recover`, {
         method: 'POST',
@@ -699,7 +714,15 @@ export const apiClient = {
       return request<{
         success: boolean;
         data: any;
-        smsResult?: { sent: boolean; simulated: boolean; reason?: string; error?: string };
+        smsResult?: {
+          sent: boolean;
+          simulated: boolean;
+          reason?: string;
+          error?: any;
+          detail?: string | null;
+          status?: string;
+          retryAfterSec?: number | null;
+        };
         contactsNotified?: number;
         chatSessionId?: string;
       }>('/alerts', {
@@ -1269,6 +1292,61 @@ export const apiClient = {
       return request<{ success: boolean; message?: string; data?: { deletedCount: number } }>('/admin/messages', {
         method: 'DELETE',
       });
+    },
+
+    async getWhatsAppDiagnostics() {
+      return request<{ success: boolean; data: any }>('/admin/whatsapp/diagnostics', {
+        method: 'GET',
+      });
+    },
+
+    async testWhatsAppSend(phone: string, templateName?: string) {
+      return request<{ success: boolean; result: any }>('/admin/whatsapp/test-send', {
+        method: 'POST',
+        body: JSON.stringify({ phone, templateName }),
+      });
+    },
+
+    reviews: {
+      async list(opts: { search?: string; rating?: number | string; status?: string; replyStatus?: string; page?: number; limit?: number } = {}) {
+        const params = new URLSearchParams();
+        if (opts.search) params.set('search', opts.search);
+        if (opts.rating && opts.rating !== 'all') params.set('rating', String(opts.rating));
+        if (opts.status && opts.status !== 'all') params.set('status', opts.status);
+        if (opts.replyStatus && opts.replyStatus !== 'all') params.set('replyStatus', opts.replyStatus);
+        if (opts.page) params.set('page', String(opts.page));
+        if (opts.limit) params.set('limit', String(opts.limit));
+        const qs = params.toString();
+        return request<{ success: boolean; data: any[]; total: number; page: number; totalPages: number }>(`/admin/reviews${qs ? `?${qs}` : ''}`, {
+          method: 'GET',
+        });
+      },
+
+      async reply(id: string, text: string, isAiGenerated = false) {
+        return request<{ success: boolean; data: any }>(`/admin/reviews/${id}/reply`, {
+          method: 'POST',
+          body: JSON.stringify({ text, isAiGenerated }),
+        });
+      },
+
+      async generateAiReply(id: string) {
+        return request<{ success: boolean; draftedReply: string }>(`/admin/reviews/${id}/ai-reply`, {
+          method: 'POST',
+        });
+      },
+
+      async updateStatus(id: string, status: 'published' | 'flagged' | 'pending') {
+        return request<{ success: boolean; data: any }>(`/admin/reviews/${id}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status }),
+        });
+      },
+
+      async delete(id: string) {
+        return request<{ success: boolean; message?: string }>(`/admin/reviews/${id}`, {
+          method: 'DELETE',
+        });
+      },
     },
   },
 

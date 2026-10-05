@@ -11,29 +11,16 @@ const { sendServerError } = require('../utils/httpErrors');
 const { clampLimit } = require('../utils/pagination');
 const { logAuditEvent } = require('../services/auditService');
 const SecurityEventTypes = require('../utils/securityEventTypes');
+const { WHATSAPP_ERROR_CODES, createWhatsAppError } = require('../utils/whatsappErrorCatalog');
 
 const URL_RE = /(https?:\/\/\S+)/;
 
-/**
- * WhatsApp anti-spam: the owner gets at most one WhatsApp per chat thread per
- * window. Alerts are still saved and the chat message still lands in the
- * thread, so nothing is lost — only the repeat notification is held back.
- * In-memory, so a server restart resets it (acceptable for a short window).
- */
-const OWNER_WHATSAPP_COOLDOWN_MS = 5 * 60 * 1000;
-const OWNER_WHATSAPP_COOLDOWN_EMERGENCY_MS = 60 * 1000;
+
+const OWNER_WHATSAPP_COOLDOWN_MS = 60 * 1000; // 1 min for general chat
+const OWNER_WHATSAPP_COOLDOWN_EMERGENCY_MS = 4 * 1000; // 4s rapid double-click guard for emergencies
 const ownerWhatsAppSentAt = new Map(); // threadKey -> last WhatsApp time (ms)
 
-/**
- * Builds the chat-thread copy of an alert. A plain `.slice(0, 100)` here used
- * to truncate the whole message — for the common case of a quick-issue alert
- * whose text is "<alert type>\n<vehicle line>\n\n<description>\n📍 Location:
- * <maps url>", the Google Maps link routinely fell past character 100 and
- * got cut mid-URL (or dropped entirely), so the "open location" link the
- * owner saw in their chat inbox was broken. This truncates only the
- * free-text part and always appends the map URL (if any) in full.
- */
-/** Longest free-text description kept in the chat thread copy of an alert. */
+
 const CHAT_TEXT_MAX = 600;
 
 function buildAlertChatText(label, rawMessage) {
@@ -62,10 +49,7 @@ class AlertController {
       const qrId = alertPayload.qrId || alertPayload.qr_id || alertPayload.qr_code_id;
       logger.event('ALERT_EMERGENCY', '🚨', `Dispatching emergency alert for QR: ${qrId || 'unknown'} (Type: ${alertPayload.type || 'SOS'})`);
 
-      // Resolve the product up front — needed both to stamp product_id onto the
-      // report (without it, the alert is orphaned and never shows up in the
-      // owner's per-sticker Alert History, which filters strictly by product_id)
-      // and to know who to notify below.
+     
       const product = qrId ? await ProductModel.getByQrCodeId(qrId).catch(() => null) : null;
       if (product?.id && !alertPayload.productId && !alertPayload.product_id) {
         alertPayload.productId = product.id;
@@ -77,31 +61,27 @@ class AlertController {
       // Best-effort WhatsApp to the sticker owner AND, for emergencies, their
       // registered emergency contacts. SMS is deliberately not used and is not a
       // fallback for this launch (see services/notificationService.js).
+      const noOwnerPhoneError = createWhatsAppError({
+        code: WHATSAPP_ERROR_CODES.NO_RECIPIENT_PHONE,
+        source: 'app',
+        whatFailed: 'No owner contact phone found',
+        whyFailed: 'No phone number is saved for this sticker, so WhatsApp alert could not be delivered.',
+        safeNextAction: 'The owner should configure their phone number in the Client Dashboard. You can still message them via in-app RepiChat.',
+      });
       let smsResult = {
         sent: false,
         simulated: false,
         reason: 'no_owner_phone',
-        detail: 'No owner phone number is saved for this sticker, so WhatsApp could not be sent.',
+        detail: noOwnerPhoneError.error.whyFailed,
+        error: noOwnerPhoneError,
       };
       let contactsNotified = 0;
       let chatSessionId = null;
 
-      // SEND_SMS buttons on the category scan pages notify the OWNER ONLY — a
-      // blocked driveway or a found wallet is not a reason to wake the whole
-      // family contact list. Defaults to true so the emergency paths that
-      // already relied on the fan-out (SOS, live-location share) are unchanged.
+     
       const notifyContacts = alertPayload.notifyContacts !== false;
 
-      // A `location_ping` is the every-5-seconds live-location trail sent
-      // while the installed PWA has the emergency screen open (see
-      // ScanPage.tsx) — it must still land in Alert History with real GPS
-      // coordinates (handled above via AlertModel.createAlert), but firing a
-      // WhatsApp message to the owner on every one of those would spam them
-      // once every 5 seconds. The one-time "Share My Location" action still
-      // uses type "emergency" and notifies as normal.
-      // Live location trail: one card in the visitor's chat thread that the server
-      // updates in place (socket 'live_location'). Pings never add a chat message
-      // and never send WhatsApp — WhatsApp goes out once, from the first share.
+      
       if (alertPayload.type === 'location_ping' && alertPayload.customerToken && alertPayload.latitude && alertPayload.longitude) {
         const { session } = await ChatModel.findOrCreateOpenSession({
           qrCodeId: qrId,
@@ -151,14 +131,36 @@ class AlertController {
         // Each one has an "open dashboard" URL button whose parameter is the
         // chat session id (msg91Client sends a placeholder when there is none,
         // since Meta rejects an empty button parameter).
-        const isEmergencyAlert = alertPayload.type === 'emergency' || alertPayload.type === 'sos';
+        const typeStr = String(alertPayload.type || '').toLowerCase();
+        const msgStr = String(alertPayload.message || '').toLowerCase();
+        const isEmergencyAlert =
+          typeStr === 'emergency' ||
+          typeStr === 'sos' ||
+          typeStr.includes('emergency') ||
+          typeStr.includes('accident') ||
+          typeStr.includes('medical') ||
+          typeStr.includes('theft') ||
+          msgStr.includes('emergency') ||
+          msgStr.includes('sos') ||
+          msgStr.includes('urgent');
+
         const throttleKey = `${qrId}:${chatSessionId || alertPayload.customerToken || 'anon'}`;
         const cooldownMs = isEmergencyAlert ? OWNER_WHATSAPP_COOLDOWN_EMERGENCY_MS : OWNER_WHATSAPP_COOLDOWN_MS;
         const withinCooldown = Date.now() - (ownerWhatsAppSentAt.get(throttleKey) || 0) < cooldownMs;
         if (withinCooldown) {
           const retryAfterSec = Math.ceil((cooldownMs - (Date.now() - (ownerWhatsAppSentAt.get(throttleKey) || 0))) / 1000);
-          const detail = `The owner was already sent a WhatsApp for this chat moments ago. The next one is allowed in ${formatWait(retryAfterSec)}.`;
-          smsResult = { sent: false, simulated: false, status: 'held', reason: 'thread_cooldown', retryAfterSec, detail };
+          const detail = isEmergencyAlert
+            ? `An emergency WhatsApp was already dispatched to the owner moments ago. Next alert allowed in ${formatWait(retryAfterSec)}.`
+            : `The owner was already sent a WhatsApp for this chat moments ago. The next one is allowed in ${formatWait(retryAfterSec)}.`;
+          const cooldownError = createWhatsAppError({
+            code: WHATSAPP_ERROR_CODES.RATE_LIMIT_THREAD_COOLDOWN,
+            source: 'app',
+            whatFailed: isEmergencyAlert ? 'Emergency WhatsApp already sent' : 'Owner already notified',
+            whyFailed: detail,
+            safeNextAction: 'Your message has been posted directly to the owner’s in-app chat thread. They will see it when they open RepiQR.',
+            retryAfterSec,
+          });
+          smsResult = { sent: false, simulated: false, status: 'held', reason: 'thread_cooldown', retryAfterSec, detail, error: cooldownError };
           if (ownerPhone) {
             MessageModel.record({
               channel: 'whatsapp',
@@ -212,7 +214,8 @@ class AlertController {
             status: result.status,
             reason: result.reason,
             retryAfterSec: result.retryAfterSec ?? null,
-            detail: result.detail || null,
+            detail: result.detail || result.error?.error?.whyFailed || null,
+            error: result.error || null,
           };
         }
 

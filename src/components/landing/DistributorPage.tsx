@@ -2,80 +2,36 @@ import React, { useMemo, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Handshake } from 'lucide-react';
 import { FlowButton } from '../ui/flow-button';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { distributorPageTranslations } from '../../i18n/distributorPageTranslations';
 import { saveDistributorApplication, getUserDistributorApplication, DistributorApplication } from '../../lib/distributorService';
 
-interface DistributorTier {
-  id: string;
-  name: string;
-  badge: string;
-  minUnits: string;
-  margin: string;
-  desc: string;
-  features: string[];
-}
-
-const DISTRIBUTOR_TIERS: DistributorTier[] = [
-  {
-    id: 'retailer-starter',
-    name: 'Retailer Starter Pack',
-    badge: 'Garages & retail shops',
-    minUnits: '50 - 100 units',
-    margin: '40%+ retail margin',
-    desc: 'Ideal for auto garages, bike accessory shops, mobile stores, and local locksmiths.',
-    features: [
-      '50x pre-activated weatherproof smart tags',
-      'Free counter display rack',
-      'Marketing posters and flyer kit',
-      'Dealer dashboard with instant QR restock',
-      '48-hour priority doorstep logistics',
-    ],
-  },
-  {
-    id: 'city-franchise',
-    name: 'City Exclusive Franchise',
-    badge: 'Exclusive territory partner',
-    minUnits: '500 - 1,000 units',
-    margin: '50%+ exclusive margin',
-    desc: 'Sole distributor rights for your city or district, with local buyer leads routed to you.',
-    features: [
-      'Exclusive city territory rights and protection',
-      '500x smart QR tags across all categories',
-      'Localised dealer branding and shop sign kit',
-      'Dedicated territory account manager',
-      'All local website buyer leads redirected to you',
-      'Quarterly volume bonuses and tier rebate',
-    ],
-  },
-  {
-    id: 'master-partner',
-    name: 'Master State / Fleet Partner',
-    badge: 'Regional master rights',
-    minUnits: '2,500+ units',
-    margin: '60%+ master margin',
-    desc: 'State-level master franchise and large fleet deployments for corporate and logistics networks.',
-    features: [
-      'State-wide master distribution exclusivity',
-      'Custom white-label QR sticker batches',
-      'Enterprise REST API and fleet sync console',
-      'Sub-dealer network and commission control',
-      '24/7 dedicated enterprise support',
-    ],
-  },
-];
-
-const TIER_OPTIONS = [
-  'Retail Kit (50 Units)',
-  'City Exclusive (500 Units)',
-  'Master State Partner (2500+ Units)',
-];
-
-const BUSINESS_OPTIONS = [
-  'Auto Accessories Shop',
-  'Car Dealership / Garage',
-  'Locksmith / Security Store',
-  'Regional Distributor',
-  'Other',
-];
+// Feature bullet lists stay in English-keyed form here and are rendered as-is;
+// everything else on this page is translated via distributorPageTranslations.
+const TIER_FEATURES: Record<string, string[]> = {
+  'retailer-starter': [
+    '50x pre-activated weatherproof smart tags',
+    'Free counter display rack',
+    'Marketing posters and flyer kit',
+    'Dealer dashboard with instant QR restock',
+    '48-hour priority doorstep logistics',
+  ],
+  'city-franchise': [
+    'Exclusive city territory rights and protection',
+    '500x smart QR tags across all categories',
+    'Localised dealer branding and shop sign kit',
+    'Dedicated territory account manager',
+    'All local website buyer leads redirected to you',
+    'Quarterly volume bonuses and tier rebate',
+  ],
+  'master-partner': [
+    'State-wide master distribution exclusivity',
+    'Custom white-label QR sticker batches',
+    'Enterprise REST API and fleet sync console',
+    'Sub-dealer network and commission control',
+    '24/7 dedicated enterprise support',
+  ],
+};
 
 interface DistributorPageProps {
   onBack: () => void;
@@ -83,6 +39,11 @@ interface DistributorPageProps {
 
 export default function DistributorPage({ onBack }: DistributorPageProps) {
   const { profile } = useAuth();
+  const { language } = useLanguage();
+  const t = distributorPageTranslations[language];
+  const DISTRIBUTOR_TIERS = t.tiers.map((tier) => ({ ...tier, features: TIER_FEATURES[tier.id] || [] }));
+  const TIER_OPTIONS = t.tierOptions;
+  const BUSINESS_OPTIONS = t.businessOptions;
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
@@ -92,6 +53,24 @@ export default function DistributorPage({ onBack }: DistributorPageProps) {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [existingApp, setExistingApp] = useState<DistributorApplication | null>(null);
+
+  // Re-sync the select values to the newly active language's option strings
+  // (BUSINESS_OPTIONS/TIER_OPTIONS are plain translated strings, not stable
+  // codes) — keep a ref of the options the current selection was made in.
+  const priorOptionsRef = React.useRef({ business: BUSINESS_OPTIONS, tier: TIER_OPTIONS });
+  React.useEffect(() => {
+    const prior = priorOptionsRef.current;
+    if (prior.business !== BUSINESS_OPTIONS) {
+      const idx = prior.business.indexOf(business);
+      setBusiness(BUSINESS_OPTIONS[idx >= 0 ? idx : 0]);
+    }
+    if (prior.tier !== TIER_OPTIONS) {
+      const idx = prior.tier.indexOf(tier);
+      setTier(TIER_OPTIONS[idx >= 0 ? idx : 0]);
+    }
+    priorOptionsRef.current = { business: BUSINESS_OPTIONS, tier: TIER_OPTIONS };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language]);
 
   React.useEffect(() => {
     if (profile?.email || profile?.phoneNumber) {
@@ -111,8 +90,8 @@ export default function DistributorPage({ onBack }: DistributorPageProps) {
   const valid = Boolean(name.trim() && phoneValid && city.trim());
 
   const selectedTierInfo = useMemo(
-    () => DISTRIBUTOR_TIERS.find((t) => tier.startsWith(t.name.split(' ')[0])) || DISTRIBUTOR_TIERS[0],
-    [tier]
+    () => DISTRIBUTOR_TIERS.find((dt) => tier.startsWith(dt.name.split(' ')[0])) || DISTRIBUTOR_TIERS[0],
+    [tier, language]
   );
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -131,7 +110,7 @@ export default function DistributorPage({ onBack }: DistributorPageProps) {
     });
     setSubmitting(false);
     if (saved) setSubmitted(true);
-    else setError("We couldn't submit your application just now. Please try again.");
+    else setError(t.submitErrorGeneric);
   };
 
   return (
@@ -139,22 +118,21 @@ export default function DistributorPage({ onBack }: DistributorPageProps) {
       <header className="border-b border-black/10 bg-[#FAFAFA]/90 backdrop-blur-md">
         <div className="mx-auto flex h-20 max-w-[1200px] items-center justify-between px-6 sm:px-10">
           <button onClick={onBack} className="flex cursor-pointer items-center gap-2 text-[13px] font-medium text-black/55 transition-colors hover:text-black">
-            <ArrowLeft size={16} /> Back to home
+            <ArrowLeft size={16} /> {t.backToHome}
           </button>
           <span className="text-sm font-semibold tracking-[0.16em]">RAPI<span className="text-[#B8860B]">QR</span></span>
-          <span className="hidden text-[11px] font-medium uppercase tracking-[0.16em] text-black/60 sm:block">Distributor network</span>
+          <span className="hidden text-[11px] font-medium uppercase tracking-[0.16em] text-black/60 sm:block">{t.networkTag}</span>
         </div>
       </header>
 
       <div className="mx-auto grid max-w-[1200px] gap-12 px-6 py-14 sm:px-10 sm:py-20 lg:grid-cols-[0.8fr_1.2fr] lg:items-start lg:gap-20">
         <section className="lg:sticky lg:top-10">
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-black/60">Become a partner</p>
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-black/60">{t.becomePartner}</p>
           <h1 className="mt-5 max-w-lg text-[clamp(2.8rem,6vw,5.4rem)] font-medium leading-[0.92] tracking-[-0.055em]">
-            Sell the tag that sells itself.
+            {t.heroTitle}
           </h1>
           <p className="mt-6 max-w-md text-[15px] font-light leading-relaxed text-black/55">
-            Partner with RapiQR to distribute smart QR safety tags in your area, shop, or auto network — three
-            tiers, from a single retail counter to a state-wide master franchise.
+            {t.heroDesc}
           </p>
 
           <div className="mt-10 space-y-4 border-t border-black/10 pt-7">
@@ -181,80 +159,79 @@ export default function DistributorPage({ onBack }: DistributorPageProps) {
               <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
                 <CheckCircle2 size={30} />
               </div>
-              <h2 className="mt-6 text-2xl font-medium tracking-[-0.03em]">Application received</h2>
+              <h2 className="mt-6 text-2xl font-medium tracking-[-0.03em]">{t.applicationReceived}</h2>
               <p className="mt-3 max-w-sm text-[14px] leading-relaxed text-black/55">
-                Thanks, {name}. Our partnerships team will review your {tier.toLowerCase()} inquiry for {city} and
-                contact you on {phone}.
+                {t.thanksPrefix} {name}. {t.thanksMiddle} {tier.toLowerCase()} {t.thanksFor} {city} {t.contactYouOn} {phone}.
               </p>
               <FlowButton tone="dark" className="mt-8" onClick={onBack}>
-                Return to home
+                {t.returnHome}
               </FlowButton>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="border-b border-black/10 pb-6">
-                <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-black/60">Partner application</p>
-                <h2 className="mt-2 text-2xl font-medium tracking-[-0.03em]">Tell us about your business</h2>
-                <p className="mt-2 text-[13px] text-black/60">Only three fields are required to get started.</p>
+                <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-black/60">{t.partnerApplication}</p>
+                <h2 className="mt-2 text-2xl font-medium tracking-[-0.03em]">{t.tellUsAboutBusiness}</h2>
+                <p className="mt-2 text-[13px] text-black/60">{t.threeFieldsRequired}</p>
               </div>
 
               {existingApp && (
                 <div className="flex items-start gap-2.5 rounded-md bg-[#FFCB56]/50 p-4 text-[13px] leading-relaxed text-[#5B4A17]">
                   <Handshake size={16} className="mt-0.5 shrink-0" />
                   <span>
-                    You already have an application on file for <strong>{existingApp.tier}</strong> — status:{' '}
-                    <strong className="capitalize">{existingApp.status}</strong>. Submitting again adds a new inquiry.
+                    {t.existingAppPrefix} <strong>{existingApp.tier}</strong> — {t.existingAppStatus}{' '}
+                    <strong className="capitalize">{existingApp.status}</strong>. {t.existingAppNote}
                   </span>
                 </div>
               )}
 
               <div>
-                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">Full name *</label>
-                <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" className="w-full rounded-md border border-black/12 px-4 py-3.5 text-[14px] outline-hidden focus:border-black" />
+                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">{t.fullName}</label>
+                <input value={name} onChange={(event) => setName(event.target.value)} placeholder={t.namePlaceholder} className="w-full rounded-md border border-black/12 px-4 py-3.5 text-[14px] outline-hidden focus:border-black" />
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">Phone *</label>
+                  <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">{t.phone}</label>
                   <input
                     type="tel"
                     value={phone}
                     onChange={(event) => setPhone(event.target.value)}
-                    placeholder="10-digit mobile number"
+                    placeholder={t.phonePlaceholder}
                     className="w-full rounded-md border border-black/12 px-4 py-3.5 text-[14px] outline-hidden focus:border-black"
                   />
                 </div>
                 <div>
-                  <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">City *</label>
+                  <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">{t.city}</label>
                   <input
                     value={city}
                     onChange={(event) => setCity(event.target.value)}
-                    placeholder="e.g. Pune"
+                    placeholder={t.cityPlaceholder}
                     className="w-full rounded-md border border-black/12 px-4 py-3.5 text-[14px] outline-hidden focus:border-black"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">Business type</label>
+                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">{t.businessType}</label>
                 <select value={business} onChange={(event) => setBusiness(event.target.value)} className="w-full cursor-pointer rounded-md border border-black/12 bg-white px-4 py-3.5 text-[14px] outline-hidden focus:border-black">
                   {BUSINESS_OPTIONS.map((b) => <option key={b} value={b}>{b}</option>)}
                 </select>
               </div>
 
               <div>
-                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">Desired tier</label>
+                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-black/60">{t.desiredTier}</label>
                 <select value={tier} onChange={(event) => setTier(event.target.value)} className="w-full cursor-pointer rounded-md border border-black/12 bg-white px-4 py-3.5 text-[14px] outline-hidden focus:border-black">
-                  {TIER_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                  {TIER_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
                 <p className="mt-2 text-[12px] leading-relaxed text-black/50">{selectedTierInfo.margin} — {selectedTierInfo.minUnits}</p>
               </div>
 
               {error && <p className="rounded-md bg-red-50 px-4 py-3 text-[13px] text-red-700">{error}</p>}
               <FlowButton type="submit" tone="dark" size="lg" fullWidth loading={submitting} disabled={!valid}>
-                {submitting ? 'Sending application' : 'Submit application'}
+                {submitting ? t.sendingApplication : t.submitApplication}
               </FlowButton>
-              <p className="text-center text-[11px] text-black/60">No fee to apply. Our partnerships team verifies every inquiry.</p>
+              <p className="text-center text-[11px] text-black/60">{t.noFeeNote}</p>
             </form>
           )}
         </section>

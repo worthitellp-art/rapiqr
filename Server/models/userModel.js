@@ -3,7 +3,7 @@ const { ADMIN_EMAIL } = require('../middleware/authMiddleware');
 const { normalizePhone, isSamePhone } = require('../utils/phone');
 const { logger } = require('../middleware/loggerMiddleware');
 
-const PUBLIC_FIELDS = 'email full_name phone_number avatar_url role subscription_plan is_subscribed metadata email_verified created_at';
+const PUBLIC_FIELDS = 'email full_name phone_number avatar_url role metadata email_verified created_at';
 
 function toApi(doc) {
   if (!doc) return null;
@@ -14,8 +14,6 @@ function toApi(doc) {
     phone_number: doc.phone_number,
     avatar_url: doc.avatar_url,
     role: doc.role,
-    subscription_plan: doc.subscription_plan,
-    is_subscribed: doc.is_subscribed,
     metadata: doc.metadata || {},
     email_verified: doc.email_verified || false,
     created_at: doc.created_at,
@@ -63,7 +61,7 @@ class UserModel {
     try {
       const doc = await User.findByIdAndUpdate(
         profile.id,
-        { $set: { role: 'admin', subscription_plan: 'enterprise', is_subscribed: true } },
+        { $set: { role: 'admin' } },
         { new: true }
       ).select(PUBLIC_FIELDS).lean();
       return toApi(doc) || profile;

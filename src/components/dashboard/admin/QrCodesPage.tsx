@@ -1,5 +1,5 @@
 import type React from "react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Plus,
   Download,
@@ -16,28 +16,22 @@ import {
   AlertTriangle,
   LayoutGrid,
   Table as TableIcon,
-  Copy,
-  Check,
   Phone,
-  Sparkles,
-  ExternalLink,
-  Shield,
-  Layers,
-  Activity,
   Tag,
   CheckCircle2,
   SlidersHorizontal,
+  X,
+  ExternalLink,
+  Shield,
+  FileSpreadsheet,
 } from "lucide-react";
 import { QrRecord, Template, StickerPos, StickerLabel } from "./types";
-import { qrFullUrl, fmtDate, dispatchActivationToUserDashboard } from "./helpers";
+import { qrFullUrl, fmtDate, getStableSlotMap, formatSlotNumber } from "./helpers";
 import { apiClient } from "../../../lib/apiClient";
 import { stickerRef, useCodesRevealed } from "../../../lib/codeVisibility";
 import { useLocalStorage } from "./useLocalStorage";
 import { generateStickerBatchPdfBlob, downloadSheetBlob } from "../../../services/stickerPrintSheetService";
 import { STICKER_CATEGORIES, getCategoryLabel, getCategoryIcon } from "../../../stickerModules";
-import QrRowActions from "./QrRowActions";
-import PrintSheetModal from "./PrintSheetModal";
-import PrintProgressModal, { PrintProgressState } from "./print-sheet/PrintProgressModal";
 import GenerateTagModal from "./GenerateTagModal";
 import StickerMockupView from "./StickerMockupView";
 import LabelBadge from "./labels/LabelBadge";
@@ -45,10 +39,24 @@ import LabelManagerModal from "./labels/LabelManagerModal";
 import AssignLabelModal from "./labels/AssignLabelModal";
 import BulkPrintByLabelModal from "./labels/BulkPrintByLabelModal";
 import { DEFAULT_PRESET_LABELS } from "./labels/labelConstants";
-import FxKpiStrip, { FxKpiCardSpec } from "../shared/FxKpiStrip";
-import { FxModal } from "../shared";
+import PrintProgressModal, { PrintProgressState } from "./print-sheet/PrintProgressModal";
 
-type ViewMode = "table" | "cards";
+type ViewMode = "cards" | "table";
+type TabFilter = "all" | "active" | "pending" | "printed";
+
+interface QrCodesPageProps {
+  qrList: QrRecord[];
+  setQrList: React.Dispatch<React.SetStateAction<QrRecord[]>>;
+  templates: Template[];
+  setToast: (msg: string | null) => void;
+  openQuickLook: (q: QrRecord) => void;
+  openRestore: () => void;
+  stickerPos: StickerPos;
+  openPrintSheet?: (targetSticker?: QrRecord, selectedBatchStickers?: QrRecord[]) => void;
+  searchQuery: string;
+  printedStickerIdList?: string[];
+  setPrintedStickerIdList?: React.Dispatch<React.SetStateAction<string[]>>;
+}
 
 export default function QrCodesPage({
   qrList,
@@ -62,19 +70,8 @@ export default function QrCodesPage({
   searchQuery,
   printedStickerIdList,
   setPrintedStickerIdList,
-}: {
-  qrList: QrRecord[];
-  setQrList: React.Dispatch<React.SetStateAction<QrRecord[]>>;
-  templates: Template[];
-  setToast: (msg: string | null) => void;
-  openQuickLook: (q: QrRecord) => void;
-  openRestore: () => void;
-  stickerPos: StickerPos;
-  openPrintSheet?: (targetSticker?: QrRecord, selectedBatchStickers?: QrRecord[]) => void;
-  searchQuery: string;
-  printedStickerIdList?: string[];
-  setPrintedStickerIdList?: React.Dispatch<React.SetStateAction<string[]>>;
-}) {
+}: QrCodesPageProps) {
+  // Printed sticker tracking
   const [internalPrintedIds, setInternalPrintedIds] = useLocalStorage<string[]>("repiqr-printed-sticker-ids", []);
   const activePrintedIdsList = printedStickerIdList ?? internalPrintedIds;
   const activeSetPrintedIds = setPrintedStickerIdList ?? setInternalPrintedIds;
@@ -82,28 +79,39 @@ export default function QrCodesPage({
 
   // Custom Color Labels
   const [labels, setLabels] = useLocalStorage<StickerLabel[]>("repiqr-custom-labels", DEFAULT_PRESET_LABELS);
-  const [selectedLabelId, setSelectedLabelId] = useState<string>("none");
 
-  const [selectedCategory, setSelectedCategory] = useState("car");
+  // Layout View Mode & Tab Segment
+  const [viewMode, setViewMode] = useState<ViewMode>("cards");
+  const [activeTab, setActiveTab] = useState<TabFilter>("all");
+
+  // Single Unified Filter Bar State
+  const [searchText, setSearchText] = useState(searchQuery);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [labelFilter, setLabelFilter] = useState("all");
   const [printStatusFilter, setPrintStatusFilter] = useState<"all" | "unprinted" | "printed">("all");
 
-  const [tab, setTab] = useState<"single" | "bulk">("single");
-  const [bulkCount, setBulkCount] = useState(25);
-  const [bulkProgress, setBulkProgress] = useState<number | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<QrRecord | null>(null);
+  // Pagination state (reset to 1 on filter changes)
   const [page, setPage] = useState(1);
-  const [viewMode, setViewMode] = useState<ViewMode>("table");
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const PAGE_SIZE = viewMode === "cards" ? 12 : 20;
+
+  // Selected stickers for batch operations
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Modals state
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<QrRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isLabelManagerOpen, setIsLabelManagerOpen] = useState(false);
+  const [isAssignLabelOpen, setIsAssignLabelOpen] = useState(false);
+  const [isBulkPrintByLabelOpen, setIsBulkPrintByLabelOpen] = useState(false);
+  const [assignLabelTargetIds, setAssignLabelTargetIds] = useState<string[]>([]);
+
+  // Recovery codes reveal & print progress
   const [revealedCodes, setRevealedCodes] = useCodesRevealed();
   const [recoveryCodeMap, setRecoveryCodeMap] = useState<Record<string, string | null>>({});
   const [revealingCodes, setRevealingCodes] = useState(false);
-
-  const PAGE_SIZE = viewMode === "cards" ? 18 : 25;
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sheetGenerating, setSheetGenerating] = useState(false);
-  const [printAllOpen, setPrintAllOpen] = useState(false);
   const [printProgress, setPrintProgress] = useState<PrintProgressState>({
     isVisible: false,
     current: 0,
@@ -112,34 +120,26 @@ export default function QrCodesPage({
     stage: "",
   });
 
-  // Modal dialog states
-  const [generateModalOpen, setGenerateModalOpen] = useState(false);
-  const [isLabelManagerOpen, setIsLabelManagerOpen] = useState(false);
-  const [isAssignLabelOpen, setIsAssignLabelOpen] = useState(false);
-  const [isBulkPrintByLabelOpen, setIsBulkPrintByLabelOpen] = useState(false);
-  const [assignLabelTargetIds, setAssignLabelTargetIds] = useState<string[]>([]);
-
-  const [searchText, setSearchText] = useState(searchQuery);
-  const [openActionMenu, setOpenActionMenu] = useState<string | null>(null);
-
+  // Sync external search query
   useEffect(() => {
-    setSearchText(searchQuery);
+    if (searchQuery !== searchText) {
+      setSearchText(searchQuery);
+    }
   }, [searchQuery]);
 
-  // Metrics computation (including printed vs unprinted counts)
+  // Compute stable slot numbers for all records so deleting #3 leaves #4 as #4 forever
+  const stableSlotMap = useMemo(() => getStableSlotMap(qrList), [qrList]);
+
+  // Metrics computation
   const metrics = useMemo(() => {
     const total = qrList.length;
     let active = 0;
-    let totalScans = 0;
     let printed = 0;
     qrList.forEach((q) => {
       const phone = q.ownerPhone || q.phoneNumber || (q as any).phone;
       if (phone && phone.trim()) active += 1;
       else if (q.status === "active") active += 1;
-      totalScans += q.scans || 0;
-      if (printedStickerIds.has(q.id) || q.isPrinted) {
-        printed += 1;
-      }
+      if (printedStickerIds.has(q.id) || q.isPrinted) printed += 1;
     });
     return {
       total,
@@ -147,27 +147,69 @@ export default function QrCodesPage({
       pending: total - active,
       printed,
       unprinted: total - printed,
-      scans: totalScans,
     };
   }, [qrList, printedStickerIds]);
 
-  // Blank stock: no linked phone number and not active (same "pending" notion as the KPI above).
-  const unassignedInactive = useMemo(
-    () =>
-      qrList.filter((q) => {
-        const phone = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
-        return !String(phone).trim() && q.status !== "active";
-      }),
-    [qrList]
-  );
-  const unassignedAlreadyPrinted = useMemo(
-    () => unassignedInactive.filter((q) => printedStickerIds.has(q.id) || q.isPrinted).length,
-    [unassignedInactive, printedStickerIds]
-  );
+  // Reset page to 1 whenever filters or tab changes (Requirement 3: deterministic filter fetch)
+  const handleTabChange = (newTab: TabFilter) => {
+    setActiveTab(newTab);
+    setPage(1);
+  };
 
-  // Filtered fleet list
+  const handleFilterChange = useCallback((updater: () => void) => {
+    updater();
+    setPage(1);
+  }, []);
+
+  const clearAllFilters = () => {
+    setSearchText("");
+    setStatusFilter("all");
+    setCategoryFilter("all");
+    setLabelFilter("all");
+    setPrintStatusFilter("all");
+    setActiveTab("all");
+    setPage(1);
+  };
+
+  const hasActiveFilters =
+    searchText.trim() !== "" ||
+    statusFilter !== "all" ||
+    categoryFilter !== "all" ||
+    labelFilter !== "all" ||
+    printStatusFilter !== "all" ||
+    activeTab !== "all";
+
+  // Filtered dataset
   const filtered = useMemo(() => {
     let result = qrList;
+
+    // Segment tab filter
+    if (activeTab === "active") {
+      result = result.filter((q) => {
+        const phone = q.ownerPhone || q.phoneNumber || (q as any).phone;
+        return (phone && phone.trim()) || q.status === "active";
+      });
+    } else if (activeTab === "pending") {
+      result = result.filter((q) => {
+        const phone = q.ownerPhone || q.phoneNumber || (q as any).phone;
+        return !phone && q.status !== "active";
+      });
+    } else if (activeTab === "printed") {
+      result = result.filter((q) => printedStickerIds.has(q.id) || q.isPrinted);
+    }
+
+    // Status filter
+    if (statusFilter === "active") {
+      result = result.filter((q) => {
+        const phone = q.ownerPhone || q.phoneNumber || (q as any).phone;
+        return (phone && phone.trim()) || q.status === "active";
+      });
+    } else if (statusFilter === "inactive") {
+      result = result.filter((q) => {
+        const phone = q.ownerPhone || q.phoneNumber || (q as any).phone;
+        return !phone && q.status !== "active";
+      });
+    }
 
     // Category filter
     if (categoryFilter !== "all") {
@@ -190,7 +232,7 @@ export default function QrCodesPage({
       result = result.filter((q) => printedStickerIds.has(q.id) || q.isPrinted);
     }
 
-    // Search text filter
+    // Search query filter
     if (searchText.trim()) {
       const needle = searchText.toLowerCase().trim();
       result = result.filter(
@@ -198,26 +240,21 @@ export default function QrCodesPage({
           (r.id || "").toLowerCase().includes(needle) ||
           (r.ownerPhone || r.phoneNumber || (r as any).phone || "").toLowerCase().includes(needle) ||
           (r.category || "").toLowerCase().includes(needle) ||
-          (r.clientId || "").toLowerCase().includes(needle) ||
-          (r.recoveryCode || "").toLowerCase().includes(needle) ||
           (r.labelName || "").toLowerCase().includes(needle) ||
-          (r.vehicleName || "").toLowerCase().includes(needle) ||
           (r.vehicleNumber || "").toLowerCase().includes(needle)
       );
     }
+
     return result;
-  }, [qrList, categoryFilter, labelFilter, printStatusFilter, searchText, printedStickerIds]);
+  }, [qrList, activeTab, statusFilter, categoryFilter, labelFilter, printStatusFilter, searchText, printedStickerIds]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
-  useEffect(() => {
-    setPage(1);
-  }, [categoryFilter, labelFilter, printStatusFilter, searchText, viewMode]);
+  const paginated = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page, PAGE_SIZE]
+  );
 
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
+  // Clean selection state when items are deleted
   useEffect(() => {
     setSelectedIds((prev) => {
       const valid = new Set(qrList.map((q) => q.id));
@@ -226,316 +263,127 @@ export default function QrCodesPage({
     });
   }, [qrList]);
 
-  useEffect(() => {
-    setOpenActionMenu(null);
-  }, [page, categoryFilter, labelFilter, printStatusFilter, searchText, viewMode]);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t?.closest?.("[data-fx-more]")) return;
-      setOpenActionMenu(null);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  function toggleSelected(id: string) {
+  const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  }
+  };
 
-  const allPageSelected = paginated.length > 0 && paginated.every((q) => selectedIds.has(q.id));
-  function toggleSelectAllPage() {
+  const toggleSelectAllCurrent = () => {
+    const pageIds = paginated.map((q) => q.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (allPageSelected) paginated.forEach((q) => next.delete(q.id));
-      else paginated.forEach((q) => next.add(q.id));
+      if (allSelected) {
+        pageIds.forEach((id) => next.delete(id));
+      } else {
+        pageIds.forEach((id) => next.add(id));
+      }
       return next;
     });
-  }
+  };
 
-  function handleCopyId(id: string) {
-    navigator.clipboard.writeText(id);
-    setCopiedId(id);
-    setToast(`Copied ${id} to clipboard`);
-    setTimeout(() => {
-      setCopiedId(null);
-      setToast(null);
-    }, 2000);
-  }
+  // Safe Explicit Deletion Flow (Requirement 2 & 7)
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    const targetId = deleteTarget.id;
 
-  // Toggle single sticker print status
-  function handleTogglePrintedStatus(id: string) {
-    const isCurrentlyPrinted = printedStickerIds.has(id);
-    const newPrinted = !isCurrentlyPrinted;
-    activeSetPrintedIds((prev) => {
-      const next = new Set<string>(prev || []);
-      if (newPrinted) next.add(id);
-      else next.delete(id);
-      return Array.from(next);
-    });
+    try {
+      const res = await apiClient.qr.deleteQrCode(targetId);
+      if (!res?.success) {
+        throw new Error((res as any)?.error || "Delete call failed");
+      }
 
-    setQrList((prev) =>
-      prev.map((q) => (q.id === id ? { ...q, isPrinted: newPrinted } : q))
-    );
+      // Remove only the confirmed deleted item; never reorder or replace other slots
+      setQrList((prev) => prev.filter((item) => item.id !== targetId));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(targetId);
+        return next;
+      });
 
-    apiClient.qr.bulkUpdatePrintStatus([id], newPrinted).catch(() => {});
-    setToast(newPrinted ? `Tag ${id} marked as Printed` : `Tag ${id} marked as Unprinted`);
-    setTimeout(() => setToast(null), 2500);
-  }
+      setDeleteTarget(null);
+      setToast(`Sticker ${targetId} permanently deleted from database.`);
+      setTimeout(() => setToast(null), 3000);
+    } catch (err: any) {
+      setToast(`Failed to delete sticker: ${err?.message || "Please check connection"}`);
+      setTimeout(() => setToast(null), 4000);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
-  // Bulk toggle print status for selected stickers
-  function handleBulkTogglePrinted(markAsPrinted: boolean) {
-    const targetIds: string[] = [...selectedIds];
-    if (targetIds.length === 0) return;
-
-    activeSetPrintedIds((prev) => {
-      const next = new Set<string>(prev || []);
-      if (markAsPrinted) targetIds.forEach((id: string) => next.add(id));
-      else targetIds.forEach((id: string) => next.delete(id));
-      return Array.from(next);
-    });
-
-    setQrList((prev) =>
-      prev.map((q) => (selectedIds.has(q.id) ? { ...q, isPrinted: markAsPrinted } : q))
-    );
-
-    apiClient.qr.bulkUpdatePrintStatus(targetIds, markAsPrinted).catch(() => {});
-    setToast(
-      markAsPrinted
-        ? `Marked ${targetIds.length} stickers as Printed`
-        : `Marked ${targetIds.length} stickers as Unprinted`
-    );
-    setTimeout(() => setToast(null), 3000);
-  }
-
-  // Assign label to selected stickers
-  function handleBulkAssignLabel(labelName: string | null, labelColor: string | null) {
-    const targetIds: string[] = assignLabelTargetIds.length > 0 ? assignLabelTargetIds : [...selectedIds];
-    if (targetIds.length === 0) return;
-
-    setQrList((prev) =>
-      prev.map((q) =>
-        targetIds.includes(q.id)
-          ? {
-              ...q,
-              labelName: labelName || undefined,
-              labelColor: labelColor || undefined,
-            }
-          : q
-      )
-    );
-
-    apiClient.qr.bulkUpdateLabels(targetIds, labelName, labelColor).catch(() => {});
-    setToast(
-      labelName
-        ? `Assigned label "${labelName}" to ${targetIds.length} sticker${targetIds.length > 1 ? "s" : ""}`
-        : `Removed label from ${targetIds.length} sticker${targetIds.length > 1 ? "s" : ""}`
-    );
-    setAssignLabelTargetIds([]);
-    setTimeout(() => setToast(null), 3000);
-  }
-
-  function handleOpenAssignLabelForSingle(qr: QrRecord) {
-    setAssignLabelTargetIds([qr.id]);
-    setIsAssignLabelOpen(true);
-  }
-
-  const [isLocalPrintModalOpen, setIsLocalPrintModalOpen] = useState(false);
-  const [localPrintTargetSticker, setLocalPrintTargetSticker] = useState<QrRecord | null>(null);
-  const [localPrintBatch, setLocalPrintBatch] = useState<QrRecord[] | undefined>(undefined);
-
-  function handleTriggerPrintSheet(targetSticker?: QrRecord, selectedBatchStickers?: QrRecord[]) {
+  // Trigger print modal
+  function handleTriggerPrint(target?: QrRecord, batch?: QrRecord[]) {
     if (openPrintSheet) {
-      openPrintSheet(targetSticker, selectedBatchStickers);
-      return;
+      openPrintSheet(target, batch);
     }
-    setLocalPrintTargetSticker(targetSticker || null);
-    setLocalPrintBatch(selectedBatchStickers);
-    setIsLocalPrintModalOpen(true);
   }
 
-  // Bulk print by label shortcut
-  function handleSelectLabelForPrint(label: StickerLabel, onlyUnprinted = false) {
-    let matching: QrRecord[];
-    if (label.id === "unlabeled") {
-      matching = qrList.filter((q) => !q.labelName);
-    } else {
-      matching = qrList.filter(
-        (q) => (q.labelName || "").toLowerCase() === label.name.toLowerCase()
-      );
-    }
-    if (onlyUnprinted) {
-      matching = matching.filter((q) => !printedStickerIds.has(q.id) && !q.isPrinted);
-    }
-    if (matching.length === 0) {
-      setToast(`No ${onlyUnprinted ? "unprinted " : ""}stickers found for label "${label.name}"`);
-      setTimeout(() => setToast(null), 3000);
-      return;
-    }
-    handleTriggerPrintSheet(undefined, matching);
+  // Bulk print export
+  const cancelBatchExportRef = useRef(false);
+
+  function handleCancelBatchExport() {
+    cancelBatchExportRef.current = true;
+    setSheetGenerating(false);
+    setPrintProgress((prev) => ({ ...prev, isVisible: false }));
+    setToast("PDF export cancelled.");
+    setTimeout(() => setToast(null), 3000);
   }
 
-  function handlePrintSheet() {
-    const selected = filtered.filter((q) => selectedIds.has(q.id));
-    if (selected.length === 0) {
-      setToast("Select at least one sticker to include in the print sheet.");
-      setTimeout(() => setToast(null), 3000);
-      return;
-    }
-    void exportStickersPdf(selected, `rapiqr-print-sheet-${new Date().toISOString().slice(0, 10)}.pdf`);
-  }
-
-  /**
-   * "Print all unassigned": every sticker that has no linked phone number AND is
-   * not active — i.e. blank stock nobody has claimed yet — in ONE PDF. Looks at
-   * the whole fleet, not the current filter/selection.
-   */
-  async function handlePrintAllUnassigned() {
-    setPrintAllOpen(false);
-    if (unassignedInactive.length === 0) {
-      setToast("No unassigned, inactive stickers to print.");
-      setTimeout(() => setToast(null), 3000);
-      return;
-    }
-    await exportStickersPdf(
-      unassignedInactive,
-      `rapiqr-unassigned-stickers-${new Date().toISOString().slice(0, 10)}.pdf`
-    );
-  }
-
-  async function exportStickersPdf(selected: QrRecord[], fileName: string) {
+  async function handleExportPdf(selected: QrRecord[]) {
     if (sheetGenerating) return;
+    cancelBatchExportRef.current = false;
     setSheetGenerating(true);
     setPrintProgress({
       isVisible: true,
       current: 0,
       total: selected.length,
       percent: 2,
-      stage: "Resolving sticker codes…",
+      stage: "Preparing stickers…",
     });
 
     try {
-      const recoveryCodeMap = await fetchMissingRecoveryCodes(selected.map((q) => q.id));
+      const codes = await fetchMissingRecoveryCodes(selected.map((q) => q.id));
+      if (cancelBatchExportRef.current) return;
+
       const pdfBlob = await generateStickerBatchPdfBlob(
         selected,
         stickerPos,
-        recoveryCodeMap,
+        codes,
         1,
         (progressInfo) => {
-          setPrintProgress({
-            isVisible: true,
-            ...progressInfo,
-          });
-        }
+          if (!cancelBatchExportRef.current) {
+            setPrintProgress({ isVisible: true, ...progressInfo });
+          }
+        },
+        () => cancelBatchExportRef.current
       );
-      if (!pdfBlob) throw new Error("No PDF generated");
-      downloadSheetBlob(pdfBlob, fileName);
+      if (cancelBatchExportRef.current) return;
+      if (!pdfBlob) throw new Error("PDF generation failed");
+      downloadSheetBlob(pdfBlob, `rapiqr-batch-${new Date().toISOString().slice(0, 10)}.pdf`);
 
-      // Mark the printed stickers as printed
-      const newlyPrintedIds = selected.map((s) => s.id);
-      const newlyPrinted = new Set(newlyPrintedIds);
-      activeSetPrintedIds((prev) => {
-        const next = new Set<string>(prev || []);
-        newlyPrintedIds.forEach((id) => next.add(id));
-        return Array.from(next);
-      });
+      // Mark as printed
+      const ids = selected.map((s) => s.id);
+      activeSetPrintedIds((prev) => Array.from(new Set([...(prev || []), ...ids])));
       setQrList((prev) =>
-        prev.map((q) => (newlyPrinted.has(q.id) ? { ...q, isPrinted: true } : q))
+        prev.map((q) => (ids.includes(q.id) ? { ...q, isPrinted: true } : q))
       );
-      apiClient.qr.bulkUpdatePrintStatus(newlyPrintedIds, true).catch(() => {});
-
-      setToast(`Generated a print-ready PDF for ${selected.length} sticker${selected.length > 1 ? "s" : ""}`);
-    } catch (err) {
-      console.error("Failed to generate print sheet:", err);
-      setToast("Failed to generate print sheet — please try again");
+      setToast(`PDF generated for ${selected.length} sticker(s)`);
+      setTimeout(() => setToast(null), 3500);
+    } catch (err: any) {
+      if (!cancelBatchExportRef.current) {
+        setToast("Failed to generate PDF sheet.");
+        setTimeout(() => setToast(null), 4000);
+      }
     } finally {
       setSheetGenerating(false);
       setPrintProgress((prev) => ({ ...prev, isVisible: false }));
-      setTimeout(() => setToast(null), 4000);
     }
-  }
-
-  function recordFromV2Response(data: any, fallbackCategory: string, labelName?: string, labelColor?: string): QrRecord {
-    return {
-      id: data.id,
-      clientId: data.client_id,
-      qrUrl: qrFullUrl(data.id),
-      createdAt: data.created_at || new Date().toISOString(),
-      scans: 0,
-      status: data.status || "inactive",
-      template: data.template_name || "Standard Tag",
-      category: data.category || fallbackCategory,
-      fg: data.fg_color || "000000",
-      bg: data.bg_color || "FFFFFF",
-      recoveryCode: data.recoveryCode,
-      labelName: data.label_name || labelName || undefined,
-      labelColor: data.label_color || labelColor || undefined,
-      isPrinted: false,
-    };
-  }
-
-  const chosenGeneratorLabel = labels.find((l) => l.id === selectedLabelId);
-
-  async function doGenerateBulk() {
-    const count = Math.min(Math.max(1, bulkCount), 200);
-    setBulkProgress(0);
-
-    const recoveryRows: [string, string][] = [];
-    let failedCount = 0;
-    const CHUNK = 20;
-
-    for (let i = 0; i < count; i++) {
-      try {
-        const res = await apiClient.qr.saveQrCodeV2({
-          category: selectedCategory,
-          labelName: chosenGeneratorLabel?.name || undefined,
-          labelColor: chosenGeneratorLabel?.color || undefined,
-        });
-        if (!res?.success || !res.data) throw new Error(res?.error || "save failed");
-        const rec = recordFromV2Response(res.data, selectedCategory, chosenGeneratorLabel?.name, chosenGeneratorLabel?.color);
-        setQrList((prev) => [rec, ...prev]);
-        if (rec.recoveryCode) recoveryRows.push([rec.id, rec.recoveryCode]);
-        dispatchActivationToUserDashboard(rec);
-      } catch (err) {
-        console.warn(`Failed to generate QR ${i + 1}/${count}:`, err);
-        failedCount += 1;
-      }
-      if ((i + 1) % CHUNK === 0 || i === count - 1) {
-        setBulkProgress(Math.min(100, Math.round(((i + 1) / count) * 100)));
-      }
-    }
-
-    setBulkProgress(null);
-
-    const savedCount = count - failedCount;
-    const labelInfo = chosenGeneratorLabel ? ` with label "${chosenGeneratorLabel.name}"` : "";
-    if (failedCount > 0) {
-      setToast(
-        `${savedCount} of ${count} QR codes generated${labelInfo} — ${failedCount} failed to save.`
-      );
-    } else if (recoveryRows.length > 0) {
-      downloadRecoveryCodesCsv(recoveryRows);
-      setToast(`${count} QR codes generated${labelInfo} — recovery codes downloaded`);
-    } else {
-      setToast(`${count} QR codes generated & synced${labelInfo}`);
-    }
-    setTimeout(() => setToast(null), 5000);
-  }
-
-  function downloadRecoveryCodesCsv(rows: [string, string][]) {
-    const csvRows = [["Sticker ID", "Recovery Code"], ...rows];
-    const csv = csvRows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `rapiqr-recovery-codes-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
   }
 
   async function fetchMissingRecoveryCodes(ids: string[]) {
@@ -548,32 +396,29 @@ export default function QrCodesPage({
       setRecoveryCodeMap(merged);
       return merged;
     } catch {
-      setToast("Failed to load recovery codes — please try again.");
-      setTimeout(() => setToast(null), 4000);
       return recoveryCodeMap;
     } finally {
       setRevealingCodes(false);
     }
   }
 
-  async function downloadCsv() {
-    const codes = await fetchMissingRecoveryCodes(qrList.map((q) => q.id));
+  // Export fleet CSV
+  function downloadFleetCsv() {
     const rows = [
-      ["QR ID", "Recovery Code", "Phone Number", "Category", "Label", "Printed", "Status", "Created"],
-      ...qrList.map((q) => {
-        const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
-        const isActivated = Boolean(phoneNum && phoneNum.trim());
-        const computedStatus = isActivated ? "active" : q.status;
-        const code = codes[q.id] ?? q.recoveryCode;
-        const isPrinted = printedStickerIds.has(q.id) || q.isPrinted;
+      ["Slot #", "Sticker ID", "Phone Number", "Category", "Batch Label", "Printed", "Status", "Created At"],
+      ...filtered.map((q) => {
+        const phone = q.ownerPhone || q.phoneNumber || (q as any).phone || "";
+        const isAct = Boolean(phone && phone.trim());
+        const isPr = printedStickerIds.has(q.id) || q.isPrinted;
+        const slot = stableSlotMap.get(q.id);
         return [
+          formatSlotNumber(slot),
           q.id,
-          code || "N/A",
-          phoneNum || "N/A",
+          phone || "Unassigned",
           q.category || "car",
           q.labelName || "None",
-          isPrinted ? "Yes" : "No",
-          computedStatus,
+          isPr ? "Yes" : "No",
+          isAct ? "Active" : "Pending",
           fmtDate(q.createdAt),
         ];
       }),
@@ -582,206 +427,229 @@ export default function QrCodesPage({
     const blob = new Blob([csv], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "rapiqr-fleet-export.csv";
+    a.download = `rapiqr-fleet-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
   }
 
-  const kpiCards: FxKpiCardSpec[] = [
-    { key: "total", label: "Total Stickers", value: metrics.total },
-    { key: "active", label: "Active", value: metrics.active, tone: "green" },
-    { key: "pending", label: "Pending", value: metrics.pending, tone: "amber" },
-    { key: "printed", label: "Printed", value: metrics.printed, tone: "green" },
-    { key: "unprinted", label: "Unprinted", value: metrics.unprinted, tone: "amber" },
-    { key: "scans", label: "Total Scans", value: metrics.scans, icon: <Activity size={14} /> },
-  ];
+  // Mark selection as printed/unprinted
+  const handleBulkSetPrinted = (printed: boolean) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    activeSetPrintedIds((prev) => {
+      const set = new Set(prev || []);
+      if (printed) ids.forEach((id) => set.add(id));
+      else ids.forEach((id) => set.delete(id));
+      return Array.from(set);
+    });
+    setQrList((prev) =>
+      prev.map((q) => (ids.includes(q.id) ? { ...q, isPrinted: printed } : q))
+    );
+    setToast(`${ids.length} sticker(s) marked as ${printed ? "printed" : "unprinted"}.`);
+    setTimeout(() => setToast(null), 2500);
+  };
+
+  const isAllCurrentPageSelected =
+    paginated.length > 0 && paginated.every((q) => selectedIds.has(q.id));
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pt-5 pb-16 space-y-6 text-[var(--fx-ink)] font-body bg-[var(--fx-canvas)] min-h-screen">
-      {/* ── Page Header ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3">
-        <h1 className="fx-text-heading-page text-[var(--fx-ink)]">QR Fleet Management</h1>
-      </div>
-
-      {/* ── Fleet KPI Strip ──────────────────────────────────────────────────── */}
-      <FxKpiStrip cards={kpiCards} />
-
-      {/* ── Generator Console Card ───────────────────────────────── */}
-      <div className="bg-white border border-[var(--fx-border)] rounded-xl shadow-xs p-5 sm:p-6 transition-all space-y-4">
-        <div className="flex flex-wrap items-end gap-4 sm:gap-6">
-          {/* Mode Switcher */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--fx-ink-2)]">Generation Mode</label>
-            <div className="inline-flex rounded-lg border border-[var(--fx-border)] overflow-hidden shadow-2xs">
-              <button
-                type="button"
-                onClick={() => setTab("single")}
-                className={`px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
-                  tab === "single"
-                    ? "bg-[var(--fx-ink)] text-white"
-                    : "bg-white text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]"
-                }`}
-              >
-                Single Tag
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab("bulk")}
-                className={`px-4 py-2 text-xs font-bold border-l border-[var(--fx-border)] transition-all cursor-pointer ${
-                  tab === "bulk"
-                    ? "bg-[var(--fx-ink)] text-white"
-                    : "bg-white text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]"
-                }`}
-              >
-                Bulk Sheet
-              </button>
-            </div>
+    <div className="px-6 lg:px-10 py-8 space-y-6 text-gray-900 bg-gray-50/60 min-h-screen">
+      {/* ── 1. Page Header (Linear / SquareUI Style) ───────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          {/* Header Squircle Icon Badge matching reference image */}
+          <div className="w-12 h-12 rounded-2xl bg-orange-500/10 text-orange-600 flex items-center justify-center border border-orange-200/50 shadow-2xs shrink-0">
+            <QrCode size={22} strokeWidth={2.2} />
           </div>
-
-          {/* Category Dropdown */}
-          <div className="flex-1 min-w-[170px] flex flex-col gap-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--fx-ink-2)]">Category</label>
-            <div className="relative">
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full pl-3 pr-8 py-2 text-xs font-semibold rounded-lg border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink)] outline-none focus:border-[var(--fx-accent)] focus:ring-2 focus:ring-[var(--fx-accent)]/20 transition-all cursor-pointer shadow-2xs"
-              >
-                {STICKER_CATEGORIES.map((cat) => (
-                  <option key={cat.value} value={cat.value}>
-                    {cat.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Batch Color Label Dropdown */}
-          <div className="flex-1 min-w-[210px] flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--fx-ink-2)]">Batch Label</label>
-              <button
-                type="button"
-                onClick={() => setIsLabelManagerOpen(true)}
-                className="text-[11px] text-[var(--fx-accent)] font-bold hover:text-[var(--fx-accent-hover)] transition-colors cursor-pointer flex items-center gap-1"
-              >
-                <Plus size={11} />
-                <span>Manage</span>
-              </button>
-            </div>
-            <div className="relative">
-              <select
-                value={selectedLabelId}
-                onChange={(e) => {
-                  if (e.target.value === "create_new") {
-                    setIsLabelManagerOpen(true);
-                  } else {
-                    setSelectedLabelId(e.target.value);
-                  }
-                }}
-                className="w-full pl-3 pr-8 py-2 text-xs font-semibold rounded-lg border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink)] outline-none focus:border-[var(--fx-accent)] focus:ring-2 focus:ring-[var(--fx-accent)]/20 transition-all cursor-pointer shadow-2xs"
-              >
-                <option value="none">No Label</option>
-                {labels.map((lbl) => (
-                  <option key={lbl.id} value={lbl.id}>
-                    🏷️ {lbl.name}
-                  </option>
-                ))}
-                <option value="create_new">+ Create New Label…</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Bulk Quantity Input */}
-          {tab === "bulk" && (
-            <div className="w-[110px] flex flex-col gap-1.5">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--fx-ink-2)]">Quantity</label>
-              <input
-                type="number"
-                min={1}
-                max={200}
-                value={bulkCount}
-                onChange={(e) => setBulkCount(parseInt(e.target.value, 10) || 1)}
-                className="w-full px-3 py-2 text-xs font-bold rounded-lg border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink)] outline-none focus:border-[var(--fx-accent)] focus:ring-2 focus:ring-[var(--fx-accent)]/20 shadow-2xs"
-              />
-            </div>
-          )}
-
-          {/* Action CTA */}
-          <div className="ml-auto sm:ml-0">
-            {tab === "single" ? (
-              <button
-                type="button"
-                onClick={() => setGenerateModalOpen(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[var(--fx-accent)] text-white font-bold text-xs hover:bg-[var(--fx-accent-hover)] active:scale-95 transition-all shadow-xs cursor-pointer"
-              >
-                <Plus size={15} strokeWidth={2.4} />
-                <span>Generate Tag</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => doGenerateBulk()}
-                disabled={bulkProgress !== null}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[var(--fx-accent)] text-white font-bold text-xs hover:bg-[var(--fx-accent-hover)] active:scale-95 disabled:opacity-50 transition-all shadow-xs cursor-pointer"
-              >
-                {bulkProgress !== null ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : (
-                  <Sparkles size={15} strokeWidth={2.4} />
-                )}
-                <span>Generate {bulkCount} Tags</span>
-              </button>
-            )}
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">
+              QR Stickers Fleet
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-500 font-normal">
+              Manage, track, print and deploy vehicle & asset QR tags
+            </p>
           </div>
         </div>
 
-        {/* Selected Label Display */}
-        {chosenGeneratorLabel && (
-          <div className="flex items-center gap-2 pt-1">
-            <span className="text-xs text-[var(--fx-ink-2)]">Will be tagged with:</span>
-            <LabelBadge name={chosenGeneratorLabel.name} color={chosenGeneratorLabel.color} size="sm" />
-          </div>
-        )}
+        {/* Primary Header Action: ONE Create Button + Utility Actions */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Single Primary Create Button (Requirement 5) */}
+          <button
+            type="button"
+            onClick={() => setCreateModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-950 text-white font-semibold text-xs hover:bg-black active:scale-98 transition-all shadow-xs cursor-pointer"
+          >
+            <Plus size={16} strokeWidth={2.4} />
+            <span>+ Create</span>
+          </button>
 
-        {/* Bulk Progress Bar */}
-        {bulkProgress !== null && (
-          <div className="mt-4 pt-4 border-t border-[var(--fx-sidebar-hover)]">
-            <div className="w-full bg-[var(--fx-sidebar-hover)] rounded-full h-2 overflow-hidden">
-              <div
-                className="h-full bg-[var(--fx-accent)] transition-all duration-200"
-                style={{ width: `${bulkProgress}%` }}
-              />
-            </div>
-            <div className="flex justify-between items-center text-[11px] text-[var(--fx-ink-2)] font-semibold mt-1.5">
-              <span>Generating stickers and storing recovery records...</span>
-              <span className="font-mono text-[var(--fx-accent)]">{bulkProgress}%</span>
-            </div>
-          </div>
-        )}
+          {/* Export Fleet CSV */}
+          <button
+            type="button"
+            onClick={downloadFleetCsv}
+            disabled={filtered.length === 0}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white border border-gray-200/80 text-gray-700 font-semibold text-xs hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-2xs cursor-pointer disabled:opacity-40"
+            title="Export CSV"
+          >
+            <Download size={14} />
+            <span className="hidden sm:inline">Export CSV</span>
+          </button>
+
+          {/* Label Manager */}
+          <button
+            type="button"
+            onClick={() => setIsLabelManagerOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white border border-gray-200/80 text-gray-700 font-semibold text-xs hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-2xs cursor-pointer"
+          >
+            <Tag size={13} className="text-orange-600" />
+            <span>Labels</span>
+          </button>
+
+          {/* Deleted Restore */}
+          <button
+            type="button"
+            onClick={openRestore}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white border border-gray-200/80 text-gray-700 font-semibold text-xs hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-2xs cursor-pointer"
+            title="Restore a deleted sticker with proof of recovery code"
+          >
+            <RefreshCw size={13} />
+            <span className="hidden md:inline">Restore</span>
+          </button>
+        </div>
       </div>
 
-      {/* ── Toolbar: Search, Filters, View Modes & Bulk Actions ───────────────────────── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        {/* Left Side: Search & Filters */}
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <div className="relative min-w-[210px]">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fx-faint)]" />
+      {/* ── 2. Segmented Capsule Tabs (Matching Reference Image) ──────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200/80 pb-4">
+        {/* Capsule Tabs */}
+        <div className="inline-flex p-1 rounded-xl bg-gray-200/70 border border-gray-200/80 self-start">
+          <button
+            type="button"
+            onClick={() => handleTabChange("all")}
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              activeTab === "all"
+                ? "bg-white text-gray-950 shadow-2xs font-bold"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            All Stickers ({metrics.total})
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange("active")}
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              activeTab === "active"
+                ? "bg-white text-gray-950 shadow-2xs font-bold"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            Active ({metrics.active})
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange("pending")}
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              activeTab === "pending"
+                ? "bg-white text-gray-950 shadow-2xs font-bold"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            Pending Stock ({metrics.pending})
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange("printed")}
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              activeTab === "printed"
+                ? "bg-white text-gray-950 shadow-2xs font-bold"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            Printed ({metrics.printed})
+          </button>
+        </div>
+
+        {/* View Mode Switcher: Cards vs Table */}
+        <div className="flex items-center gap-1.5 self-end sm:self-auto">
+          <div className="inline-flex p-0.5 rounded-lg border border-gray-200/80 bg-white shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setViewMode("cards")}
+              className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                viewMode === "cards" ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900"
+              }`}
+              title="Cards Grid View"
+            >
+              <LayoutGrid size={15} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                viewMode === "table" ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900"
+              }`}
+              title="Table View"
+            >
+              <TableIcon size={15} />
+            </button>
+          </div>
+
+          {/* Reveal Recovery Codes Toggle */}
+          <button
+            type="button"
+            onClick={async () => {
+              const next = !revealedCodes;
+              setRevealedCodes(next);
+              if (next) await fetchMissingRecoveryCodes(qrList.map((q) => q.id));
+            }}
+            disabled={revealingCodes}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200/80 transition-colors cursor-pointer ${
+              revealedCodes ? "bg-gray-900 text-white" : "bg-white text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            {revealingCodes ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : revealedCodes ? (
+              <EyeOff size={13} />
+            ) : (
+              <Eye size={13} />
+            )}
+            <span className="hidden sm:inline">{revealedCodes ? "Hide Codes" : "See Codes"}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── 3. Single Unified Horizontal Filter Bar (Requirement 4) ───────── */}
+      <div className="p-3 bg-white border border-gray-200/80 rounded-2xl shadow-2xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
+          {/* Search Input */}
+          <div className="relative flex-1 min-w-[200px] max-w-xs">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search sticker ID, label, phone..."
+              placeholder="Search ID, phone, vehicle..."
               value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink)] outline-none focus:border-[var(--fx-accent)] focus:ring-2 focus:ring-[var(--fx-accent)]/20 shadow-2xs"
+              onChange={(e) => handleFilterChange(() => setSearchText(e.target.value))}
+              className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-gray-200/90 bg-gray-50/50 text-gray-900 placeholder:text-gray-400 outline-none focus:bg-white focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 transition-all"
             />
           </div>
 
-          {/* Category Filter */}
+          {/* Status Dropdown */}
+          <select
+            value={statusFilter}
+            onChange={(e) => handleFilterChange(() => setStatusFilter(e.target.value as any))}
+            className="px-3 py-1.5 text-xs font-medium rounded-xl border border-gray-200/90 bg-white text-gray-700 outline-none hover:border-gray-300 focus:border-gray-900 cursor-pointer transition-all"
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active Only</option>
+            <option value="inactive">Pending Stock Only</option>
+          </select>
+
+          {/* Category Dropdown */}
           <select
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-2 text-xs font-semibold rounded-lg border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink-2)] outline-none cursor-pointer focus:border-[var(--fx-accent)] shadow-2xs"
+            onChange={(e) => handleFilterChange(() => setCategoryFilter(e.target.value))}
+            className="px-3 py-1.5 text-xs font-medium rounded-xl border border-gray-200/90 bg-white text-gray-700 outline-none hover:border-gray-300 focus:border-gray-900 cursor-pointer transition-all"
           >
-            <option value="all">All Categories ({qrList.length})</option>
+            <option value="all">All Categories</option>
             {STICKER_CATEGORIES.map((cat) => (
               <option key={cat.value} value={cat.value}>
                 {cat.label}
@@ -792,10 +660,10 @@ export default function QrCodesPage({
           {/* Label Filter */}
           <select
             value={labelFilter}
-            onChange={(e) => setLabelFilter(e.target.value)}
-            className="px-3 py-2 text-xs font-semibold rounded-lg border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink-2)] outline-none cursor-pointer focus:border-[var(--fx-accent)] shadow-2xs"
+            onChange={(e) => handleFilterChange(() => setLabelFilter(e.target.value))}
+            className="px-3 py-1.5 text-xs font-medium rounded-xl border border-gray-200/90 bg-white text-gray-700 outline-none hover:border-gray-300 focus:border-gray-900 cursor-pointer transition-all"
           >
-            <option value="all">All Labels ({labels.length})</option>
+            <option value="all">All Batch Labels</option>
             {labels.map((lbl) => (
               <option key={lbl.id} value={lbl.name}>
                 🏷️ {lbl.name}
@@ -807,131 +675,41 @@ export default function QrCodesPage({
           {/* Print Status Filter */}
           <select
             value={printStatusFilter}
-            onChange={(e) => setPrintStatusFilter(e.target.value as any)}
-            className="px-3 py-2 text-xs font-semibold rounded-lg border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink-2)] outline-none cursor-pointer focus:border-[var(--fx-accent)] shadow-2xs"
+            onChange={(e) => handleFilterChange(() => setPrintStatusFilter(e.target.value as any))}
+            className="px-3 py-1.5 text-xs font-medium rounded-xl border border-gray-200/90 bg-white text-gray-700 outline-none hover:border-gray-300 focus:border-gray-900 cursor-pointer transition-all"
           >
             <option value="all">All Print Status</option>
-            <option value="unprinted">🖨️ Unprinted Only ({metrics.unprinted})</option>
-            <option value="printed">✅ Printed Only ({metrics.printed})</option>
+            <option value="unprinted">Unprinted Only ({metrics.unprinted})</option>
+            <option value="printed">Printed Only ({metrics.printed})</option>
           </select>
+
+          {/* Clear All Filters Button */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-950 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
+            >
+              <X size={13} />
+              <span>Clear Filters</span>
+            </button>
+          )}
         </div>
 
-        {/* Right Side: Action Buttons (segmented pill style) */}
-        <div className="flex items-center gap-2 flex-wrap">
-
-          {/* Primary action group: Print by Label */}
-          <button
-            type="button"
-            onClick={() => setIsBulkPrintByLabelOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-lg bg-[var(--fx-ink)] text-white hover:bg-[var(--fx-ink)]/90 transition-all shadow-xs cursor-pointer"
-            title="Bulk print stickers grouped by label"
-          >
-            <Printer size={13} />
-            <span>Print by Label</span>
-          </button>
-
-          {/* Secondary button group: Labels | Table/Cards | Restore | See Codes */}
-          <div className="inline-flex rounded-lg border border-[var(--fx-border-strong)] overflow-hidden shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setIsLabelManagerOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold bg-white text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer border-r border-[var(--fx-border)]"
-              title="Manage batch labels"
-            >
-              <Tag size={13} className="text-[var(--fx-accent)]" />
-              <span>Labels</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("table")}
-              className={`inline-flex items-center justify-center px-2.5 py-2 text-xs font-bold transition-all cursor-pointer border-r border-[var(--fx-border)] ${
-                viewMode === "table" ? "bg-[var(--fx-ink)] text-white" : "bg-white text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]"
-              }`}
-              title="Table View"
-            >
-              <TableIcon size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("cards")}
-              className={`inline-flex items-center justify-center px-2.5 py-2 text-xs font-bold transition-all cursor-pointer border-r border-[var(--fx-border)] ${
-                viewMode === "cards" ? "bg-[var(--fx-ink)] text-white" : "bg-white text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]"
-              }`}
-              title="Card View"
-            >
-              <LayoutGrid size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={openRestore}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold bg-white text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer border-r border-[var(--fx-border)]"
-              title="Restore a deleted sticker"
-            >
-              <RefreshCw size={12} />
-              <span className="hidden sm:inline">Restore</span>
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                const next = !revealedCodes;
-                setRevealedCodes(next);
-                if (next) await fetchMissingRecoveryCodes(qrList.map((q) => q.id));
-              }}
-              disabled={revealingCodes}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold transition-colors cursor-pointer disabled:opacity-60 ${
-                revealedCodes ? "bg-[var(--fx-ink)] text-white" : "bg-white text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]"
-              }`}
-              title="Toggle recovery codes"
-            >
-              {revealingCodes ? <Loader2 size={12} className="animate-spin" /> : revealedCodes ? <EyeOff size={12} /> : <Eye size={12} />}
-              <span className="hidden sm:inline">{revealedCodes ? "Hide Codes" : "See Codes"}</span>
-            </button>
-          </div>
-
-          {/* Export group: PDF | CSV */}
-          <div className="inline-flex rounded-lg border border-[var(--fx-border-strong)] overflow-hidden shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setPrintAllOpen(true)}
-              disabled={unassignedInactive.length === 0 || sheetGenerating}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold bg-white text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] transition-colors disabled:opacity-40 cursor-pointer border-r border-[var(--fx-border)]"
-              title="One PDF with every sticker that has no linked phone and isn't active"
-            >
-              <Printer size={13} />
-              <span>Print all unassigned ({unassignedInactive.length})</span>
-            </button>
-            <button
-              type="button"
-              onClick={handlePrintSheet}
-              disabled={selectedIds.size === 0 || sheetGenerating}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold bg-white text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] transition-colors shadow-2xs disabled:opacity-40 cursor-pointer border-r border-[var(--fx-border)]"
-              title="Select stickers then export PDF"
-            >
-              {sheetGenerating ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />}
-              <span>Export PDF{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</span>
-            </button>
-            <button
-              type="button"
-              onClick={downloadCsv}
-              disabled={qrList.length === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold bg-white text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] transition-colors disabled:opacity-40 cursor-pointer"
-            >
-              <Download size={12} />
-              <span>CSV</span>
-            </button>
-          </div>
-
+        {/* Count summary */}
+        <div className="text-xs text-gray-500 font-medium whitespace-nowrap">
+          Showing <span className="font-bold text-gray-900">{filtered.length}</span> matching stickers
         </div>
       </div>
 
-      {/* ── Selection Action Bar (when items are checked) ────────────── */}
+      {/* ── 4. Batch Selection Toolbar (when items selected) ──────────────── */}
       {selectedIds.size > 0 && (
-        <div className="bg-[var(--fx-accent-soft)] border border-[var(--fx-border-strong)] rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-sm animate-in fade-in slide-in-from-top-2 duration-150">
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-[var(--fx-accent)] text-white text-xs font-bold flex items-center justify-center">
+        <div className="bg-gray-900 text-white rounded-2xl p-3.5 px-5 flex flex-wrap items-center justify-between gap-4 shadow-lg animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="flex items-center gap-3">
+            <span className="w-6 h-6 rounded-full bg-white/20 text-white font-bold text-xs flex items-center justify-center">
               {selectedIds.size}
             </span>
-            <span className="text-xs font-bold text-[var(--fx-accent)]">
+            <span className="text-xs font-semibold">
               {selectedIds.size} sticker{selectedIds.size > 1 ? "s" : ""} selected
             </span>
           </div>
@@ -943,7 +721,7 @@ export default function QrCodesPage({
                 setAssignLabelTargetIds(Array.from(selectedIds));
                 setIsAssignLabelOpen(true);
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[var(--fx-border-strong)] text-[var(--fx-accent-hover)] text-xs font-bold hover:bg-[var(--fx-sidebar-hover)] transition-colors cursor-pointer shadow-2xs"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors cursor-pointer"
             >
               <Tag size={13} />
               <span>Assign Label</span>
@@ -951,29 +729,29 @@ export default function QrCodesPage({
 
             <button
               type="button"
-              onClick={() => handleBulkTogglePrinted(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--fx-green)] text-white text-xs font-bold hover:bg-[var(--fx-green)] transition-colors cursor-pointer shadow-2xs"
+              onClick={() => handleBulkSetPrinted(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors cursor-pointer"
             >
               <CheckCircle2 size={13} />
-              <span>Mark as Printed</span>
+              <span>Mark Printed</span>
             </button>
 
             <button
               type="button"
-              onClick={() => handleBulkTogglePrinted(false)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[var(--fx-border-strong)] text-[var(--fx-ink-2)] text-xs font-bold hover:bg-[var(--fx-sidebar-hover)] transition-colors cursor-pointer shadow-2xs"
+              onClick={() => handleBulkSetPrinted(false)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors cursor-pointer"
             >
               <Printer size={13} />
-              <span>Mark as Unprinted</span>
+              <span>Mark Unprinted</span>
             </button>
 
             <button
               type="button"
               onClick={() => {
                 const selected = filtered.filter((q) => selectedIds.has(q.id));
-                handleTriggerPrintSheet(undefined, selected);
+                handleTriggerPrint(undefined, selected);
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[var(--fx-accent-hover)] text-white text-xs font-bold hover:bg-[var(--fx-accent-hover)] transition-colors cursor-pointer shadow-2xs"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs"
             >
               <Printer size={13} />
               <span>Print Sheet Modal ({selectedIds.size})</span>
@@ -982,7 +760,7 @@ export default function QrCodesPage({
             <button
               type="button"
               onClick={() => setSelectedIds(new Set())}
-              className="text-xs text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] font-bold px-2 py-1 cursor-pointer"
+              className="text-xs text-gray-400 hover:text-white font-medium px-2 py-1 cursor-pointer"
             >
               Deselect All
             </button>
@@ -990,462 +768,453 @@ export default function QrCodesPage({
         </div>
       )}
 
-      {/* ── Empty State ────────────────────────────────────────────── */}
+      {/* ── 5. Main Content: Cards Grid vs Table ───────────────────────────── */}
       {filtered.length === 0 ? (
-        <div className="bg-white border border-[var(--fx-border)] rounded-xl p-8 text-center shadow-xs">
-          <div className="w-12 h-12 rounded-xl bg-[var(--fx-accent-soft)] text-[var(--fx-accent)] flex items-center justify-center mx-auto mb-3 border border-[var(--fx-border-strong)]">
-            <QrCode size={22} />
+        /* Empty State */
+        <div className="bg-white border border-gray-200/80 rounded-2xl p-12 text-center shadow-2xs space-y-3">
+          <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-400 mx-auto">
+            <QrCode size={26} />
           </div>
-          <h3 className="font-bold text-[var(--fx-ink)] text-base">
-            {categoryFilter !== "all" || labelFilter !== "all" || printStatusFilter !== "all" || searchText.trim()
-              ? "No stickers match current filters."
-              : "No QR codes yet — generate one using the console above."}
+          <h3 className="text-base font-bold text-gray-900">
+            {hasActiveFilters ? "No stickers match your filters" : "No QR stickers in fleet yet"}
           </h3>
-          {(categoryFilter !== "all" || labelFilter !== "all" || printStatusFilter !== "all" || searchText.trim()) && (
-            <button
-              onClick={() => {
-                setCategoryFilter("all");
-                setLabelFilter("all");
-                setPrintStatusFilter("all");
-                setSearchText("");
-              }}
-              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-[var(--fx-sidebar-hover)] text-[var(--fx-ink-2)] hover:bg-[var(--fx-border)] transition-colors cursor-pointer"
-            >
-              <RefreshCw size={12} /> Clear All Filters
-            </button>
-          )}
+          <p className="text-xs text-gray-500 max-w-sm mx-auto">
+            {hasActiveFilters
+              ? "Try clearing or adjusting your search filters to find what you are looking for."
+              : "Create your first QR sticker to begin managing and deploying vehicle tags."}
+          </p>
+          <div className="pt-2">
+            {hasActiveFilters ? (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer"
+              >
+                <RefreshCw size={13} />
+                <span>Reset All Filters</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCreateModalOpen(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded-xl bg-gray-900 text-white hover:bg-black transition-colors cursor-pointer shadow-xs"
+              >
+                <Plus size={15} />
+                <span>+ Create First QR Sticker</span>
+              </button>
+            )}
+          </div>
+        </div>
+      ) : viewMode === "cards" ? (
+        /* ── Cards Grid View (Matching Reference Style: rounded-2xl, subtle borders) ── */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          {paginated.map((q) => {
+            const slotNumber = stableSlotMap.get(q.id);
+            const catKey = (q.category || "car") as any;
+            const catLabel = getCategoryLabel(catKey);
+            const catIcon = getCategoryIcon(catKey);
+            const phone = q.ownerPhone || q.phoneNumber || (q as any).phone || "";
+            const isActivated = Boolean(phone && phone.trim());
+            const isPrinted = printedStickerIds.has(q.id) || q.isPrinted;
+            const isSelected = selectedIds.has(q.id);
+
+            return (
+              <div
+                key={q.id}
+                className={`
+                  bg-white rounded-2xl border transition-all duration-150 overflow-hidden flex flex-col justify-between
+                  hover:shadow-md hover:border-gray-300
+                  ${isSelected ? "border-gray-900 ring-2 ring-gray-900/10" : "border-gray-200/80 shadow-2xs"}
+                `}
+              >
+                {/* Card Top: Stable Slot Number, Selection, Status */}
+                <div className="p-4 pb-3 flex items-center justify-between border-b border-gray-100 bg-gray-50/40">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelect(q.id)}
+                      className="w-4 h-4 rounded-md border-gray-300 text-gray-900 focus:ring-gray-900 cursor-pointer"
+                    />
+                    {/* Stable Permanent Slot Number */}
+                    <span className="font-mono text-xs font-bold text-gray-800 bg-gray-200/70 px-2 py-0.5 rounded-md">
+                      {formatSlotNumber(slotNumber)}
+                    </span>
+                  </div>
+
+                  {/* Status Pill */}
+                  <span
+                    className={`
+                      text-[11px] font-semibold px-2 py-0.5 rounded-full border
+                      ${
+                        isActivated
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                          : "bg-amber-50 text-amber-700 border-amber-200/60"
+                      }
+                    `}
+                  >
+                    {isActivated ? "Active" : "Pending"}
+                  </span>
+                </div>
+
+                {/* Card Middle: Preview with Hover Zoom */}
+                <div
+                  className="p-5 flex flex-col items-center justify-center bg-gray-50/20 cursor-pointer group"
+                  onClick={() => openQuickLook(q)}
+                >
+                  <div className="w-full max-w-[200px] transition-transform duration-200 group-hover:scale-105">
+                    <StickerMockupView qr={q} mode="physical" />
+                  </div>
+                </div>
+
+                {/* Card Details & Metadata */}
+                <div className="p-4 pt-3 border-t border-gray-100 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="inline-flex items-center gap-1.5 text-gray-700 font-semibold">
+                      <span>{catIcon}</span>
+                      <span>{catLabel}</span>
+                    </span>
+
+                    {/* Batch Label */}
+                    {q.labelName ? (
+                      <LabelBadge
+                        name={q.labelName}
+                        color={q.labelColor}
+                        size="xs"
+                        onClick={() => {
+                          setAssignLabelTargetIds([q.id]);
+                          setIsAssignLabelOpen(true);
+                        }}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAssignLabelTargetIds([q.id]);
+                          setIsAssignLabelOpen(true);
+                        }}
+                        className="text-[11px] text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+                      >
+                        + Label
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Phone / Identity */}
+                  <div className="text-xs">
+                    {isActivated ? (
+                      <div className="flex items-center gap-1.5 text-gray-800 bg-gray-100/80 px-2.5 py-1 rounded-lg">
+                        <Phone size={12} className="text-emerald-600" />
+                        <span className="font-semibold">{phone}</span>
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg">
+                        Unassigned Blank Stock
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer Action Buttons */}
+                  <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() => openQuickLook(q)}
+                      className="flex-1 py-1.5 px-3 rounded-xl bg-gray-100 hover:bg-gray-200/80 text-gray-900 text-xs font-semibold transition-colors cursor-pointer text-center"
+                    >
+                      Inspect
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTriggerPrint(q, [q])}
+                      className="p-1.5 rounded-xl border border-gray-200/80 hover:bg-gray-50 text-gray-600 transition-colors cursor-pointer"
+                      title="Print Sticker"
+                    >
+                      <Printer size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(q)}
+                      className="p-1.5 rounded-xl border border-red-200/80 text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                      title="Delete Sticker"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       ) : (
-        <>
-          {/* ══════════════════════════════════════════════════════════
-              VIEW MODE 1: TABLE VIEW
-             ══════════════════════════════════════════════════════════ */}
-          {viewMode === "table" && (
-            <div className="bg-white border border-[var(--fx-border)] rounded-xl shadow-xs overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-[var(--fx-ink)]">
-                  <thead className="bg-[var(--fx-surface)] border-b border-[var(--fx-border)] text-[var(--fx-ink-2)] fx-text-body-regular">
-                    <tr>
-                      <th className="px-4 py-3 w-10">
-                        <input
-                          type="checkbox"
-                          checked={allPageSelected}
-                          onChange={toggleSelectAllPage}
-                          className="w-4 h-4 rounded-md border-[var(--fx-border-strong)] text-[var(--fx-accent)] focus:ring-[var(--fx-accent)] cursor-pointer"
-                        />
-                      </th>
-                      <th className="px-4 py-3">{revealedCodes ? "Sticker ID" : "Vehicle"}</th>
-                      <th className="px-4 py-3">Batch Label</th>
-                      <th className="px-4 py-3">Recovery Code</th>
-                      <th className="px-4 py-3">Linked Phone</th>
-                      <th className="px-4 py-3 hidden md:table-cell">Category</th>
-                      <th className="px-4 py-3">Print Status</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--fx-sidebar-hover)] font-medium">
-                    {paginated.map((q) => {
-                      const catKey = (q.category || "car") as any;
-                      const label = getCategoryLabel(catKey);
-                      const icon = getCategoryIcon(catKey);
-                      const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
-                      const isActivated = Boolean(phoneNum && phoneNum.trim());
-                      const computedStatus = isActivated ? "active" : q.status;
-                      const isSelected = selectedIds.has(q.id);
-                      const isPrinted = printedStickerIds.has(q.id) || q.isPrinted;
+        /* ── Table View ──────────────────────────────────────────────────────── */
+        <div className="bg-white border border-gray-200/80 rounded-2xl shadow-2xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-gray-900">
+              <thead className="bg-gray-50/80 border-b border-gray-200/80 text-gray-500 font-semibold uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="px-4 py-3.5 w-10">
+                    <input
+                      type="checkbox"
+                      checked={isAllCurrentPageSelected}
+                      onChange={toggleSelectAllCurrent}
+                      className="w-4 h-4 rounded-md border-gray-300 text-gray-900 focus:ring-gray-900 cursor-pointer"
+                    />
+                  </th>
+                  <th className="px-4 py-3.5">Slot #</th>
+                  <th className="px-4 py-3.5">Sticker ID</th>
+                  <th className="px-4 py-3.5">Category</th>
+                  <th className="px-4 py-3.5">Batch Label</th>
+                  <th className="px-4 py-3.5">Owner Phone</th>
+                  <th className="px-4 py-3.5">Print Status</th>
+                  <th className="px-4 py-3.5">Status</th>
+                  <th className="px-4 py-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 font-normal">
+                {paginated.map((q) => {
+                  const slotNumber = stableSlotMap.get(q.id);
+                  const catKey = (q.category || "car") as any;
+                  const catLabel = getCategoryLabel(catKey);
+                  const catIcon = getCategoryIcon(catKey);
+                  const phone = q.ownerPhone || q.phoneNumber || (q as any).phone || "";
+                  const isActivated = Boolean(phone && phone.trim());
+                  const isPrinted = printedStickerIds.has(q.id) || q.isPrinted;
+                  const isSelected = selectedIds.has(q.id);
 
-                      return (
-                        <tr
-                          key={q.id}
-                          className={`hover:bg-[var(--fx-canvas)]/70 transition-colors ${
-                            isSelected ? "bg-[var(--fx-accent-soft)]/30" : ""
-                          }`}
-                        >
-                          <td className="px-4 py-3">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleSelected(q.id)}
-                              className="w-4 h-4 rounded-md border-[var(--fx-border-strong)] text-[var(--fx-accent)] focus:ring-[var(--fx-accent)] cursor-pointer"
-                            />
-                          </td>
-                          {/* Vehicle number by default; the sticker ID only after "See Codes" */}
-                          <td className="px-4 py-3">
-                            <button
-                              type="button"
-                              onClick={() => openQuickLook(q)}
-                              className="flex items-center gap-2.5 text-left cursor-pointer group"
-                              title="Inspect sticker"
-                            >
-                              <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-[var(--fx-canvas)] border border-[var(--fx-border)] text-[var(--fx-ink-2)] group-hover:border-[var(--fx-accent)] group-hover:text-[var(--fx-accent)] transition-colors shrink-0">
-                                <QrCode size={16} />
-                              </span>
-                              <span className="font-mono font-semibold text-[12px] text-[var(--fx-ink)] truncate max-w-[160px]">
-                                {stickerRef(q, revealedCodes, label)}
-                              </span>
-                            </button>
-                          </td>
-
-                          {/* Label Column */}
-                          <td className="px-4 py-3">
-                            {q.labelName ? (
-                              <LabelBadge
-                                name={q.labelName}
-                                color={q.labelColor}
-                                size="xs"
-                                onClick={() => handleOpenAssignLabelForSingle(q)}
-                              />
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenAssignLabelForSingle(q)}
-                                className="text-[11px] text-[var(--fx-faint)] hover:text-[var(--fx-accent)] font-normal hover:font-semibold transition-colors cursor-pointer"
-                              >
-                                + Label
-                              </button>
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3">
-                            <span className="font-mono text-[var(--fx-ink-2)]">
-                              {revealedCodes ? (recoveryCodeMap[q.id] ?? q.recoveryCode ?? "—") : "••••••••"}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            {isActivated ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--fx-green-soft)] text-[var(--fx-green)] font-bold text-[11px] border border-[var(--fx-green)]">
-                                <Phone size={11} />
-                                <span>{phoneNum}</span>
-                              </span>
-                            ) : (
-                              <span className="text-[var(--fx-faint)] font-normal">Unassigned</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 hidden md:table-cell">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--fx-sidebar-hover)] text-[var(--fx-ink-2)] font-semibold text-[11px]">
-                              <span>{icon}</span>
-                              <span>{label}</span>
-                            </span>
-                          </td>
-
-                          {/* Print Status Sign Column */}
-                          <td className="px-4 py-3">
-                            <button
-                              type="button"
-                              onClick={() => handleTogglePrintedStatus(q.id)}
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all shadow-2xs cursor-pointer select-none ${
-                                isPrinted
-                                  ? "bg-[var(--fx-green-soft)] text-[var(--fx-green)] border border-[var(--fx-green)] hover:bg-[var(--fx-green-soft)]"
-                                  : "bg-[var(--fx-sidebar-hover)] text-[var(--fx-ink-2)] border border-[var(--fx-border)] hover:bg-[var(--fx-border)]"
-                              }`}
-                              title={isPrinted ? "Click to mark as Unprinted" : "Click to mark as Printed"}
-                            >
-                              <Printer size={12} className={isPrinted ? "text-[var(--fx-green)]" : "text-[var(--fx-faint)]"} />
-                              <span>{isPrinted ? "Printed" : "Not Printed"}</span>
-                            </button>
-                          </td>
-
-                          <td className="px-4 py-3">
-                            <span
-                              className={`fx-score-badge fx-text-label-caps ${
-                                computedStatus === "active" ? "fx-score-excellent" : "fx-score-fair"
-                              }`}
-                            >
-                              {computedStatus === "active" ? "Active" : "Inactive"}
-                            </span>
-                          </td>
-
-                          <td className="px-4 py-3 text-right">
-                            <QrRowActions
-                              qr={q}
-                              openQuickLook={openQuickLook}
-                              setDeleteTarget={setDeleteTarget}
-                              openPrintSheet={(target) => handleTriggerPrintSheet(target, [target])}
-                              onAssignLabel={() => handleOpenAssignLabelForSingle(q)}
-                              onTogglePrinted={() => handleTogglePrintedStatus(q.id)}
-                              isPrinted={isPrinted}
-                              menuOpen={openActionMenu === q.id}
-                              onMenuToggle={() => setOpenActionMenu((prev) => (prev === q.id ? null : q.id))}
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════
-              VIEW MODE 2: STICKER CARDS GRID
-             ══════════════════════════════════════════════════════════ */}
-          {viewMode === "cards" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {paginated.map((q) => {
-                const catKey = (q.category || "car") as any;
-                const label = getCategoryLabel(catKey);
-                const icon = getCategoryIcon(catKey);
-                const phoneNum = q.ownerPhone || q.phoneNumber || (q as any).phone || (q as any).owner_phone || "";
-                const isActivated = Boolean(phoneNum && phoneNum.trim());
-                const computedStatus = isActivated ? "active" : q.status;
-                const isSelected = selectedIds.has(q.id);
-                const isPrinted = printedStickerIds.has(q.id) || q.isPrinted;
-
-                return (
-                  <div
-                    key={q.id}
-                    className={`bg-white rounded-xl border transition-all duration-200 shadow-xs overflow-hidden flex flex-col justify-between hover:shadow-md ${
-                      isSelected ? "border-[var(--fx-accent)] ring-2 ring-[var(--fx-accent-soft)]" : "border-[var(--fx-border)]"
-                    }`}
-                  >
-                    {/* Card Header */}
-                    <div className="p-3.5 bg-[var(--fx-canvas)]/70 border-b border-[var(--fx-sidebar-hover)] flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                  return (
+                    <tr
+                      key={q.id}
+                      className={`hover:bg-gray-50/80 transition-colors ${
+                        isSelected ? "bg-gray-50" : ""
+                      }`}
+                    >
+                      <td className="px-4 py-3.5">
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => toggleSelected(q.id)}
-                          className="w-4 h-4 rounded-md border-[var(--fx-border-strong)] text-[var(--fx-accent)] focus:ring-[var(--fx-accent)] cursor-pointer"
+                          onChange={() => toggleSelect(q.id)}
+                          className="w-4 h-4 rounded-md border-gray-300 text-gray-900 focus:ring-gray-900 cursor-pointer"
                         />
-                        {/* Vehicle number by default; the sticker ID only after "See Codes" */}
+                      </td>
+                      <td className="px-4 py-3.5 font-mono font-bold text-gray-800">
+                        {formatSlotNumber(slotNumber)}
+                      </td>
+                      <td className="px-4 py-3.5">
                         <button
                           type="button"
                           onClick={() => openQuickLook(q)}
-                          className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[var(--fx-ink-2)] hover:text-[var(--fx-accent)] transition-colors cursor-pointer"
-                          title="Inspect sticker"
+                          className="font-mono font-semibold text-gray-900 hover:text-orange-600 transition-colors cursor-pointer text-left"
                         >
-                          <QrCode size={13} />
-                          <span className="font-mono truncate max-w-[140px]">{stickerRef(q, revealedCodes, label)}</span>
+                          {stickerRef(q, revealedCodes, catLabel)}
                         </button>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {/* Printed Sign Badge */}
-                        <button
-                          type="button"
-                          onClick={() => handleTogglePrintedStatus(q.id)}
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold border transition-colors cursor-pointer ${
-                            isPrinted
-                              ? "bg-[var(--fx-green-soft)] text-[var(--fx-green)] border-[var(--fx-green)] hover:bg-[var(--fx-green-soft)]"
-                              : "bg-[var(--fx-sidebar-hover)] text-[var(--fx-ink-2)] border-[var(--fx-border)] hover:bg-[var(--fx-border)]"
-                          }`}
-                          title={isPrinted ? "Click to unmark as printed" : "Click to mark as printed"}
-                        >
-                          <Printer size={10} />
-                          <span>{isPrinted ? "Printed" : "Unprinted"}</span>
-                        </button>
-
-                        <span
-                          className={`fx-score-badge fx-text-label-caps ${
-                            computedStatus === "active" ? "fx-score-excellent" : "fx-score-fair"
-                          }`}
-                        >
-                          {computedStatus === "active" ? "Active" : "Inactive"}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span className="inline-flex items-center gap-1.5 text-gray-700 font-medium">
+                          <span>{catIcon}</span>
+                          <span>{catLabel}</span>
                         </span>
-                      </div>
-                    </div>
-
-                    {/* Sticker Graphic Preview */}
-                    <div className="p-4 flex flex-col items-center justify-center bg-[var(--fx-canvas)]/30">
-                      <button
-                        type="button"
-                        onClick={() => openQuickLook(q)}
-                        className="w-full max-w-[240px] cursor-pointer hover:scale-[1.03] transition-transform"
-                      >
-                        <StickerMockupView qr={q} mode="physical" />
-                      </button>
-                    </div>
-
-                    {/* Card Details & Actions */}
-                    <div className="p-3.5 border-t border-[var(--fx-sidebar-hover)] space-y-2.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="inline-flex items-center gap-1.5 text-[var(--fx-ink-2)] font-semibold">
-                          <span>{icon}</span>
-                          <span>{label}</span>
-                        </span>
-
-                        {/* Label Badge on Card */}
+                      </td>
+                      <td className="px-4 py-3.5">
                         {q.labelName ? (
                           <LabelBadge
                             name={q.labelName}
                             color={q.labelColor}
                             size="xs"
-                            onClick={() => handleOpenAssignLabelForSingle(q)}
+                            onClick={() => {
+                              setAssignLabelTargetIds([q.id]);
+                              setIsAssignLabelOpen(true);
+                            }}
                           />
                         ) : (
                           <button
                             type="button"
-                            onClick={() => handleOpenAssignLabelForSingle(q)}
-                            className="text-[11px] text-[var(--fx-faint)] hover:text-[var(--fx-accent)] font-normal transition-colors cursor-pointer"
+                            onClick={() => {
+                              setAssignLabelTargetIds([q.id]);
+                              setIsAssignLabelOpen(true);
+                            }}
+                            className="text-[11px] text-gray-400 hover:text-gray-700 cursor-pointer"
                           >
                             + Label
                           </button>
                         )}
-                      </div>
-
-                      {isActivated ? (
-                        <div className="flex items-center gap-1.5 text-xs text-[var(--fx-green)] bg-[var(--fx-green-soft)] px-2.5 py-1 rounded-lg border border-[var(--fx-green)]">
-                          <Phone size={12} />
-                          <span className="font-bold">{phoneNum}</span>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {isActivated ? (
+                          <span className="font-semibold text-gray-900">{phone}</span>
+                        ) : (
+                          <span className="text-gray-400">Unassigned</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span
+                          className={`
+                            text-[11px] font-semibold px-2 py-0.5 rounded-full border
+                            ${
+                              isPrinted
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                                : "bg-gray-100 text-gray-600 border-gray-200/60"
+                            }
+                          `}
+                        >
+                          {isPrinted ? "Printed" : "Unprinted"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span
+                          className={`
+                            text-[11px] font-semibold px-2 py-0.5 rounded-full border
+                            ${
+                              isActivated
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                                : "bg-amber-50 text-amber-700 border-amber-200/60"
+                            }
+                          `}
+                        >
+                          {isActivated ? "Active" : "Pending"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openQuickLook(q)}
+                            className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg cursor-pointer"
+                            title="Inspect"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleTriggerPrint(q, [q])}
+                            className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg cursor-pointer"
+                            title="Print"
+                          >
+                            <Printer size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget(q)}
+                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg cursor-pointer"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
-                      ) : (
-                        <div className="text-[11px] text-[var(--fx-faint)] bg-[var(--fx-canvas)] px-2.5 py-1 rounded-lg">
-                          No phone assigned yet
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => openQuickLook(q)}
-                          className="flex-1 py-1.5 px-3 rounded-lg bg-[var(--fx-sidebar-hover)] hover:bg-[var(--fx-border)] text-[var(--fx-ink)] text-xs font-bold transition-colors cursor-pointer text-center"
-                        >
-                          Inspect Sticker
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleTriggerPrintSheet(q, [q])}
-                          className="p-1.5 rounded-lg border border-[var(--fx-border)] hover:bg-[var(--fx-sidebar-hover)] text-[var(--fx-ink-2)] transition-colors cursor-pointer"
-                          title="Print Sticker Sheet"
-                        >
-                          <Printer size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteTarget(q)}
-                          className="p-1.5 rounded-lg border border-[var(--fx-red)] text-[var(--fx-red)] hover:bg-[var(--fx-red-soft)] transition-colors cursor-pointer"
-                          title="Delete Sticker"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* ── Pagination Controls ────────────────────────────────────────── */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between gap-4 pt-2">
-              <p className="text-xs text-[var(--fx-ink-2)]">
-                Showing{" "}
-                <span className="font-bold text-[var(--fx-ink)]">
-                  {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)}
-                </span>{" "}
-                of <span className="font-bold text-[var(--fx-ink)]">{filtered.length}</span> tags
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] disabled:opacity-40 transition-colors cursor-pointer"
-                >
-                  <ChevronLeft size={14} />
-                  <span>Prev</span>
-                </button>
-                <span className="text-xs font-bold text-[var(--fx-ink-2)] px-2">
-                  {page} / {totalPages}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] disabled:opacity-40 transition-colors cursor-pointer"
-                >
-                  <span>Next</span>
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-            </div>
-          )}
-        </>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
-      {/* ── Modals: Delete Confirmation, Generate Tag, Print Sheet, Labels ─── */}
+      {/* ── 6. Pagination Controls ────────────────────────────────────────── */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-4 pt-2">
+          <p className="text-xs text-gray-500">
+            Showing{" "}
+            <span className="font-semibold text-gray-900">
+              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)}
+            </span>{" "}
+            of <span className="font-semibold text-gray-900">{filtered.length}</span> stickers
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-xl border border-gray-200/80 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors cursor-pointer"
+            >
+              <ChevronLeft size={14} />
+              <span>Prev</span>
+            </button>
+            <span className="text-xs font-bold text-gray-700 px-2">
+              {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-xl border border-gray-200/80 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors cursor-pointer"
+            >
+              <span>Next</span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 7. Safe Delete Confirmation Modal (Requirement 7) ─────────────── */}
       {deleteTarget && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(16, 24, 40, 0.5)", backdropFilter: "blur(4px)" }}
-          onClick={() => setDeleteTarget(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-950/45 backdrop-blur-xs select-none"
+          onClick={() => !isDeleting && setDeleteTarget(null)}
         >
           <div
-            className="bg-white rounded-xl border border-[var(--fx-border)] p-6 max-w-sm w-full shadow-2xl space-y-4"
+            className="bg-white rounded-2xl border border-gray-200 shadow-2xl p-6 max-w-sm w-full space-y-4 animate-in fade-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[var(--fx-red-soft)] text-[var(--fx-red)] flex items-center justify-center flex-shrink-0">
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0 border border-red-200/60">
                 <AlertTriangle size={20} />
               </div>
-              <div>
-                <h3 className="text-base font-bold text-[var(--fx-ink)]">Delete QR Sticker?</h3>
-                <p className="text-xs text-[var(--fx-ink-2)] mt-1 leading-relaxed">
-                  Tag <span className="font-mono font-bold text-[var(--fx-ink)]">{deleteTarget.id}</span> will be removed from
-                  the fleet list. You can restore it later with its recovery code.
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-gray-950">
+                  Delete QR Sticker {deleteTarget.id}?
+                </h3>
+                <p className="text-xs text-gray-500 font-normal leading-relaxed">
+                  Are you sure you want to permanently delete this sticker? Existing sticker slot numbers will{" "}
+                  <strong className="text-gray-800">NOT</strong> shift, and no replacement will be automatically created.
                 </p>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-2.5 pt-2">
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-gray-100">
               <button
                 type="button"
+                disabled={isDeleting}
                 onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 text-xs font-bold rounded-lg border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={async () => {
-                  const targetId = deleteTarget.id;
-                  setDeleteTarget(null);
-                  const deleted = await apiClient.qr
-                    .deleteQrCode(targetId)
-                    .then((res) => res?.success)
-                    .catch(() => false);
-                  if (!deleted) {
-                    setToast(`Failed to delete ${targetId}. Please try again.`);
-                    setTimeout(() => setToast(null), 3000);
-                    return;
-                  }
-                  setQrList((prev) => prev.filter((x) => x.id !== targetId));
-                  setToast("Sticker deleted from database");
-                  setTimeout(() => setToast(null), 2000);
-                }}
-                className="px-4 py-2 text-xs font-bold rounded-lg bg-[var(--fx-red)] text-white hover:bg-[var(--fx-red)] transition-colors cursor-pointer"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-red-600 text-white hover:bg-red-700 active:scale-98 transition-all cursor-pointer disabled:opacity-50 shadow-xs"
               >
-                Delete Sticker
+                {isDeleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                <span>Delete Permanently</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Single Tag Generation Modal */}
+      {/* ── 8. Create Tag Modal (Hidden by default; open ONLY on [+ Create]) ─ */}
       <GenerateTagModal
-        isOpen={generateModalOpen}
-        onClose={() => setGenerateModalOpen(false)}
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
         qrList={qrList}
         setQrList={setQrList}
-        initialCategory={selectedCategory}
+        initialCategory={categoryFilter !== "all" ? categoryFilter : "car"}
         labels={labels}
         setToast={setToast}
-        onPrint={(target, batch) => handleTriggerPrintSheet(target, batch)}
+        onPrint={(target, batch) => handleTriggerPrint(target, batch)}
       />
 
-      {/* Label Manager Modal */}
+      {/* ── 9. Auxiliary Label Modals ─────────────────────────────────────── */}
       <LabelManagerModal
         isOpen={isLabelManagerOpen}
         onClose={() => setIsLabelManagerOpen(false)}
         labels={labels}
         onSaveLabels={setLabels}
-        onSelectLabel={(lbl) => setSelectedLabelId(lbl.id)}
+        onSelectLabel={() => {}}
       />
 
-      {/* Assign Label Modal */}
       <AssignLabelModal
         isOpen={isAssignLabelOpen}
         onClose={() => {
@@ -1454,63 +1223,53 @@ export default function QrCodesPage({
         }}
         selectedCount={assignLabelTargetIds.length > 0 ? assignLabelTargetIds.length : selectedIds.size}
         labels={labels}
-        onAssignLabel={handleBulkAssignLabel}
+        onAssignLabel={(labelId) => {
+          const targetIds = assignLabelTargetIds.length > 0 ? assignLabelTargetIds : Array.from(selectedIds);
+          const chosen = labels.find((l) => l.id === labelId);
+          setQrList((prev) =>
+            prev.map((q) =>
+              targetIds.includes(q.id)
+                ? {
+                    ...q,
+                    labelName: chosen ? chosen.name : undefined,
+                    labelColor: chosen ? chosen.color : undefined,
+                  }
+                : q
+            )
+          );
+          setIsAssignLabelOpen(false);
+          setAssignLabelTargetIds([]);
+          setToast(`Assigned label to ${targetIds.length} sticker(s)`);
+          setTimeout(() => setToast(null), 2500);
+        }}
         onOpenCreateLabel={() => setIsLabelManagerOpen(true)}
       />
 
-      {/* Bulk Print By Label Modal */}
       <BulkPrintByLabelModal
         isOpen={isBulkPrintByLabelOpen}
         onClose={() => setIsBulkPrintByLabelOpen(false)}
         labels={labels}
         qrList={qrList}
         printedStickerIds={printedStickerIds}
-        onSelectLabelForPrint={handleSelectLabelForPrint}
-      />
-
-      {/* Print Sheet Modal */}
-      <PrintSheetModal
-        isOpen={isLocalPrintModalOpen}
-        onClose={() => setIsLocalPrintModalOpen(false)}
-        availableStickers={filtered}
-        initialSelectedSticker={localPrintTargetSticker}
-        initialBatchStickers={localPrintBatch}
-        stickerPos={stickerPos}
-        printedStickerIdList={activePrintedIdsList}
-        setPrintedStickerIdList={activeSetPrintedIds}
-        onShowToast={(msg) => {
-          setToast(msg);
-          setTimeout(() => setToast(null), 4000);
+        onSelectLabelForPrint={(lbl, onlyUnprinted) => {
+          let matching = qrList.filter(
+            (q) => (q.labelName || "").toLowerCase() === lbl.name.toLowerCase()
+          );
+          if (onlyUnprinted) matching = matching.filter((q) => !printedStickerIds.has(q.id) && !q.isPrinted);
+          if (matching.length === 0) {
+            setToast(`No stickers found for label "${lbl.name}".`);
+            setTimeout(() => setToast(null), 3000);
+            return;
+          }
+          handleTriggerPrint(undefined, matching);
         }}
       />
 
-      <FxModal
-        isOpen={printAllOpen}
-        onClose={() => setPrintAllOpen(false)}
-        title="Print all unassigned stickers?"
-        icon={<Printer size={19} />}
-        iconTone="accent"
-        footer={
-          <>
-            <button onClick={() => setPrintAllOpen(false)} className="fx-btn fx-btn-secondary flex-1">Cancel</button>
-            <button onClick={handlePrintAllUnassigned} className="fx-btn fx-btn-primary flex-1">
-              Print {unassignedInactive.length}
-            </button>
-          </>
-        }
-      >
-        <p>
-          {unassignedInactive.length} sticker{unassignedInactive.length === 1 ? "" : "s"} with no linked phone number
-          that aren't active will go into a single PDF, one per page, followed by a recovery-code list.
-        </p>
-        {unassignedAlreadyPrinted > 0 && (
-          <p className="mt-2 font-semibold text-[var(--fx-amber)]">
-            {unassignedAlreadyPrinted} of them {unassignedAlreadyPrinted === 1 ? "was" : "were"} already printed before.
-          </p>
-        )}
-      </FxModal>
-
-      <PrintProgressModal progress={printProgress} />
+      {/* Print Progress Non-blocking Widget */}
+      <PrintProgressModal
+        progress={printProgress}
+        onCancel={handleCancelBatchExport}
+      />
     </div>
   );
 }

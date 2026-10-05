@@ -19,14 +19,13 @@ import CustomizePage from "./CustomizePage";
 import DistributorsPage from "./DistributorsPage";
 import ShopProductsPage from "./ShopProductsPage";
 import OrdersPage from "./OrdersPage";
+import ReviewsPage from "./ReviewsPage";
 import RepiChatPage from "./RepiChatPage";
 import PrintSheetModal from "./PrintSheetModal";
 import { apiClient, AdminSummary } from "../../../lib/apiClient";
 import { usePolling } from "../../../hooks/usePolling";
 
-// How often the cheap heartbeat runs, and the slower safety-net refresh of the
-// full fleet list (which otherwise only reloads when the heartbeat says it changed).
-const SUMMARY_INTERVAL_MS = 30_000;
+// Slower safety-net refresh of the full fleet list (fallback interval)
 const FLEET_FALLBACK_INTERVAL_MS = 120_000;
 const CHAT_INTERVAL_MS = 20_000;
 // A just-generated row may not be in a response that was already in flight; keep it
@@ -109,13 +108,31 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
     if (res.success) setUnreadChats(res.data.reduce((sum, s) => sum + (s.unread_owner_count || 0), 0));
   }, { intervalMs: CHAT_INTERVAL_MS, enabled: !isAdmin });
 
-  // Heartbeat: one small, PII-free response gives the sidebar badges and the
-  // Overview KPIs (exact, straight from the database — not derived from a capped
-  // list). Pauses while the tab is hidden, backs off if the server errors.
-  const refreshSummary = usePolling(async () => {
-    const res = await apiClient.admin.getSummary();
-    if (res?.success) setSummary(res.data);
-  }, { intervalMs: SUMMARY_INTERVAL_MS, enabled: isAdmin });
+  // Summary totals for sidebar badges and Overview KPIs.
+  // Fetched on-demand (initial load, overview visit, or manual refresh) — no continuous background polling.
+  const refreshSummary = useCallback(async () => {
+    if (!isAdmin) return;
+    try {
+      const res = await apiClient.admin.getSummary();
+      if (res?.success) setSummary(res.data);
+    } catch {
+      // quiet fallback
+    }
+  }, [isAdmin]);
+
+  // Load summary once on mount when admin is authenticated
+  useEffect(() => {
+    if (isAdmin) {
+      refreshSummary();
+    }
+  }, [isAdmin, refreshSummary]);
+
+  // Refresh summary when navigating to overview page
+  useEffect(() => {
+    if (isAdmin && page === "overview") {
+      refreshSummary();
+    }
+  }, [page, isAdmin, refreshSummary]);
 
   // The fleet list backs the tables. Backend rows are the source of truth; a row
   // that exists only locally survives just long enough for its create call to
@@ -134,14 +151,8 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
       setPrintedStickerIdList((prev) => Array.from(new Set([...prev, ...serverPrintedIds])));
     }
 
-    setQrList((prev) => {
-      const backendIds = new Set(mapped.map((r) => r.id));
-      const now = Date.now();
-      const freshLocalOnly = prev.filter(
-        (r) => !backendIds.has(r.id) && now - new Date(r.createdAt || 0).getTime() < LOCAL_ONLY_GRACE_MS
-      );
-      return [...freshLocalOnly, ...mapped];
-    });
+    // Authoritative backend synchronization: never resurrect deleted items
+    setQrList(mapped);
   }, { intervalMs: FLEET_FALLBACK_INTERVAL_MS, enabled: isAdmin });
 
   // Re-download the list only when the heartbeat reports the fleet actually changed.
@@ -245,6 +256,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
           )}
           {page === "orders" && <OrdersPage setToast={setToast} />}
           {page === "distributors" && <DistributorsPage setToast={setToast} />}
+          {page === "reviews" && <ReviewsPage setToast={setToast} />}
           {page === "qr" && (
             <QrCodesPage
               qrList={qrList} setQrList={setQrList} templates={templates}

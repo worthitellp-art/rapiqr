@@ -444,6 +444,77 @@ class AdminController {
       return sendServerError(res, err);
     }
   }
+
+  /**
+   * WhatsApp Diagnostics: configuration & provider readiness audit.
+   * GET /api/admin/whatsapp/diagnostics
+   */
+  static async getWhatsAppDiagnostics(req, res) {
+    try {
+      const { getMsg91Config } = require('../services/msg91Client');
+      const { resolveWhatsAppProvider } = require('../services/smsService');
+      const { MSG91_TEMPLATES } = require('../services/msg91Templates');
+
+      const config = getMsg91Config();
+      const activeProvider = resolveWhatsAppProvider();
+
+      const diagnostics = {
+        activeProvider,
+        isConfigured: config.isConfigured,
+        hasAuthKey: Boolean(config.authKey),
+        authKeyPrefix: config.authKey ? `${config.authKey.slice(0, 6)}...` : null,
+        integratedNumber: config.whatsappIntegratedNumber || null,
+        hasIntegratedNumber: Boolean(config.whatsappIntegratedNumber),
+        defaultTemplateName: config.whatsappTemplateName || null,
+        namespace: config.whatsappTemplateNamespace || null,
+        languageCode: config.whatsappLanguageCode || 'en',
+        availableTemplates: Object.entries(MSG91_TEMPLATES).map(([type, tpl]) => ({
+          type,
+          name: tpl.name,
+          audience: tpl.audience,
+          variables: tpl.variables,
+        })),
+        envProviderSetting: process.env.WHATSAPP_PROVIDER || process.env.NOTIFICATION_PROVIDER || 'not explicitly set',
+      };
+
+      return res.json({ success: true, data: diagnostics });
+    } catch (err) {
+      logger.error('ADMIN_WHATSAPP_DIAGNOSTICS', 'Failed to fetch WhatsApp diagnostics', err);
+      return sendServerError(res, err);
+    }
+  }
+
+  /**
+   * WhatsApp Live Test Dispatch: sends a test template message and traces entire pipeline.
+   * POST /api/admin/whatsapp/test-send
+   */
+  static async testWhatsAppSend(req, res) {
+    try {
+      const { recipientPhone, templateType = 'QR_SCAN_ALERT', itemName = 'Test Tag', messageText = 'Live diagnostic test alert' } = req.body || {};
+      if (!recipientPhone) {
+        return res.status(400).json({ success: false, error: 'recipientPhone is required' });
+      }
+
+      const { notifyOwner } = require('../services/notificationService');
+      logger.info('ADMIN_WHATSAPP_TEST', `Initiating test WhatsApp send to ${recipientPhone} (${templateType})`);
+
+      const result = await notifyOwner({
+        type: templateType,
+        ownerPhone: recipientPhone,
+        data: { item_name: itemName, message: messageText, session: 'admin-diagnostic-test' },
+        eventId: 'admin-test',
+      });
+
+      return res.json({
+        success: Boolean(result.sent),
+        data: result,
+        message: result.sent ? 'Test WhatsApp delivered to MSG91 successfully' : 'Test WhatsApp dispatch failed',
+      });
+    } catch (err) {
+      logger.error('ADMIN_WHATSAPP_TEST', 'Test WhatsApp dispatch failed with exception', err);
+      return sendServerError(res, err);
+    }
+  }
 }
 
 module.exports = AdminController;

@@ -12,20 +12,21 @@ import {
   LogOut,
   Eye,
   Search,
-  Grid,
-  History,
+  LayoutDashboard,
   Trash2,
   Loader2,
-  Users,
-  Settings,
-  LifeBuoy,
+  Users2,
+  Contact2,
+  SlidersHorizontal,
+  HelpCircle,
   X,
   Share2,
   ShoppingBag,
+  PackageCheck,
   Pencil,
   ArrowRightLeft,
   Power,
-  RefreshCcw,
+  RefreshCw,
   Sparkles,
   QrCode,
   Tag,
@@ -34,12 +35,22 @@ import {
   Smartphone,
   CheckCircle2,
   ArrowRight,
-  MessageSquare,
+  MessageSquareText,
   MessageCircle,
   Package,
   Zap,
   Wallet,
   Globe,
+  PanelLeftClose,
+  PanelLeftOpen,
+  BellRing,
+  ShieldAlert,
+  ChevronRight,
+  Clock,
+  MapPin,
+  Flame,
+  ArrowUpRight,
+  Truck,
 } from 'lucide-react';
 import { DEFAULT_PRODUCTS, mapApiShopProduct, type ProductItem } from '../data/products';
 
@@ -162,18 +173,18 @@ type TabId = 'setup' | 'overview' | 'products' | 'chat' | 'contacts' | 'history'
 function buildNavItems(t: typeof dashboardTranslations['en']['client']): {
   id: TabId;
   label: string;
-  icon: React.ComponentType<{ size?: number }>;
+  icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
   section?: string;
 }[] {
   return [
-    { id: 'chat', label: t.nav.chat, icon: MessageSquare },
-    { id: 'overview', label: t.nav.overview, icon: Grid },
+    { id: 'overview', label: t.nav.overview, icon: LayoutDashboard },
+    { id: 'chat', label: t.nav.chat, icon: MessageSquareText },
     { id: 'setup', label: t.nav.setup, icon: Sparkles, section: t.navSections.myTag },
-    { id: 'products', label: t.nav.products, icon: ShoppingBag, section: t.navSections.myTag },
-    { id: 'contacts', label: t.nav.contacts, icon: Users, section: t.navSections.communication },
-    { id: 'history', label: t.nav.history, icon: History, section: t.navSections.communication },
-    { id: 'settings', label: t.nav.settings, icon: Settings, section: t.navSections.account },
-    { id: 'support', label: t.nav.support, icon: LifeBuoy, section: t.navSections.account },
+    { id: 'products', label: t.nav.products, icon: PackageCheck, section: t.navSections.myTag },
+    { id: 'contacts', label: t.nav.contacts, icon: Contact2, section: t.navSections.communication },
+    { id: 'history', label: t.nav.history, icon: BellRing, section: t.navSections.communication },
+    { id: 'settings', label: t.nav.settings, icon: SlidersHorizontal, section: t.navSections.account },
+    { id: 'support', label: t.nav.support, icon: HelpCircle, section: t.navSections.account },
   ];
 }
 
@@ -181,7 +192,6 @@ function buildNavItems(t: typeof dashboardTranslations['en']['client']): {
  * The customer-facing view of an order's four fulfillment states. `cancelled`
  * has no place on a progress line, so those cards skip the stepper entirely.
  */
-const DELIVERY_STEPS: string[] = ['Ordered', 'Shipped', 'Delivered'];
 
 type ModalState =
   | { type: 'editDetails'; sticker: DashboardSticker }
@@ -236,24 +246,51 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     handlePurchaseStickerClick();
   };
 
-  // Pre-purchase shop catalog — same admin-managed /api/shop-products list the
-  // landing page shows, so a product the admin adds/edits appears here too.
-  // Falls back to the built-in DEFAULT_PRODUCTS if none are configured yet.
+  // Shop products catalog (displayed in Products tab and pre-purchase gate)
   const [shopProducts, setShopProducts] = useState<ProductItem[]>(DEFAULT_PRODUCTS);
-  useEffect(() => {
-    apiClient.shopProducts
-      .list()
-      .then((res) => {
-        if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
-          setShopProducts(res.data.map(mapApiShopProduct));
-        }
-      })
-      .catch(() => {
-        /* keep the built-in fallback catalog */
-      });
+  const [shopProductsLoading, setShopProductsLoading] = useState(false);
+  const [productViewTab, setProductViewTab] = useState<'catalog' | 'orders'>('catalog');
+  const [orderSearch, setOrderSearch] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'placed' | 'shipped' | 'delivered' | 'cancelled'>('all');
+
+  const loadShopProducts = useCallback(async () => {
+    setShopProductsLoading(true);
+    try {
+      const res = await apiClient.shopProducts.list();
+      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+        setShopProducts(res.data.map(mapApiShopProduct));
+      }
+    } catch {
+      /* keep built-in fallback */
+    } finally {
+      setShopProductsLoading(false);
+    }
   }, []);
 
-  // ─── DASHBOARD PREPARATION SPLASH ANIMATION ───
+  useEffect(() => {
+    loadShopProducts();
+  }, [loadShopProducts]);
+
+  // Sidebar collapsible state with localStorage persistence
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('rapiqr-sidebar-collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('rapiqr-sidebar-collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // ─── DASHBOARD PREPARATION SPLASH ANIMATION (Shopify Minimal Clean Look) ───
   const [isPreparing, setIsPreparing] = useState(true);
 
 
@@ -393,6 +430,17 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     try {
       localStorage.setItem('repiqr-client-active-tab', activeTab);
     } catch { /* fallback */ }
+
+    const tabTitles: Record<string, string> = {
+      overview: 'RepiQR - Dashboard',
+      products: 'RepiQR - Products & Orders',
+      contacts: 'RepiQR - Emergency Contacts',
+      history: 'RepiQR - Alerts & Scan History',
+      chat: 'RepiQR - Live Visitor Chat',
+      settings: 'RepiQR - Account Settings',
+      support: 'RepiQR - Support & Help',
+    };
+    document.title = tabTitles[activeTab] || 'RepiQR - Dashboard';
   }, [activeTab]);
 
   const [products, setProducts] = useState<DashboardSticker[]>([]);
@@ -616,6 +664,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
 
   const [allHistory, setAllHistory] = useState<any[]>([]);
   const [allHistoryLoading, setAllHistoryLoading] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
 
   // ─── PRODUCTS TAB: PURCHASE / ORDER HISTORY (checkout orders, not stickers) ───
   // Fetched as soon as the profile is known (not just when the Products tab is
@@ -799,35 +848,40 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   // Overview's "Recent Scans" card reads the same feed as the History tab, so both
   // load it — before, only History did, and Overview claimed "No scans recorded"
   // until the owner happened to open History once.
+  // Alert history — cached with ref so switching tabs only calls backend ONCE!
+  const hasFetchedHistoryRef = useRef(false);
+
+  const fetchAlertHistory = useCallback(async (force = false) => {
+    if (!force && hasFetchedHistoryRef.current) return;
+    setAllHistoryLoading(true);
+    try {
+      const rows = await getAllHistoryFromDb();
+      const byId = new Map<string, DashboardSticker>(products.map((p) => [p.id, p] as const));
+      const merged = (Array.isArray(rows) ? rows : [])
+        .map((r: any) => {
+          const p = byId.get(r.sticker_id);
+          return {
+            ...r,
+            stickerNickname: p?.nickname || r.stickerNickname || r.sticker_nickname || 'Vehicle Tag',
+            stickerVehicle: p?.vehicleNumber || r.stickerVehicle || r.sticker_vehicle,
+            stickerCode: p?.qrCodeId || r.stickerCode || r.sticker_code || r.sticker_id || 'QR Tag',
+          };
+        })
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setAllHistory(merged);
+      hasFetchedHistoryRef.current = true;
+    } catch (err) {
+      console.warn('Failed to load alert history:', err);
+    } finally {
+      setAllHistoryLoading(false);
+    }
+  }, [products]);
+
   useEffect(() => {
     const needsHistory = activeTab === 'history' || activeTab === 'overview';
-    if (!needsHistory || products.length === 0) {
-      if (needsHistory && products.length === 0) setAllHistory([]);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      setAllHistoryLoading(true);
-      // One request for every sticker's events (rows carry their sticker_id) —
-      // this used to fan out one request per sticker each time the tab opened.
-      const rows = await getAllHistoryFromDb();
-      if (!cancelled) {
-        const byId = new Map<string, DashboardSticker>(products.map((p) => [p.id, p] as const));
-        const merged = rows
-          .filter((r: any) => byId.has(r.sticker_id))
-          .map((r: any) => {
-            const p = byId.get(r.sticker_id)!;
-            return { ...r, stickerNickname: p.nickname, stickerVehicle: p.vehicleNumber, stickerCode: p.qrCodeId };
-          })
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        setAllHistory(merged);
-        setAllHistoryLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTab, products.length]);
+    if (!needsHistory) return;
+    fetchAlertHistory(false);
+  }, [activeTab, fetchAlertHistory]);
 
   const activeProduct = drawerProductId ? products.find((p) => p.id === drawerProductId) || null : null;
   const activeCount = products.filter((p) => p.status === 'Active').length;
@@ -840,23 +894,19 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   const completedSetupCount = [isPhoneComplete, isContactsComplete, isStickersComplete].filter(Boolean).length;
   const setupPercent = Math.round((completedSetupCount / 3) * 100);
 
-  // ─── DASHBOARD PREPARATION SPLASH LOADING ANIMATION ───
+  // ─── DASHBOARD PREPARATION SPLASH LOADING ANIMATION (Vercel-style full-screen) ───
   if (isPreparing) {
     return (
-      <div className="fx-shell fixed inset-0 z-50 flex items-center justify-center bg-[var(--fx-canvas)] px-6 text-center text-[var(--fx-ink)] animate-fade-in">
-        <div className="flex w-full max-w-sm flex-col items-center">
-          <AppLogo variant="light" className="mb-7 h-9 w-auto object-contain" />
-          <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-full border border-[var(--fx-accent)]/25 bg-[var(--fx-accent-soft)]">
-            <Loader2 size={22} className="animate-spin text-[var(--fx-accent)]" />
-          </div>
-          <h2 className="text-lg font-semibold tracking-tight sm:text-xl">Preparing your dashboard</h2>
-          <p className="mt-2 max-w-xs text-xs font-medium leading-relaxed text-[var(--fx-ink-2)] sm:text-sm">
-            Synchronizing safety stickers, emergency contacts, and protection settings...
-          </p>
-          <div className="mt-7 h-1 w-44 overflow-hidden rounded-full bg-[var(--fx-border)]">
-            <div className="h-full w-full rounded-full bg-[var(--fx-accent)] animate-pulse" />
-          </div>
-        </div>
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black px-6 text-center font-body select-none">
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+          {t.splash.heading}
+        </h2>
+        <p className="mt-4 text-sm sm:text-base text-neutral-400">
+          {t.splash.line1}
+          <br />
+          {t.splash.line2}
+        </p>
+        <Loader2 size={28} className="mt-8 animate-spin text-neutral-500" strokeWidth={2} />
       </div>
     );
   }
@@ -887,16 +937,16 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
           <div className="flex items-center gap-3">
             <LanguageSwitcher />
             <span className="hidden text-xs font-medium text-[var(--fx-ink-2)] sm:inline">
-              Logged in as{' '}
+              {t.gate.loggedInAs}{' '}
               <span className="font-semibold text-[var(--fx-ink)]">
-                {profile?.fullName || profile?.email || 'you'}
+                {profile?.fullName || profile?.email || t.gate.you}
               </span>
             </span>
             <button
               onClick={handleSignOut}
               className="flex items-center gap-1.5 rounded-lg border border-[var(--fx-border)] px-3 py-2 text-xs font-semibold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] cursor-pointer"
             >
-              <LogOut size={14} /> Log out
+              <LogOut size={14} /> {t.gate.logOut}
             </button>
           </div>
         </header>
@@ -905,7 +955,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
           <div className="mb-10 text-center">
 
             <h1 className="text-2xl font-black tracking-tight text-[var(--fx-ink)] sm:text-3xl">
-              Get Your Free Safety Sticker to Activate Your Dashboard
+              {t.gate.heading}
             </h1>
 
             <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
@@ -913,7 +963,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                 onClick={() => setModal({ type: 'recover' })}
                 className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--fx-accent)] hover:underline cursor-pointer"
               >
-                <QrCode size={20} /> Already have a tag? Link it by recovery code
+                <QrCode size={20} /> {t.gate.recoverLink}
               </button>
 
               {/* Testing-only: preview the full dashboard without buying a sticker first. */}
@@ -921,7 +971,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                 onClick={() => setSkipPurchaseGate(true)}
                 className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--fx-ink-2)] hover:underline cursor-pointer"
               >
-                Skip for now →
+                {t.gate.skip}
               </button>
             </div>
           </div>
@@ -947,7 +997,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                     onClick={() => handleBuyProduct(product)}
                     className="mt-4 flex items-center justify-center gap-1.5 rounded-lg bg-[var(--fx-ink)] py-2.5 text-xs font-bold text-white hover:opacity-90 cursor-pointer"
                   >
-                    Get Free <ArrowRight size={13} />
+                    {t.gate.getFreePrefix} <ArrowRight size={13} />
                   </button>
                 </div>
               </div>
@@ -983,7 +1033,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     <div className="flex min-h-0 flex-1">
       <section className={`${selectedChatSession ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col border-r border-[var(--fx-border)] bg-white md:w-[340px]`}>
         <div className="flex items-center justify-between px-4 pb-2 pt-4">
-          <h1 className="font-display text-[20px] font-bold text-[var(--fx-ink)]">Chats</h1>
+          <h1 className="font-display text-[20px] font-bold text-[var(--fx-ink)]">{t.chatInbox.title}</h1>
           <button
             type="button"
             onClick={loadOwnerSessions}
@@ -992,7 +1042,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
             title="Refresh chats"
             className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] cursor-pointer disabled:opacity-50"
           >
-            <RefreshCcw size={16} className={ownerSessionsLoading ? 'animate-spin' : ''} />
+            <RefreshCw size={16} className={ownerSessionsLoading ? 'animate-spin' : ''} />
           </button>
         </div>
 
@@ -1002,7 +1052,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
             <input
               value={chatSearch}
               onChange={(e) => setChatSearch(e.target.value)}
-              placeholder="Search chats"
+              placeholder={t.chatInbox.searchPlaceholder}
               className="w-full bg-transparent text-xs text-[var(--fx-ink)] outline-none placeholder:text-[var(--fx-faint)]"
             />
           </label>
@@ -1018,7 +1068,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                     : 'border border-[var(--fx-border)] text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]'
                 }`}
               >
-                {f === 'all' ? 'All' : 'Unread'}
+                {f === 'all' ? t.chatInbox.all : t.chatInbox.unread}
               </button>
             ))}
           </div>
@@ -1026,16 +1076,16 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {ownerSessionsLoading ? (
-            <div className="py-10 text-center text-xs text-[var(--fx-ink-2)]">Loading chats...</div>
+            <div className="py-10 text-center text-xs text-[var(--fx-ink-2)]">{t.chatInbox.loadingChats}</div>
           ) : visibleSessions.length === 0 ? (
             <div className="px-6 py-10 text-center text-xs text-[var(--fx-ink-2)]">
-              {ownerSessions.length === 0 ? 'Your inbox is empty. Visitor chats appear here after a scan.' : 'No chats match.'}
+              {ownerSessions.length === 0 ? t.chatInbox.emptyInbox : t.chatInbox.noMatches}
             </div>
           ) : (
             visibleSessions.map((sess) => {
               const selected = selectedChatSession?.id === sess.id;
               const unread = sess.unread_owner_count || 0;
-              const name = sess.customer_name || 'Visitor';
+              const name = sess.customer_name || t.chatInbox.visitor;
               return (
                 <div
                   key={sess.id}
@@ -1057,7 +1107,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                         </span>
                       </span>
                       <span className="mt-0.5 flex items-center justify-between gap-2">
-                        <span className="truncate text-xs text-[var(--fx-ink-2)]">{sess.last_message_preview || 'No messages yet'}</span>
+                        <span className="truncate text-xs text-[var(--fx-ink-2)]">{sess.last_message_preview || t.chatInbox.noMessagesYet}</span>
                         {unread > 0 && (
                           <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-[var(--fx-accent)] px-1.5 text-[10px] font-bold text-white">
                             {unread}
@@ -1072,8 +1122,8 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   <button
                     type="button"
                     onClick={(e) => handleDeleteChatSession(e, sess.id)}
-                    title="Delete conversation"
-                    aria-label="Delete conversation"
+                    title={t.chatInbox.deleteConversation}
+                    aria-label={t.chatInbox.deleteConversation}
                     className="mr-2 hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--fx-faint)] hover:bg-[#FEE2E2] hover:text-[#DC2626] group-hover:flex cursor-pointer"
                   >
                     <Trash2 size={14} />
@@ -1098,8 +1148,8 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
           />
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center text-[var(--fx-ink-2)]">
-            <MessageSquare size={28} className="text-[var(--fx-faint)]" />
-            <p className="text-xs font-semibold">Select a chat to reply</p>
+            <MessageSquareText size={28} className="text-[var(--fx-faint)]" />
+            <p className="text-xs font-semibold">{t.chatInbox.selectChat}</p>
           </div>
         )}
       </section>
@@ -1110,59 +1160,149 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     <div className="fx-shell flex h-screen w-full overflow-hidden text-[var(--fx-ink)] bg-[var(--fx-canvas)] font-body">
 
       <div className="flex min-h-0 min-w-0 flex-1">
-        {/* ─── ICON RAIL: every dashboard section, always visible ─── */}
-        <nav aria-label="Dashboard sections" className="flex w-[60px] shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-[var(--fx-border)] bg-white py-3">
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="RapiQR home"
-            title="RapiQR home"
-            className="mb-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--fx-ink)] text-sm font-black text-white cursor-pointer"
-          >
-            R
-          </button>
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const active = activeTab === item.id;
-            return (
+        {/* ─── COLLAPSIBLE SIDEBAR: expandable / collapsible navigation ─── */}
+        <nav
+          aria-label="Dashboard sections"
+          className={`flex shrink-0 flex-col border-r border-[var(--fx-border)] bg-white transition-[width] duration-300 ease-in-out z-30 ${
+            isSidebarCollapsed ? 'w-[68px]' : 'w-[245px]'
+          }`}
+        >
+          {/* Header Branding */}
+          <div className="flex h-[62px] shrink-0 items-center justify-between border-b border-[var(--fx-border)] px-3.5">
+            {isSidebarCollapsed ? (
               <button
-                key={item.id}
                 type="button"
-                onClick={() => setActiveTab(item.id)}
-                title={item.label}
-                aria-label={item.label}
-                aria-current={active ? 'page' : undefined}
-                className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors cursor-pointer ${
-                  active ? 'bg-[var(--fx-accent-soft)] text-[var(--fx-accent)]' : 'text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]'
-                }`}
+                onClick={onBack}
+                aria-label={t.chrome.home}
+                title={t.chrome.home}
+                className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--fx-ink)] text-sm font-black text-white cursor-pointer"
               >
-                <Icon size={18} strokeWidth={2} />
-                {item.id === 'chat' && totalUnreadChats > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--fx-accent)] px-1 text-[9px] font-bold text-white">
-                    {totalUnreadChats}
-                  </span>
-                )}
+                R
               </button>
-            );
-          })}
-          <div className="mt-auto flex flex-col items-center gap-1 pt-2">
+            ) : (
+              <>
+                <button onClick={onBack} className="flex items-center gap-2 cursor-pointer text-left">
+                  <AppLogo variant="light" className="h-7 w-auto object-contain" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--fx-accent)] bg-[var(--fx-accent-soft)] px-1.5 py-0.5 rounded">
+                    {t.chrome.clientBadge}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleSidebar}
+                  title={t.chrome.collapseSidebar}
+                  aria-label={t.chrome.collapseSidebar}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] cursor-pointer transition-colors"
+                >
+                  <PanelLeftClose size={16} />
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Navigation Items */}
+          <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
+            {NAV_ITEMS.map((item, idx) => {
+              const Icon = item.icon;
+              const active = activeTab === item.id;
+              const showSectionHeader = !isSidebarCollapsed && item.section && (idx === 0 || NAV_ITEMS[idx - 1]?.section !== item.section);
+
+              return (
+                <React.Fragment key={item.id}>
+                  {showSectionHeader && (
+                    <div className="px-3 pt-3.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--fx-faint)]">
+                      {item.section}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab(item.id)}
+                    title={item.label}
+                    aria-label={item.label}
+                    aria-current={active ? 'page' : undefined}
+                    className={`group relative flex items-center rounded-xl transition-all cursor-pointer ${
+                      isSidebarCollapsed
+                        ? 'h-10 w-10 mx-auto justify-center'
+                        : 'h-10 w-full px-3 justify-start gap-3'
+                    } ${
+                      active
+                        ? 'bg-[var(--fx-accent-soft)] text-[var(--fx-accent)] font-bold shadow-2xs'
+                        : 'text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)]'
+                    }`}
+                  >
+                    <Icon size={18} strokeWidth={active ? 2.2 : 1.8} className="shrink-0" />
+                    {!isSidebarCollapsed && (
+                      <span className="truncate text-xs font-semibold">{item.label}</span>
+                    )}
+                    {item.id === 'chat' && totalUnreadChats > 0 && (
+                      <span
+                        className={`${
+                          isSidebarCollapsed ? 'absolute -right-0.5 -top-0.5 text-[9px] px-1' : 'ml-auto text-[10px] px-1.5'
+                        } flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--fx-accent)] font-bold text-white`}
+                      >
+                        {totalUnreadChats}
+                      </span>
+                    )}
+                  </button>
+                </React.Fragment>
+              );
+            })}
+          </div>
+
+          {/* Footer Actions */}
+          <div className="mt-auto border-t border-[var(--fx-border)] p-2 space-y-1">
+            {isSidebarCollapsed && (
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                title={t.chrome.expandSidebar}
+                aria-label={t.chrome.expandSidebar}
+                className="flex h-10 w-10 mx-auto items-center justify-center rounded-xl text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] cursor-pointer"
+              >
+                <PanelLeftOpen size={18} />
+              </button>
+            )}
+
+            {!isSidebarCollapsed && (
+              <div className="flex items-center gap-2.5 px-2.5 py-2 mb-1 rounded-xl bg-[var(--fx-canvas)] border border-[var(--fx-border)]">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--fx-accent-soft)] text-xs font-bold text-[var(--fx-accent)]">
+                  {(profile?.fullName || profile?.email || 'U').charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-bold text-[var(--fx-ink)]">
+                    {profile?.fullName || t.chrome.user}
+                  </p>
+                  <p className="truncate text-[10px] text-[var(--fx-faint)]">
+                    {profile?.phoneNumber || profile?.email || t.chrome.owner}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={onBack}
-              title="Back to site"
-              aria-label="Back to site"
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] cursor-pointer"
+              title={t.chrome.backToSite}
+              aria-label={t.chrome.backToSite}
+              className={`flex items-center rounded-xl text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] cursor-pointer transition-colors ${
+                isSidebarCollapsed ? 'h-10 w-10 mx-auto justify-center' : 'h-9 w-full px-3 gap-2.5 text-xs font-medium'
+              }`}
             >
-              <Globe size={18} />
+              <Globe size={16} />
+              {!isSidebarCollapsed && <span>{t.chrome.backToSite}</span>}
             </button>
+
             <button
               type="button"
               onClick={handleSignOut}
-              title={`Sign out (${profile?.fullName || profile?.email || 'account'})`}
-              aria-label="Sign out"
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-[#DC2626] hover:bg-[#FEE2E2] cursor-pointer"
+              title={`${t.chrome.logOut} (${profile?.fullName || profile?.email || t.chrome.owner})`}
+              aria-label={t.chrome.logOut}
+              className={`flex items-center rounded-xl text-[#DC2626] hover:bg-[#FEE2E2] cursor-pointer transition-colors ${
+                isSidebarCollapsed ? 'h-10 w-10 mx-auto justify-center' : 'h-9 w-full px-3 gap-2.5 text-xs font-medium'
+              }`}
             >
-              <LogOut size={18} />
+              <LogOut size={16} />
+              {!isSidebarCollapsed && <span>{t.chrome.logOut}</span>}
             </button>
           </div>
         </nav>
@@ -1173,16 +1313,25 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
           {/* Top Bar */}
           <header className="h-[62px] flex-shrink-0 bg-[var(--fx-canvas)] border-b border-[var(--fx-border)] flex items-center justify-between gap-2 sm:gap-4 px-3 sm:px-8 lg:px-10 z-20">
             <div className="flex items-center gap-3 min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                title={isSidebarCollapsed ? t.chrome.expandSidebar : t.chrome.collapseSidebar}
+                aria-label={isSidebarCollapsed ? t.chrome.expandSidebar : t.chrome.collapseSidebar}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--fx-border)] bg-white text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
+              >
+                {isSidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+              </button>
 
               {/* My Balance — sum of this account's Razorpay-paid top-ups */}
               <div
                 className="inline-flex items-center gap-2 h-9 pl-2 pr-3 rounded-full bg-white border border-[var(--fx-border)] min-w-0"
-                title="Balance from your paid top-ups"
+                title={t.chrome.balanceTooltip}
               >
                 <span className="w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
                   <Wallet size={13} />
                 </span>
-                <span className="hidden sm:inline text-[11px] text-[var(--fx-ink-2)] font-medium">My Balance</span>
+                <span className="hidden sm:inline text-[11px] text-[var(--fx-ink-2)] font-medium">{t.chrome.myBalance}</span>
                 <span className="text-sm font-bold text-[var(--fx-ink)] tabular-nums">
                   {myOrdersLoading ? '…' : `₹${balance.toLocaleString('en-IN')}`}
                 </span>
@@ -1196,16 +1345,16 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
               <button
                 onClick={handlePurchaseStickerClick}
                 className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[#111111] hover:bg-black active:scale-[0.99] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
-                aria-label="Get a free sticker"
+                aria-label={t.chrome.getFreeSticker}
               >
                 <Plus size={14} />
-                <span className="hidden sm:inline">Get Free Sticker</span>
+                <span className="hidden sm:inline">{t.chrome.getFreeSticker}</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('chat')}
                 className="relative p-2 text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:bg-black/5 rounded-full cursor-pointer transition-colors"
-                title={totalUnreadChats > 0 ? `${totalUnreadChats} unread message(s)` : 'Live Chat Notifications'}
+                title={totalUnreadChats > 0 ? `${totalUnreadChats} ${t.chrome.unreadMessagesSuffix}` : t.chrome.liveChatNotifications}
               >
                 <Bell size={18} />
                 {totalUnreadChats > 0 && (
@@ -1230,13 +1379,13 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-amber-900 flex items-center gap-2">
-                      <span>{profile?.phoneNumber ? 'Action Required: Phone Verification Pending' : 'Action Required: Add & Verify Mobile Number'}</span>
-                      <span className="text-[10px] uppercase tracking-wider bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-bold">Unverified</span>
+                      <span>{profile?.phoneNumber ? t.phoneBanner.titlePending : t.phoneBanner.titleAdd}</span>
+                      <span className="text-[10px] uppercase tracking-wider bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-bold">{t.phoneBanner.unverified}</span>
                     </h4>
                     <p className="text-xs text-amber-800 mt-1 leading-relaxed">
                       {profile?.phoneNumber
-                        ? `Complete OTP verification for ${profile.phoneNumber} to auto-claim safety stickers and enable emergency SMS alerts.`
-                        : 'Add and verify your mobile phone number via OTP to link safety stickers to your dashboard and enable instant emergency call bridges.'
+                        ? `${t.phoneBanner.descPendingPrefix} ${profile.phoneNumber} ${t.phoneBanner.descPendingSuffix}`
+                        : t.phoneBanner.descAdd
                       }
                     </p>
                   </div>
@@ -1250,14 +1399,14 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                     className="flex-1 sm:flex-initial px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-2 flex-shrink-0 shadow-xs cursor-pointer"
                   >
                     <Smartphone size={14} />
-                    <span>{profile?.phoneNumber ? 'Verify Phone via OTP' : 'Add & Verify Mobile Number'}</span>
+                    <span>{profile?.phoneNumber ? t.phoneBanner.verifyBtn : t.phoneBanner.addBtn}</span>
                     <ArrowRight size={14} />
                   </button>
                   <button
                     onClick={handleDismissProfilePopup}
                     className="p-2 text-amber-700 hover:text-amber-900 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer"
-                    title="Dismiss alert"
-                    aria-label="Dismiss alert"
+                    title={t.phoneBanner.dismiss}
+                    aria-label={t.phoneBanner.dismiss}
                   >
                     <X size={16} />
                   </button>
@@ -1272,10 +1421,10 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                 <div className="bg-white border border-[var(--fx-border)] rounded-lg p-4 sm:p-6 shadow-xs space-y-6">
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b border-[var(--fx-border)] pb-4">
                     <div>
-                      <h1 className="text-xl sm:text-2xl font-bold text-[var(--fx-ink)]">Welcome to RapiQR, {profile?.fullName || 'Client'}!</h1>
+                      <h1 className="text-xl sm:text-2xl font-bold text-[var(--fx-ink)]">{t.setup.welcomePrefix} {profile?.fullName || t.chrome.clientBadge}!</h1>
                     </div>
                     <div className="flex items-center gap-3 text-xs">
-                      <span className="font-semibold text-[var(--fx-ink)]">{completedSetupCount}/3 completed</span>
+                      <span className="font-semibold text-[var(--fx-ink)]">{completedSetupCount}/3 {t.setup.completedSuffix}</span>
                       <div className="w-32 h-1.5 bg-[var(--fx-border)] rounded-full overflow-hidden">
                         <div className="h-full bg-[#4FC47A] rounded-full transition-all duration-500" style={{ width: `${setupPercent}%` }} />
                       </div>
@@ -1290,18 +1439,18 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                           {isPhoneComplete ? '✓' : '!'}
                         </div>
                         <div>
-                          <p className="font-semibold text-sm text-[var(--fx-ink)]">Verify Mobile Phone Number OTP</p>
+                          <p className="font-semibold text-sm text-[var(--fx-ink)]">{t.setup.step1Title}</p>
                           <p className="text-xs text-[var(--fx-ink-2)]">
                             {isPhoneComplete
-                              ? `Verified mobile number linked: ${profile?.phoneNumber}`
+                              ? `${t.setup.step1VerifiedPrefix} ${profile?.phoneNumber}`
                               : profile?.phoneNumber
-                                ? `Verification pending for ${profile.phoneNumber}`
-                                : 'No mobile number verified yet (Required to auto-claim stickers)'}
+                                ? `${t.setup.step1PendingPrefix} ${profile.phoneNumber}`
+                                : t.setup.step1None}
                           </p>
                         </div>
                       </div>
                       {isPhoneComplete ? (
-                        <span className="text-xs font-bold text-[#2E9E5B]">Completed</span>
+                        <span className="text-xs font-bold text-[#2E9E5B]">{t.setup.completedLabel}</span>
                       ) : (
                         <button
                           onClick={() => {
@@ -1310,7 +1459,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                           }}
                           className="text-xs font-bold text-amber-600 hover:underline cursor-pointer"
                         >
-                          Verify Phone ›
+                          {t.setup.verifyLink}
                         </button>
                       )}
                     </div>
@@ -1322,12 +1471,12 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                           {isContactsComplete ? '✓' : '2'}
                         </div>
                         <div>
-                          <p className="font-semibold text-sm text-[var(--fx-ink)]">Link Emergency Responders</p>
-                          <p className="text-xs text-[var(--fx-ink-2)]">{totalContacts} emergency contact numbers active</p>
+                          <p className="font-semibold text-sm text-[var(--fx-ink)]">{t.setup.step2Title}</p>
+                          <p className="text-xs text-[var(--fx-ink-2)]">{totalContacts} {t.setup.step2DescSuffix}</p>
                         </div>
                       </div>
                       <button onClick={() => setActiveTab('contacts')} className="text-xs font-bold text-[var(--fx-accent)] hover:underline cursor-pointer">
-                        {isContactsComplete ? 'Configure ›' : 'Add Contacts ›'}
+                        {isContactsComplete ? t.setup.configureLink : t.setup.addContactsLink}
                       </button>
                     </div>
 
@@ -1338,12 +1487,12 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                           {isStickersComplete ? '✓' : '3'}
                         </div>
                         <div>
-                          <p className="font-semibold text-sm text-[var(--fx-ink)]">Active Safety QR Plates</p>
-                          <p className="text-xs text-[var(--fx-ink-2)]">{activeCount} active vehicle QR plates online</p>
+                          <p className="font-semibold text-sm text-[var(--fx-ink)]">{t.setup.step3Title}</p>
+                          <p className="text-xs text-[var(--fx-ink-2)]">{activeCount} {t.setup.step3DescSuffix}</p>
                         </div>
                       </div>
                       <button onClick={() => setActiveTab('overview')} className="text-xs font-bold text-[var(--fx-accent)] hover:underline cursor-pointer">
-                        View Stickers ›
+                        {t.setup.viewStickersLink}
                       </button>
                     </div>
                   </div>
@@ -1361,7 +1510,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                     {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                   </div>
                   <h1 className="text-2xl sm:text-[28px] font-bold text-[var(--fx-ink)] leading-tight tracking-tight">
-                    Welcome back, {profile?.fullName?.split(' ')[0] || 'Client'}
+                    {t.overview.welcomeBackPrefix} {profile?.fullName?.split(' ')[0] || t.chrome.clientBadge}
                   </h1>
                 </div>
 
@@ -1373,18 +1522,18 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                     <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
                       <div className="max-w-xl space-y-2 text-left">
                         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white text-[11px] font-bold tracking-wide uppercase">
-                          <Sparkles size={13} /> Your Sticker Is Free
+                          <Sparkles size={13} /> {t.overview.heroBadge}
                         </div>
                         <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white font-display">
-                          Get Your Free Safety Sticker to Activate Your Dashboard
+                          {t.overview.heroTitle}
                         </h2>
                         <p className="text-zinc-300 text-xs sm:text-sm leading-relaxed">
-                          Your account is ready! To generate your vehicle QR plate, emergency responder tree, and instant WhatsApp parking alerts, get your free RapiQR smart safety tag.
+                          {t.overview.heroDesc}
                         </p>
                         <div className="flex flex-wrap items-center gap-4 pt-1 text-xs text-zinc-400">
-                          <span className="flex items-center gap-1"><ShieldCheck size={14} className="text-emerald-400" /> 100% Number Masking</span>
-                          <span className="flex items-center gap-1"><Zap size={14} className="text-white" /> 0.4s Instant Alerts</span>
-                          <span className="flex items-center gap-1"><CheckCircle2 size={14} className="text-emerald-400" /> Free Delivery</span>
+                          <span className="flex items-center gap-1"><ShieldCheck size={14} className="text-emerald-400" /> {t.overview.maskingBadge}</span>
+                          <span className="flex items-center gap-1"><Zap size={14} className="text-white" /> {t.overview.instantBadge}</span>
+                          <span className="flex items-center gap-1"><CheckCircle2 size={14} className="text-emerald-400" /> {t.overview.deliveryBadge}</span>
                         </div>
                       </div>
 
@@ -1394,14 +1543,14 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                           className="h-11 px-6 rounded-xl bg-white hover:bg-neutral-100 active:scale-[0.99] text-black font-extrabold text-sm shadow-lg shadow-black/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
                         >
                           <ShoppingBag size={17} />
-                          <span>Get Free Sticker →</span>
+                          <span>{t.overview.getFreeStickerBtn}</span>
                         </button>
                         <button
                           onClick={() => setModal({ type: 'recover' })}
                           className="h-9 px-4 rounded-lg border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 active:scale-[0.99] text-zinc-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                         >
                           <QrCode size={13} />
-                          <span>Have a Tag? Link by Code</span>
+                          <span>{t.overview.haveTagLink}</span>
                         </button>
                       </div>
                     </div>
@@ -1411,20 +1560,20 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                 {/* HoneyBook Stats Bar (4 columns) */}
                 <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.04)] grid grid-cols-2 lg:grid-cols-4 rounded-lg overflow-hidden divide-x divide-y lg:divide-y-0 divide-[var(--fx-border)]">
                   <div className="p-4 sm:p-6">
-                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">Active Stickers</div>
+                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">{t.overview.statActive}</div>
                     <div className="text-2xl sm:text-3xl font-light tracking-tight text-[var(--fx-ink)]">{activeCount}</div>
                   </div>
                   <div className="p-4 sm:p-6">
-                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">Total Scans</div>
+                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">{t.overview.statScans}</div>
                     <div className="text-2xl sm:text-3xl font-light tracking-tight text-[var(--fx-ink)]">{totalScans}</div>
                   </div>
                   <div className="p-4 sm:p-6">
-                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">Emergency Contacts</div>
+                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">{t.overview.statContacts}</div>
                     <div className="text-2xl sm:text-3xl font-light tracking-tight text-[var(--fx-ink)]">{totalContacts}</div>
                   </div>
                   <div className="p-4 sm:p-6">
-                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">Security Status</div>
-                    <div className="text-xl sm:text-2xl font-semibold text-[#4FC47A] tracking-tight mt-1">Protected</div>
+                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">{t.overview.statSecurity}</div>
+                    <div className="text-xl sm:text-2xl font-semibold text-[#4FC47A] tracking-tight mt-1">{t.overview.protectedLabel}</div>
                   </div>
                 </div>
 
@@ -1432,17 +1581,17 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                 <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4">
                   <div className="flex justify-between items-center mb-2">
                     <h3 className="text-xs font-semibold text-[var(--fx-ink)]">
-                      Latest chat{totalUnreadChats > 0 ? ` (${totalUnreadChats} unread)` : ''}
+                      {t.overview.latestChat}{totalUnreadChats > 0 ? ` (${totalUnreadChats} ${t.overview.unreadSuffix})` : ''}
                     </h3>
                     <button onClick={() => setActiveTab('chat')} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">
-                      View inbox ›
+                      {t.overview.viewInbox}
                     </button>
                   </div>
 
                   {ownerSessionsLoading ? (
-                    <div className="py-4 text-center text-xs text-[var(--fx-ink-2)]">Loading chats...</div>
+                    <div className="py-4 text-center text-xs text-[var(--fx-ink-2)]">{t.overview.loadingChats}</div>
                   ) : latestSessions.length === 0 ? (
-                    <div className="py-4 text-center text-xs text-[var(--fx-ink-2)]">No chats yet.</div>
+                    <div className="py-4 text-center text-xs text-[var(--fx-ink-2)]">{t.overview.noChatsYet}</div>
                   ) : (
                     <div className="divide-y divide-[var(--fx-canvas)]">
                       {latestSessions.map((sess) => (
@@ -1457,10 +1606,10 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                         >
                           <div className="min-w-0">
                             <p className="text-xs font-bold text-[var(--fx-ink)] truncate">
-                              {sess.customer_name || 'Visitor'}
+                              {sess.customer_name || t.chatInbox.visitor}
                               {sess.vehicle_label && <span className="font-medium text-[var(--fx-ink-2)]"> · {sess.vehicle_label}</span>}
                             </p>
-                            <p className="text-[11px] text-[var(--fx-ink-2)] truncate">{sess.last_message_preview || 'No messages yet'}</p>
+                            <p className="text-[11px] text-[var(--fx-ink-2)] truncate">{sess.last_message_preview || t.overview.noMessagesYet}</p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             {(sess.unread_owner_count || 0) > 0 && (
@@ -1484,19 +1633,19 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   {/* Card 1: Create New */}
                   <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4 flex flex-col justify-between md:min-h-[360px]">
                     <div>
-                      <h3 className="text-xs font-semibold text-[var(--fx-ink)] mb-3.5">Quick Actions</h3>
+                      <h3 className="text-xs font-semibold text-[var(--fx-ink)] mb-3.5">{t.overview.quickActions}</h3>
                       <div className="space-y-2">
                         <button
                           onClick={() => setActiveTab('chat')}
                           className="w-full h-11 border border-[var(--fx-border)] bg-[var(--fx-canvas)] rounded hover:border-[var(--fx-accent)] flex items-center px-3 gap-2.5 text-xs text-[var(--fx-ink)] font-bold hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
                         >
-                          <MessageCircle size={15} className="text-[var(--fx-accent)]" /> Open Live Visitor Chat
+                          <MessageSquareText size={15} className="text-[var(--fx-accent)]" /> {t.overview.openChat}
                         </button>
                         <button
                           onClick={() => setActiveTab('contacts')}
                           className="w-full h-11 border border-[var(--fx-border)] rounded hover:border-[var(--fx-accent)] flex items-center px-3 gap-2.5 text-xs text-[var(--fx-ink)] font-medium hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
                         >
-                          <Users size={15} className="text-[var(--fx-accent)]" /> Add Emergency Contact
+                          <Contact2 size={15} className="text-[var(--fx-accent)]" /> {t.overview.addContact}
                         </button>
                         <button
                           onClick={async () => {
@@ -1505,20 +1654,20 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                           }}
                           className="w-full h-11 border border-[var(--fx-border)] rounded hover:border-[var(--fx-accent)] flex items-center px-3 gap-2.5 text-xs text-[var(--fx-ink)] font-medium hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
                         >
-                          <RefreshCcw size={15} className="text-[var(--fx-accent)]" /> Sync Safety Stickers
+                          <RefreshCw size={15} className="text-[var(--fx-accent)]" /> {t.overview.syncStickers}
                         </button>
                         <button
                           onClick={() => setModal({ type: 'qrCode', sticker: products[0] })}
                           disabled={!products[0]}
                           className="w-full h-11 border border-[var(--fx-border)] rounded hover:border-[var(--fx-accent)] flex items-center px-3 gap-2.5 text-xs text-[var(--fx-ink)] font-medium hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer disabled:opacity-50"
                         >
-                          <QrCode size={15} className="text-[var(--fx-accent)]" /> View QR Plate Code
+                          <QrCode size={15} className="text-[var(--fx-accent)]" /> {t.overview.viewQr}
                         </button>
                         <button
                           onClick={() => setActiveTab('history')}
                           className="w-full h-11 border border-[var(--fx-border)] rounded hover:border-[var(--fx-accent)] flex items-center px-3 gap-2.5 text-xs text-[var(--fx-ink)] font-medium hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
                         >
-                          <History size={15} className="text-[var(--fx-accent)]" /> Scan Logs & Alerts
+                          <BellRing size={15} className="text-[var(--fx-accent)]" /> {t.overview.scanLogs}
                         </button>
                       </div>
                     </div>
@@ -1528,27 +1677,27 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4 flex flex-col justify-between md:min-h-[360px]">
                     <div>
                       <div className="flex justify-between items-center mb-3">
-                        <h3 className="text-xs font-semibold text-[var(--fx-ink)]">My Safety Stickers ({products.length})</h3>
+                        <h3 className="text-xs font-semibold text-[var(--fx-ink)]">{t.overview.mySafetyStickersPrefix} ({products.length})</h3>
                         <div className="flex items-center gap-2.5">
                           <CodeVisibilityToggleButton isRevealed={codesRevealed} onToggleVisibility={() => setCodesRevealed(!codesRevealed)} />
-                          <button onClick={() => setModal({ type: 'recover' })} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">Recover a sticker</button>
-                          <button onClick={() => loadProducts({ sync: true })} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">Refresh</button>
+                          <button onClick={() => setModal({ type: 'recover' })} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">{t.overview.recoverLink}</button>
+                          <button onClick={() => loadProducts({ sync: true })} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">{t.overview.refreshLink}</button>
                         </div>
                       </div>
 
                       {productsLoading ? (
-                        <div className="py-12 text-center text-xs text-[var(--fx-ink-2)]">Loading stickers...</div>
+                        <div className="py-12 text-center text-xs text-[var(--fx-ink-2)]">{t.overview.loadingStickers}</div>
                       ) : products.length === 0 ? (
                         <div className="py-8 text-center text-xs text-[var(--fx-ink-2)] space-y-3">
                           <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center">
                             <ShoppingBag size={22} />
                           </div>
                           <div>
-                            <p className="font-bold text-sm text-[var(--fx-ink)]">No Safety Stickers Linked Yet</p>
-                            <p className="text-[11px] text-[var(--fx-ink-2)] mt-0.5">Get your free sticker to create your vehicle plate.</p>
+                            <p className="font-bold text-sm text-[var(--fx-ink)]">{t.overview.noStickersTitle}</p>
+                            <p className="text-[11px] text-[var(--fx-ink-2)] mt-0.5">{t.overview.noStickersDesc}</p>
                           </div>
                           <FlowButton tone="dark" size="sm" onClick={handlePurchaseStickerClick}>
-                            <Plus size={14} /> Get Free Sticker
+                            <Plus size={14} /> {t.overview.getFreeStickerShort}
                           </FlowButton>
                         </div>
                       ) : (
@@ -1566,13 +1715,13 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                                   onClick={() => setModal({ type: 'qrCode', sticker: p })}
                                   className="px-2 py-1 bg-[var(--fx-accent-soft)] border border-[var(--fx-accent-ink)] text-[var(--fx-accent-ink)] text-[11px] font-bold rounded cursor-pointer"
                                 >
-                                  QR
+                                  {t.overview.qrBtn}
                                 </button>
                                 <button
                                   onClick={() => setModal({ type: 'editDetails', sticker: p })}
                                   className="px-2 py-1 bg-white border border-[var(--fx-border)] text-[var(--fx-ink)] text-[11px] font-semibold rounded cursor-pointer"
                                 >
-                                  Edit
+                                  {t.overview.editBtn}
                                 </button>
                               </div>
                             </div>
@@ -1586,7 +1735,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                           {removedStickers.map((s) => (
                             <div key={s.id} className="p-2.5 border border-[#FBE3B8] bg-[#FFFBF2] rounded-md flex items-center justify-between gap-2">
                               <div className="min-w-0">
-                                <p className="text-[11px] font-bold text-[#8A5A00] truncate">{s.nickname || 'A sticker'} no longer shows here</p>
+                                <p className="text-[11px] font-bold text-[#8A5A00] truncate">{s.nickname || 'A sticker'} {t.overview.noLongerShowsSuffix}</p>
                                 {codesRevealed && <p className="text-[10px] text-[#A67C1F] font-mono truncate">{s.qrCodeId}</p>}
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
@@ -1595,7 +1744,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                                   disabled={recoveringId === s.qrCodeId}
                                   className="px-2 py-1 bg-white border border-[var(--fx-accent-ink)] text-[var(--fx-accent-ink)] text-[10px] font-bold rounded cursor-pointer disabled:opacity-60"
                                 >
-                                  {recoveringId === s.qrCodeId ? 'Recovering…' : 'Recover'}
+                                  {recoveringId === s.qrCodeId ? t.overview.recovering : t.overview.recoverBtn}
                                 </button>
                                 <button
                                   onClick={() => dismissRemovedSticker(s.id)}
@@ -1611,7 +1760,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                       )}
                     </div>
                     <div className="pt-2 text-xs font-semibold text-[var(--fx-accent)] cursor-pointer hover:underline" onClick={() => setActiveTab('overview')}>
-                      View all safety stickers ›
+                      {t.overview.viewAllStickers}
                     </div>
                   </div>
 
@@ -1619,8 +1768,8 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4 flex flex-col justify-between md:min-h-[360px]">
                     <div>
                       <div className="flex justify-between items-center mb-3">
-                        <h3 className="text-xs font-semibold text-[var(--fx-ink)]">Emergency Contacts ({totalContacts})</h3>
-                        <button onClick={() => setActiveTab('contacts')} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">＋ Contact</button>
+                        <h3 className="text-xs font-semibold text-[var(--fx-ink)]">{t.overview.emergencyContactsPrefix} ({totalContacts})</h3>
+                        <button onClick={() => setActiveTab('contacts')} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">{t.overview.addContactShort}</button>
                       </div>
 
                       <div className="space-y-3 mt-4">
@@ -1636,14 +1785,14 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                           ))
                         ) : (
                           <div className="py-10 text-center text-xs text-[var(--fx-ink-2)]">
-                            <p>No emergency contacts added yet.</p>
-                            <button onClick={() => setActiveTab('contacts')} className="text-[var(--fx-accent)] font-bold mt-2 hover:underline">Add Emergency Responders</button>
+                            <p>{t.overview.noContactsYet}</p>
+                            <button onClick={() => setActiveTab('contacts')} className="text-[var(--fx-accent)] font-bold mt-2 hover:underline">{t.overview.addResponders}</button>
                           </div>
                         )}
                       </div>
                     </div>
                     <div className="pt-2 text-xs font-semibold text-[var(--fx-accent)] cursor-pointer hover:underline" onClick={() => setActiveTab('contacts')}>
-                      Manage responder contacts ›
+                      {t.overview.manageContacts}
                     </div>
                   </div>
 
@@ -1652,11 +1801,11 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                 {/* Recent scans — expands into the latest scan events */}
                 <div className="pt-2">
                   <ActivityDropdown
-                    title="Recent Scans"
+                    title={t.overview.recentScans}
                     subtitle={
                       allHistory.length > 0
                         ? `${allHistory.length} scan event${allHistory.length === 1 ? '' : 's'}`
-                        : 'No scans recorded yet'
+                        : t.overview.noScansYet
                     }
                     icon={<QrCode className="h-5 w-5" />}
                     items={allHistory.slice(0, 5).map((h, i) => ({
@@ -1666,8 +1815,8 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                       description: h.event_type || 'Vehicle QR scan recorded',
                       time: new Date(h.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
                     }))}
-                    emptyText="No scan events recorded recently."
-                    action={{ label: 'Full log', onClick: () => setActiveTab('history') }}
+                    emptyText={t.history.noScanEventsRecent}
+                    action={{ label: t.history.fullLog, onClick: () => setActiveTab('history') }}
                     defaultOpen
                   />
                 </div>
@@ -1675,36 +1824,231 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
               </div>
             )}
 
-            {/* ════ VIEW 1B: PRODUCTS (PURCHASE / ORDER HISTORY) ════ */}
+            {/* ════ VIEW 1B: PRODUCTS & ORDERS ════ */}
             {activeTab === 'products' && (
               <div className="space-y-6">
-                <div>
-                  <h1 className="font-display text-[26px] font-bold text-[var(--fx-ink)]">
-                    Products
-                  </h1>
+                <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--fx-ink)]">
+                  {t.products.title}
+                </h1>
+
+                {/* Underlined Tabs */}
+                <div className="flex items-center gap-6 border-b border-[var(--fx-border)]">
+                  <button
+                    type="button"
+                    onClick={() => setProductViewTab('catalog')}
+                    className={`flex items-center gap-1.5 pb-3 text-sm font-semibold border-b-2 -mb-px transition-colors cursor-pointer ${
+                      productViewTab === 'catalog'
+                        ? 'border-[var(--fx-accent)] text-[var(--fx-accent)]'
+                        : 'border-transparent text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)]'
+                    }`}
+                  >
+                    <span>{t.products.availableTags}</span>
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-neutral-100 text-neutral-600">
+                      {shopProducts.length}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProductViewTab('orders')}
+                    className={`flex items-center gap-1.5 pb-3 text-sm font-semibold border-b-2 -mb-px transition-colors cursor-pointer ${
+                      productViewTab === 'orders'
+                        ? 'border-[var(--fx-accent)] text-[var(--fx-accent)]'
+                        : 'border-transparent text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)]'
+                    }`}
+                  >
+                    <span>{t.products.myOrders}</span>
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-neutral-100 text-neutral-600">
+                      {myOrders.length}
+                    </span>
+                  </button>
                 </div>
 
-                {myOrdersLoading ? (
-                  <div className="bg-white border border-[var(--fx-border)] rounded-[14px] py-10 px-6 text-center text-[var(--fx-faint)]">
-                    <Loader2 size={32} className="animate-spin mx-auto mb-2 text-[var(--fx-accent)]" />
-                    <p className="text-[13.5px] font-semibold text-[var(--fx-ink)]">Loading your orders...</p>
+                {/* VIEW: CATALOG */}
+                {productViewTab === 'catalog' && (
+                  <div className="space-y-6">
+                    {shopProductsLoading ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                        {[1, 2, 3, 4].map((n) => (
+                          <div key={n} className="rounded-2xl border border-[var(--fx-border)] bg-white p-4 space-y-3 animate-pulse">
+                            <div className="aspect-[16/10] bg-neutral-100 rounded-xl" />
+                            <div className="h-4 bg-neutral-100 rounded w-3/4" />
+                            <div className="h-3 bg-neutral-100 rounded w-full" />
+                            <div className="h-9 bg-neutral-100 rounded-lg mt-4" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : shopProducts.length === 0 ? (
+                      <div className="bg-white border border-[var(--fx-border)] rounded-2xl py-12 px-6 text-center">
+                        <ShoppingBag size={38} className="mx-auto mb-3 opacity-40 text-[var(--fx-accent)]" />
+                        <h3 className="text-sm font-bold text-[var(--fx-ink)]">{t.products.noProductsTitle}</h3>
+                        <p className="text-xs text-[var(--fx-ink-2)] mt-1">{t.products.noProductsDesc}</p>
+                        <button
+                          onClick={loadShopProducts}
+                          className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-[var(--fx-accent)] text-white hover:opacity-90 cursor-pointer"
+                        >
+                          <RefreshCw size={13} /> {t.products.refreshCatalog}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                        {shopProducts.map((product) => (
+                          <div
+                            key={product.id}
+                            className="group flex flex-col overflow-hidden rounded-2xl border border-[var(--fx-border)] bg-white shadow-2xs hover:shadow-md transition-all duration-200"
+                          >
+                            <div className="relative aspect-[16/10] overflow-hidden bg-neutral-100">
+                              <img
+                                src={product.img}
+                                alt={product.name}
+                                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                onError={(e) => {
+                                  (e.target as HTMLElement).style.display = 'none';
+                                }}
+                              />
+                              {product.badge && (
+                                <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-xs shadow-xs">
+                                  {product.badge}
+                                </span>
+                              )}
+                              <span className="absolute right-3 top-3 rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-neutral-700 shadow-2xs backdrop-blur-xs">
+                                {product.category || t.products.safetyTagCategory}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-1 flex-col justify-between p-4 sm:p-5">
+                              <div>
+                                <h3 className="text-sm font-bold text-[var(--fx-ink)] group-hover:text-[var(--fx-accent)] transition-colors">
+                                  {product.name}
+                                </h3>
+                                <p className="mt-1.5 text-xs text-[var(--fx-ink-2)] line-clamp-2 leading-relaxed">
+                                  {product.desc}
+                                </p>
+
+                                {product.features && product.features.length > 0 && (
+                                  <ul className="mt-3 space-y-1">
+                                    {product.features.slice(0, 2).map((feat, idx) => (
+                                      <li key={idx} className="flex items-center gap-1.5 text-[11px] text-[var(--fx-ink-2)]">
+                                        <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />
+                                        <span className="truncate">{feat}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+
+                              <div className="mt-5 pt-3 border-t border-[var(--fx-canvas)]">
+                                <div className="flex items-baseline justify-between mb-3">
+                                  <div>
+                                    <span className="text-base font-bold text-[var(--fx-ink)]">
+                                      {product.price === 0 ? t.products.freeTag : `₹${product.price}`}
+                                    </span>
+                                    {product.mrp && product.mrp > product.price && (
+                                      <span className="ml-1.5 text-xs text-neutral-400 line-through">
+                                        ₹{product.mrp}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                    {t.products.privacyBadge}
+                                  </span>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleBuyProduct(product)}
+                                  className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-neutral-900 py-2.5 text-xs font-bold text-white hover:bg-black transition-all active:scale-[0.99] cursor-pointer shadow-xs"
+                                >
+                                  <span>{product.price === 0 ? t.products.getFreeTagBtn : t.products.orderNowBtn}</span>
+                                  <ArrowRight size={13} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ) : myOrdersError ? (
-                  <div className="bg-white border border-[var(--fx-border)] rounded-[14px] py-10 px-6 text-center text-[var(--fx-faint)]">
-                    <AlertTriangle size={32} className="mx-auto mb-2 text-[#DC2626]" />
-                    <p className="text-[13.5px] font-semibold text-[var(--fx-ink)]">{myOrdersError}</p>
-                  </div>
-                ) : myOrders.length === 0 ? (
-                  <div className="bg-white border border-[var(--fx-border)] rounded-[14px] py-10 px-6 text-center text-[var(--fx-faint)]">
-                    <ShoppingBag size={34} className="mx-auto mb-3 opacity-50 text-[var(--fx-accent)]" />
-                    <p className="text-[13.5px] text-[var(--fx-ink)] font-semibold">No orders yet.</p>
-                    <p className="text-[12.5px] text-[var(--fx-faint)] mt-1">Purchases you make on the RapiQR store will show up here.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {myOrders.map((o) => {
+                )}
+
+                {/* VIEW: MY ORDERS */}
+                {productViewTab === 'orders' && (() => {
+                  const filteredOrders = myOrders.filter((o) => {
+                    if (orderStatusFilter !== 'all' && o.status !== orderStatusFilter) return false;
+                    const needle = orderSearch.trim().toLowerCase();
+                    if (!needle) return true;
+                    return (o.id || '').toLowerCase().includes(needle) || (o.items || []).some((it: any) => (it.name || '').toLowerCase().includes(needle));
+                  });
+                  return (
+                  <div className="space-y-4">
+                    {/* Search + Status Filter Toolbar */}
+                    {myOrders.length > 0 && (
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+                        <div className="relative flex-1 min-w-[200px]">
+                          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fx-faint)]" />
+                          <input
+                            type="text"
+                            placeholder={t.products.searchOrders}
+                            value={orderSearch}
+                            onChange={(e) => setOrderSearch(e.target.value)}
+                            className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink)] outline-none focus:border-[var(--fx-accent)] focus:ring-2 focus:ring-[var(--fx-accent)]/20 shadow-2xs"
+                          />
+                        </div>
+                        <select
+                          value={orderStatusFilter}
+                          onChange={(e) => setOrderStatusFilter(e.target.value as any)}
+                          className="px-3 py-2 text-xs font-semibold rounded-lg border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink-2)] outline-none cursor-pointer focus:border-[var(--fx-accent)] shadow-2xs"
+                        >
+                          <option value="all">{t.products.allStatus}</option>
+                          <option value="placed">{t.products.placed}</option>
+                          <option value="shipped">{t.products.shipped}</option>
+                          <option value="delivered">{t.products.delivered}</option>
+                          <option value="cancelled">{t.products.cancelled}</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {myOrdersLoading ? (
+                      <div className="bg-white border border-[var(--fx-border)] rounded-2xl py-10 px-6 text-center text-[var(--fx-faint)]">
+                        <Loader2 size={32} className="animate-spin mx-auto mb-2 text-[var(--fx-accent)]" />
+                        <p className="text-[13.5px] font-semibold text-[var(--fx-ink)]">{t.products.loadingOrders}</p>
+                      </div>
+                    ) : myOrdersError ? (
+                      <div className="bg-white border border-[var(--fx-border)] rounded-2xl py-10 px-6 text-center text-[var(--fx-faint)]">
+                        <AlertTriangle size={32} className="mx-auto mb-2 text-[#DC2626]" />
+                        <p className="text-[13.5px] font-semibold text-[var(--fx-ink)]">{myOrdersError}</p>
+                      </div>
+                    ) : myOrders.length === 0 ? (
+                      <div className="bg-white border border-[var(--fx-border)] rounded-2xl py-12 px-6 text-center">
+                        <ShoppingBag size={38} className="mx-auto mb-3 opacity-40 text-[var(--fx-accent)]" />
+                        <p className="text-sm text-[var(--fx-ink)] font-bold">{t.products.noOrdersTitle}</p>
+                        <p className="text-xs text-[var(--fx-ink-2)] mt-1 max-w-sm mx-auto">
+                          {t.products.noOrdersDesc}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setProductViewTab('catalog')}
+                          className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-neutral-900 text-white hover:bg-black cursor-pointer shadow-xs"
+                        >
+                          <PackageCheck size={14} /> {t.products.browseTagsBtn}
+                        </button>
+                      </div>
+                    ) : filteredOrders.length === 0 ? (
+                      <div className="bg-white border border-[var(--fx-border)] rounded-xl py-10 px-6 text-center">
+                        <Search size={28} className="mx-auto mb-2 opacity-40 text-[var(--fx-accent)]" />
+                        <p className="text-sm text-[var(--fx-ink)] font-bold">{t.products.noOrdersMatch}</p>
+                        <button
+                          type="button"
+                          onClick={() => { setOrderSearch(''); setOrderStatusFilter('all'); }}
+                          className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg bg-[var(--fx-canvas)] text-[var(--fx-ink-2)] hover:bg-[var(--fx-border)] transition-colors cursor-pointer"
+                        >
+                          <RefreshCw size={12} /> {t.products.clearFilters}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                    {filteredOrders.map((o) => {
                       const payStatus: string = o.payment?.status || 'created';
-                      const payLabel = payStatus === 'paid' ? 'Paid' : payStatus === 'failed' ? 'Payment Failed' : 'Awaiting Payment';
+                      const payLabel = payStatus === 'paid' ? t.products.paid : payStatus === 'failed' ? t.products.paymentFailed : t.products.awaitingPayment;
                       const payColor = payStatus === 'paid' ? 'text-[#2E9E5B] bg-[#E9F9EF]' : payStatus === 'failed' ? 'text-[#DC2626] bg-[#FDEAEA]' : 'text-[#B8863F] bg-[#FBF3E4]';
                       const fulfillColor =
                         o.status === 'delivered' ? 'text-[#2E9E5B] bg-[#E9F9EF]' :
@@ -1733,7 +2077,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                             {(o.items || []).map((it: any, i: number) => (
                               <div key={i} className="flex items-center justify-between py-1.5 text-[13px]">
                                 <span className="text-[var(--fx-ink)]">{it.name} × {it.qty}</span>
-                                <span className="font-mono text-[var(--fx-ink-2)]">{it.price > 0 ? `₹${(it.price * it.qty).toLocaleString('en-IN')}` : 'Free'}</span>
+                                <span className="font-mono text-[var(--fx-ink-2)]">{it.price > 0 ? `₹${(it.price * it.qty).toLocaleString('en-IN')}` : t.products.free}</span>
                               </div>
                             ))}
                           </div>
@@ -1742,12 +2086,13 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                           {o.status !== 'cancelled' && (
                             <div className="mt-3 pt-3 border-t border-[var(--fx-canvas)]">
                               <div className="flex items-center">
-                                {DELIVERY_STEPS.map((stepLabel, idx) => {
-                                  const reached = idx <= DELIVERY_STEPS.indexOf(
-                                    o.status === 'delivered' ? 'Delivered' : o.status === 'shipped' ? 'Shipped' : 'Ordered'
+                                {(['ordered', 'shipped', 'delivered'] as const).map((stepKey, idx) => {
+                                  const stepLabel = stepKey === 'ordered' ? t.products.stepOrdered : stepKey === 'shipped' ? t.products.stepShipped : t.products.stepDelivered;
+                                  const reached = idx <= ['ordered', 'shipped', 'delivered'].indexOf(
+                                    o.status === 'delivered' ? 'delivered' : o.status === 'shipped' ? 'shipped' : 'ordered'
                                   );
                                   return (
-                                    <React.Fragment key={stepLabel}>
+                                    <React.Fragment key={stepKey}>
                                       {idx > 0 && (
                                         <div className={`h-[2px] flex-1 ${reached ? 'bg-[#2E9E5B]' : 'bg-[var(--fx-border)]'}`} />
                                       )}
@@ -1764,7 +2109,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
 
                               {(o.shiprocket?.awbCode || o.shiprocket?.courierName) && (
                                 <p className="text-[12px] text-[var(--fx-ink-2)] mt-3">
-                                  {o.shiprocket.courierName || 'Courier'}
+                                  {o.shiprocket.courierName || t.products.courierFallback}
                                   {o.shiprocket.awbCode && <> · AWB <span className="font-mono text-[var(--fx-ink)]">{o.shiprocket.awbCode}</span></>}
                                   {o.shiprocket.etd && <> · Expected <span className="text-[var(--fx-ink)]">{o.shiprocket.etd}</span></>}
                                 </p>
@@ -1778,8 +2123,8 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                                 >
                                   {trackLoading[o.id]
                                     ? <Loader2 size={13} className="animate-spin" />
-                                    : <RefreshCcw size={13} className="text-[var(--fx-accent)]" />}
-                                  {trackLoading[o.id] ? 'Checking…' : trackOpen[o.id] ? 'Hide tracking' : 'Track delivery'}
+                                    : <RefreshCw size={13} className="text-[var(--fx-accent)]" />}
+                                  {trackLoading[o.id] ? t.products.checking : trackOpen[o.id] ? t.products.hideTracking : t.products.trackDelivery}
                                 </button>
                                 {o.shiprocket?.trackingUrl && (
                                   <a
@@ -1788,7 +2133,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                                     rel="noreferrer"
                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[12px] font-semibold text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] transition-colors"
                                   >
-                                    Courier site
+                                    {t.products.courierSite}
                                     <ArrowRight size={12} />
                                   </a>
                                 )}
@@ -1801,8 +2146,8 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                                   ) : !(trackData[o.id]?.shiprocket?.timeline || []).length ? (
                                     <p className="text-[12.5px] text-[var(--fx-ink-2)]">
                                       {o.status === 'placed'
-                                        ? "We're preparing your order. Tracking appears here as soon as it's handed to the courier."
-                                        : 'No courier scans reported yet — check back shortly.'}
+                                        ? t.products.preparingOrder
+                                        : t.products.noCourierScans}
                                     </p>
                                   ) : (
                                     <div className="space-y-2.5">
@@ -1826,10 +2171,13 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                         </div>
                       );
                     })}
-                  </div>
-                )}
-              </div>
-            )}
+                    </div>
+                  )}
+                </div>
+                  );
+                })()}
+            </div>
+          )}
 
             {/* ════ VIEW 2: EMERGENCY CONTACTS ════ */}
             {activeTab === 'contacts' && (
@@ -1842,42 +2190,165 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
             {/* ════ VIEW 3: ALERT HISTORY ════ */}
             {activeTab === 'history' && (
               <div className="space-y-6">
-                <div>
-                  <h1 className="font-display text-[26px] font-bold text-[var(--fx-ink)]">
-                    Alert history
+                {/* Header with Title and Manual Refresh */}
+                <div className="flex items-center justify-between gap-3">
+                  <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--fx-ink)]">
+                    {t.history.title}
                   </h1>
+                  <button
+                    type="button"
+                    onClick={() => fetchAlertHistory(true)}
+                    disabled={allHistoryLoading}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--fx-border)] bg-white text-xs font-semibold text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] transition-colors self-start sm:self-auto cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw size={13} className={allHistoryLoading ? 'animate-spin text-[var(--fx-accent)]' : ''} />
+                    <span>{allHistoryLoading ? t.history.refreshing : t.history.refreshAlerts}</span>
+                  </button>
                 </div>
 
-                {allHistoryLoading ? (
-                  <div className="bg-white border border-[var(--fx-border)] rounded-[14px] py-10 px-6 text-center text-[var(--fx-faint)]">
+                {allHistoryLoading && allHistory.length === 0 ? (
+                  <div className="bg-white border border-[var(--fx-border)] rounded-2xl py-12 px-6 text-center text-[var(--fx-faint)]">
                     <Loader2 size={32} className="animate-spin mx-auto mb-2 text-[var(--fx-accent)]" />
-                    <p className="text-[13.5px] font-semibold text-[var(--fx-ink)]">Fetching alert history...</p>
+                    <p className="text-[13.5px] font-semibold text-[var(--fx-ink)]">{t.history.fetching}</p>
                   </div>
                 ) : allHistory.length === 0 ? (
-                  <div className="bg-white border border-[var(--fx-border)] rounded-[14px] py-10 px-6 text-center text-[var(--fx-faint)]">
-                    <History size={34} className="mx-auto mb-3 opacity-50 text-[var(--fx-accent)]" />
-                    <p className="text-[13.5px] text-[var(--fx-ink)] font-semibold">No alert events recorded yet.</p>
+                  <div className="bg-white border border-[var(--fx-border)] rounded-2xl py-12 px-6 text-center text-[var(--fx-faint)]">
+                    <BellRing size={36} className="mx-auto mb-3 opacity-40 text-[var(--fx-accent)]" />
+                    <p className="text-sm text-[var(--fx-ink)] font-bold">{t.history.noAlertsTitle}</p>
+                    <p className="text-xs text-[var(--fx-ink-2)] mt-1 max-w-sm mx-auto">
+                      {t.history.noAlertsDesc}
+                    </p>
                   </div>
                 ) : (
-                  <div className="bg-white rounded-[14px] border border-[var(--fx-border)] overflow-x-auto">
-                    <table className="w-full min-w-[520px] text-sm text-[var(--fx-ink)]">
-                      <thead>
-                        <tr className="text-left font-display text-[12px] font-semibold text-[var(--fx-ink-2)] tracking-normal bg-[var(--fx-canvas)] border-b border-[var(--fx-border)]">
-                          <th className="px-6 py-3">Sticker</th>
-                          <th className="px-3 py-3">Event</th>
-                          <th className="px-3 py-3">Time</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--fx-border)]">
-                        {allHistory.map((h, i) => (
-                          <tr key={i} className="hover:bg-[var(--fx-canvas)]">
-                            <td className="px-6 py-3 font-display font-semibold text-[15px]">{codesRevealed ? h.stickerCode : (h.stickerVehicle || h.stickerNickname || 'Sticker')}</td>
-                            <td className="px-3 py-3 text-xs">{h.event_type || 'Scan Recorded'}</td>
-                            <td className="px-3 py-3 font-mono text-xs text-[var(--fx-faint)]">{new Date(h.created_at).toLocaleString('en-IN')}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="space-y-6">
+                    {/* ── LATEST ALERT HERO CARD ── */}
+                    {allHistory[0] && (
+                      <div className="rounded-2xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50/70 via-white to-neutral-50/40 p-5 sm:p-6 shadow-xs">
+                        <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+                          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100/90 text-emerald-800 border border-emerald-300/60">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600" />
+                            </span>
+                            {t.history.latestAlert}
+                          </span>
+                          <span className="font-mono text-xs text-neutral-500">
+                            {new Date(allHistory[0].created_at).toLocaleString('en-IN', {
+                              dateStyle: 'medium',
+                              timeStyle: 'short',
+                            })}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div>
+                            <h2 className="text-base sm:text-lg font-bold text-neutral-900">
+                              {codesRevealed ? allHistory[0].stickerCode : (allHistory[0].stickerVehicle || allHistory[0].stickerNickname || t.history.vehicleSafetyTag)}
+                            </h2>
+                            <div className="text-xs text-neutral-600 mt-1.5 flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-200">
+                                {allHistory[0].event_type || t.history.scanRecorded}
+                              </span>
+                              {allHistory[0].location && (
+                                <span className="flex items-center gap-1 text-neutral-500">
+                                  <MapPin size={12} /> {allHistory[0].location}
+                                </span>
+                              )}
+                              {allHistory[0].scanner_name && (
+                                <span className="text-neutral-500">
+                                  {t.history.scannedByPrefix} <span className="font-medium text-neutral-700">{allHistory[0].scanner_name}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const found = products.find((p) => p.id === allHistory[0].sticker_id || p.qrCodeId === allHistory[0].stickerCode);
+                                if (found) setModal({ type: 'qrCode', sticker: found });
+                              }}
+                              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white border border-neutral-200 text-neutral-800 hover:bg-neutral-50 shadow-2xs transition-colors cursor-pointer"
+                            >
+                              {t.history.viewPlate}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab('chat')}
+                              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white hover:bg-black shadow-2xs transition-colors cursor-pointer"
+                            >
+                              {t.history.openVisitorChat}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── ALL PAST ALERTS TABLE ── */}
+                    <div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3 px-1">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--fx-ink-2)]">
+                          {t.history.allLogsPrefix} ({allHistory.length})
+                        </h3>
+                        <div className="relative w-full sm:w-[220px]">
+                          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fx-faint)]" />
+                          <input
+                            type="text"
+                            placeholder={t.history.searchLogs}
+                            value={historySearch}
+                            onChange={(e) => setHistorySearch(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink)] outline-none focus:border-[var(--fx-accent)] focus:ring-2 focus:ring-[var(--fx-accent)]/20 shadow-2xs"
+                          />
+                        </div>
+                      </div>
+                      {(() => {
+                        const needle = historySearch.trim().toLowerCase();
+                        const filteredHistory = !needle ? allHistory : allHistory.filter((h) =>
+                          [h.stickerCode, h.stickerVehicle, h.stickerNickname, h.event_type, h.location, h.scanner_name]
+                            .some((v) => (v || '').toLowerCase().includes(needle))
+                        );
+                        return filteredHistory.length === 0 ? (
+                          <div className="bg-white border border-[var(--fx-border)] rounded-2xl py-8 px-6 text-center text-xs text-[var(--fx-ink-2)] font-semibold">
+                            {t.history.noLogsMatchPrefix} "{historySearch}".
+                          </div>
+                        ) : (
+                        <div className="bg-white rounded-2xl border border-[var(--fx-border)] overflow-hidden shadow-2xs">
+                          <table className="w-full min-w-[520px] text-sm text-[var(--fx-ink)]">
+                            <thead>
+                              <tr className="text-left font-display text-[12px] font-semibold text-[var(--fx-ink-2)] tracking-normal bg-[var(--fx-canvas)] border-b border-[var(--fx-border)]">
+                                <th className="px-6 py-3.5">{t.history.colSticker}</th>
+                                <th className="px-4 py-3.5">{t.history.colEventType}</th>
+                                <th className="px-4 py-3.5">{t.history.colContext}</th>
+                                <th className="px-6 py-3.5 text-right">{t.history.colTimestamp}</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[var(--fx-border)]">
+                              {filteredHistory.map((h, i) => (
+                                <tr key={i} className="hover:bg-[var(--fx-canvas)] transition-colors">
+                                  <td className="px-6 py-3.5 font-display font-semibold text-[14px]">
+                                    {codesRevealed ? h.stickerCode : (h.stickerVehicle || h.stickerNickname || t.history.stickerFallback)}
+                                  </td>
+                                  <td className="px-4 py-3.5 text-xs">
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-700">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                      {h.event_type || t.history.scanRecorded}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3.5 text-xs text-[var(--fx-ink-2)]">
+                                    {h.location || h.scanner_name || t.history.directScan}
+                                  </td>
+                                  <td className="px-6 py-3.5 font-mono text-xs text-[var(--fx-faint)] text-right">
+                                    {new Date(h.created_at).toLocaleString('en-IN')}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        );
+                      })()}
+                    </div>
                   </div>
                 )}
               </div>

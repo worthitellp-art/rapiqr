@@ -6,7 +6,7 @@ const OrderModel = require('../models/orderModel');
 const { JWT_SECRET, ADMIN_EMAIL } = require('../middleware/authMiddleware');
 const { logger } = require('../middleware/loggerMiddleware');
 const { generateSecret, verifyTOTP, buildOtpauthUrl } = require('../utils/totp');
-const { sendWhatsAppOtp } = require('../services/smsService');
+const { sendWhatsAppOtp, sendSmsOtp } = require('../services/smsService');
 const { verifyMsg91WidgetAccessToken } = require('../services/msg91Client');
 const { createOtp, verifyOtp } = require('../services/phoneVerificationService');
 const { createEmailOtp, verifyEmailOtp } = require('../services/emailOtpService');
@@ -789,24 +789,34 @@ class AuthController {
   }
 
   /**
-   * Account Settings — change password. Re-verifies the current password before
-   * applying the new one, so this can't be used to hijack an account from an
-   * already-authenticated-but-stolen JWT alone.
+   * Account Settings — change password. Supports both current password verification
+   * AND phone OTP verification.
    */
   static async changePassword(req, res) {
     try {
-      const { currentPassword, newPassword } = req.body || {};
-      if (!currentPassword || !newPassword) {
-        return res.status(400).json({ success: false, error: 'currentPassword and newPassword are required' });
-      }
-      if (newPassword.length < 6) {
+      const { currentPassword, newPassword, phoneNumber, otpCode } = req.body || {};
+      if (!newPassword || String(newPassword).length < 6) {
         return res.status(400).json({ success: false, error: 'New password must be at least 6 characters' });
       }
 
-      const authUser = await UserModel.findAuthById(req.user.id);
-      if (!authUser || !(await verifyPassword(currentPassword, authUser.password_hash))) {
-        logger.security('PASSWORD_CHANGE_DENIED', `Incorrect current password for ${req.user.email}`);
-        return res.status(401).json({ success: false, error: 'Current password is incorrect' });
+      if (otpCode && phoneNumber) {
+        const norm = normalizePhone(phoneNumber);
+        if (!norm) {
+          return res.status(400).json({ success: false, error: 'Valid phone number is required' });
+        }
+        const verifyResult = verifyOtp(`reset:${norm}`, String(otpCode).trim());
+        if (!verifyResult.ok) {
+          return res.status(400).json({ success: false, error: 'Invalid or expired OTP code' });
+        }
+      } else {
+        if (!currentPassword) {
+          return res.status(400).json({ success: false, error: 'Current password or phone OTP is required' });
+        }
+        const authUser = await UserModel.findAuthById(req.user.id);
+        if (!authUser || !(await verifyPassword(currentPassword, authUser.password_hash))) {
+          logger.security('PASSWORD_CHANGE_DENIED', `Incorrect current password for ${req.user.email}`);
+          return res.status(401).json({ success: false, error: 'Current password is incorrect' });
+        }
       }
 
       const newHash = await hashPassword(newPassword);
@@ -817,6 +827,94 @@ class AuthController {
     } catch (err) {
       logger.error('PASSWORD_CHANGE', 'Failed to change password', err);
       return res.status(500).json({ success: false, error: err.message || 'Failed to change password' });
+    }
+  }
+
+  /**
+   * Phone OTP password reset / verification — step 1: send code.
+   * Can be used by logged-in users to change password or unauthenticated users for forgot-password.
+   */
+  static async sendPasswordResetPhoneOtp(req, res) {
+    try {
+      let { phoneNumber } = req.body || {};
+      if (!phoneNumber && req.user?.id) {
+        const profile = await UserModel.ensureProfile(req.user.id);
+        phoneNumber = profile?.phone_number;
+      }
+      if (!phoneNumber || !normalizePhone(phoneNumber)) {
+        return res.status(400).json({ success: false, error: 'Please enter a valid 10-digit mobile number.' });
+      }
+
+      const norm = normalizePhone(phoneNumber);
+      const profile = await UserModel.findByPhone(phoneNumber);
+      if (profile || req.user?.id) {
+        const code = createOtp(`reset:${norm}`, phoneNumber);
+        const text = `Your RapiQR password verification code is ${code}. Valid for 5 minutes.`;
+        sendWhatsAppOtp({ to: phoneNumber, code, event: 'PASSWORD_RESET_WHATSAPP' }).catch(() => {});
+        sendSmsOtp({ to: phoneNumber, code, body: text, event: 'PASSWORD_RESET_SMS' }).catch(() => {});
+        logger.security('PASSWORD_RESET_OTP_SENT', `Password reset OTP dispatched to ${norm}`);
+      } else {
+        logger.warn('PASSWORD_RESET_OTP_SENT', `Password reset OTP requested for unregistered phone: ${norm}`);
+      }
+
+      return res.json({ success: true, message: 'Verification code sent to your phone number.' });
+    } catch (err) {
+      logger.error('PASSWORD_RESET_OTP_SEND', 'Failed to send password reset OTP', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Phone OTP password reset / verification — step 2: verify code and set new password directly.
+   */
+  static async resetPasswordWithPhoneOtp(req, res) {
+    try {
+      let { phoneNumber, code, newPassword } = req.body || {};
+      if (!phoneNumber && req.user?.id) {
+        const profile = await UserModel.ensureProfile(req.user.id);
+        phoneNumber = profile?.phone_number;
+      }
+      if (!phoneNumber || !normalizePhone(phoneNumber)) {
+        return res.status(400).json({ success: false, error: 'Please enter a valid 10-digit mobile number.' });
+      }
+      if (!code || !String(code).trim()) {
+        return res.status(400).json({ success: false, error: 'Verification code is required.' });
+      }
+      if (!newPassword || String(newPassword).length < 6) {
+        return res.status(400).json({ success: false, error: 'New password must be at least 6 characters.' });
+      }
+
+      const norm = normalizePhone(phoneNumber);
+      const result = verifyOtp(`reset:${norm}`, String(code).trim());
+      if (!result.ok) {
+        const messages = {
+          no_pending_otp: 'No active verification code — please request a new one.',
+          expired: 'Verification code has expired — please request a new one.',
+          too_many_attempts: 'Too many incorrect attempts — please request a new code.',
+          invalid_code: `Incorrect code.${result.attemptsLeft ? ` ${result.attemptsLeft} attempt(s) left.` : ''}`,
+        };
+        return res.status(400).json({ success: false, error: messages[result.reason] || 'Verification failed.' });
+      }
+
+      let user = null;
+      if (req.user?.id) {
+        user = await UserModel.findById(req.user.id);
+      }
+      if (!user) {
+        user = await UserModel.findByPhone(phoneNumber);
+      }
+      if (!user) {
+        return res.status(404).json({ success: false, error: 'No account found for this phone number.' });
+      }
+
+      const newHash = await hashPassword(newPassword);
+      await UserModel.setPasswordHash(user._id || user.id, newHash);
+
+      logger.security('PASSWORD_RESET_COMPLETED', `Password updated via phone OTP for user ${user.email || user.id}`);
+      return res.json({ success: true, message: 'Password updated successfully! You can now use your new password.' });
+    } catch (err) {
+      logger.error('PASSWORD_RESET_OTP_VERIFY', 'Failed to reset password via phone OTP', err);
+      return res.status(500).json({ success: false, error: err.message });
     }
   }
 

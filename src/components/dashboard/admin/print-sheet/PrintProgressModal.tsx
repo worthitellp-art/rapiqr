@@ -1,5 +1,4 @@
 import React from "react";
-import { FileDown, Sparkles, CheckCircle2 } from "lucide-react";
 
 export interface PrintProgressState {
   isVisible: boolean;
@@ -12,82 +11,92 @@ export interface PrintProgressState {
 
 interface PrintProgressModalProps {
   progress: PrintProgressState;
+  onCancel?: () => void;
 }
 
-export default function PrintProgressModal({ progress }: PrintProgressModalProps) {
+export default function PrintProgressModal({ progress, onCancel }: PrintProgressModalProps) {
   if (!progress.isVisible) return null;
 
   const isComplete = progress.percent >= 100;
+  const clampedPercent = Math.max(0, Math.min(100, Math.round(progress.percent)));
 
   return (
     <div
-      className="fixed inset-0 z-[180] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
-      style={{ animation: "fadeIn 0.2s ease-out" }}
+      role="status"
+      aria-live="polite"
+      className="fixed bottom-5 right-5 z-[200] w-[380px] max-w-[calc(100vw-2rem)] pointer-events-auto select-none"
+      style={{ animation: "fadeInUp 0.2s cubic-bezier(0.16, 1, 0.3, 1)" }}
     >
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 overflow-hidden p-6 relative"
-        style={{ animation: "scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)" }}
-      >
-        {/* Top Glowing Accent */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500" />
+      <div className="bg-white rounded-xl shadow-[0_12px_36px_rgba(0,0,0,0.14)] border border-gray-200/90 overflow-hidden">
+        {/* Subtle Top Accent */}
+        <div
+          className={`h-1 w-full transition-colors duration-300 ${
+            isComplete ? "bg-emerald-600" : "bg-gray-900"
+          }`}
+        />
 
-        {/* Icon & Title */}
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center flex-shrink-0 text-orange-600 shadow-sm">
-            {isComplete ? (
-              <CheckCircle2 size={24} className="text-emerald-600 animate-bounce" />
-            ) : (
-              <FileDown size={24} className="animate-pulse text-orange-600" />
-            )}
-          </div>
+        <div className="p-4 space-y-3">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h4 className="text-sm font-semibold text-gray-900 leading-snug">
+                {isComplete ? "PDF Ready" : "Generating Print Sheet PDF"}
+              </h4>
+              <p className="text-xs text-gray-500 truncate mt-0.5">
+                {progress.stage || "Building high-resolution stickers in background…"}
+              </p>
+            </div>
 
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900">
-                {isComplete ? "PDF Ready!" : "Generating Print Sheet PDF"}
-              </h3>
-              <span className="text-sm font-extrabold text-orange-600 font-mono">
-                {Math.round(progress.percent)}%
+            <div className="flex-shrink-0 flex items-center gap-1.5">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-800 tabular-nums">
+                {clampedPercent}%
               </span>
             </div>
-
-            <p className="text-xs text-slate-500 mt-0.5 truncate">
-              {progress.stage || "Rendering high-resolution stickers…"}
-            </p>
           </div>
-        </div>
 
-        {/* Progress Bar */}
-        <div className="mt-5 space-y-2">
-          <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200 shadow-inner">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all duration-300 ease-out relative overflow-hidden"
-              style={{ width: `${Math.max(4, Math.min(100, progress.percent))}%` }}
-            >
-              {/* Shimmer animation */}
-              <div className="absolute inset-0 bg-white/25 animate-pulse" />
+          {/* Progress Bar */}
+          <div className="space-y-1.5">
+            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden border border-gray-200/60 p-[1px]">
+              <div
+                className={`h-full rounded-full transition-all duration-200 ease-out ${
+                  isComplete ? "bg-emerald-600" : "bg-gray-900"
+                }`}
+                style={{ width: `${Math.max(4, clampedPercent)}%` }}
+              />
+            </div>
+
+            {/* Sub-label & Current Sticker info */}
+            <div className="flex items-center justify-between text-[11px] text-gray-500">
+              <span className="font-medium">
+                {progress.total > 0
+                  ? `Page ${Math.min(progress.current, progress.total)} of ${progress.total}`
+                  : "Preparing pages…"}
+              </span>
+
+              {progress.stickerId && (
+                <span className="font-mono text-[10px] bg-gray-50 text-gray-700 px-1.5 py-0.5 rounded border border-gray-200/80">
+                  {progress.stickerId}
+                </span>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-xs text-slate-500 px-0.5">
-            <span className="font-medium">
-              {progress.total > 0
-                ? `Page ${Math.min(progress.current, progress.total)} of ${progress.total}`
-                : "Preparing pages…"}
+          {/* Footer Controls & Non-blocking notice */}
+          <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2 text-[11px]">
+            <span className="text-gray-400 truncate">
+              {isComplete ? "Download started" : "Running in background • Work freely"}
             </span>
 
-            {progress.stickerId && (
-              <span className="font-mono text-[11px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
-                {progress.stickerId}
-              </span>
+            {onCancel && !isComplete && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="flex-shrink-0 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors cursor-pointer active:scale-95"
+              >
+                Cancel
+              </button>
             )}
           </div>
-        </div>
-
-        {/* Footer Note */}
-        <div className="mt-5 pt-3 border-t border-slate-100 flex items-center gap-2 text-[11px] text-slate-400">
-          <Sparkles size={13} className="text-amber-500 flex-shrink-0" />
-          <span>Rendering true-to-scale 4″×2.5″ stickers centered on standard A4 pages.</span>
         </div>
       </div>
     </div>

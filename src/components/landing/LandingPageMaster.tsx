@@ -73,59 +73,17 @@ interface CartItem {
 
 interface FaqItem {
   id: string;
-  question: string;
-  answer: string;
 }
 
 // ── Clean Static Data (Truthful & Lean) ────────────────────────────────────
 
-const HOW_IT_WORKS_STEPS = [
-  {
-    step: 1,
-    title: 'Stick',
-    description: 'Peel and attach your weatherproof tag to your vehicle, bag, or pet collar.',
-  },
-  {
-    step: 2,
-    title: 'Scan',
-    description: 'A finder scans the QR code or taps the NFC tag using any smartphone camera.',
-  },
-  {
-    step: 3,
-    title: 'Get Alerted',
-    description: 'Receive an instant masked call or WhatsApp notification to connect safely.',
-  },
-];
+const HOW_IT_WORKS_STEPS = [{ step: 1 }, { step: 2 }, { step: 3 }];
 
 const FEATURES_LIST = [
-  {
-    id: 'f1',
-    title: 'Masked Calling',
-    description: 'Callers connect through a private virtual number so neither party ever sees your real phone number.',
-    badge: 'Privacy Shield',
-    badgeColor: 'bg-sky-50 text-sky-700 border-sky-200/70',
-  },
-  {
-    id: 'f2',
-    title: 'Instant WhatsApp & SMS',
-    description: 'Receive immediate scan notifications with the finder’s note and optional location.',
-    badge: 'Real-time Alerts',
-    badgeColor: 'bg-amber-50 text-amber-800 border-amber-200/70',
-  },
-  {
-    id: 'f3',
-    title: 'Emergency Contacts',
-    description: 'Add backup family members who can be reached if you do not answer.',
-    badge: 'Family Safety',
-    badgeColor: 'bg-rose-50 text-rose-700 border-rose-200/70',
-  },
-  {
-    id: 'f4',
-    title: 'No App & No Batteries',
-    description: 'Passive NFC and QR tags require no charging and work in any standard smartphone browser.',
-    badge: 'Zero Friction',
-    badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-200/70',
-  },
+  { id: 'f1', badgeColor: 'bg-sky-50 text-sky-700 border-sky-200/70' },
+  { id: 'f2', badgeColor: 'bg-amber-50 text-amber-800 border-amber-200/70' },
+  { id: 'f3', badgeColor: 'bg-rose-50 text-rose-700 border-rose-200/70' },
+  { id: 'f4', badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-200/70' },
 ];
 
 const TWO_PRODUCTS: ProductItem[] = [
@@ -168,11 +126,6 @@ const FRANCHISE_TIERS = [
     price: '₹7,450',
     moq: 'MOQ 50 Units @ ₹149/unit',
     margin: '50% margin on retail ₹299 MRP',
-    bullets: [
-      '50% margin on retail ₹299 MRP',
-      'Countertop display packaging included',
-    ],
-    cta: 'Inquire Starter Kit',
     popular: false,
   },
   {
@@ -181,11 +134,6 @@ const FRANCHISE_TIERS = [
     price: '₹59,500',
     moq: 'MOQ 500 Units @ ₹119/unit',
     margin: '60% margin on retail ₹299 MRP',
-    bullets: [
-      '60% margin on retail ₹299 MRP',
-      'Exclusive distribution rights for your city',
-    ],
-    cta: 'Apply for City Franchise',
     popular: true,
   },
   {
@@ -194,46 +142,16 @@ const FRANCHISE_TIERS = [
     price: '₹2,22,500',
     moq: 'MOQ 2,500 Units @ ₹89/unit',
     margin: '70% margin on retail ₹299 MRP',
-    bullets: [
-      '70% margin on retail ₹299 MRP',
-      'State-wide distribution & bulk priority fulfillment',
-    ],
-    cta: 'Contact for Master Rights',
     popular: false,
   },
 ];
 
 const FAQS: FaqItem[] = [
-  {
-    id: 'faq-1',
-    question: 'How does masked calling protect my privacy?',
-    answer:
-      'When someone scans your tag and taps "Call Owner", our cloud telecom system bridges the call through a virtual number. Neither party’s real phone number is ever revealed.',
-  },
-  {
-    id: 'faq-2',
-    question: 'Does the person scanning need an app?',
-    answer:
-      'No. Any smartphone camera or QR scanner opens the safety page directly in their web browser. No download or registration needed.',
-  },
-  {
-    id: 'faq-3',
-    question: 'How does location sharing work?',
-    answer:
-      'RepiQR tags are passive (no GPS chip or battery). When someone scans, their browser asks if they wish to share their location to assist you. If they accept, you receive a Google Maps pin.',
-  },
-  {
-    id: 'faq-4',
-    question: 'Can I change my phone number or emergency contacts later?',
-    answer:
-      'Yes. You can log into your web dashboard at any time to update phone numbers and backup emergency contacts without replacing the physical tag.',
-  },
-  {
-    id: 'faq-5',
-    question: 'What happens if a tag arrives damaged?',
-    answer:
-      'If your tag arrives damaged or fails to scan, we replace it free of charge within 7 days of delivery.',
-  },
+  { id: 'faq-1' },
+  { id: 'faq-2' },
+  { id: 'faq-3' },
+  { id: 'faq-4' },
+  { id: 'faq-5' },
 ];
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -248,6 +166,7 @@ function Reveal({
   delay?: number;
   y?: number;
   className?: string;
+  key?: React.Key;
 }) {
   const reduced = useReducedMotion();
   return (
@@ -300,6 +219,8 @@ function Counter({ to, suffix = '' }: { to: number; suffix?: string }) {
 // ── Step 01 Animated Vector Mockup: STICK ─────────────────────────────────
 
 function StickMockup() {
+  const { language } = useLanguage();
+  const t = landingTranslations[language].howItWorks.stickMockup;
   return (
     <div className="relative h-48 w-full overflow-hidden rounded-md bg-gradient-to-br from-slate-50 via-sky-50/40 to-slate-100 p-4 border border-neutral-200/80 flex items-center justify-center">
       {/* Background subtle dots */}
@@ -323,16 +244,16 @@ function StickMockup() {
             <QrCode size={13} />
           </div>
           <div>
-            <p className="text-[10px] font-mono font-bold text-neutral-900">REPIQR TAG</p>
-            <p className="text-[8px] text-neutral-500 font-medium">Weatherproof Mount</p>
+            <p className="text-[10px] font-mono font-bold text-neutral-900">{t.tagName}</p>
+            <p className="text-[8px] text-neutral-500 font-medium">{t.mount}</p>
           </div>
         </div>
 
         <div className="rounded-sm bg-neutral-50 p-2 border border-neutral-200/80 text-center">
           <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
-            <Check size={10} className="stroke-[3]" /> Peel &amp; Stick
+            <Check size={10} className="stroke-[3]" /> {t.peelStick}
           </span>
-          <p className="text-[8px] text-neutral-500 mt-1">Durable 3M Adhesive</p>
+          <p className="text-[8px] text-neutral-500 mt-1">{t.adhesive}</p>
         </div>
       </motion.div>
 
@@ -343,7 +264,7 @@ function StickMockup() {
         className="absolute bottom-2.5 rounded-md bg-white/95 backdrop-blur-xs px-3 py-1 text-[10px] font-semibold text-neutral-800 border border-neutral-200/90 shadow-xs flex items-center gap-1.5"
       >
         <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-        <span>Rain &amp; UV Outdoor Proof</span>
+        <span>{t.weatherproof}</span>
       </motion.div>
     </div>
   );
@@ -352,6 +273,8 @@ function StickMockup() {
 // ── Step 02 Animated Vector Mockup: SCAN ──────────────────────────────────
 
 function ScanMockup() {
+  const { language } = useLanguage();
+  const t = landingTranslations[language].howItWorks.scanMockup;
   return (
     <div className="relative h-48 w-full overflow-hidden rounded-md bg-neutral-950 p-4 border border-neutral-800 flex items-center justify-center text-white">
       {/* Viewfinder Target Area */}
@@ -382,7 +305,7 @@ function ScanMockup() {
         className="absolute bottom-2.5 rounded-md bg-white/10 backdrop-blur-md px-3.5 py-1 text-[10px] font-mono font-medium text-sky-200 border border-white/20 shadow-lg flex items-center gap-1.5"
       >
         <Globe size={11} className="text-sky-400" />
-        <span>repiqr.com/t/8a3f · No app needed</span>
+        <span>repiqr.com/t/8a3f · {t.noAppNeeded}</span>
       </motion.div>
     </div>
   );
@@ -391,6 +314,8 @@ function ScanMockup() {
 // ── Step 03 Animated Vector Mockup: GET ALERTED ───────────────────────────
 
 function AlertMockup() {
+  const { language } = useLanguage();
+  const t = landingTranslations[language].howItWorks.alertMockup;
   return (
     <div className="relative h-48 w-full overflow-hidden rounded-md bg-gradient-to-br from-emerald-50/60 via-slate-50 to-emerald-100/30 p-4 border border-neutral-200/80 flex flex-col items-center justify-center gap-2">
       {/* Animated Incoming Masked Call Banner */}
@@ -408,12 +333,12 @@ function AlertMockup() {
             <Phone size={13} />
           </motion.div>
           <div className="min-w-0">
-            <p className="truncate text-[10px] font-bold text-white">Masked Call</p>
-            <p className="truncate text-[8px] text-emerald-400 font-medium">Number Private</p>
+            <p className="truncate text-[10px] font-bold text-white">{t.maskedCall}</p>
+            <p className="truncate text-[8px] text-emerald-400 font-medium">{t.numberPrivate}</p>
           </div>
         </div>
         <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-[8px] font-bold text-emerald-400">
-          Live
+          {t.live}
         </span>
       </motion.div>
 
@@ -427,8 +352,8 @@ function AlertMockup() {
           <MessageSquare size={13} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[10px] font-bold text-neutral-900">WhatsApp Alert</p>
-          <p className="truncate text-[8px] text-neutral-500">"Finder shared location pin"</p>
+          <p className="truncate text-[10px] font-bold text-neutral-900">{t.whatsappAlert}</p>
+          <p className="truncate text-[8px] text-neutral-500">{t.locationPin}</p>
         </div>
       </motion.div>
     </div>
@@ -657,7 +582,7 @@ export default function LandingPageMaster({
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             className="flex cursor-pointer items-center focus:outline-none"
-            aria-label="RepiQR home"
+            aria-label={t.homeAria}
           >
             <img src={lightBgLogo} alt="RepiQR" className="h-7 sm:h-8 w-auto object-contain" />
           </button>
@@ -668,31 +593,31 @@ export default function LandingPageMaster({
               onClick={() => handleSmoothScroll('hiw-section')}
               className="cursor-pointer hover:text-neutral-950 transition-colors"
             >
-              How it works
+              {t.navLinks.hiw}
             </button>
             <button
               onClick={() => handleSmoothScroll('features-section')}
               className="cursor-pointer hover:text-neutral-950 transition-colors"
             >
-              Features
+              {t.navLinks.features}
             </button>
             <button
               onClick={() => handleSmoothScroll('products-section')}
               className="cursor-pointer hover:text-neutral-950 transition-colors"
             >
-              Products
+              {t.navLinks.products}
             </button>
             <button
               onClick={() => handleSmoothScroll('franchise-section')}
               className="cursor-pointer hover:text-neutral-950 transition-colors"
             >
-              Franchise
+              {t.navLinks.distributor}
             </button>
             <button
               onClick={() => handleSmoothScroll('faq-section')}
               className="cursor-pointer hover:text-neutral-950 transition-colors"
             >
-              FAQ
+              {t.navLinks.faq}
             </button>
 
             {/* ── Join Us: the trigger morphs into the service list ── */}
@@ -740,17 +665,17 @@ export default function LandingPageMaster({
               <button
                 onClick={onOpenTrackOrder}
                 className="cursor-pointer text-xs font-semibold text-neutral-700 hover:text-neutral-950 px-3 py-1.5 rounded-md hover:bg-neutral-100 transition-colors flex items-center gap-1.5 border border-neutral-200/80"
-                title="Track order delivery"
+                title={t.trackOrder}
               >
                 <Package size={14} className="text-neutral-500" />
-                <span>Track Order</span>
+                <span>{t.trackOrder}</span>
               </button>
             )}
 
             <button
               onClick={() => setIsCartOpen(true)}
               className="relative cursor-pointer p-2 rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors"
-              aria-label="Open cart"
+              aria-label={t.openCartAria}
             >
               <ShoppingBag size={19} />
               {cartCount > 0 && (
@@ -765,7 +690,7 @@ export default function LandingPageMaster({
             {isLoggedIn ? (
               <FlowButton tone="dark" size="sm" onClick={onOpenDashboard || onLogin}>
                 <LayoutDashboard size={13} />
-                <span>Dashboard</span>
+                <span>{t.dashboard}</span>
               </FlowButton>
             ) : (
               <div className="flex items-center gap-2">
@@ -773,10 +698,10 @@ export default function LandingPageMaster({
                   onClick={onLogin}
                   className="cursor-pointer px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:text-neutral-950 transition-colors"
                 >
-                  Log in
+                  {t.logIn}
                 </button>
                 <FlowButton tone="dark" size="sm" onClick={() => handleSmoothScroll('products-section')}>
-                  Shop Tags
+                  {t.shopTags}
                 </FlowButton>
               </div>
             )}
@@ -787,7 +712,7 @@ export default function LandingPageMaster({
             <button
               onClick={() => setIsCartOpen(true)}
               className="relative p-2 rounded-md text-neutral-800 hover:bg-neutral-100"
-              aria-label="Open cart"
+              aria-label={t.openCartAria}
             >
               <ShoppingBag size={20} />
               {cartCount > 0 && (
@@ -800,7 +725,7 @@ export default function LandingPageMaster({
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-2 rounded-md text-neutral-800 hover:bg-neutral-100 border border-neutral-200 active:scale-95 transition-all"
-              aria-label="Toggle navigation"
+              aria-label={t.toggleNavAria}
             >
               {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
@@ -821,31 +746,31 @@ export default function LandingPageMaster({
                   onClick={() => handleSmoothScroll('hiw-section')}
                   className="block w-full py-2.5 px-3 rounded-md text-left text-neutral-800 hover:bg-neutral-50 hover:text-neutral-950 transition-colors"
                 >
-                  How it works
+                  {t.navLinks.hiw}
                 </button>
                 <button
                   onClick={() => handleSmoothScroll('features-section')}
                   className="block w-full py-2.5 px-3 rounded-md text-left text-neutral-800 hover:bg-neutral-50 hover:text-neutral-950 transition-colors"
                 >
-                  Features
+                  {t.navLinks.features}
                 </button>
                 <button
                   onClick={() => handleSmoothScroll('products-section')}
                   className="block w-full py-2.5 px-3 rounded-md text-left text-neutral-800 hover:bg-neutral-50 hover:text-neutral-950 transition-colors"
                 >
-                  Products
+                  {t.navLinks.products}
                 </button>
                 <button
                   onClick={() => handleSmoothScroll('franchise-section')}
                   className="block w-full py-2.5 px-3 rounded-md text-left text-neutral-800 hover:bg-neutral-50 hover:text-neutral-950 transition-colors"
                 >
-                  Franchise
+                  {t.navLinks.distributor}
                 </button>
                 <button
                   onClick={() => handleSmoothScroll('faq-section')}
                   className="block w-full py-2.5 px-3 rounded-md text-left text-neutral-800 hover:bg-neutral-50 hover:text-neutral-950 transition-colors"
                 >
-                  FAQ
+                  {t.navLinks.faq}
                 </button>
 
                 <button
@@ -856,7 +781,7 @@ export default function LandingPageMaster({
                   }}
                   className="flex w-full items-center justify-between py-2.5 px-3 rounded-md text-left font-semibold text-neutral-950 hover:bg-neutral-50 border-t border-neutral-100 mt-2 pt-3 transition-colors"
                 >
-                  <span>{t.joinUs} (Partner Services)</span>
+                  <span>{t.joinUsMobileLabel}</span>
                   <ArrowRight size={14} />
                 </button>
 
@@ -869,13 +794,13 @@ export default function LandingPageMaster({
                     className="flex w-full items-center gap-2 py-2.5 px-3 rounded-md text-left text-neutral-700 hover:bg-neutral-50 transition-colors"
                   >
                     <Package size={15} />
-                    <span>Track Order</span>
+                    <span>{t.trackOrder}</span>
                   </button>
                 )}
 
                 <div className="pt-3 border-t border-neutral-100 flex flex-col gap-2">
                   <FlowButton tone="dark" size="md" fullWidth onClick={() => handleSmoothScroll('products-section')}>
-                    Shop Safety Tags
+                    {t.shopSafetyTags}
                   </FlowButton>
                   {isLoggedIn ? (
                     <FlowButton
@@ -888,7 +813,7 @@ export default function LandingPageMaster({
                         else if (onLogin) onLogin();
                       }}
                     >
-                      Dashboard
+                      {t.dashboard}
                     </FlowButton>
                   ) : (
                     <FlowButton
@@ -900,7 +825,7 @@ export default function LandingPageMaster({
                         if (onLogin) onLogin();
                       }}
                     >
-                      Log in
+                      {t.logIn}
                     </FlowButton>
                   )}
                 </div>
@@ -918,25 +843,25 @@ export default function LandingPageMaster({
               className="text-[clamp(3.75rem,10vw,7.5rem)] font-extrabold leading-[0.84] tracking-[-0.055em] text-neutral-950"
               style={{ fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif" }}
             >
-              safety,
+              {t.hero.headingLine1}
               <br />
-              one scan
+              {t.hero.headingLine2}
               <br />
-              away
+              {t.hero.headingLine3}
             </h1>
 
             <p className="mt-8 max-w-[22rem] text-xl leading-snug text-neutral-800">
-              Connects you to the right person, when it matters — without exposing your phone number.
+              {t.hero.subheading}
             </p>
 
             <FlowButton tone="outline" size="lg" className="mt-8" onClick={() => handleSmoothScroll('products-section')}>
-              Explore RepiQR
+              {t.hero.cta}
             </FlowButton>
 
             <div className="mt-12 flex items-center gap-4 text-[11px] font-medium tracking-[0.14em] text-neutral-700 lg:mt-20">
-              <span>VEHICLE SAFETY</span>
+              <span>{t.hero.tagVehicle}</span>
               <span className="h-1.5 w-1.5 rounded-full bg-[#FFD500]" />
-              <span>HOME SAFETY</span>
+              <span>{t.hero.tagHome}</span>
               <span className="h-1.5 w-1.5 rounded-full bg-[#FFD500]" />
             </div>
           </div>
@@ -956,7 +881,7 @@ export default function LandingPageMaster({
                 <Counter to={100} suffix="%" />
               </div>
               <p className="mt-2 text-xs sm:text-sm font-bold text-neutral-600 uppercase tracking-wider">
-                Phone Number Privacy
+                {t.statsStrip.privacyLabel}
               </p>
             </div>
             <div className="rounded-md bg-neutral-50/70 p-6 border border-neutral-200/80 shadow-xs">
@@ -964,7 +889,7 @@ export default function LandingPageMaster({
                 <Counter to={0} suffix="" />
               </div>
               <p className="mt-2 text-xs sm:text-sm font-bold text-neutral-600 uppercase tracking-wider">
-                Apps Required for Finders
+                {t.statsStrip.appsLabel}
               </p>
             </div>
           </div>
@@ -976,13 +901,13 @@ export default function LandingPageMaster({
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Reveal className="max-w-xl">
             <p className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-2">
-              Three Simple Steps
+              {t.howItWorks.kicker}
             </p>
             <h2 className="text-3xl sm:text-5xl font-serif font-normal tracking-tight text-neutral-950">
-              How It Works
+              {t.howItWorks.title}
             </h2>
             <p className="mt-3 text-base text-neutral-600">
-              Protect your essentials in minutes with zero setup friction.
+              {t.howItWorks.subtitle}
             </p>
           </Reveal>
 
@@ -1006,7 +931,7 @@ export default function LandingPageMaster({
                           0{step.step}
                         </span>
                         <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">
-                          Step 0{step.step}
+                          {t.howItWorks.stepWord} 0{step.step}
                         </span>
                       </div>
 
@@ -1019,10 +944,10 @@ export default function LandingPageMaster({
 
                       {/* Clean Editorial Title and Description */}
                       <h3 className="text-2xl font-serif font-normal text-neutral-950">
-                        {step.title}
+                        {t.howItWorks.steps[step.step - 1].title}
                       </h3>
                       <p className="mt-2 text-sm text-neutral-700 leading-relaxed">
-                        {step.description}
+                        {t.howItWorks.steps[step.step - 1].description}
                       </p>
                     </div>
                   </div>
@@ -1038,13 +963,13 @@ export default function LandingPageMaster({
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Reveal className="max-w-xl">
             <p className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-2">
-              Privacy &amp; Simplicity
+              {t.features.kicker}
             </p>
             <h2 className="text-3xl sm:text-5xl font-serif font-normal tracking-tight text-neutral-950">
-              Features
+              {t.features.title}
             </h2>
             <p className="mt-3 text-base text-neutral-600">
-              Engineered with private telecom bridges and instant notifications.
+              {t.features.subtitle}
             </p>
           </Reveal>
 
@@ -1055,15 +980,15 @@ export default function LandingPageMaster({
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <span className={`rounded-md px-3 py-0.5 text-xs font-semibold border ${f.badgeColor}`}>
-                        {f.badge}
+                        {t.features.items[i].badge}
                       </span>
                     </div>
 
                     <h3 className="text-xl sm:text-2xl font-serif font-normal text-neutral-950">
-                      {f.title}
+                      {t.features.items[i].title}
                     </h3>
                     <p className="mt-2.5 text-sm text-neutral-600 leading-relaxed">
-                      {f.description}
+                      {t.features.items[i].description}
                     </p>
                   </div>
                 </div>
@@ -1078,16 +1003,16 @@ export default function LandingPageMaster({
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
           <Reveal className="text-center max-w-2xl mx-auto">
             <h2 className="text-3xl sm:text-5xl font-serif font-normal text-neutral-950 tracking-tight">
-              Ready on Every Device
+              {t.platform.title}
             </h2>
             <div className="mt-4 flex justify-center">
               <span className="rounded-md bg-sky-100/70 border border-sky-200/80 px-5 py-2 text-xs font-semibold text-sky-900 shadow-xs flex items-center gap-1.5">
                 <Check size={14} className="stroke-[3] text-sky-700" />
-                <span>Optimized for iOS, Android &amp; Web Browsers</span>
+                <span>{t.platform.badge}</span>
               </span>
             </div>
             <p className="mt-4 text-base text-neutral-600">
-              No app download, no battery charging, and no manual Bluetooth pairing. Native smartphone camera scanning works out of the box.
+              {t.platform.subtitle}
             </p>
           </Reveal>
 
@@ -1097,21 +1022,21 @@ export default function LandingPageMaster({
             <div className="rounded-md bg-white p-7 sm:p-9 border border-neutral-200/90 shadow-sm flex flex-col justify-between">
               <div>
                 <h3 className="font-serif text-2xl font-normal text-neutral-950 mb-6">
-                  Vehicles &amp; Fleets
+                  {t.platform.vehiclesTitle}
                 </h3>
                 <div className="space-y-4 divide-y divide-neutral-100 text-sm">
                   <div className="pt-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Car size={18} className="text-neutral-700" />
-                      <span className="font-medium text-neutral-900">Windshield Safety Tag</span>
+                      <span className="font-medium text-neutral-900">{t.platform.windshield}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <FlowButton tone="dark" size="sm" onClick={() => handleSmoothScroll('products-section')}>Order Tag</FlowButton>
+                      <FlowButton tone="dark" size="sm" onClick={() => handleSmoothScroll('products-section')}>{t.platform.orderTag}</FlowButton>
                       <button
                         onClick={() => handleSmoothScroll('hiw-section')}
                         className="cursor-pointer rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold px-3 py-2 transition-all"
                       >
-                        Try Demo
+                        {t.platform.tryDemo}
                       </button>
                     </div>
                   </div>
@@ -1119,15 +1044,15 @@ export default function LandingPageMaster({
                   <div className="pt-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <ShieldCheck size={18} className="text-neutral-700" />
-                      <span className="font-medium text-neutral-900">Motorcycles &amp; Helmets</span>
+                      <span className="font-medium text-neutral-900">{t.platform.motorcycles}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <FlowButton tone="dark" size="sm" onClick={() => handleSmoothScroll('products-section')}>Order Tag</FlowButton>
+                      <FlowButton tone="dark" size="sm" onClick={() => handleSmoothScroll('products-section')}>{t.platform.orderTag}</FlowButton>
                       <button
                         onClick={() => handleSmoothScroll('features-section')}
                         className="cursor-pointer rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold px-3 py-2 transition-all"
                       >
-                        Specs
+                        {t.platform.specs}
                       </button>
                     </div>
                   </div>
@@ -1135,7 +1060,7 @@ export default function LandingPageMaster({
                   <div className="pt-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Truck size={18} className="text-neutral-700" />
-                      <span className="font-medium text-neutral-900">Commercial Fleets &amp; Cabs</span>
+                      <span className="font-medium text-neutral-900">{t.platform.fleets}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <FlowButton
@@ -1146,7 +1071,7 @@ export default function LandingPageMaster({
                           setIsPartnerModalOpen(true);
                         }}
                       >
-                        Bulk Quote
+                        {t.platform.bulkQuote}
                       </FlowButton>
                     </div>
                   </div>
@@ -1158,21 +1083,21 @@ export default function LandingPageMaster({
             <div className="rounded-md bg-white p-7 sm:p-9 border border-neutral-200/90 shadow-sm flex flex-col justify-between">
               <div>
                 <h3 className="font-serif text-2xl font-normal text-neutral-950 mb-6">
-                  Everyday &amp; Pets
+                  {t.platform.everydayTitle}
                 </h3>
                 <div className="space-y-4 divide-y divide-neutral-100 text-sm">
                   <div className="pt-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Key size={18} className="text-neutral-700" />
-                      <span className="font-medium text-neutral-900">Luggage &amp; Keyring Charm</span>
+                      <span className="font-medium text-neutral-900">{t.platform.luggage}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <FlowButton tone="dark" size="sm" onClick={() => handleSmoothScroll('products-section')}>Order Charm</FlowButton>
+                      <FlowButton tone="dark" size="sm" onClick={() => handleSmoothScroll('products-section')}>{t.platform.orderCharm}</FlowButton>
                       <button
                         onClick={() => handleSmoothScroll('hiw-section')}
                         className="cursor-pointer rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold px-3 py-2 transition-all"
                       >
-                        Try Demo
+                        {t.platform.tryDemo}
                       </button>
                     </div>
                   </div>
@@ -1180,15 +1105,15 @@ export default function LandingPageMaster({
                   <div className="pt-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <ShieldAlert size={18} className="text-neutral-700" />
-                      <span className="font-medium text-neutral-900">Pet Collars &amp; Leashes</span>
+                      <span className="font-medium text-neutral-900">{t.platform.petCollars}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <FlowButton tone="dark" size="sm" onClick={() => handleSmoothScroll('products-section')}>Order Tag</FlowButton>
+                      <FlowButton tone="dark" size="sm" onClick={() => handleSmoothScroll('products-section')}>{t.platform.orderTag}</FlowButton>
                       <button
                         onClick={() => handleSmoothScroll('hiw-section')}
                         className="cursor-pointer rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold px-3 py-2 transition-all"
                       >
-                        Scan Demo
+                        {t.platform.scanDemo}
                       </button>
                     </div>
                   </div>
@@ -1196,10 +1121,10 @@ export default function LandingPageMaster({
                   <div className="pt-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <DoorClosed size={18} className="text-neutral-700" />
-                      <span className="font-medium text-neutral-900">Apartment Gates &amp; Doors</span>
+                      <span className="font-medium text-neutral-900">{t.platform.gates}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <FlowButton tone="dark" size="sm" onClick={() => handleSmoothScroll('products-section')}>Order Plate</FlowButton>
+                      <FlowButton tone="dark" size="sm" onClick={() => handleSmoothScroll('products-section')}>{t.platform.orderPlate}</FlowButton>
                     </div>
                   </div>
                 </div>
@@ -1210,7 +1135,7 @@ export default function LandingPageMaster({
           {/* Craft Signature Editorial Italic Quote from Image 2 */}
           <div className="mt-14 text-center">
             <blockquote className="font-serif italic text-xl sm:text-3xl text-neutral-800 max-w-2xl mx-auto leading-relaxed">
-              “RepiQR falls somewhere between <span className="text-neutral-950 font-normal">immediately helpful</span> and <span className="text-neutral-950 font-normal">peace of mind you can count on</span> every single day.”
+              {t.platform.quote}
             </blockquote>
           </div>
         </div>
@@ -1221,13 +1146,13 @@ export default function LandingPageMaster({
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Reveal className="max-w-xl">
             <p className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-2">
-              The Safety Collection
+              {t.products.kicker}
             </p>
             <h2 className="text-3xl sm:text-5xl font-serif font-normal tracking-tight text-neutral-950">
-              Products
+              {t.products.title}
             </h2>
             <p className="mt-3 text-base text-neutral-600">
-              Choose the tag style that fits your lifestyle.
+              {t.products.subtitle}
             </p>
           </Reveal>
 
@@ -1261,13 +1186,13 @@ export default function LandingPageMaster({
                           ₹{prod.mrp}
                         </span>
                         <span className="rounded-sm bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
-                          Save ₹{prod.mrp - prod.price}
+                          {t.products.save} ₹{prod.mrp - prod.price}
                         </span>
                       </div>
 
                       <div className="mt-1.5 flex items-center gap-1.5 text-xs text-neutral-500">
                         <Truck size={13} className="text-neutral-400" />
-                        <span>Standard delivery 2–3 business days across India</span>
+                        <span>{t.products.delivery}</span>
                       </div>
 
                       <ul className="mt-6 space-y-2.5">
@@ -1283,13 +1208,13 @@ export default function LandingPageMaster({
 
                   <div className="mt-8 border-t border-neutral-100 pt-5 flex items-center gap-3">
                     <FlowButton tone="dark" size="md" className="flex-1 py-3.5" onClick={() => handleBuyNow(prod)}>
-                      Order Now
+                      {t.products.orderNow}
                     </FlowButton>
                     <button
                       onClick={() => addToCart(prod, 1)}
                       className="cursor-pointer rounded-md border border-neutral-200 p-3.5 text-neutral-700 hover:bg-neutral-50 transition-colors active:scale-95"
-                      title="Add to cart"
-                      aria-label="Add to cart"
+                      title={t.products.addToCartAria}
+                      aria-label={t.products.addToCartAria}
                     >
                       <ShoppingBag size={18} />
                     </button>
@@ -1306,13 +1231,13 @@ export default function LandingPageMaster({
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Reveal className="max-w-xl">
             <p className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-2">
-              Wholesale Opportunities
+              {t.franchise.kicker}
             </p>
             <h2 className="text-3xl sm:text-5xl font-serif font-normal tracking-tight text-neutral-950">
-              Grow With RepiQR
+              {t.franchise.title}
             </h2>
             <p className="mt-3 text-base text-neutral-600">
-              Wholesale distribution and territory franchise opportunities.
+              {t.franchise.subtitle}
             </p>
           </Reveal>
 
@@ -1331,7 +1256,7 @@ export default function LandingPageMaster({
                       <h3 className="text-xl font-serif font-normal text-neutral-950">{tier.name}</h3>
                       {tier.popular && (
                         <span className="rounded-md bg-neutral-950 px-3 py-1 text-xs font-semibold text-white">
-                          Exclusive
+                          {t.franchise.exclusive}
                         </span>
                       )}
                     </div>
@@ -1342,7 +1267,7 @@ export default function LandingPageMaster({
                     <p className="mt-1 text-xs font-semibold text-neutral-500">{tier.moq}</p>
 
                     <ul className="mt-6 space-y-2.5">
-                      {tier.bullets.map((b) => (
+                      {t.franchise.tiers[tier.id as 'starter' | 'city' | 'master'].bullets.map((b) => (
                         <li key={b} className="flex items-start gap-2.5 text-xs font-medium text-neutral-700">
                           <Check size={14} className="mt-0.5 shrink-0 text-neutral-950 stroke-[2.5]" />
                           <span>{b}</span>
@@ -1362,7 +1287,7 @@ export default function LandingPageMaster({
                         : 'bg-neutral-100 hover:bg-neutral-200/80 text-neutral-900 border border-neutral-200/80'
                     }`}
                   >
-                    <span>{tier.cta}</span>
+                    <span>{t.franchise.tiers[tier.id as 'starter' | 'city' | 'master'].cta}</span>
                     <ArrowRight size={14} />
                   </button>
                 </div>
@@ -1376,7 +1301,7 @@ export default function LandingPageMaster({
                 onClick={onOpenDistributorDashboard}
                 className="w-full cursor-pointer rounded-md border border-neutral-200 bg-neutral-50 py-3.5 text-sm font-semibold text-neutral-900 hover:bg-neutral-100 transition-colors"
               >
-                Open distributor dashboard
+                {t.franchise.openDistributorDashboard}
               </button>
             </div>
           )}
@@ -1388,16 +1313,17 @@ export default function LandingPageMaster({
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
           <Reveal className="mb-10 text-center">
             <h2 className="text-3xl sm:text-5xl font-serif font-normal tracking-tight text-neutral-950">
-              Frequently Asked Questions
+              {t.faq.title}
             </h2>
             <p className="mt-2 text-base text-neutral-600">
-              Clear, practical answers about RepiQR technology.
+              {t.faq.subtitle}
             </p>
           </Reveal>
 
           <div className="space-y-3.5">
             {FAQS.map((faq, i) => {
               const open = expandedFaqId === faq.id;
+              const faqCopy = t.faq.items[i];
               return (
                 <Reveal key={faq.id} delay={i * 0.04}>
                   <div
@@ -1412,7 +1338,7 @@ export default function LandingPageMaster({
                       className="flex w-full cursor-pointer items-center justify-between p-5 sm:p-6 text-left"
                       aria-expanded={open}
                     >
-                      <span className="text-base sm:text-lg font-serif font-normal text-neutral-900">{faq.question}</span>
+                      <span className="text-base sm:text-lg font-serif font-normal text-neutral-900">{faqCopy.question}</span>
                       <span className="ml-4 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
                         {open ? <Minus size={14} /> : <Plus size={14} />}
                       </span>
@@ -1428,7 +1354,7 @@ export default function LandingPageMaster({
                           className="overflow-hidden"
                         >
                           <p className="px-5 pb-5 sm:px-6 sm:pb-6 text-sm text-neutral-600 leading-relaxed">
-                            {faq.answer}
+                            {faqCopy.answer}
                           </p>
                         </motion.div>
                       )}
@@ -1447,13 +1373,13 @@ export default function LandingPageMaster({
           <div className="grid grid-cols-1 md:grid-cols-12 gap-10 pb-10">
             <div className="md:col-span-4 space-y-3">
               <img src={lightBgLogo} alt="RepiQR" className="h-7 w-auto object-contain" />
-              <p className="text-neutral-500">Scan. Connect. Stay Safe.</p>
+              <p className="text-neutral-500">{t.footer.tagline}</p>
             </div>
 
             <div className="md:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-8">
               <div className="space-y-2">
                 <div className="font-semibold text-neutral-950 uppercase tracking-wider text-[11px]">
-                  Products
+                  {t.footer.productsHeading}
                 </div>
                 <ul className="space-y-1.5 text-neutral-600">
                   <li>
@@ -1461,7 +1387,7 @@ export default function LandingPageMaster({
                       onClick={() => handleSmoothScroll('products-section')}
                       className="cursor-pointer hover:text-neutral-950 transition-colors"
                     >
-                      Adhesive Safety Tag
+                      {t.footer.adhesiveTag}
                     </button>
                   </li>
                   <li>
@@ -1469,7 +1395,7 @@ export default function LandingPageMaster({
                       onClick={() => handleSmoothScroll('products-section')}
                       className="cursor-pointer hover:text-neutral-950 transition-colors"
                     >
-                      Safety Keyring Charm
+                      {t.footer.charmTag}
                     </button>
                   </li>
                 </ul>
@@ -1477,7 +1403,7 @@ export default function LandingPageMaster({
 
               <div className="space-y-2">
                 <div className="font-semibold text-neutral-950 uppercase tracking-wider text-[11px]">
-                  Company
+                  {t.footer.companyHeading}
                 </div>
                 <ul className="space-y-1.5 text-neutral-600">
                   <li>
@@ -1485,7 +1411,7 @@ export default function LandingPageMaster({
                       onClick={() => handleSmoothScroll('hiw-section')}
                       className="cursor-pointer hover:text-neutral-950 transition-colors"
                     >
-                      How It Works
+                      {t.footer.howItWorks}
                     </button>
                   </li>
                   <li>
@@ -1493,7 +1419,7 @@ export default function LandingPageMaster({
                       onClick={onOpenPrivacy}
                       className="cursor-pointer hover:text-neutral-950 transition-colors"
                     >
-                      Privacy Policy
+                      {t.footer.privacyPolicy}
                     </button>
                   </li>
                   <li>
@@ -1501,7 +1427,7 @@ export default function LandingPageMaster({
                       href="mailto:admin@repiqr.com"
                       className="hover:text-neutral-950 transition-colors"
                     >
-                      Contact
+                      {t.footer.contactLink}
                     </a>
                   </li>
                 </ul>
@@ -1509,7 +1435,7 @@ export default function LandingPageMaster({
 
               <div className="space-y-2">
                 <div className="font-semibold text-neutral-950 uppercase tracking-wider text-[11px]">
-                  Contact
+                  {t.footer.contactHeading}
                 </div>
                 <ul className="space-y-1 text-neutral-600 leading-relaxed">
                   <li>Surendranagar, Gujarat 363530</li>
@@ -1529,8 +1455,8 @@ export default function LandingPageMaster({
           </div>
 
           <div className="pt-6 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-neutral-400">
-            <p>© {new Date().getFullYear()} Worthite LLP. All rights reserved.</p>
-            <p>RepiQR is a product of Worthite LLP | GSTIN: 24AAFFW7093N1ZH</p>
+            <p>© {new Date().getFullYear()} Worthite LLP. {t.footer.allRightsReserved}</p>
+            <p>{t.footer.productOf}</p>
           </div>
         </div>
       </footer>
@@ -1546,14 +1472,14 @@ export default function LandingPageMaster({
           >
             <Check size={14} className="text-emerald-400 stroke-[3]" />
             <span>
-              Added {cartNotice.qty > 1 ? `${cartNotice.qty}x ` : ''}
-              {cartNotice.name} to cart
+              {t.cartToast.addedPrefix} {cartNotice.qty > 1 ? `${cartNotice.qty}x ` : ''}
+              {cartNotice.name} {t.cartToast.toCart}
             </span>
             <button
               onClick={() => setIsCartOpen(true)}
               className="cursor-pointer underline underline-offset-2 ml-2 font-semibold text-neutral-200 hover:text-white"
             >
-              View cart
+              {t.cartToast.viewCart}
             </button>
           </motion.div>
         )}
@@ -1575,7 +1501,7 @@ export default function LandingPageMaster({
             {/* Panel — half-height bottom sheet on mobile (expandable), right drawer on md+ */}
             <motion.aside
               role="dialog"
-              aria-label="Your cart"
+              aria-label={t.cartDrawer.title}
               initial={
                 typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches
                   ? { x: '100%' }
@@ -1611,7 +1537,7 @@ export default function LandingPageMaster({
                 type="button"
                 onPointerDown={(e) => cartDrag.start(e)}
                 onClick={() => setIsCartExpanded((v) => !v)}
-                aria-label={isCartExpanded ? 'Collapse cart' : 'Expand cart'}
+                aria-label={isCartExpanded ? t.cartDrawer.collapseAria : t.cartDrawer.expandAria}
                 className="md:hidden shrink-0 touch-none cursor-grab flex justify-center pt-2.5 pb-1"
               >
                 <span className="h-1.5 w-11 rounded-full bg-neutral-300" />
@@ -1620,7 +1546,7 @@ export default function LandingPageMaster({
               {/* Header */}
               <div className="flex items-center justify-between px-5 pt-1.5 pb-3 md:py-4 md:border-b md:border-neutral-100 shrink-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-[17px] font-bold tracking-tight text-neutral-950">Your cart</h3>
+                  <h3 className="text-[17px] font-bold tracking-tight text-neutral-950">{t.cartDrawer.title}</h3>
                   {cartCount > 0 && (
                     <span className="rounded-md bg-neutral-950 px-2 py-0.5 text-[11px] font-bold leading-none text-white">
                       {cartCount}
@@ -1630,7 +1556,7 @@ export default function LandingPageMaster({
                 <button
                   onClick={() => setIsCartOpen(false)}
                   className="cursor-pointer rounded-md w-10 h-10 -mr-2 flex items-center justify-center text-neutral-500 hover:bg-neutral-100 transition-colors"
-                  aria-label="Close cart"
+                  aria-label={t.cartDrawer.closeAria}
                 >
                   <X size={18} />
                 </button>
@@ -1643,9 +1569,9 @@ export default function LandingPageMaster({
                     <div className="w-14 h-14 rounded-lg bg-neutral-100 flex items-center justify-center mx-auto mb-3">
                       <ShoppingBag size={24} className="text-neutral-400" />
                     </div>
-                    <p className="font-semibold text-neutral-800 text-sm">Your cart is empty</p>
+                    <p className="font-semibold text-neutral-800 text-sm">{t.cartDrawer.empty}</p>
                     <FlowButton tone="dark" size="sm" className="mt-4" onClick={() => setIsCartOpen(false)}>
-                      Browse products
+                      {t.cartDrawer.browseProducts}
                     </FlowButton>
                   </div>
                 ) : (
@@ -1678,7 +1604,7 @@ export default function LandingPageMaster({
                               <button
                                 onClick={() => updateCartQty(item.product.id, -1)}
                                 className="cursor-pointer w-9 h-9 flex items-center justify-center rounded-sm text-neutral-600 hover:bg-neutral-100 active:scale-90 transition"
-                                aria-label={`Decrease ${item.product.name} quantity`}
+                                aria-label={`${t.cartDrawer.decreaseQtyAria} ${item.product.name}`}
                               >
                                 <Minus size={14} />
                               </button>
@@ -1688,7 +1614,7 @@ export default function LandingPageMaster({
                               <button
                                 onClick={() => updateCartQty(item.product.id, 1)}
                                 className="cursor-pointer w-9 h-9 flex items-center justify-center rounded-sm text-neutral-600 hover:bg-neutral-100 active:scale-90 transition"
-                                aria-label={`Increase ${item.product.name} quantity`}
+                                aria-label={`${t.cartDrawer.increaseQtyAria} ${item.product.name}`}
                               >
                                 <Plus size={14} />
                               </button>
@@ -1697,7 +1623,7 @@ export default function LandingPageMaster({
                             <button
                               onClick={() => removeFromCart(item.product.id)}
                               className="cursor-pointer w-9 h-9 flex items-center justify-center rounded-sm text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                              aria-label={`Remove ${item.product.name}`}
+                              aria-label={`${t.cartDrawer.removeAria} ${item.product.name}`}
                             >
                               <Trash2 size={16} />
                             </button>
@@ -1715,22 +1641,22 @@ export default function LandingPageMaster({
                   <div className="mb-3 flex items-end justify-between">
                     <div>
                       <p className="text-[12.5px] font-medium text-neutral-500">
-                        Subtotal · {cartCount} item{cartCount !== 1 ? 's' : ''}
+                        {t.cartDrawer.subtotal} · {cartCount} {cartCount !== 1 ? t.cartDrawer.items : t.cartDrawer.item}
                       </p>
-                      <p className="text-[11px] text-neutral-400">Shipping &amp; taxes at checkout</p>
+                      <p className="text-[11px] text-neutral-400">{t.cartDrawer.shippingNote}</p>
                     </div>
                     <p className="text-[22px] font-bold leading-none tracking-tight text-neutral-950">
                       ₹{cartTotal.toLocaleString('en-IN')}
                     </p>
                   </div>
                   <FlowButton tone="dark" size="md" fullWidth className="h-12" onClick={openCheckout}>
-                    Checkout
+                    {t.cartDrawer.checkout}
                   </FlowButton>
                   <button
                     onClick={() => setIsCartOpen(false)}
                     className="mt-1 w-full cursor-pointer h-10 text-[13px] font-semibold text-neutral-500 hover:text-neutral-900 transition-colors"
                   >
-                    Continue shopping
+                    {t.cartDrawer.continueShopping}
                   </button>
                 </div>
               )}
@@ -1765,7 +1691,7 @@ export default function LandingPageMaster({
                   setPartnerSubmitted(false);
                 }}
                 className="absolute right-4 top-4 cursor-pointer text-neutral-400 hover:text-neutral-800 p-1 rounded-md hover:bg-neutral-100"
-                aria-label="Close"
+                aria-label={t.partnerModal.closeAria}
               >
                 <X size={18} />
               </button>
@@ -1775,9 +1701,9 @@ export default function LandingPageMaster({
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 mb-3">
                     <Check size={22} className="stroke-[2.5]" />
                   </div>
-                  <h3 className="text-2xl font-serif font-normal text-neutral-950">Inquiry Received</h3>
+                  <h3 className="text-2xl font-serif font-normal text-neutral-950">{t.partnerModal.receivedTitle}</h3>
                   <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
-                    Thank you, {partnerForm.name}. Our distribution team will review your inquiry and contact you shortly.
+                    {t.partnerModal.thankYouPrefix} {partnerForm.name}. {t.partnerModal.thankYouSuffix}
                   </p>
                   <FlowButton
                     tone="dark"
@@ -1789,25 +1715,25 @@ export default function LandingPageMaster({
                       setPartnerSubmitted(false);
                     }}
                   >
-                    Done
+                    {t.partnerModal.done}
                   </FlowButton>
                 </div>
               ) : (
                 <>
                   <div className="mb-6">
-                    <h3 className="text-2xl font-serif font-normal text-neutral-950">Franchise Inquiry</h3>
+                    <h3 className="text-2xl font-serif font-normal text-neutral-950">{t.partnerModal.title}</h3>
                     <p className="text-xs font-semibold text-neutral-500 mt-1">{partnerForm.tier}</p>
                   </div>
 
                   <form onSubmit={handlePartnerSubmit} className="space-y-4">
                     <div>
                       <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
-                        Full Name / Business Name
+                        {t.partnerModal.nameLabel}
                       </label>
                       <input
                         type="text"
                         required
-                        placeholder="e.g. Ramesh Auto Accessories"
+                        placeholder={t.partnerModal.namePlaceholder}
                         value={partnerForm.name}
                         onChange={(e) => setPartnerForm({ ...partnerForm, name: e.target.value })}
                         className="w-full rounded-md border border-neutral-300 bg-white px-4 py-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-950 focus:ring-1 focus:ring-neutral-950 transition-colors"
@@ -1816,7 +1742,7 @@ export default function LandingPageMaster({
 
                     <div>
                       <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
-                        Phone / WhatsApp
+                        {t.partnerModal.phoneLabel}
                       </label>
                       <PhoneInputWithCountry
                         required
@@ -1827,12 +1753,12 @@ export default function LandingPageMaster({
 
                     <div>
                       <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
-                        City &amp; State
+                        {t.partnerModal.cityLabel}
                       </label>
                       <input
                         type="text"
                         required
-                        placeholder="e.g. Pune, Maharashtra"
+                        placeholder={t.partnerModal.cityPlaceholder}
                         value={partnerForm.city}
                         onChange={(e) => setPartnerForm({ ...partnerForm, city: e.target.value })}
                         className="w-full rounded-md border border-neutral-300 bg-white px-4 py-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-950 focus:ring-1 focus:ring-neutral-950 transition-colors"
@@ -1840,7 +1766,7 @@ export default function LandingPageMaster({
                     </div>
 
                     <FlowButton type="submit" tone="dark" size="md" fullWidth className="mt-2">
-                      Submit Inquiry
+                      {t.partnerModal.submit}
                     </FlowButton>
                   </form>
                 </>
@@ -1876,7 +1802,7 @@ export default function LandingPageMaster({
                   setJoinSubmitted(false);
                 }}
                 className="absolute right-4 top-4 cursor-pointer text-neutral-400 hover:text-neutral-800 p-1 rounded-md hover:bg-neutral-100"
-                aria-label="Close"
+                aria-label={t.joinModal.closeAria}
               >
                 <X size={18} />
               </button>
@@ -1886,9 +1812,9 @@ export default function LandingPageMaster({
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 mb-3">
                     <Check size={22} className="stroke-[2.5]" />
                   </div>
-                  <h3 className="text-2xl font-serif font-normal text-neutral-950">Application Submitted</h3>
+                  <h3 className="text-2xl font-serif font-normal text-neutral-950">{t.joinModal.submittedTitle}</h3>
                   <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
-                    Thank you, {joinForm.name}. Our partner operations team will review your application and contact you.
+                    {t.joinModal.thankYouPrefix} {joinForm.name}. {t.joinModal.thankYouSuffix}
                   </p>
                   <FlowButton
                     tone="dark"
@@ -1900,27 +1826,27 @@ export default function LandingPageMaster({
                       setJoinSubmitted(false);
                     }}
                   >
-                    Close
+                    {t.joinModal.close}
                   </FlowButton>
                 </div>
               ) : (
                 <>
                   <div className="mb-6">
-                    <h3 className="text-2xl font-serif font-normal text-neutral-950">Join as Service Partner</h3>
+                    <h3 className="text-2xl font-serif font-normal text-neutral-950">{t.joinModal.title}</h3>
                     <p className="text-xs font-semibold text-neutral-500 mt-1">
-                      {SERVICE_TYPES.find((s) => s.slug === selectedServiceSlug)?.label || 'Partner Service'}
+                      {SERVICE_TYPES.find((s) => s.slug === selectedServiceSlug)?.label || t.joinModal.partnerServiceFallback}
                     </p>
                   </div>
 
                   <form onSubmit={handleJoinSubmit} className="space-y-4">
                     <div>
                       <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
-                        Business / Service Name
+                        {t.joinModal.nameLabel}
                       </label>
                       <input
                         type="text"
                         required
-                        placeholder="e.g. Apex Towing & Assistance"
+                        placeholder={t.joinModal.namePlaceholder}
                         value={joinForm.name}
                         onChange={(e) => setJoinForm({ ...joinForm, name: e.target.value })}
                         className="w-full rounded-md border border-neutral-300 bg-white px-4 py-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-950 focus:ring-1 focus:ring-neutral-950 transition-colors"
@@ -1929,7 +1855,7 @@ export default function LandingPageMaster({
 
                     <div>
                       <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
-                        Phone / WhatsApp
+                        {t.joinModal.phoneLabel}
                       </label>
                       <PhoneInputWithCountry
                         required
@@ -1940,12 +1866,12 @@ export default function LandingPageMaster({
 
                     <div>
                       <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
-                        City &amp; Operating Area
+                        {t.joinModal.cityLabel}
                       </label>
                       <input
                         type="text"
                         required
-                        placeholder="e.g. Ahmedabad, Gujarat"
+                        placeholder={t.joinModal.cityPlaceholder}
                         value={joinForm.city}
                         onChange={(e) => setJoinForm({ ...joinForm, city: e.target.value })}
                         className="w-full rounded-md border border-neutral-300 bg-white px-4 py-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-950 focus:ring-1 focus:ring-neutral-950 transition-colors"
@@ -1953,7 +1879,7 @@ export default function LandingPageMaster({
                     </div>
 
                     <FlowButton type="submit" tone="dark" size="md" fullWidth loading={joinSubmitting} className="mt-2">
-                      {joinSubmitting ? 'Submitting…' : 'Apply as Partner'}
+                      {joinSubmitting ? t.joinModal.submitting : t.joinModal.submit}
                     </FlowButton>
                   </form>
                 </>

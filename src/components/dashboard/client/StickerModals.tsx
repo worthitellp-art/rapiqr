@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { X, AlertTriangle, Plus, Trash2, ArrowRightLeft, History, Loader2, ExternalLink, Download, Copy, Check, QrCode, Printer, RefreshCw } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import type { DashboardSticker, EmergencyContact } from './types';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
 import { getCategoryIcon } from '../../../stickerModules';
 import { generateRepeatedStickerSheetBlob, downloadSheetBlob, PRINT_SHEET_CONSTANTS } from '../../../services/stickerPrintSheetService';
-import { DEFAULT_STICKER_POS } from '../admin/helpers';
+import { DEFAULT_STICKER_POS, generateQrDataUrl } from '../admin/helpers';
+import QrCodeImage from '../admin/QrCodeImage';
 import type { QrRecord } from '../admin/types';
-import repiqrWordmark from '../../../assets/repiqr-wordmark.png';
 
 function ModalShell({
   onClose,
@@ -510,33 +509,18 @@ export function QrCodeModal({
     setTimeout(() => setCopied(false), 2500);
   };
 
-  const handleDownloadQrCode = () => {
-    const svgElement = document.getElementById(`qr-code-svg-${sticker.id}`);
-    if (!svgElement) return;
-
-    const svgData = new XMLSerializer().serializeToString(svgElement);
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-
-    img.onload = () => {
-      canvas.width = 500;
-      canvas.height = 500;
-      if (ctx) {
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 25, 25, 450, 450);
-        const pngUrl = canvas.toDataURL('image/png');
-        const downloadLink = document.createElement('a');
-        downloadLink.href = pngUrl;
-        downloadLink.download = `${(sticker.nickname || 'Sticker').replace(/\s+/g, '_')}_QR.png`;
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-        onShowToast('QR code image downloaded');
-      }
-    };
-    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+  const handleDownloadQrCode = async () => {
+    // Same renderer (and safe, proportional logo sizing) as the production
+    // sticker artwork — see generateQrDataUrl — so what's downloaded here
+    // always matches, and always scans like, the real printed tag.
+    const pngUrl = await generateQrDataUrl(scanUrl, '000000', 'FFFFFF', 500);
+    const downloadLink = document.createElement('a');
+    downloadLink.href = pngUrl;
+    downloadLink.download = `${(sticker.nickname || 'Sticker').replace(/\s+/g, '_')}_QR.png`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    onShowToast('QR code image downloaded');
   };
 
   return (
@@ -557,18 +541,12 @@ export function QrCodeModal({
 
         {/* QR Code Container */}
         <div className="p-5 bg-white rounded-2xl border border-[var(--fx-border)] shadow-sm flex flex-col items-center justify-center">
-          <QRCodeSVG
-            id={`qr-code-svg-${sticker.id}`}
-            value={scanUrl}
+          <QrCodeImage
+            data={scanUrl}
+            fg="000000"
+            bg="FFFFFF"
             size={190}
-            level="H"
-            includeMargin={true}
-            imageSettings={{
-              src: repiqrWordmark,
-              height: 36,
-              width: 123,
-              excavate: true,
-            }}
+            style={{ width: 190, height: 190 }}
           />
           <p className="text-[10px] font-extrabold text-[var(--fx-ink-2)] mt-2 tracking-widest uppercase">RepiQR Safety Tag</p>
         </div>

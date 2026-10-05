@@ -27,8 +27,8 @@ export default defineConfig(() => {
           type: 'module',
         },
         manifest: {
-          name: 'RapiQR - Smart Safety QR Tags',
-          short_name: 'RapiQR',
+          name: 'RepiQR - Smart Safety QR Tags',
+          short_name: 'RepiQR',
           description: 'Smart safety QR tags with instant scan-and-alert notifications, live chat, and location sharing.',
           theme_color: '#D9581F',
           background_color: '#FFFFFF',

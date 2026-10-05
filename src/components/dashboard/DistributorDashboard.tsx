@@ -22,46 +22,48 @@ const fmtDay = (iso?: string | null) =>
 
 const rowKeyOf = (s: StickerRow) => `${s.ref}-${s.allocatedAt}`;
 
-const stickerColumns: FxTableColumn<StickerRow>[] = [
-  { key: 'ref', header: 'Sticker', render: (s) => <span className="font-mono font-semibold">{s.ref}</span> },
-  { key: 'type', header: 'Type', render: (s) => <span className="capitalize text-[var(--fx-ink-2)]">{s.category}</span> },
-  {
-    key: 'customer',
-    header: 'Customer',
-    render: (s) => (s.ownerName ? <span className="font-semibold">{s.ownerName}</span> : <span className="text-[var(--fx-faint)]">—</span>),
-  },
-  {
-    key: 'phone',
-    header: 'Phone',
-    render: (s) => (s.ownerPhone ? <span className="font-mono text-[12px]">{s.ownerPhone}</span> : <span className="text-[var(--fx-faint)]">—</span>),
-  },
-  { key: 'activated', header: 'Activated', render: (s) => <span className="text-[12px] text-[var(--fx-ink-2)]">{fmtDay(s.activatedAt)}</span> },
-  { key: 'scans', header: 'Scans', render: (s) => <span className="tabular-nums">{s.scans}</span> },
-  {
-    key: 'status',
-    header: 'Status',
-    align: 'right',
-    render: (s) => (
-      <span
-        className={`inline-flex items-center h-6 px-2 rounded-[var(--fx-radius-pill)] text-[12px] font-semibold ${
-          s.status === 'active' ? 'bg-[var(--fx-green-soft)] text-[var(--fx-green)]' : 'bg-[var(--fx-canvas)] text-[var(--fx-ink-2)]'
-        }`}
-      >
-        {s.status === 'active' ? 'Active' : 'In stock'}
-      </span>
-    ),
-  },
-];
+function buildStickerColumns(t: typeof dashboardTranslations['en']['distributor']): FxTableColumn<StickerRow>[] {
+  return [
+    { key: 'ref', header: t.columns.sticker, render: (s) => <span className="font-mono font-semibold">{s.ref}</span> },
+    { key: 'type', header: t.columns.type, render: (s) => <span className="capitalize text-[var(--fx-ink-2)]">{s.category}</span> },
+    {
+      key: 'customer',
+      header: t.columns.customer,
+      render: (s) => (s.ownerName ? <span className="font-semibold">{s.ownerName}</span> : <span className="text-[var(--fx-faint)]">—</span>),
+    },
+    {
+      key: 'phone',
+      header: t.columns.phone,
+      render: (s) => (s.ownerPhone ? <span className="font-mono text-[12px]">{s.ownerPhone}</span> : <span className="text-[var(--fx-faint)]">—</span>),
+    },
+    { key: 'activated', header: t.columns.activated, render: (s) => <span className="text-[12px] text-[var(--fx-ink-2)]">{fmtDay(s.activatedAt)}</span> },
+    { key: 'scans', header: t.columns.scans, render: (s) => <span className="tabular-nums">{s.scans}</span> },
+    {
+      key: 'status',
+      header: t.columns.status,
+      align: 'right',
+      render: (s) => (
+        <span
+          className={`inline-flex items-center h-6 px-2 rounded-[var(--fx-radius-pill)] text-[12px] font-semibold ${
+            s.status === 'active' ? 'bg-[var(--fx-green-soft)] text-[var(--fx-green)]' : 'bg-[var(--fx-canvas)] text-[var(--fx-ink-2)]'
+          }`}
+        >
+          {s.status === 'active' ? t.statusActive : t.statusInStock}
+        </span>
+      ),
+    },
+  ];
+}
 
 /** What a partner sees when the account isn't an approved distributor (yet). */
-function ApplicationGate({ status, onBack }: { status: ApplicationStatus | null; onBack: () => void }) {
+function ApplicationGate({ status, onBack, t }: { status: ApplicationStatus | null; onBack: () => void; t: typeof dashboardTranslations['en']['distributor'] }) {
   const meta = {
-    pending: { icon: Clock, tone: 'bg-[var(--fx-amber-soft)] text-[var(--fx-amber)]', title: 'Application under review' },
-    rejected: { icon: XCircle, tone: 'bg-[var(--fx-red-soft)] text-[var(--fx-red)]', title: 'Application not approved' },
+    pending: { icon: Clock, tone: 'bg-[var(--fx-amber-soft)] text-[var(--fx-amber)]', title: t.gate.pendingTitle },
+    rejected: { icon: XCircle, tone: 'bg-[var(--fx-red-soft)] text-[var(--fx-red)]', title: t.gate.rejectedTitle },
     // Approved, yet this account was never granted the partner role (the application
     // was filed before the account existed) — only support can finish linking it.
-    approved: { icon: CheckCircle2, tone: 'bg-[var(--fx-green-soft)] text-[var(--fx-green)]', title: 'Approved — contact support to finish setup' },
-    none: { icon: Store, tone: 'bg-[var(--fx-canvas)] text-[var(--fx-ink-2)]', title: 'No partner application yet' },
+    approved: { icon: CheckCircle2, tone: 'bg-[var(--fx-green-soft)] text-[var(--fx-green)]', title: t.gate.approvedTitle },
+    none: { icon: Store, tone: 'bg-[var(--fx-canvas)] text-[var(--fx-ink-2)]', title: t.gate.noneTitle },
   }[status ?? 'none'];
   const Icon = meta.icon;
 
@@ -71,7 +73,7 @@ function ApplicationGate({ status, onBack }: { status: ApplicationStatus | null;
         <Icon size={20} />
       </span>
       <p className="text-[14px] font-semibold text-[var(--fx-ink)]">{meta.title}</p>
-      <button onClick={onBack} className="fx-btn fx-btn-secondary mt-1">Back to site</button>
+      <button onClick={onBack} className="fx-btn fx-btn-secondary mt-1">{t.gate.backToSite}</button>
     </div>
   );
 }
@@ -80,6 +82,7 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
   const { profile, signOut } = useAuth();
   const { language } = useLanguage();
   const t = dashboardTranslations[language].distributor;
+  const stickerColumns = buildStickerColumns(t);
 
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     try {
@@ -138,8 +141,8 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
   }, { intervalMs: POLL_MS });
 
   const items: FxSidebarItem[] = [
-    { id: 'overview', label: 'Overview', icon: LayoutGrid },
-    { id: 'stickers', label: 'Stickers', icon: Tag },
+    { id: 'overview', label: t.nav.overview, icon: LayoutGrid },
+    { id: 'stickers', label: t.nav.stickers, icon: Tag },
   ];
 
   const stats = data?.stats;
@@ -190,8 +193,8 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
           <button
             type="button"
             onClick={refresh}
-            aria-label="Refresh"
-            title="Refresh"
+            aria-label={t.refresh}
+            title={t.refresh}
             className="w-9 h-9 flex-shrink-0 rounded-[var(--fx-radius-control)] border border-[var(--fx-border)] bg-[var(--fx-surface)] flex items-center justify-center text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] cursor-pointer"
           >
             <RefreshCw size={15} />
@@ -202,11 +205,11 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
           {loading ? (
             <div className="fx-empty"><Loader2 size={22} className="fx-spin text-[var(--fx-ink-2)]" /></div>
           ) : gate ? (
-            <ApplicationGate status={gate === 'none' ? null : gate} onBack={onBack} />
+            <ApplicationGate status={gate === 'none' ? null : gate} onBack={onBack} t={t} />
           ) : error && !data ? (
             <div className="fx-empty" role="alert">
               <p className="text-[13px] font-semibold text-[var(--fx-red)]">{error}</p>
-              <button onClick={refresh} className="fx-btn fx-btn-secondary mt-1"><RefreshCw size={14} /> Retry</button>
+              <button onClick={refresh} className="fx-btn fx-btn-secondary mt-1"><RefreshCw size={14} /> {t.retry}</button>
             </div>
           ) : data && stats ? (
             <>
@@ -214,17 +217,17 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
                 <>
                   <FxKpiStrip
                     cards={[
-                      { key: 'allocated', label: 'Allocated', value: stats.allocated.toLocaleString('en-IN'), icon: <Boxes size={14} /> },
+                      { key: 'allocated', label: t.kpi.allocated, value: stats.allocated.toLocaleString('en-IN'), icon: <Boxes size={14} /> },
                       {
                         key: 'activated',
-                        label: 'Activated',
+                        label: t.kpi.activated,
                         value: stats.activated.toLocaleString('en-IN'),
                         tone: 'green',
                         badge: stats.allocated > 0 ? { text: `${activationPct}%`, tone: 'green' } : undefined,
                         icon: <CheckCircle2 size={14} />,
                       },
-                      { key: 'stock', label: 'In stock', value: stats.inStock.toLocaleString('en-IN'), tone: stats.inStock > 0 ? 'amber' : 'neutral', icon: <QrCode size={14} /> },
-                      { key: 'scans', label: 'Scans', value: stats.scans.toLocaleString('en-IN'), icon: <ScanLine size={14} /> },
+                      { key: 'stock', label: t.kpi.inStock, value: stats.inStock.toLocaleString('en-IN'), tone: stats.inStock > 0 ? 'amber' : 'neutral', icon: <QrCode size={14} /> },
+                      { key: 'scans', label: t.kpi.scans, value: stats.scans.toLocaleString('en-IN'), icon: <ScanLine size={14} /> },
                     ]}
                   />
 
@@ -239,28 +242,28 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
                         </span>
                       )}
                       {app.tier && <span className="text-[var(--fx-ink-2)]">{app.tier}</span>}
-                      <span className="text-[var(--fx-faint)]">Since {fmtDay(app.approvedAt || app.createdAt)}</span>
+                      <span className="text-[var(--fx-faint)]">{t.sinceLabel} {fmtDay(app.approvedAt || app.createdAt)}</span>
                     </div>
                   )}
 
                   {stats.allocated === 0 ? (
                     <div className="fx-empty">
                       <Tag size={24} className="text-[var(--fx-faint)]" />
-                      <p className="text-[13.5px] font-semibold text-[var(--fx-ink)]">No stickers allocated yet</p>
+                      <p className="text-[13.5px] font-semibold text-[var(--fx-ink)]">{t.noAllocatedYet}</p>
                     </div>
                   ) : (
                     <div className="fx-card p-4 space-y-3">
                       <div className="flex items-center justify-between">
-                        <h2 className="text-[15px] font-bold text-[var(--fx-ink)]">Recent activations</h2>
+                        <h2 className="text-[15px] font-bold text-[var(--fx-ink)]">{t.recentActivations}</h2>
                         <button onClick={() => selectTab('stickers')} className="text-[12.5px] font-semibold text-[var(--fx-accent)] hover:underline cursor-pointer">
-                          View all
+                          {t.viewAll}
                         </button>
                       </div>
                       <FxTable<StickerRow>
                         dense
                         rows={data.stickers.filter((s) => s.status === 'active').slice(0, 5)}
                         rowKey={rowKeyOf}
-                        emptyState="No activations yet"
+                        emptyState={t.noActivationsYet}
                         columns={stickerColumns.filter((c) => c.key !== 'status' && c.key !== 'type')}
                       />
                     </div>
@@ -270,7 +273,7 @@ export default function DistributorDashboard({ onBack }: { onBack: () => void })
 
               {activeTab === 'stickers' && (
                 <div className="fx-card overflow-hidden">
-                  <FxTable<StickerRow> rows={data.stickers} rowKey={rowKeyOf} emptyState="No stickers allocated yet" columns={stickerColumns} />
+                  <FxTable<StickerRow> rows={data.stickers} rowKey={rowKeyOf} emptyState={t.noAllocatedYet} columns={stickerColumns} />
                 </div>
               )}
             </>

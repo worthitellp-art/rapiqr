@@ -41,6 +41,8 @@ router.post('/forgot-password', passwordResetLimiter, AuthController.forgotPassw
 router.post('/reset-password', passwordResetLimiter, AuthController.resetPassword);
 router.post('/forgot-password/whatsapp/send', passwordResetLimiter, AuthController.forgotPasswordWhatsApp);
 router.post('/forgot-password/whatsapp/verify', passwordResetLimiter, AuthController.verifyForgotPasswordWhatsApp);
+router.post('/phone-password-reset/send', passwordResetLimiter, optionalAuth, AuthController.sendPasswordResetPhoneOtp);
+router.post('/phone-password-reset/verify', passwordResetLimiter, optionalAuth, AuthController.resetPasswordWithPhoneOtp);
 router.get('/me', verifyToken, AuthController.getMe);
 router.patch('/me', verifyToken, AuthController.updateProfile);
 router.post('/logout', optionalAuth, AuthController.logout);

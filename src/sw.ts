@@ -30,12 +30,12 @@ self.addEventListener('push', (event: PushEvent) => {
     data = { body: event.data ? event.data.text() : '' };
   }
 
-  const title = data.title || 'RapiQR';
+  const title = data.title || 'RepiQR';
   const options: NotificationOptions = {
     body: data.body || 'You have a new notification.',
     icon: '/pwa-192x192.png',
     badge: '/pwa-192x192.png',
-    tag: data.tag || 'rapiqr-notification',
+    tag: data.tag || 'repiqr-notification',
     data: { url: data.url || '/' },
   };
 

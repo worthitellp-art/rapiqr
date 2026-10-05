@@ -1,4 +1,5 @@
 const https = require('https');
+const { WHATSAPP_ERROR_CODES, createWhatsAppError, classifyMsg91Failure } = require('../utils/whatsappErrorCatalog');
 
 /**
  * Returns configured MSG91 credentials and default identifiers from environment variables.
@@ -28,14 +29,20 @@ function getMsg91Config() {
 
 /**
  * Sanitizes phone numbers into standard digits expected by MSG91.
- * If 10 digits without country code, prepends "91" (India).
+ * - Strips all non-digit characters.
+ * - Handles leading zeros (e.g. 09876543210 -> 9876543210).
+ * - Prepends '91' for 10-digit Indian numbers without country code.
  *
  * @param {string} phone
  * @returns {string}
  */
 function formatRecipientMobile(phone) {
   if (!phone) return '';
-  const digits = String(phone).replace(/\D/g, '');
+  let digits = String(phone).replace(/\D/g, '');
+  // Strip single leading zero for 11-digit numbers (common Indian dialer artifact)
+  if (digits.length === 11 && digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
   if (digits.length === 10) {
     return `91${digits}`;
   }
@@ -43,15 +50,57 @@ function formatRecipientMobile(phone) {
 }
 
 /**
- * Generic HTTPS request helper for MSG91 REST API endpoints.
+ * Validates a mobile number for WhatsApp dispatch.
+ * 
+ * @param {string} phone
+ * @returns {{ valid: boolean, formatted: string, error?: object }}
+ */
+function validateRecipientMobile(phone) {
+  if (!phone || String(phone).trim() === '') {
+    return {
+      valid: false,
+      formatted: '',
+      error: createWhatsAppError({
+        code: WHATSAPP_ERROR_CODES.NO_RECIPIENT_PHONE,
+        source: 'client',
+        whatFailed: 'Recipient mobile number is missing',
+        whyFailed: 'No phone number was supplied for the WhatsApp alert dispatch.',
+        safeNextAction: 'Ensure an owner phone number is configured on this tag. Alternatively, leave a message via in-app RepiChat.',
+      }),
+    };
+  }
+
+  const formatted = formatRecipientMobile(phone);
+  // International E.164 phone numbers typically have 10 to 15 digits
+  if (!formatted || formatted.length < 10 || formatted.length > 15) {
+    return {
+      valid: false,
+      formatted,
+      error: createWhatsAppError({
+        code: WHATSAPP_ERROR_CODES.INVALID_RECIPIENT_PHONE,
+        source: 'client',
+        whatFailed: 'Invalid recipient phone number',
+        whyFailed: `The provided phone number "${phone}" (${formatted.length} digits) is not a valid mobile number. Minimum 10 digits required.`,
+        safeNextAction: 'Please check and enter a valid 10-digit mobile number with country code. Use in-app chat in the meantime.',
+        technicalDetails: { rawPhone: phone, parsedDigits: formatted },
+      }),
+    };
+  }
+
+  return { valid: true, formatted };
+}
+
+/**
+ * Generic HTTPS request helper for MSG91 REST API endpoints with a 10s timeout.
  *
  * @param {'GET'|'POST'|'PUT'|'DELETE'} method
  * @param {string} apiPath
  * @param {object|string|null} payload
  * @param {object} customHeaders
+ * @param {number} timeoutMs
  * @returns {Promise<{ status: number, body: any }>}
  */
-function callMsg91Api(method, apiPath, payload = null, customHeaders = {}) {
+function callMsg91Api(method, apiPath, payload = null, customHeaders = {}, timeoutMs = 10000) {
   const { authKey } = getMsg91Config();
   return new Promise((resolve, reject) => {
     const headers = {
@@ -74,12 +123,15 @@ function callMsg91Api(method, apiPath, payload = null, customHeaders = {}) {
       headers,
     };
 
+    let settled = false;
     const req = https.request(requestOptions, (res) => {
       let responseBody = '';
       res.on('data', (chunk) => {
         responseBody += chunk;
       });
       res.on('end', () => {
+        if (settled) return;
+        settled = true;
         try {
           const parsed = JSON.parse(responseBody);
           resolve({ status: res.statusCode, body: parsed });
@@ -89,7 +141,21 @@ function callMsg91Api(method, apiPath, payload = null, customHeaders = {}) {
       });
     });
 
-    req.on('error', (err) => reject(err));
+    req.setTimeout(timeoutMs, () => {
+      if (settled) return;
+      settled = true;
+      const timeoutErr = new Error(`MSG91 API request to ${apiPath} timed out after ${timeoutMs}ms`);
+      timeoutErr.code = 'ETIMEDOUT';
+      req.destroy(timeoutErr);
+      reject(timeoutErr);
+    });
+
+    req.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      reject(err);
+    });
+
     if (dataString) {
       req.write(dataString);
     }
@@ -360,7 +426,7 @@ function buildMsg91WhatsAppComponents({ variables = {}, components = {}, body = 
  *   fails to resolve templates registered under a full locale code.
  * @param {string} [params.templateNamespace] Meta WABA template namespace. Falls back to
  *   MSG91_WHATSAPP_TEMPLATE_NAMESPACE. Required for MSG91 to resolve the template.
- * @returns {Promise<{ success: boolean, simulated: boolean, statusCode?: number, response?: any, messageId?: string|null, error?: string|null, reason?: string }>}
+ * @returns {Promise<{ success: boolean, simulated: boolean, statusCode?: number, response?: any, messageId?: string|null, error?: object|null, reason?: string }>}
  */
 async function sendMsg91WhatsApp({
   to,
@@ -379,21 +445,58 @@ async function sendMsg91WhatsApp({
   const resolvedLanguage = (languageCode || config.whatsappLanguageCode || 'en').trim();
   const resolvedNamespace = (templateNamespace || config.whatsappTemplateNamespace || '').trim();
 
-  // Normalize recipient numbers into international format array
-  const rawList = Array.isArray(to) ? to : [to];
-  const recipientList = rawList.map((num) => formatRecipientMobile(num)).filter(Boolean);
-
   if (!config.authKey) {
-    return { success: false, simulated: true, reason: 'MSG91_AUTH_KEY not set in Server/.env' };
+    const errorObj = createWhatsAppError({
+      code: WHATSAPP_ERROR_CODES.MSG91_AUTH_KEY_MISSING,
+      source: 'app',
+      whatFailed: 'MSG91 credentials missing',
+      whyFailed: 'MSG91_AUTH_KEY is not configured in Server/.env.',
+      safeNextAction: 'Configure MSG91_AUTH_KEY in server environment. The system is operating in simulated mode.',
+    });
+    return { success: false, simulated: true, reason: 'MSG91_AUTH_KEY not set in Server/.env', error: errorObj };
   }
   if (!senderNumber) {
-    return { success: false, simulated: false, error: 'MSG91_WHATSAPP_INTEGRATED_NUMBER is not configured' };
+    const errorObj = createWhatsAppError({
+      code: WHATSAPP_ERROR_CODES.MSG91_NUMBER_NOT_INTEGRATED,
+      source: 'app',
+      whatFailed: 'WhatsApp sender number not configured',
+      whyFailed: 'MSG91_WHATSAPP_INTEGRATED_NUMBER is not set in Server/.env.',
+      safeNextAction: 'Configure MSG91_WHATSAPP_INTEGRATED_NUMBER with an approved WhatsApp Business number.',
+    });
+    return { success: false, simulated: false, error: errorObj };
   }
+
+  // Validate all recipient numbers
+  const rawList = Array.isArray(to) ? to : [to];
+  const recipientList = [];
+  for (const rawNum of rawList) {
+    const val = validateRecipientMobile(rawNum);
+    if (!val.valid) {
+      return { success: false, simulated: false, error: val.error };
+    }
+    recipientList.push(val.formatted);
+  }
+
   if (recipientList.length === 0) {
-    return { success: false, simulated: false, error: 'Recipient phone number is invalid or empty' };
+    const errorObj = createWhatsAppError({
+      code: WHATSAPP_ERROR_CODES.NO_RECIPIENT_PHONE,
+      source: 'client',
+      whatFailed: 'No recipient mobile provided',
+      whyFailed: 'Recipient mobile number is empty or contains no digits.',
+      safeNextAction: 'Enter a valid mobile number for the sticker owner or emergency contact.',
+    });
+    return { success: false, simulated: false, error: errorObj };
   }
+
   if (!targetTemplate) {
-    return { success: false, simulated: false, error: 'MSG91_WHATSAPP_TEMPLATE_NAME is not configured' };
+    const errorObj = createWhatsAppError({
+      code: WHATSAPP_ERROR_CODES.TEMPLATE_NOT_CONFIGURED,
+      source: 'app',
+      whatFailed: 'WhatsApp template not specified',
+      whyFailed: 'MSG91 template name was neither passed nor set in MSG91_WHATSAPP_TEMPLATE_NAME.',
+      safeNextAction: 'Admin action: set a valid template name in Server/.env.',
+    });
+    return { success: false, simulated: false, error: errorObj };
   }
 
   const formattedComponents = buildMsg91WhatsAppComponents({ variables, components, body, headerMediaUrl });
@@ -402,9 +505,6 @@ async function sendMsg91WhatsApp({
     integrated_number: senderNumber,
     content_type: 'template',
     payload: {
-      // Present in MSG91's own sample payload for this endpoint (returned
-      // from the dashboard alongside the qr_scan_alert approval) — omitted
-      // here previously.
       messaging_product: 'whatsapp',
       type: 'template',
       template: {
@@ -424,12 +524,29 @@ async function sendMsg91WhatsApp({
     },
   };
 
-  const response = await callMsg91Api('POST', '/api/v5/whatsapp/whatsapp-outbound-message/bulk/', payload);
+  const endpoint = '/api/v5/whatsapp/whatsapp-outbound-message/bulk/';
+  let response;
+  try {
+    response = await callMsg91Api('POST', endpoint, payload);
+  } catch (err) {
+    const classified = classifyMsg91Failure({ error: err, payload, endpoint });
+    return {
+      success: false,
+      simulated: false,
+      statusCode: null,
+      response: null,
+      messageId: null,
+      error: classified,
+    };
+  }
+
   const isOk =
     response.status >= 200 &&
     response.status < 300 &&
     response.body?.status !== 'error' &&
-    response.body?.type !== 'error';
+    response.body?.status !== 'fail' &&
+    response.body?.type !== 'error' &&
+    response.body?.hasError !== true;
 
   const messageId =
     response.body?.request_id ||
@@ -437,15 +554,25 @@ async function sendMsg91WhatsApp({
     (Array.isArray(response.body?.data) ? response.body.data[0]?.message_id : null) ||
     null;
 
-  const errorMessage = isOk ? null : msg91ErrorText(response) || 'MSG91 WhatsApp send failed';
+  if (!isOk) {
+    const classified = classifyMsg91Failure({ status: response.status, body: response.body, payload, endpoint });
+    return {
+      success: false,
+      simulated: false,
+      statusCode: response.status,
+      response: response.body,
+      messageId: null,
+      error: classified,
+    };
+  }
 
   return {
-    success: isOk,
+    success: true,
     simulated: false,
     statusCode: response.status,
     response: response.body,
     messageId,
-    error: errorMessage,
+    error: null,
   };
 }
 
@@ -453,27 +580,39 @@ async function sendMsg91WhatsApp({
  * Dispatches a session (within 24 hours of customer interaction) text message via MSG91 WhatsApp.
  *
  * @param {{ to: string, text: string, integratedNumber?: string }} params
- * @returns {Promise<{ success: boolean, simulated: boolean, statusCode?: number, response?: any, messageId?: string|null, error?: string|null, reason?: string }>}
+ * @returns {Promise<{ success: boolean, simulated: boolean, statusCode?: number, response?: any, messageId?: string|null, error?: object|null, reason?: string }>}
  */
 async function sendMsg91SessionWhatsApp({ to, text, integratedNumber }) {
   const config = getMsg91Config();
-  const recipient = formatRecipientMobile(to);
+  const phoneVal = validateRecipientMobile(to);
+  if (!phoneVal.valid) {
+    return { success: false, simulated: false, error: phoneVal.error };
+  }
+  const recipient = phoneVal.formatted;
   const senderNumber = (integratedNumber || config.whatsappIntegratedNumber || '').trim();
 
   if (!config.authKey) {
-    return { success: false, simulated: true, reason: 'MSG91_AUTH_KEY not set in Server/.env' };
+    const errorObj = createWhatsAppError({
+      code: WHATSAPP_ERROR_CODES.MSG91_AUTH_KEY_MISSING,
+      source: 'app',
+      whatFailed: 'MSG91 credentials missing',
+      whyFailed: 'MSG91_AUTH_KEY not set in Server/.env',
+      safeNextAction: 'Configure MSG91_AUTH_KEY in Server/.env.',
+    });
+    return { success: false, simulated: true, reason: 'MSG91_AUTH_KEY not set in Server/.env', error: errorObj };
   }
   if (!senderNumber) {
-    return { success: false, simulated: false, error: 'MSG91_WHATSAPP_INTEGRATED_NUMBER is not configured' };
-  }
-  if (!recipient) {
-    return { success: false, simulated: false, error: 'Recipient phone number is invalid or empty' };
+    const errorObj = createWhatsAppError({
+      code: WHATSAPP_ERROR_CODES.MSG91_NUMBER_NOT_INTEGRATED,
+      source: 'app',
+      whatFailed: 'WhatsApp sender number missing',
+      whyFailed: 'MSG91_WHATSAPP_INTEGRATED_NUMBER is not configured in Server/.env',
+      safeNextAction: 'Set MSG91_WHATSAPP_INTEGRATED_NUMBER in Server/.env.',
+    });
+    return { success: false, simulated: false, error: errorObj };
   }
 
   // MSG91's plain-text WhatsApp body rejects embedded newlines outright
-  // ("next line(\n) is not supported for body value") — every alert message
-  // this app builds is multi-line, so every session-message send was failing
-  // 100% of the time. Collapse to a single line rather than dropping content.
   const singleLineText = String(text || '').replace(/\r?\n+/g, ' — ').trim();
 
   const payload = {
@@ -485,23 +624,51 @@ async function sendMsg91SessionWhatsApp({ to, text, integratedNumber }) {
     },
   };
 
-  const response = await callMsg91Api('POST', '/api/v5/whatsapp/whatsapp-outbound-message/', payload);
+  const endpoint = '/api/v5/whatsapp/whatsapp-outbound-message/';
+  let response;
+  try {
+    response = await callMsg91Api('POST', endpoint, payload);
+  } catch (err) {
+    const classified = classifyMsg91Failure({ error: err, payload, endpoint });
+    return {
+      success: false,
+      simulated: false,
+      statusCode: null,
+      response: null,
+      messageId: null,
+      error: classified,
+    };
+  }
+
   const isOk =
     response.status >= 200 &&
     response.status < 300 &&
     response.body?.status !== 'error' &&
-    response.body?.type !== 'error';
+    response.body?.status !== 'fail' &&
+    response.body?.type !== 'error' &&
+    response.body?.hasError !== true;
 
   const messageId = response.body?.request_id || response.body?.message_id || null;
-  const errorMessage = isOk ? null : msg91ErrorText(response) || 'MSG91 WhatsApp session message failed';
+
+  if (!isOk) {
+    const classified = classifyMsg91Failure({ status: response.status, body: response.body, payload, endpoint });
+    return {
+      success: false,
+      simulated: false,
+      statusCode: response.status,
+      response: response.body,
+      messageId: null,
+      error: classified,
+    };
+  }
 
   return {
-    success: isOk,
+    success: true,
     simulated: false,
     statusCode: response.status,
     response: response.body,
     messageId,
-    error: errorMessage,
+    error: null,
   };
 }
 
@@ -542,6 +709,7 @@ async function verifyMsg91WidgetAccessToken({ accessToken }) {
 module.exports = {
   getMsg91Config,
   formatRecipientMobile,
+  validateRecipientMobile,
   callMsg91Api,
   sendMsg91FlowSms,
   sendMsg91Otp,

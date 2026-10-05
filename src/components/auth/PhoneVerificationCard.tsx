@@ -1,6 +1,8 @@
 import React from 'react';
 import { Smartphone, ShieldCheck, ArrowRight, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
+import { useLanguage } from '../../context/LanguageContext';
+import { authTranslations } from '../../i18n/authTranslations';
 
 export interface PhoneVerificationCardProps {
   linkingPhone: string;
@@ -33,6 +35,9 @@ export default function PhoneVerificationCard({
   onBack,
   handleSignOut,
 }: PhoneVerificationCardProps) {
+  const { language } = useLanguage();
+  const t = authTranslations[language].phoneLink;
+
   const handlePhoneInputChange = (phoneNumber: string) => {
     setLinkingPhone(phoneNumber);
     setLinkingMessage(null);
@@ -61,10 +66,10 @@ export default function PhoneVerificationCard({
         {/* ── Header Title ── */}
         <div>
           <h1 className="font-display text-xl font-bold text-slate-900 tracking-tight">
-            Verify Phone Number
+            {t.title}
           </h1>
           <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
-            Enter the verification code sent to your phone to access your dashboard.
+            {t.subtitle}
           </p>
         </div>
 
@@ -91,12 +96,12 @@ export default function PhoneVerificationCard({
           <form onSubmit={handleSendPhoneVerification} className="space-y-4 text-left">
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">
-                Mobile Phone Number
+                {t.phoneLabel}
               </label>
               <PhoneInputWithCountry
                 value={linkingPhone}
                 onChange={handlePhoneInputChange}
-                placeholder="10-digit mobile number"
+                placeholder={t.phonePlaceholder}
               />
             </div>
 
@@ -108,11 +113,11 @@ export default function PhoneVerificationCard({
               {linkingLoading ? (
                 <>
                   <Loader2 size={16} className="animate-spin text-black" />
-                  <span>Sending OTP...</span>
+                  <span>{t.sendingOtp}</span>
                 </>
               ) : (
                 <>
-                  <span>Send Verification Code</span>
+                  <span>{t.sendVerificationCode}</span>
                   <ArrowRight size={16} />
                 </>
               )}
@@ -124,14 +129,14 @@ export default function PhoneVerificationCard({
             <div>
               <div className="flex justify-between items-center mb-2">
                 <label className="block text-sm font-medium text-gray-900">
-                  Enter OTP Code
+                  {t.otpLabel}
                 </label>
                 <button
                   type="button"
                   onClick={handleReturnToPhoneStep}
                   className="text-xs text-gray-700 font-semibold hover:underline cursor-pointer transition-colors"
                 >
-                  Change Phone
+                  {t.changePhone}
                 </button>
               </div>
               <input
@@ -140,7 +145,7 @@ export default function PhoneVerificationCard({
                 maxLength={4}
                 value={otpCode}
                 onChange={handleOtpInputChange}
-                placeholder="Enter code"
+                placeholder={t.otpPlaceholder}
                 className="w-full h-12 text-center text-xl tracking-[8px] font-mono font-semibold bg-white border border-gray-300 focus:border-black focus:ring-1 focus:ring-black rounded-lg outline-none text-gray-900 shadow-xs transition-all placeholder:text-gray-300"
               />
             </div>
@@ -153,12 +158,12 @@ export default function PhoneVerificationCard({
               {linkingLoading ? (
                 <>
                   <Loader2 size={16} className="animate-spin text-black" />
-                  <span>Verifying...</span>
+                  <span>{t.verifying}</span>
                 </>
               ) : (
                 <>
                   <ShieldCheck size={16} className="text-black" />
-                  <span>Verify &amp; Access Dashboard</span>
+                  <span>{t.verifyAndAccessDashboard}</span>
                 </>
               )}
             </button>
@@ -172,14 +177,14 @@ export default function PhoneVerificationCard({
             onClick={onBack}
             className="text-slate-500 hover:text-slate-900 font-bold transition-colors cursor-pointer"
           >
-            ← Back to Home
+            {t.backToHome}
           </button>
           <button
             type="button"
             onClick={handleSignOut}
             className="text-rose-600 hover:text-rose-700 font-bold transition-colors cursor-pointer"
           >
-            Sign Out
+            {t.signOut}
           </button>
         </div>
       </div>

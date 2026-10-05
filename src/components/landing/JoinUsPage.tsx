@@ -13,6 +13,8 @@ import { STICKER_CATEGORIES } from '../../stickerModules';
 import { apiClient } from '../../lib/apiClient';
 import { FlowButton } from '../ui/flow-button';
 import { INDIAN_CITIES, INDIAN_CITY_NAMES, COUNTRIES } from '../../data/locations';
+import { useLanguage } from '../../context/LanguageContext';
+import { joinUsTranslations } from '../../i18n/joinUsTranslations';
 
 // Leaflet is heavy and only the Location/Coverage steps need it — load on demand.
 const RadiusMap = lazy(() => import('../common/RadiusMap'));
@@ -22,48 +24,24 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_RADIUS_KM = 1;
 const MAX_RADIUS_KM = 150;
 const RADIUS_OPTIONS = [5, 10, 15, 25, 50, 75, 100];
-const EXPERIENCE_OPTIONS = ['New to this', '1–3 years', '3–5 years', '5–10 years', '10+ years'];
 
 interface JoinUsPageProps {
   onBack: () => void;
   initialServiceType?: string;
 }
 
-const JOIN_BENEFITS = [
-  {
-    title: 'Private Number Masking',
-    desc: 'Nearby scans route to your phone through a secure masked bridge. Your real number stays confidential.',
-  },
-  {
-    title: 'Custom Categories & Reach',
-    desc: 'Choose the exact sticker categories you service (vehicles, pets, bags, home) and set your travel radius.',
-  },
-  {
-    title: 'Zero Listing or Platform Fees',
-    desc: 'Free to join. Every provider profile is vetted for safety before listing to keep trust high.',
-  },
-];
-
-const WIZARD_STEPS = ['Service', 'Location', 'Coverage', 'Availability', 'Details', 'Review'];
+const WIZARD_STEP_KEYS = ['service', 'location', 'coverage', 'availability', 'details', 'review'] as const;
 
 type AvailabilityType = 'always' | 'daytime' | 'night' | 'custom';
 type HoursMode = 'same' | 'perday';
 interface DayHours { open: string; close: string; closed: boolean }
-const DAYS = [
-  { key: 'mon', label: 'Monday' }, { key: 'tue', label: 'Tuesday' }, { key: 'wed', label: 'Wednesday' },
-  { key: 'thu', label: 'Thursday' }, { key: 'fri', label: 'Friday' }, { key: 'sat', label: 'Saturday' },
-  { key: 'sun', label: 'Sunday' },
-];
+const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DEFAULT_DAY_HOURS: DayHours = { open: '09:00', close: '18:00', closed: false };
 
 interface ServiceArea { id: string; name: string; radiusKm: number }
 
-const AVAILABILITY_OPTIONS: { value: AvailabilityType; Icon: typeof Zap; label: string; sub: string }[] = [
-  { value: 'always', Icon: Zap, label: '24/7 Service', sub: 'Available round the clock for emergencies' },
-  { value: 'daytime', Icon: Sun, label: 'Daytime', sub: 'Standard business hours (Morning to Evening)' },
-  { value: 'night', Icon: Moon, label: 'Night Shift', sub: 'Evening to early morning assistance' },
-  { value: 'custom', Icon: CalendarClock, label: 'Custom Hours', sub: 'Define your specific operating schedule' },
-];
+const AVAILABILITY_VALUES: AvailabilityType[] = ['always', 'daytime', 'night', 'custom'];
+const AVAILABILITY_ICONS: Record<AvailabilityType, typeof Zap> = { always: Zap, daytime: Sun, night: Moon, custom: CalendarClock };
 
 /** Cities in the same state as `cityName` — real, project-defined data, never invented. */
 function nearbyCities(cityName: string): string[] {
@@ -83,6 +61,8 @@ function radiusToPixels(km: number): number {
 
 /** Clean illustrative coverage visual */
 function CoverageVisual({ km, city }: { km: number; city: string }) {
+  const { language } = useLanguage();
+  const t = joinUsTranslations[language].joinUs;
   const r = radiusToPixels(km);
   return (
     <div className="flex flex-col items-center gap-3 rounded-md border border-neutral-200 bg-neutral-50/70 p-6">
@@ -97,9 +77,9 @@ function CoverageVisual({ km, city }: { km: number; city: string }) {
         </div>
       </div>
       <div className="text-center">
-        <p className="text-xs font-semibold text-neutral-900">{city || 'Base location'} · ~{km} KM coverage radius</p>
+        <p className="text-xs font-semibold text-neutral-900">{t.step2.coverageSummary(city, t.step2.radiusLabel(km))}</p>
         <p className="mt-1 text-[11px] text-neutral-500">
-          Estimated dispatch area for assistance requests
+          {t.step2.estimatedDispatch}
         </p>
       </div>
     </div>
@@ -107,6 +87,20 @@ function CoverageVisual({ km, city }: { km: number; city: string }) {
 }
 
 export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPageProps) {
+  const { language } = useLanguage();
+  const t = joinUsTranslations[language].joinUs;
+
+  const WIZARD_STEPS = WIZARD_STEP_KEYS.map((key) => t.wizardSteps[key]);
+  const DAYS = DAY_KEYS.map((key, i) => ({ key, label: t.step3.days[i] }));
+  const JOIN_BENEFITS = t.hero.benefits;
+  const AVAILABILITY_OPTIONS = AVAILABILITY_VALUES.map((value, i) => ({
+    value,
+    Icon: AVAILABILITY_ICONS[value],
+    label: t.step3.availability[i].label,
+    sub: t.step3.availability[i].sub,
+  }));
+  const EXPERIENCE_OPTIONS = t.step4.experienceOptions;
+
   const defaultService = SERVICE_TYPES.some((type) => type.slug === initialServiceType)
     ? initialServiceType!
     : SERVICE_TYPES[0].slug;
@@ -147,7 +141,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
   const [hoursMode, setHoursMode] = useState<HoursMode>('same');
   const [sameHours, setSameHours] = useState({ open: '09:00', close: '18:00' });
   const [perDayHours, setPerDayHours] = useState<Record<string, DayHours>>(
-    DAYS.reduce((acc, d) => ({ ...acc, [d.key]: { ...DEFAULT_DAY_HOURS } }), {})
+    DAY_KEYS.reduce((acc, key) => ({ ...acc, [key]: { ...DEFAULT_DAY_HOURS } }), {})
   );
 
   // Step 4 — Details
@@ -290,13 +284,13 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
   };
 
   const availabilitySummary = useMemo(() => {
-    if (availabilityType === 'always') return '24/7 Round the clock';
-    if (availabilityType === 'daytime') return 'Daytime';
-    if (availabilityType === 'night') return 'Night hours';
-    if (hoursMode === 'same') return `Everyday ${sameHours.open} – ${sameHours.close}`;
-    const openDays = DAYS.filter((d) => !perDayHours[d.key]?.closed).length;
-    return `${openDays} days/week (Custom hours)`;
-  }, [availabilityType, hoursMode, sameHours, perDayHours]);
+    if (availabilityType === 'always') return t.step3.summaryAlways;
+    if (availabilityType === 'daytime') return t.step3.summaryDaytime;
+    if (availabilityType === 'night') return t.step3.summaryNight;
+    if (hoursMode === 'same') return t.step3.summaryEveryday(sameHours.open, sameHours.close);
+    const openDays = DAY_KEYS.filter((key) => !perDayHours[key]?.closed).length;
+    return t.step3.summaryCustom(openDays);
+  }, [availabilityType, hoursMode, sameHours, perDayHours, t]);
 
   const handleSubmit = async () => {
     if (!stepValid) return;
@@ -337,10 +331,10 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
     }
     setSubmitting(false);
     if (saved) setSubmitted(true);
-    else setError("We couldn't submit your application just now. Please try again.");
+    else setError(t.step5.errorFallback);
   };
 
-  const stepLabel = (n: number) => `Step ${n + 1} of ${WIZARD_STEPS.length}`;
+  const stepLabel = (n: number) => t.header.stepOf(n + 1, WIZARD_STEPS.length);
 
   return (
     <main className="min-h-screen bg-neutral-50/50 text-neutral-900">
@@ -351,13 +345,13 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
             onClick={goBack}
             className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-neutral-600 transition-colors hover:text-neutral-900"
           >
-            <ArrowLeft size={15} /> {step === 0 || submitted ? 'Back to home' : 'Back'}
+            <ArrowLeft size={15} /> {step === 0 || submitted ? t.header.backToHome : t.header.back}
           </button>
           <div className="flex items-center gap-3">
             <img src={lightBgLogo} alt="RepiQR" className="h-7 w-auto object-contain" />
             <span className="hidden h-4 w-px bg-neutral-200 sm:inline-block" />
             <span className="hidden text-[11px] font-semibold uppercase tracking-wider text-neutral-500 sm:inline-block">
-              Partner Network
+              {t.header.partnerNetwork}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -379,27 +373,27 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
               <CheckCircle2 size={32} />
             </div>
             <h2 className="mt-5 font-serif text-2xl sm:text-3xl font-medium tracking-tight text-neutral-900">
-              Application Submitted
+              {t.success.title}
             </h2>
             <p className="mt-3 text-sm text-neutral-600 leading-relaxed">
-              Thank you, <span className="font-semibold text-neutral-900">{label}</span>. We have received your {service.label} partner application for <span className="font-semibold text-neutral-900">{city}</span>.
+              {t.success.thankYou(label, service.label, city)}
             </p>
             <div className="mt-6 rounded-md bg-neutral-50 p-4 text-left border border-neutral-150 space-y-2 text-xs text-neutral-700">
               <div className="flex items-center gap-2">
                 <Check size={14} className="text-emerald-600 shrink-0" />
-                <span>Details &amp; coverage radius recorded</span>
+                <span>{t.success.detailsRecorded}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Check size={14} className="text-emerald-600 shrink-0" />
-                <span>Phone number ({phone}) queued for verification</span>
+                <span>{t.success.phoneQueued(phone)}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Check size={14} className="text-emerald-600 shrink-0" />
-                <span>Masked call routing will be activated upon approval</span>
+                <span>{t.success.maskedCallActivated}</span>
               </div>
             </div>
             <FlowButton tone="dark" size="sm" className="mt-8" onClick={onBack}>
-              Return to Homepage
+              {t.success.returnHome}
             </FlowButton>
           </div>
         ) : (
@@ -411,13 +405,13 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                 <div>
                   <div className="inline-flex items-center gap-1.5 rounded-sm bg-neutral-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-700">
                     <Sparkles size={12} className="text-neutral-900" />
-                    Service Network
+                    {t.hero.badge}
                   </div>
                   <h1 className="mt-4 font-serif text-3xl sm:text-4xl lg:text-5xl font-medium tracking-tight text-neutral-900 leading-[1.08]">
-                    Be the help someone finds.
+                    {t.hero.headline}
                   </h1>
                   <p className="mt-4 text-sm sm:text-base text-neutral-600 leading-relaxed font-normal">
-                    Join the RepiQR service partner network. Connect with nearby customers in need of urgent roadside, medical, or key assistance through privacy-masked calls.
+                    {t.hero.subheading}
                   </p>
 
                   <div className="mt-8 space-y-3.5 border-t border-neutral-200 pt-6">
@@ -438,7 +432,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
 
                   <div className="mt-6 flex items-center gap-2 text-xs text-neutral-500">
                     <ShieldCheck size={16} className="text-neutral-900 shrink-0" />
-                    <span>Zero spam guarantee · Verified provider badge upon review</span>
+                    <span>{t.hero.trustLine}</span>
                   </div>
                 </div>
               ) : (
@@ -448,10 +442,10 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                     <div className="flex items-center justify-between border-b border-neutral-100 pb-4">
                       <div>
                         <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
-                          Application Summary
+                          {t.summarySidebar.applicationSummary}
                         </p>
                         <h3 className="mt-0.5 text-base font-semibold text-neutral-900">
-                          {label.trim() || 'Service Provider Profile'}
+                          {label.trim() || t.summarySidebar.profileFallback}
                         </h3>
                       </div>
                       <span className="rounded-sm bg-neutral-100 px-2 py-1 text-[11px] font-semibold text-neutral-700">
@@ -470,7 +464,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-neutral-900 truncate">{service.label}</p>
-                          <p className="text-[11px] text-neutral-500">Primary Service Offering</p>
+                          <p className="text-[11px] text-neutral-500">{t.summarySidebar.primaryServiceOffering}</p>
                         </div>
                       </div>
 
@@ -478,7 +472,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                       <div className="flex items-center gap-2.5 text-neutral-700">
                         <MapPin size={15} className="text-neutral-400 shrink-0" />
                         <span className="font-medium">
-                          {city.trim() ? `${city}${state ? `, ${state}` : ''}` : 'Location pending selection'}
+                          {city.trim() ? `${city}${state ? `, ${state}` : ''}` : t.summarySidebar.locationPending}
                         </span>
                       </div>
 
@@ -486,8 +480,8 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                       <div className="flex items-center gap-2.5 text-neutral-700">
                         <LocateFixed size={15} className="text-neutral-400 shrink-0" />
                         <span className="font-medium">
-                          {effectiveRadius > 0 ? `~${effectiveRadius} KM radius` : 'Coverage radius not set'}
-                          {serviceAreas.length > 0 && ` (+${serviceAreas.length} extra area${serviceAreas.length > 1 ? 's' : ''})`}
+                          {effectiveRadius > 0 ? t.summarySidebar.radiusKm(effectiveRadius) : t.summarySidebar.radiusNotSet}
+                          {serviceAreas.length > 0 && t.summarySidebar.extraAreas(serviceAreas.length)}
                         </span>
                       </div>
 
@@ -501,14 +495,14 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                       {phone.trim() && (
                         <div className="flex items-center gap-2.5 text-neutral-700">
                           <Phone size={15} className="text-neutral-400 shrink-0" />
-                          <span className="font-medium">{phone} (Protected via masked relay)</span>
+                          <span className="font-medium">{phone} {t.summarySidebar.protectedViaMaskedRelay}</span>
                         </div>
                       )}
                     </div>
 
                     {categories.length > 0 && (
                       <div className="mt-4 border-t border-neutral-100 pt-3">
-                        <p className="text-[11px] font-medium text-neutral-500 mb-2">Supported Categories:</p>
+                        <p className="text-[11px] font-medium text-neutral-500 mb-2">{t.summarySidebar.supportedCategories}</p>
                         <div className="flex flex-wrap gap-1.5">
                           {categories.map((c) => (
                             <span
@@ -528,9 +522,9 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                     <div className="flex items-start gap-3">
                       <Shield size={16} className="text-neutral-800 mt-0.5 shrink-0" />
                       <div>
-                        <h5 className="text-xs font-semibold text-neutral-900">Privacy &amp; Safety Standard</h5>
+                        <h5 className="text-xs font-semibold text-neutral-900">{t.summarySidebar.privacySafetyTitle}</h5>
                         <p className="mt-1 text-[11px] text-neutral-600 leading-relaxed">
-                          Your phone number is stored on encrypted servers and never displayed publicly. When a user requests assistance, our system connects you via a private masked bridge.
+                          {t.summarySidebar.privacySafetyDesc}
                         </p>
                       </div>
                     </div>
@@ -546,7 +540,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                 <div className="border-b border-neutral-100 pb-5">
                   <div className="flex items-center justify-between">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
-                      Step {step + 1} of {WIZARD_STEPS.length} · {WIZARD_STEPS[step]}
+                      {t.header.stepOf(step + 1, WIZARD_STEPS.length)} · {WIZARD_STEPS[step]}
                     </p>
                     <span className="text-xs font-semibold text-neutral-900">
                       {Math.round(((step + 1) / WIZARD_STEPS.length) * 100)}%
@@ -567,7 +561,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                 {showStepError && !stepValid && (
                   <div className="flex items-center gap-2 rounded-md bg-red-50 border border-red-200 px-3.5 py-2.5 text-xs font-semibold text-red-700">
                     <AlertCircle size={15} className="shrink-0" />
-                    <span>Please complete all required fields before proceeding.</span>
+                    <span>{t.progress.completeFields}</span>
                   </div>
                 )}
 
@@ -576,10 +570,10 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                   <div className="space-y-6">
                     <div>
                       <h2 className="font-serif text-xl sm:text-2xl font-medium tracking-tight text-neutral-900">
-                        Which service do you provide?
+                        {t.step0.heading}
                       </h2>
                       <p className="mt-1 text-xs text-neutral-500">
-                        Select your primary specialty. You can adjust this or add more services later.
+                        {t.step0.sub}
                       </p>
                     </div>
 
@@ -618,7 +612,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
 
                     <div className="border-t border-neutral-100 pt-5">
                       <label className="mb-2 block text-xs font-semibold text-neutral-700">
-                        Tag categories covered <span className="font-normal text-neutral-400">(optional)</span>
+                        {t.step0.categoriesLabel} <span className="font-normal text-neutral-400">{t.step0.optional}</span>
                       </label>
                       <div className="flex flex-wrap gap-2">
                         {STICKER_CATEGORIES.map((category) => {
@@ -649,16 +643,16 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                   <div className="space-y-5">
                     <div>
                       <h2 className="font-serif text-xl sm:text-2xl font-medium tracking-tight text-neutral-900">
-                        Where is your base location?
+                        {t.step1.heading}
                       </h2>
                       <p className="mt-1 text-xs text-neutral-500">
-                        Customers scanning tags nearby will be routed based on your base city.
+                        {t.step1.sub}
                       </p>
                     </div>
 
                     <div>
                       <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-neutral-700">
-                        <Search size={13} /> Base city *
+                        <Search size={13} /> {t.step1.baseCityLabel}
                       </label>
                       <AutocompleteField
                         label=""
@@ -669,7 +663,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                         }}
                         onSelect={(v) => setStateName(INDIAN_CITIES.find((c) => c.name === v)?.state || '')}
                         suggestions={INDIAN_CITY_NAMES}
-                        placeholder="Select your city"
+                        placeholder={t.step1.selectCityPlaceholder}
                         inputClassName="w-full rounded-md border border-neutral-200 px-3.5 py-2.5 text-sm outline-none focus:border-neutral-900 transition-colors"
                       />
                     </div>
@@ -680,19 +674,19 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                         <Suspense fallback={<div className="h-64 w-full animate-pulse rounded-md bg-neutral-100" />}>
                           <RadiusMap latitude={coords.lat} longitude={coords.lng} onMove={handlePinMove} />
                         </Suspense>
-                        <p className="text-[11px] text-neutral-500">Drag the pin to fine-tune your base point.</p>
+                        <p className="text-[11px] text-neutral-500">{t.step1.dragPin}</p>
                       </div>
                     )}
 
                     <div>
                       <label className="mb-1.5 block text-xs font-semibold text-neutral-700">
-                        Full address <span className="font-normal text-neutral-400">(optional)</span>
+                        {t.step1.fullAddressLabel} <span className="font-normal text-neutral-400">{t.step0.optional}</span>
                       </label>
                       <input
                         type="text"
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
-                        placeholder="Building, street"
+                        placeholder={t.step1.buildingStreetPlaceholder}
                         className="w-full rounded-md border border-neutral-200 px-3.5 py-2.5 text-sm outline-none focus:border-neutral-900 transition-colors"
                       />
                     </div>
@@ -700,7 +694,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <label className="mb-1.5 block text-xs font-semibold text-neutral-700">
-                          Area / locality <span className="font-normal text-neutral-400">(optional)</span>
+                          {t.step1.areaLocalityLabel} <span className="font-normal text-neutral-400">{t.step0.optional}</span>
                         </label>
                         <input
                           type="text"
@@ -711,7 +705,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                       </div>
                       <div>
                         <label className="mb-1.5 block text-xs font-semibold text-neutral-700">
-                          PIN code <span className="font-normal text-neutral-400">(optional)</span>
+                          {t.step1.pinCodeLabel} <span className="font-normal text-neutral-400">{t.step0.optional}</span>
                         </label>
                         <input
                           type="text"
@@ -719,17 +713,17 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                           maxLength={6}
                           value={pincode}
                           onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                          placeholder="6 digits"
+                          placeholder={t.step1.sixDigitsPlaceholder}
                           className="w-full rounded-md border border-neutral-200 px-3.5 py-2.5 text-sm outline-none focus:border-neutral-900 transition-colors"
                         />
                         {!pinValid && (
                           <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-red-600">
-                            <AlertCircle size={12} /> Enter a valid 6-digit PIN code.
+                            <AlertCircle size={12} /> {t.step1.invalidPin}
                           </p>
                         )}
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="mb-1.5 block text-xs font-semibold text-neutral-700">State</label>
+                        <label className="mb-1.5 block text-xs font-semibold text-neutral-700">{t.step1.stateLabel}</label>
                         <input
                           type="text"
                           value={state}
@@ -741,14 +735,14 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
 
                     <div>
                       <label className="mb-1.5 block text-xs font-semibold text-neutral-700">
-                        Country <span className="font-normal text-neutral-400">(optional)</span>
+                        {t.step1.countryLabel} <span className="font-normal text-neutral-400">{t.step0.optional}</span>
                       </label>
                       <AutocompleteField
                         label=""
                         value={country}
                         onChange={setCountry}
                         suggestions={COUNTRIES}
-                        placeholder="e.g. India"
+                        placeholder={t.step1.countryPlaceholder}
                         inputClassName="w-full rounded-md border border-neutral-200 px-3.5 py-2.5 text-sm outline-none focus:border-neutral-900 transition-colors"
                       />
                     </div>
@@ -760,10 +754,10 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                   <div className="space-y-5">
                     <div>
                       <h2 className="font-serif text-xl sm:text-2xl font-medium tracking-tight text-neutral-900">
-                        What is your operational radius?
+                        {t.step2.heading}
                       </h2>
                       <p className="mt-1 text-xs text-neutral-500">
-                        Specify how far you can travel or dispatch assistance from {city || 'your base'}.
+                        {t.step2.sub(city)}
                       </p>
                     </div>
 
@@ -794,7 +788,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                             : 'border-neutral-200 text-neutral-700 hover:border-neutral-300'
                         }`}
                       >
-                        Custom Radius
+                        {t.step2.customRadius}
                       </button>
                     </div>
 
@@ -806,14 +800,14 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                             value={customRadius}
                             onChange={(e) => setCustomRadius(e.target.value)}
                             onBlur={() => setRadiusTouched(true)}
-                            placeholder="e.g. 35"
+                            placeholder={t.step2.customRadiusPlaceholder}
                             className="w-32 rounded-md border border-neutral-200 px-3.5 py-2.5 text-sm outline-none focus:border-neutral-900"
                           />
-                          <span className="text-xs font-medium text-neutral-600">Kilometers</span>
+                          <span className="text-xs font-medium text-neutral-600">{t.step2.kilometers}</span>
                         </div>
                         {radiusTouched && !radiusValid && (
                           <p className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-red-600">
-                            <AlertCircle size={12} /> Please enter a radius between {MIN_RADIUS_KM} and {MAX_RADIUS_KM} KM.
+                            <AlertCircle size={12} /> {t.step2.radiusRangeError(MIN_RADIUS_KM, MAX_RADIUS_KM)}
                           </p>
                         )}
                       </div>
@@ -830,7 +824,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                           />
                         </Suspense>
                         <p className="text-center text-[11px] text-neutral-500">
-                          {city || 'Base location'} · {radiusValid ? `${effectiveRadius} KM` : '—'} coverage radius
+                          {t.step2.coverageSummary(city, radiusValid ? `${effectiveRadius} KM` : '—')}
                         </p>
                       </div>
                     ) : (
@@ -839,7 +833,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
 
                     {serviceAreas.length > 0 && (
                       <div className="space-y-2">
-                        <p className="text-xs font-semibold text-neutral-700">Additional coverage zones:</p>
+                        <p className="text-xs font-semibold text-neutral-700">{t.step2.additionalZones}</p>
                         {serviceAreas.map((area) => (
                           <div
                             key={area.id}
@@ -847,7 +841,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                           >
                             <div>
                               <p className="text-xs font-semibold text-neutral-800">{area.name}</p>
-                              <p className="text-[11px] text-neutral-500">{area.radiusKm} KM radius</p>
+                              <p className="text-[11px] text-neutral-500">{t.step2.radiusLabel(area.radiusKm)}</p>
                             </div>
                             <button
                               type="button"
@@ -864,11 +858,11 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                     {addingArea ? (
                       <div className="space-y-3 rounded-md border border-neutral-200 p-4 bg-neutral-50/50">
                         <AutocompleteField
-                          label="Additional Service Zone"
+                          label={t.step2.additionalZoneLabel}
                           value={newAreaName}
                           onChange={setNewAreaName}
                           suggestions={suggestions.length ? suggestions : INDIAN_CITY_NAMES}
-                          placeholder="e.g. Navi Mumbai"
+                          placeholder={t.step2.newAreaPlaceholder}
                           inputClassName="w-full rounded-md border border-neutral-200 px-3.5 py-2.5 text-sm outline-none focus:border-neutral-900 bg-white"
                         />
                         <div className="flex flex-wrap gap-2">
@@ -894,14 +888,14 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                             disabled={!newAreaName.trim()}
                             className="flex-1 cursor-pointer rounded-md bg-neutral-900 py-2 text-xs font-semibold text-white disabled:opacity-40"
                           >
-                            Add Area
+                            {t.step2.addArea}
                           </button>
                           <button
                             type="button"
                             onClick={() => setAddingArea(false)}
                             className="cursor-pointer rounded-md border border-neutral-200 px-4 py-2 text-xs font-semibold text-neutral-600 hover:bg-neutral-100"
                           >
-                            Cancel
+                            {t.step2.cancel}
                           </button>
                         </div>
                       </div>
@@ -930,7 +924,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                           onClick={() => setAddingArea(true)}
                           className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-neutral-700 hover:text-neutral-900"
                         >
-                          <Plus size={14} /> Add another nearby area
+                          <Plus size={14} /> {t.step2.addAnotherArea}
                         </button>
                       </div>
                     )}
@@ -942,10 +936,10 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                   <div className="space-y-5">
                     <div>
                       <h2 className="font-serif text-xl sm:text-2xl font-medium tracking-tight text-neutral-900">
-                        When are you available to respond?
+                        {t.step3.heading}
                       </h2>
                       <p className="mt-1 text-xs text-neutral-500">
-                        Inform users and emergency dispatch when your service line is active.
+                        {t.step3.sub}
                       </p>
                     </div>
 
@@ -983,7 +977,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                                 : 'border-neutral-200 text-neutral-600'
                             }`}
                           >
-                            Same hours every day
+                            {t.step3.sameHoursEveryDay}
                           </button>
                           <button
                             type="button"
@@ -994,7 +988,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                                 : 'border-neutral-200 text-neutral-600'
                             }`}
                           >
-                            Custom per day
+                            {t.step3.customPerDay}
                           </button>
                         </div>
 
@@ -1006,7 +1000,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                               onChange={(e) => setSameHours((h) => ({ ...h, open: e.target.value }))}
                               className="rounded-md border border-neutral-200 px-3 py-2 text-xs outline-none focus:border-neutral-900"
                             />
-                            <span className="text-xs text-neutral-400">to</span>
+                            <span className="text-xs text-neutral-400">{t.step3.to}</span>
                             <input
                               type="time"
                               value={sameHours.close}
@@ -1035,7 +1029,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                                     {d.label.slice(0, 3)}
                                   </label>
                                   {hours.closed ? (
-                                    <span className="text-xs text-neutral-400">Closed</span>
+                                    <span className="text-xs text-neutral-400">{t.step3.closed}</span>
                                   ) : (
                                     <div className="flex items-center gap-2">
                                       <input
@@ -1049,7 +1043,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                                         }
                                         className="rounded-md border border-neutral-200 px-2 py-1 text-xs outline-none focus:border-neutral-900"
                                       />
-                                      <span className="text-neutral-400 text-xs">to</span>
+                                      <span className="text-neutral-400 text-xs">{t.step3.to}</span>
                                       <input
                                         type="time"
                                         value={hours.close}
@@ -1078,33 +1072,33 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                   <div className="space-y-4">
                     <div>
                       <h2 className="font-serif text-xl sm:text-2xl font-medium tracking-tight text-neutral-900">
-                        Provider &amp; Contact Details
+                        {t.step4.heading}
                       </h2>
                       <p className="mt-1 text-xs text-neutral-500">
-                        Used solely for internal vetting and private dispatch routing.
+                        {t.step4.sub}
                       </p>
                     </div>
 
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-neutral-700">
-                        Business / Provider Name *
+                        {t.step4.businessNameLabel}
                       </label>
                       <input
                         value={label}
                         onChange={(e) => setLabel(e.target.value)}
-                        placeholder={serviceMeta.placeholder || 'e.g. Apex 24x7 Roadside Assistance'}
+                        placeholder={serviceMeta.placeholder || t.step4.businessNamePlaceholder}
                         className="w-full rounded-md border border-neutral-200 px-3.5 py-2.5 text-sm outline-none focus:border-neutral-900"
                       />
                     </div>
 
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-neutral-700">
-                        Official Contact Mobile *
+                        {t.step4.contactMobileLabel}
                       </label>
                       <PhoneInputWithCountry value={phone} onChange={setPhone} />
                       <p className="mt-1 flex items-start gap-1.5 text-[11px] text-neutral-500">
                         <Info size={12} className="mt-0.5 shrink-0" />
-                        Our team will verify this number. Customers only see a masked routing bridge.
+                        {t.step4.verifyNote}
                       </p>
                     </div>
 
@@ -1116,21 +1110,21 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                           onChange={(e) => setWhatsappSame(e.target.checked)}
                           className="h-3.5 w-3.5 rounded border-neutral-300"
                         />
-                        WhatsApp number is same as contact mobile
+                        {t.step4.whatsappSameLabel}
                       </label>
                       {!whatsappSame && (
-                        <PhoneInputWithCountry value={whatsapp} onChange={setWhatsapp} placeholder="10-digit WhatsApp number" />
+                        <PhoneInputWithCountry value={whatsapp} onChange={setWhatsapp} placeholder={t.step4.whatsappPlaceholder} />
                       )}
                       {!whatsappValid && (
                         <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-red-600">
-                          <AlertCircle size={11} /> Enter a valid 10-digit WhatsApp number.
+                          <AlertCircle size={11} /> {t.step4.whatsappInvalid}
                         </p>
                       )}
                     </div>
 
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-neutral-700">
-                        Business Email <span className="font-normal text-neutral-400">(optional)</span>
+                        {t.step4.emailLabel} <span className="font-normal text-neutral-400">{t.step0.optional}</span>
                       </label>
                       <div className="relative">
                         <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
@@ -1139,7 +1133,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           onBlur={() => setTouchedEmail(true)}
-                          placeholder="support@yourcompany.com"
+                          placeholder={t.step4.emailPlaceholder}
                           className={`w-full rounded-md border py-2.5 pl-10 pr-3.5 text-sm outline-none ${
                             touchedEmail && !emailValid
                               ? 'border-red-400 focus:border-red-500'
@@ -1149,14 +1143,14 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                       </div>
                       {touchedEmail && !emailValid && (
                         <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-red-600">
-                          <AlertCircle size={11} /> Enter a valid email address.
+                          <AlertCircle size={11} /> {t.step4.emailInvalid}
                         </p>
                       )}
                     </div>
 
                     <div>
                       <label className="mb-1.5 block text-xs font-semibold text-neutral-700">
-                        Experience in service <span className="font-normal text-neutral-400">(optional)</span>
+                        {t.step4.experienceLabel} <span className="font-normal text-neutral-400">{t.step0.optional}</span>
                       </label>
                       <div className="flex flex-wrap gap-1.5">
                         {EXPERIENCE_OPTIONS.map((opt) => (
@@ -1178,13 +1172,13 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
 
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-neutral-700">
-                        Additional details or license info <span className="font-normal text-neutral-400">(optional)</span>
+                        {t.step4.notesLabel} <span className="font-normal text-neutral-400">{t.step0.optional}</span>
                       </label>
                       <textarea
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         rows={2}
-                        placeholder="Fleet size, vehicle types, license info, certifications..."
+                        placeholder={t.step4.notesPlaceholder}
                         className="w-full resize-none rounded-md border border-neutral-200 px-3.5 py-2.5 text-sm outline-none focus:border-neutral-900"
                       />
                     </div>
@@ -1196,10 +1190,10 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                   <div className="space-y-5">
                     <div>
                       <h2 className="font-serif text-xl sm:text-2xl font-medium tracking-tight text-neutral-900">
-                        Review Your Partner Profile
+                        {t.step5.heading}
                       </h2>
                       <p className="mt-1 text-xs text-neutral-500">
-                        Please confirm your details before submitting for partner onboarding.
+                        {t.step5.sub}
                       </p>
                     </div>
 
@@ -1212,7 +1206,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                           <serviceMeta.Icon size={20} />
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-neutral-900">{label || 'Provider Name'}</p>
+                          <p className="text-sm font-semibold text-neutral-900">{label || t.step5.providerNameFallback}</p>
                           <p className="text-xs text-neutral-500">{service.label}</p>
                         </div>
                       </div>
@@ -1220,24 +1214,24 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                       <div className="border-t border-neutral-200/60 pt-3 space-y-2 text-xs text-neutral-700">
                         <p className="flex items-center gap-2">
                           <MapPin size={14} className="text-neutral-400" />
-                          <span>Base: <strong className="text-neutral-900">{city}{state ? `, ${state}` : ''}</strong></span>
+                          <span>{t.step5.base} <strong className="text-neutral-900">{city}{state ? `, ${state}` : ''}</strong></span>
                         </p>
                         <p className="flex items-center gap-2">
                           <LocateFixed size={14} className="text-neutral-400" />
-                          <span>Dispatch Radius: <strong className="text-neutral-900">{effectiveRadius} KM</strong> {serviceAreas.length ? ` (+${serviceAreas.length} extra area${serviceAreas.length > 1 ? 's' : ''})` : ''}</span>
+                          <span>{t.step5.dispatchRadius} <strong className="text-neutral-900">{effectiveRadius} KM</strong> {serviceAreas.length ? t.step5.extraAreasSuffix(serviceAreas.length) : ''}</span>
                         </p>
                         <p className="flex items-center gap-2">
                           <Clock size={14} className="text-neutral-400" />
-                          <span>Availability: <strong className="text-neutral-900">{availabilitySummary}</strong></span>
+                          <span>{t.step5.availabilityLabel} <strong className="text-neutral-900">{availabilitySummary}</strong></span>
                         </p>
                         <p className="flex items-center gap-2">
                           <Phone size={14} className="text-neutral-400" />
-                          <span>Phone: <strong className="text-neutral-900">{phone}</strong> (Calls routed through masked bridge)</span>
+                          <span>{t.step5.phoneLabel} <strong className="text-neutral-900">{phone}</strong> {t.step5.phoneSuffix}</span>
                         </p>
                         {email && (
                           <p className="flex items-center gap-2">
                             <Mail size={14} className="text-neutral-400" />
-                            <span>Email: <strong className="text-neutral-900">{email}</strong></span>
+                            <span>{t.step5.emailLabel} <strong className="text-neutral-900">{email}</strong></span>
                           </p>
                         )}
                       </div>
@@ -1251,16 +1245,16 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
 
                     <FlowButton tone="dark" size="md" fullWidth loading={submitting} onClick={handleSubmit}>
                       {submitting ? (
-                        'Submitting Application…'
+                        t.step5.submitting
                       ) : (
                         <>
                           <ShieldCheck size={15} />
-                          Submit Partner Application
+                          {t.step5.submitCta}
                         </>
                       )}
                     </FlowButton>
                     <p className="text-center text-[11px] text-neutral-500">
-                      By submitting, you agree to receive verification calls from the RepiQR team. No fee required.
+                      {t.step5.agreementNote}
                     </p>
                   </div>
                 )}
@@ -1273,10 +1267,10 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                       onClick={goBack}
                       className="cursor-pointer rounded-md border border-neutral-200 px-4 py-2.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
                     >
-                      Back
+                      {t.nav.back}
                     </button>
                     <FlowButton tone="dark" size="sm" className="flex-1" onClick={goNext}>
-                      Continue
+                      {t.nav.continue}
                     </FlowButton>
                   </div>
                 )}
@@ -1287,7 +1281,7 @@ export default function JoinUsPage({ onBack, initialServiceType }: JoinUsPagePro
                       onClick={() => setStep(0)}
                       className="cursor-pointer text-xs font-medium text-neutral-500 hover:text-neutral-900 underline underline-offset-4"
                     >
-                      Edit details from start
+                      {t.nav.editFromStart}
                     </button>
                   </div>
                 )}

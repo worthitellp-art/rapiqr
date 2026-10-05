@@ -86,7 +86,10 @@ const MSG91_TEMPLATES = {
   },
 
   EMERGENCY_ALERT: {
-    name: 'rapi_urgent_alert',
+    // Uses rapi_tag_scan by default because it is approved as UTILITY.
+    // rapi_urgent_alert is currently categorized as MARKETING in MSG91, which Meta
+    // drops/restricts under marketing message fatigue limits.
+    name: process.env.MSG91_WHATSAPP_URGENT_TEMPLATE || 'rapi_tag_scan',
     audience: 'owner',
     variables: ['item_name', 'message'],
     buttonVariable: 'session',
@@ -97,7 +100,7 @@ const MSG91_TEMPLATES = {
   // Emergency contacts get the same urgent template. Their button opens the
   // RepiQR dashboard (they sign in to see it); there is no thread of their own.
   EMERGENCY_CONTACT_ALERT: {
-    name: 'rapi_urgent_alert',
+    name: process.env.MSG91_WHATSAPP_URGENT_TEMPLATE || 'rapi_tag_scan',
     audience: 'emergency_contact',
     variables: ['item_name', 'message'],
     buttonVariable: 'session',
@@ -106,7 +109,7 @@ const MSG91_TEMPLATES = {
   },
 
   CHAT_STARTED: {
-    name: 'rapi_new_chat',
+    name: process.env.MSG91_WHATSAPP_CHAT_TEMPLATE || 'rapi_tag_scan',
     audience: 'owner',
     variables: ['item_name', 'message'],
     buttonVariable: 'session',
@@ -115,7 +118,7 @@ const MSG91_TEMPLATES = {
   },
 
   CHAT_MESSAGE: {
-    name: 'rapi_new_chat',
+    name: process.env.MSG91_WHATSAPP_CHAT_TEMPLATE || 'rapi_tag_scan',
     audience: 'owner',
     variables: ['item_name', 'message'],
     buttonVariable: 'session',

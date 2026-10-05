@@ -61,6 +61,9 @@ export default function AccountSettingsPanel({
         isAdmin={isAdmin}
       />
 
+      {/* PASSWORD CHANGE & PHONE OTP RESET SECTION */}
+      <PasswordSecuritySection profile={profile} showToast={showToast} />
+
       {/* SECURITY CONTROLS */}
       <TwoFactorSection profile={profile} refreshProfile={refreshProfile} showToast={showToast} />
       <PushNotificationsSection showToast={showToast} />
@@ -92,10 +95,8 @@ function UnifiedAccountForm({
   const [fullName, setFullName] = useState(profile?.fullName || '');
   const [email, setEmail] = useState(profile?.email || '');
 
-  // Password fields (optional)
+  // Password confirmation for email changes
   const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
 
   // Status & feedback
   const [saving, setSaving] = useState(false);
@@ -206,9 +207,8 @@ function UnifiedAccountForm({
 
     const nameChanged = fullName.trim() !== (profile?.fullName || '');
     const emailChanged = email.trim() !== (profile?.email || '');
-    const wantsPasswordChange = !!newPassword || !!confirmPassword;
 
-    if (!nameChanged && !emailChanged && !wantsPasswordChange) {
+    if (!nameChanged && !emailChanged) {
       setMsg({ tone: 'success', text: 'No changes detected.' });
       return;
     }
@@ -226,21 +226,6 @@ function UnifiedAccountForm({
       }
       if (!isAdmin && !currentPassword) {
         setMsg({ tone: 'error', text: 'Please enter your current password to confirm email change.' });
-        return;
-      }
-    }
-
-    if (wantsPasswordChange) {
-      if (!currentPassword) {
-        setMsg({ tone: 'error', text: 'Please enter your current password to set a new password.' });
-        return;
-      }
-      if (newPassword.length < 6) {
-        setMsg({ tone: 'error', text: 'New password must be at least 6 characters long.' });
-        return;
-      }
-      if (newPassword !== confirmPassword) {
-        setMsg({ tone: 'error', text: 'New password and confirmation do not match.' });
         return;
       }
     }
@@ -263,23 +248,15 @@ function UnifiedAccountForm({
           localStorage.setItem('namoqr-token', res.token);
         }
         updatesDone.push('email');
-      }
-
-      // 3. Update Password if specified
-      if (wantsPasswordChange) {
-        await apiClient.auth.changePassword(currentPassword, newPassword);
-        updatesDone.push('password');
         setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
       }
 
       await refreshProfile();
       setMsg({
         tone: 'success',
-        text: `Account details updated successfully (${updatesDone.join(', ')}).`,
+        text: `Profile updated successfully (${updatesDone.join(', ')}).`,
       });
-      showToast('Account details saved successfully');
+      showToast('Profile details saved successfully');
     } catch (err: any) {
       setMsg({ tone: 'error', text: err?.message || 'Failed to save account changes.' });
     } finally {
@@ -445,58 +422,27 @@ function UnifiedAccountForm({
           )}
         </div>
 
-        {/* ROW 3: SECURITY & PASSWORD (INTEGRATED SINGLE FORM) */}
-        <div className="border-t border-[var(--fx-border)] pt-5 space-y-4">
-          <div>
-            <h3 className="font-bold text-sm text-[var(--fx-ink)] flex items-center gap-2">
-              <Lock size={15} /> Password &amp; Authorization
-            </h3>
-            <p className="text-xs text-[var(--fx-ink-2)] mt-0.5">
-              Fill these fields only if you want to change your password or verify an email change. Otherwise leave blank.
-            </p>
+        {/* EMAIL CHANGE CONFIRMATION (SHOWN ONLY IF EMAIL CHANGED) */}
+        {email.trim() !== (profile?.email || '') && !isAdmin && (
+          <div className="border-t border-[var(--fx-border)] pt-4 space-y-2 animate-fade-in max-w-sm">
+            <label className={labelCls}>Confirm Current Password (Required to update email)</label>
+            <input
+              type="password"
+              className={inputCls}
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Enter current password"
+            />
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-            <div>
-              <label className={labelCls}>Current Password</label>
-              <input
-                type="password"
-                className={inputCls}
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Current password"
-              />
-            </div>
-            <div>
-              <label className={labelCls}>New Password</label>
-              <input
-                type="password"
-                className={inputCls}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Min 6 characters"
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Confirm New Password</label>
-              <input
-                type="password"
-                className={inputCls}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Re-type new password"
-              />
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* FEEDBACK BANNER */}
         {msg && <Banner tone={msg.tone} message={msg.text} />}
 
-        {/* SINGLE UNIFIED SAVE BUTTON */}
+        {/* SINGLE SAVE BUTTON */}
         <div className="border-t border-[var(--fx-border)] pt-5 flex items-center justify-between">
           <p className="text-[11px] text-[var(--fx-ink-2)]">
-            All profile, email, and password changes are committed together.
+            Account name, login email, and linked phone number.
           </p>
           <button
             type="submit"
@@ -504,9 +450,385 @@ function UnifiedAccountForm({
             className="px-6 py-2.5 rounded-lg bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-2 shadow-xs transition-all"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            <span>Save Changes</span>
+            <span>Save Profile</span>
           </button>
         </div>
+      </form>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * PASSWORD CHANGE & PHONE OTP RESET SECTION
+ * ────────────────────────────────────────────────────────────────────────── */
+function PasswordSecuritySection({ profile, showToast }: { profile: any; showToast: (msg: string) => void }) {
+  const [tab, setTab] = useState<'otp' | 'forgot' | 'password'>('otp');
+  const [phone, setPhone] = useState(profile?.phoneNumber || '');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const [countdown, setCountdown] = useState(0);
+
+  useEffect(() => {
+    if (profile?.phoneNumber && !phone) {
+      setPhone(profile.phoneNumber);
+    }
+  }, [profile?.phoneNumber, phone]);
+
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const t = setInterval(() => setCountdown((c) => (c > 1 ? c - 1 : 0)), 1000);
+    return () => clearInterval(t);
+  }, [countdown]);
+
+  const handleSendOtp = async (targetPhone: string) => {
+    const clean = (targetPhone || '').replace(/\D/g, '');
+    if (clean.length < 10) {
+      setMsg({ tone: 'error', text: 'Please enter a valid 10-digit mobile number.' });
+      return;
+    }
+    setLoading(true);
+    setMsg(null);
+    try {
+      const res = await apiClient.auth.sendPasswordResetPhoneOtp(targetPhone);
+      if (res?.success) {
+        setOtpSent(true);
+        setCountdown(30);
+        setMsg({ tone: 'success', text: `OTP verification code sent to ${targetPhone} via SMS & WhatsApp.` });
+        showToast(`Verification code sent to ${targetPhone}`);
+      } else {
+        setMsg({ tone: 'error', text: res?.error || 'Failed to send OTP code. Please try again.' });
+      }
+    } catch (err: any) {
+      setMsg({ tone: 'error', text: err?.message || 'Failed to send OTP code.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyAndUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMsg(null);
+
+    if (newPassword.length < 6) {
+      setMsg({ tone: 'error', text: 'New password must be at least 6 characters long.' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setMsg({ tone: 'error', text: 'New password and confirmation password do not match.' });
+      return;
+    }
+
+    if (tab === 'otp' || tab === 'forgot') {
+      const targetPhone = (tab === 'otp' ? (profile?.phoneNumber || phone) : phone).trim();
+      if (!targetPhone) {
+        setMsg({ tone: 'error', text: 'Please enter a valid mobile number.' });
+        return;
+      }
+      if (!otpCode.trim()) {
+        setMsg({ tone: 'error', text: 'Please enter the 4-digit verification code.' });
+        return;
+      }
+      setLoading(true);
+      try {
+        const res = await apiClient.auth.resetPasswordWithPhoneOtp({
+          phoneNumber: targetPhone,
+          code: otpCode.trim(),
+          newPassword,
+        });
+        if (res?.success) {
+          setMsg({ tone: 'success', text: 'Password successfully updated! Your account is secured.' });
+          showToast('Password updated successfully');
+          setOtpCode('');
+          setNewPassword('');
+          setConfirmPassword('');
+          setOtpSent(false);
+        } else {
+          setMsg({ tone: 'error', text: res?.error || 'Invalid or expired OTP code.' });
+        }
+      } catch (err: any) {
+        setMsg({ tone: 'error', text: err?.message || 'Failed to reset password.' });
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // standard current password change
+      if (!currentPassword) {
+        setMsg({ tone: 'error', text: 'Please enter your current password.' });
+        return;
+      }
+      setLoading(true);
+      try {
+        const res = await apiClient.auth.changePassword(currentPassword, newPassword);
+        if (res?.success) {
+          setMsg({ tone: 'success', text: 'Password updated successfully.' });
+          showToast('Password updated successfully');
+          setCurrentPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+        } else {
+          setMsg({ tone: 'error', text: res?.error || 'Failed to update password.' });
+        }
+      } catch (err: any) {
+        setMsg({ tone: 'error', text: err?.message || 'Incorrect current password or update failed.' });
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  return (
+    <div className={cardCls}>
+      <div className="flex items-center justify-between border-b border-[var(--fx-border)] pb-4">
+        <div>
+          <h2 className="font-bold text-base text-[var(--fx-ink)] flex items-center gap-2">
+            <KeyRound size={17} className="text-[var(--fx-accent)]" /> Password &amp; Security
+          </h2>
+          <p className="text-xs text-[var(--fx-ink-2)] mt-0.5">
+            Reset or change your password with instant mobile OTP verification or current password.
+          </p>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-2 border-b border-[var(--fx-border)] pb-3">
+        <button
+          type="button"
+          onClick={() => { setTab('otp'); setMsg(null); setOtpSent(false); }}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+            tab === 'otp'
+              ? 'bg-[var(--fx-ink)] text-white shadow-xs'
+              : 'border border-[var(--fx-border)] text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]'
+          }`}
+        >
+          Verify via Phone OTP
+        </button>
+        <button
+          type="button"
+          onClick={() => { setTab('forgot'); setMsg(null); setOtpSent(false); }}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+            tab === 'forgot'
+              ? 'bg-[var(--fx-ink)] text-white shadow-xs'
+              : 'border border-[var(--fx-border)] text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]'
+          }`}
+        >
+          Forgot Password (Phone Reset)
+        </button>
+        <button
+          type="button"
+          onClick={() => { setTab('password'); setMsg(null); }}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+            tab === 'password'
+              ? 'bg-[var(--fx-ink)] text-white shadow-xs'
+              : 'border border-[var(--fx-border)] text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]'
+          }`}
+        >
+          Use Current Password
+        </button>
+      </div>
+
+      {/* Form Content */}
+      <form onSubmit={handleVerifyAndUpdatePassword} className="space-y-4 pt-1">
+        {/* TAB 1: PHONE OTP VERIFICATION */}
+        {tab === 'otp' && (
+          <div className="space-y-4">
+            <div className="rounded-lg bg-[var(--fx-canvas)] p-3.5 border border-[var(--fx-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-bold text-[var(--fx-ink)] flex items-center gap-1.5">
+                  <Smartphone size={14} className="text-[var(--fx-accent)]" /> Registered Phone Number
+                </span>
+                <p className="font-mono text-sm font-bold text-[var(--fx-ink)] mt-0.5">
+                  {profile?.phoneNumber || phone || 'No phone attached yet'}
+                </p>
+                <p className="text-[11px] text-[var(--fx-ink-2)] mt-0.5">
+                  We will send a one-time code to verify your phone before setting your new password.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {!otpSent ? (
+                  <button
+                    type="button"
+                    onClick={() => handleSendOtp(phone || profile?.phoneNumber || '')}
+                    disabled={loading || !(phone || profile?.phoneNumber)}
+                    className="px-4 py-2 rounded-lg bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5 shadow-xs"
+                  >
+                    {loading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={14} />}
+                    <span>Send Verification OTP</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleSendOtp(phone || profile?.phoneNumber || '')}
+                    disabled={loading || countdown > 0}
+                    className="px-3 py-1.5 rounded-lg border border-[var(--fx-border)] bg-white text-xs font-semibold text-[var(--fx-ink)] hover:bg-neutral-50 disabled:opacity-50 cursor-pointer"
+                  >
+                    {countdown > 0 ? `Resend in ${countdown}s` : 'Resend Code'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {otpSent && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2 animate-fade-in">
+                <div>
+                  <label className={labelCls}>Verification Code (OTP)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Enter code"
+                    className={`${inputCls} font-mono tracking-widest`}
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>New Password</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Min 6 characters"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter password"
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 2: FORGOT PASSWORD (PHONE NUMBER RESET) */}
+        {tab === 'forgot' && (
+          <div className="space-y-4">
+            <p className="text-xs text-[var(--fx-ink-2)]">
+              Enter your mobile phone number to verify identity and reset your password right now without knowing your old password.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 max-w-md">
+              <div className="flex-1">
+                <PhoneInputWithCountry
+                  value={phone}
+                  onChange={(val) => { setPhone(val); setMsg(null); }}
+                  placeholder="10-digit mobile number"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSendOtp(phone)}
+                disabled={loading || !phone || countdown > 0}
+                className="px-4 py-2.5 rounded-lg bg-[var(--fx-ink)] hover:bg-black text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+              >
+                {loading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={14} />}
+                <span>{countdown > 0 ? `Wait ${countdown}s` : otpSent ? 'Resend OTP' : 'Send Reset Code'}</span>
+              </button>
+            </div>
+
+            {otpSent && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2 animate-fade-in">
+                <div>
+                  <label className={labelCls}>Verification Code (OTP)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Enter code"
+                    className={`${inputCls} font-mono tracking-widest`}
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>New Password</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Min 6 characters"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter password"
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: CURRENT PASSWORD */}
+        {tab === 'password' && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div>
+              <label className={labelCls}>Current Password</label>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Current password"
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>New Password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Min 6 characters"
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-type new password"
+                className={inputCls}
+              />
+            </div>
+          </div>
+        )}
+
+        {msg && <Banner tone={msg.tone} message={msg.text} />}
+
+        {((tab === 'password') || (otpSent && (tab === 'otp' || tab === 'forgot'))) && (
+          <div className="pt-2 flex justify-end">
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-2.5 rounded-lg bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-2 shadow-xs transition-all"
+            >
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
+              <span>{tab === 'forgot' ? 'Reset Password' : 'Confirm & Update Password'}</span>
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

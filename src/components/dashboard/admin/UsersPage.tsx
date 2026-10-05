@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Search, Mail, Phone, ShieldCheck, KeyRound, ShieldOff, Loader2, X,
   Users as UsersIcon, Trash2, Check, AlertTriangle, Plus, Sparkles, Filter, RefreshCw
@@ -15,8 +15,6 @@ export interface AdminUserRow {
   full_name: string;
   phone_number: string | null;
   role: string;
-  subscription_plan: string;
-  is_subscribed: boolean;
   created_at: string;
   stickerCount: number;
   metadata?: { twoFactor?: { enabled?: boolean } };

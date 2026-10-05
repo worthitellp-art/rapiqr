@@ -19,6 +19,34 @@ class MessageModel {
    */
   static async record({ channel, to, event, status, sid = null, error = null, body = null }) {
     try {
+      // Defensive deduplication: if the exact same message send was already recorded
+      // within the last 3 seconds (e.g. concurrent callbacks or stacked notifications),
+      // update the existing entry rather than creating a duplicate log entry.
+      if (to && event) {
+        const recentWindow = new Date(Date.now() - 3000);
+        const existing = await SmsMessage.findOne({
+          channel,
+          to_number: to,
+          event,
+          created_at: { $gte: recentWindow },
+        }).sort({ created_at: -1 });
+
+        if (existing) {
+          await SmsMessage.updateOne(
+            { _id: existing._id },
+            {
+              $set: {
+                status: status || existing.status,
+                provider_sid: sid || existing.provider_sid,
+                error: error || existing.error,
+                body_preview: body ? String(body).slice(0, 160) : existing.body_preview,
+              },
+            }
+          );
+          return;
+        }
+      }
+
       await SmsMessage.create({
         channel,
         to_number: to || null,

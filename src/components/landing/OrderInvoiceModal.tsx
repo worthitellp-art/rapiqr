@@ -9,6 +9,8 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { OrderInvoice } from '../../types/invoice';
+import { useLanguage } from '../../context/LanguageContext';
+import { orderTranslations } from '../../i18n/orderTranslations';
 
 interface OrderInvoiceModalProps {
   isOpen: boolean;
@@ -23,6 +25,9 @@ export default function OrderInvoiceModal({
   invoice,
   onPrintInvoice,
 }: OrderInvoiceModalProps) {
+  const { language } = useLanguage();
+  const t = orderTranslations[language].invoiceModal;
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -79,7 +84,7 @@ export default function OrderInvoiceModal({
         <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/90 px-5 py-3.5 sm:px-6">
           <div className="flex items-center gap-2 text-sm font-black text-slate-900">
             <FileText size={18} className="text-[#111111]" />
-            <span id="invoice-modal-title">Tax Invoice Preview</span>
+            <span id="invoice-modal-title">{t.title}</span>
             <span className="hidden sm:inline-block rounded-sm bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-900">
               #{invoiceNumber}
             </span>
@@ -90,16 +95,16 @@ export default function OrderInvoiceModal({
               type="button"
               onClick={onPrintInvoice}
               className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-800 shadow-xs"
-              title="Print or save as PDF"
+              title={t.printTitle}
             >
               <Printer size={14} className="text-white" />
-              <span>Print / PDF</span>
+              <span>{t.printButton}</span>
             </button>
             <button
               type="button"
               onClick={onClose}
               className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-slate-200/80 text-slate-600 transition-colors hover:bg-slate-300 hover:text-slate-900"
-              aria-label="Close invoice preview"
+              aria-label={t.closeAria}
             >
               <X size={17} />
             </button>
@@ -116,7 +121,7 @@ export default function OrderInvoiceModal({
                   RAPI<span className="text-[#111111]">QR</span>
                 </span>
                 <span className="rounded-sm bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-800 tracking-wider">
-                  OFFICIAL TAX INVOICE
+                  {t.officialBadge}
                 </span>
               </div>
               <div className="mt-1 font-bold text-slate-800">{seller.companyName}</div>
@@ -130,16 +135,16 @@ export default function OrderInvoiceModal({
 
             <div className="sm:text-right space-y-1">
               <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Invoice Number
+                {t.invoiceNumberLabel}
               </div>
               <div className="text-base sm:text-lg font-black font-mono text-slate-950">
                 {invoiceNumber}
               </div>
               <div className="text-xs text-slate-600">
-                Invoice Date: <strong className="text-slate-900">{issueDate}</strong>
+                {t.invoiceDateLabel} <strong className="text-slate-900">{issueDate}</strong>
               </div>
               <div className="text-xs text-slate-500">
-                Order ID: <strong className="font-mono text-slate-700">{orderReferenceId}</strong>
+                {t.orderIdLabel} <strong className="font-mono text-slate-700">{orderReferenceId}</strong>
               </div>
             </div>
           </div>
@@ -148,7 +153,7 @@ export default function OrderInvoiceModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4 space-y-1">
               <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                Billed &amp; Shipped To
+                {t.billedShippedTo}
               </div>
               <div className="font-extrabold text-slate-900">{customerName}</div>
               <div className="text-xs text-slate-600 leading-relaxed">
@@ -157,35 +162,35 @@ export default function OrderInvoiceModal({
                 {shippingAddress.city}, {shippingAddress.state} - {shippingAddress.pincode}
               </div>
               <div className="pt-1 text-[11px] text-slate-500">
-                Phone: <strong className="text-slate-700">{customerPhone}</strong>
+                {t.phoneLabel} <strong className="text-slate-700">{customerPhone}</strong>
                 <br />
-                Email: <strong className="text-slate-700">{customerEmail}</strong>
+                {t.emailLabel} <strong className="text-slate-700">{customerEmail}</strong>
               </div>
             </div>
 
             <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4 space-y-1">
               <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                Order &amp; Payment Status
+                {t.orderPaymentStatus}
               </div>
               <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-extrabold pt-0.5">
                 <CheckCircle2 size={14} className="text-emerald-600" />
-                <span>Payment Status: {paymentStatus}</span>
+                <span>{t.paymentStatusPrefix}{paymentStatus}</span>
               </div>
               <div className="text-xs text-slate-600">
-                Payment Mode: <strong className="text-slate-900">{paymentMethod}</strong>
+                {t.paymentModeLabel} <strong className="text-slate-900">{paymentMethod}</strong>
               </div>
               {paymentTransactionId && (
                 <div className="text-[11px] text-slate-500 font-mono">
-                  Gateway Ref: {paymentTransactionId}
+                  {t.gatewayRefLabel} {paymentTransactionId}
                 </div>
               )}
               <div className="text-[11px] text-slate-500">
-                Fulfilled via:{' '}
+                {t.fulfilledViaLabel}{' '}
                 <strong className="text-slate-700">
-                  {deliveryType === 'express' ? 'Express Priority (24-48 hrs)' : 'Standard Delivery'}
+                  {deliveryType === 'express' ? t.expressPriority : t.standardDelivery}
                 </strong>
               </div>
-              <div className="text-[11px] text-slate-400">Order Placed: {orderTimestamp}</div>
+              <div className="text-[11px] text-slate-400">{t.orderPlacedLabel} {orderTimestamp}</div>
             </div>
           </div>
 
@@ -195,10 +200,10 @@ export default function OrderInvoiceModal({
               <thead>
                 <tr className="bg-slate-900 text-white text-[11px] uppercase tracking-wider">
                   <th className="py-2.5 px-3 w-10 text-center">#</th>
-                  <th className="py-2.5 px-3">Item Description</th>
-                  <th className="py-2.5 px-3 text-center w-14">Qty</th>
-                  <th className="py-2.5 px-3 text-right w-24">Unit Rate</th>
-                  <th className="py-2.5 px-3 text-right w-28">Amount (₹)</th>
+                  <th className="py-2.5 px-3">{t.itemDescriptionHeader}</th>
+                  <th className="py-2.5 px-3 text-center w-14">{t.qtyHeader}</th>
+                  <th className="py-2.5 px-3 text-right w-24">{t.unitRateHeader}</th>
+                  <th className="py-2.5 px-3 text-right w-28">{t.amountHeader}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-xs">
@@ -210,7 +215,7 @@ export default function OrderInvoiceModal({
                     <td className="py-2.5 px-3">
                       <div className="font-extrabold text-slate-900">{item.name}</div>
                       <div className="text-[10px] text-slate-500 font-mono">
-                        HSN/SAC: {item.hsnSacCode}
+                        {t.hsnSacLabel} {item.hsnSacCode}
                       </div>
                     </td>
                     <td className="py-2.5 px-3 text-center font-bold text-slate-800">
@@ -233,43 +238,42 @@ export default function OrderInvoiceModal({
             <div className="text-[11px] text-slate-500 space-y-1 max-w-sm">
               <div className="flex items-center gap-1.5 font-bold text-slate-700">
                 <ShieldCheck size={14} className="text-emerald-600" />
-                <span>3-Year 3M Weatherproof Warranty Guarantee</span>
+                <span>{t.warrantyTitle}</span>
               </div>
               <p>
-                Tags replaced free of charge for any sun fading, water damage, or adhesion failure
-                under normal usage conditions.
+                {t.warrantyDescription}
               </p>
             </div>
 
             <div className="w-full sm:w-72 space-y-1.5 rounded-lg bg-slate-50 p-4 border border-slate-200 text-xs">
               <div className="flex justify-between text-slate-600">
-                <span>Taxable Base:</span>
+                <span>{t.taxableBaseLabel}</span>
                 <span className="font-semibold text-slate-800">
                   ₹{taxBreakdown.taxableSubtotal.toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>CGST (9%):</span>
+                <span>{t.cgstLabel}</span>
                 <span className="font-semibold text-slate-800">
                   ₹{taxBreakdown.centralGstAmount.toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>SGST (9%):</span>
+                <span>{t.sgstLabel}</span>
                 <span className="font-semibold text-slate-800">
                   ₹{taxBreakdown.stateGstAmount.toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>Shipping Fee:</span>
+                <span>{t.shippingFeeLabel}</span>
                 <span className="font-semibold text-slate-800">
                   {taxBreakdown.deliveryFee === 0
-                    ? 'FREE'
+                    ? t.free
                     : `₹${taxBreakdown.deliveryFee.toFixed(2)}`}
                 </span>
               </div>
               <div className="flex justify-between border-t border-slate-300 pt-2 text-sm font-black text-slate-950">
-                <span>Total Amount Paid:</span>
+                <span>{t.totalAmountPaidLabel}</span>
                 <span className="text-[#111111]">₹{taxBreakdown.grandTotal.toFixed(2)}</span>
               </div>
             </div>
@@ -277,7 +281,7 @@ export default function OrderInvoiceModal({
 
           {/* Digital Signature Disclaimer */}
           <div className="border-t border-dashed border-slate-300 pt-4 text-center text-[10px] text-slate-400">
-            This is a computer-generated tax invoice and requires no physical signature. Support:{' '}
+            {t.computerGeneratedNotice}{' '}
             <span className="font-semibold text-slate-600">{seller.supportEmail}</span>
           </div>
         </div>
@@ -289,7 +293,7 @@ export default function OrderInvoiceModal({
             onClick={onClose}
             className="cursor-pointer rounded-md border border-gray-300 hover:border-black bg-white hover:bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-700 transition-colors"
           >
-            Close
+            {t.closeButton}
           </button>
           <button
             type="button"
@@ -297,7 +301,7 @@ export default function OrderInvoiceModal({
             className="flex cursor-pointer items-center gap-1.5 rounded-md bg-white hover:bg-gray-50 border border-gray-300 hover:border-black px-4 py-2 text-xs font-semibold text-black transition-colors shadow-xs"
           >
             <Download size={14} />
-            <span>Download / Print Invoice</span>
+            <span>{t.downloadPrintButton}</span>
           </button>
         </div>
       </div>

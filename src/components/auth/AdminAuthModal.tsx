@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { X, ShieldAlert, ArrowRight, Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
+import { authTranslations } from '../../i18n/authTranslations';
 
 interface AdminAuthModalProps {
   isOpen: boolean;
@@ -15,6 +17,8 @@ interface AdminAuthModalProps {
  */
 export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuthModalProps) {
   const { adminLogin } = useAuth();
+  const { language } = useLanguage();
+  const t = authTranslations[language].admin;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,7 +35,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
     setErrorMessage(null);
 
     if (!email.trim() || !password) {
-      setErrorMessage('Enter the admin email and password.');
+      setErrorMessage(t.errors.missingFields);
       return;
     }
 
@@ -39,7 +43,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
     try {
       const result = await adminLogin(email, password);
       if (!result.success) {
-        setErrorMessage(result.error || 'Incorrect email or password.');
+        setErrorMessage(result.error || t.errors.incorrectCredentials);
         return;
       }
       setPassword('');
@@ -62,7 +66,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
         <button
           onClick={onClose}
           className="absolute top-5 right-5 w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
-          aria-label="Close modal"
+          aria-label={t.closeModalAriaLabel}
         >
           <X size={18} />
         </button>
@@ -71,8 +75,8 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
           <div className="w-13 h-13 rounded-2xl bg-[#F5F5F5] border border-[#111111]/40 text-[#111111] flex items-center justify-center mx-auto mb-3.5">
             <ShieldAlert size={26} />
           </div>
-          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Admin Access</h2>
-          <p className="mt-1.5 text-xs text-slate-500">Sign in with the admin email and password.</p>
+          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">{t.title}</h2>
+          <p className="mt-1.5 text-xs text-slate-500">{t.subtitle}</p>
         </div>
 
         {errorMessage && (
@@ -85,7 +89,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="admin-email" className="block text-sm font-medium text-gray-900 mb-1.5">
-              Admin email
+              {t.emailLabel}
             </label>
             <input
               id="admin-email"
@@ -93,7 +97,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
               autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin email"
+              placeholder={t.emailPlaceholder}
               autoFocus
               className="w-full h-11 px-3.5 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all text-sm text-gray-900 placeholder:text-gray-400"
             />
@@ -101,7 +105,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
 
           <div>
             <label htmlFor="admin-password" className="block text-sm font-medium text-gray-900 mb-1.5">
-              Password
+              {t.passwordLabel}
             </label>
             <div className="relative">
               <input
@@ -110,14 +114,14 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
+                placeholder={t.passwordPlaceholder}
                 className="w-full h-11 pl-3.5 pr-11 rounded-lg border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all text-sm text-gray-900 placeholder:text-gray-400"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md text-gray-500 hover:text-black flex items-center justify-center cursor-pointer"
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? t.hidePasswordAriaLabel : t.showPasswordAriaLabel}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -133,7 +137,7 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
               <Loader2 className="w-4 h-4 animate-spin text-black" />
             ) : (
               <>
-                <span>Sign In</span>
+                <span>{t.signIn}</span>
                 <ArrowRight size={16} />
               </>
             )}

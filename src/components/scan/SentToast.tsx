@@ -23,7 +23,7 @@ const TONE_STYLE: Record<SentToastTone, { iconBg: string; border: string; Icon: 
  * the same whether the bespoke car/bike screen or a category tile sheet is
  * active, and sits above the chat panel it often opens alongside.
  */
-export default function SentToast({ text, tone = "success", durationMs = tone === "pending" ? 6000 : 3200, onClose }: SentToastProps) {
+export default function SentToast({ text, tone = "success", durationMs = tone === "pending" ? 6000 : 5000, onClose }: SentToastProps) {
   const [closing, setClosing] = useState(false);
 
   useEffect(() => {

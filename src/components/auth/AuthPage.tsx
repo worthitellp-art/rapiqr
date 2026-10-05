@@ -22,11 +22,8 @@ import {
   MAX_OTP_ATTEMPTS,
 } from '../../lib/otpRateLimit';
 import { useOtpLock } from '../../lib/useOtpLock';
-
-const sendLockedMessage = (time: string) =>
-  `You've used all ${MAX_OTP_ATTEMPTS} code requests. For your security, new codes are locked for 1 hour — try again in ${time}.`;
-const verifyLockedMessage = (time: string) =>
-  `Too many incorrect codes (${MAX_OTP_ATTEMPTS}/${MAX_OTP_ATTEMPTS}). For your security, verification is locked for 1 hour — try again in ${time}.`;
+import { useLanguage } from '../../context/LanguageContext';
+import { authTranslations } from '../../i18n/authTranslations';
 
 interface AuthPageProps {
   initialMode?: 'login' | 'signup';
@@ -41,6 +38,11 @@ export default function AuthPage({
   onSuccess,
 }: AuthPageProps) {
   const { sendPhoneLoginOtp, verifyPhoneLoginOtp, signInWithGoogle } = useAuth();
+  const { language } = useLanguage();
+  const t = authTranslations[language].client;
+
+  const sendLockedMessage = (time: string) => t.errors.sendLocked(MAX_OTP_ATTEMPTS, time);
+  const verifyLockedMessage = (time: string) => t.errors.verifyLocked(MAX_OTP_ATTEMPTS, time);
 
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -76,7 +78,7 @@ export default function AuthPage({
     try {
       const res = await signInWithGoogle();
       if (res.success) {
-        setSuccessMessage('Signed in with Google! Loading dashboard…');
+        setSuccessMessage(t.success.googleSignedIn);
         localStorage.setItem('rapiqr-phone-number-filled', 'true');
         localStorage.setItem('rapiqr-phone-asked-once', 'true');
         localStorage.setItem('repiqr-current-page', 'dashboard');
@@ -88,7 +90,7 @@ export default function AuthPage({
         setErrorMessage(res.error);
       }
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Google sign-in failed. Please try again.');
+      setErrorMessage(err?.message || t.errors.googleSignInFailed);
     } finally {
       setIsGoogleSubmitting(false);
     }
@@ -101,13 +103,13 @@ export default function AuthPage({
 
     const clean = phoneDigits.replace(/\D/g, '');
     if (clean.length < 10) {
-      setErrorMessage('Please enter a valid 10-digit mobile number.');
+      setErrorMessage(t.errors.invalidPhone);
       return;
     }
 
     const finalPhone = phoneNumber || clean;
 
-    // Check rate limit (3 codes, then a 4 hour lock)
+    // Check rate limit (3 codes, then a 1 hour lock)
     const rateStatus = checkOtpRateLimit(finalPhone, 'send');
     if (rateStatus.isLocked) {
       refreshLock();
@@ -122,7 +124,7 @@ export default function AuthPage({
       // Backend pre-flight (format/ownership checks) first
       const res = await sendPhoneLoginOtp(finalPhone);
       if (!res.success) {
-        setErrorMessage(res.error || 'Failed to send verification code. Please try again.');
+        setErrorMessage(res.error || t.errors.sendFailedGeneric);
         return;
       }
       await sendMsg91Otp(toMsg91Identifier(finalPhone));
@@ -133,13 +135,13 @@ export default function AuthPage({
       refreshLock();
       setSuccessMessage(
         attemptResult.isLocked
-          ? 'Code sent. That was your last code request — new codes are locked for 1 hour.'
-          : `Verification code sent to your phone. (${attemptResult.attempts} of ${MAX_OTP_ATTEMPTS} requests used)`
+          ? t.success.codeSentLastRequest
+          : t.success.codeSentWithCount(attemptResult.attempts, MAX_OTP_ATTEMPTS)
       );
       setStep('otp');
       setCountdown(30);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Network error while sending verification code.');
+      setErrorMessage(err.message || t.errors.networkErrorSending);
     } finally {
       setIsSubmitting(false);
     }
@@ -160,7 +162,7 @@ export default function AuthPage({
 
     const trimmedOtp = otpCode.trim();
     if (!trimmedOtp || trimmedOtp.length < 4) {
-      setErrorMessage('Please enter the verification code.');
+      setErrorMessage(t.errors.enterCode);
       return;
     }
 
@@ -171,7 +173,7 @@ export default function AuthPage({
       if (res.success) {
         // Clear rate limiting upon successful login
         clearOtpRateLimit(finalPhone);
-        setSuccessMessage('Verified successfully! Loading dashboard…');
+        setSuccessMessage(t.success.verifiedSuccessfully);
         localStorage.setItem('rapiqr-phone-number-filled', 'true');
         localStorage.setItem('rapiqr-phone-asked-once', 'true');
         localStorage.setItem('repiqr-current-page', 'dashboard');
@@ -188,7 +190,7 @@ export default function AuthPage({
         } else {
           const remainingTries = MAX_OTP_ATTEMPTS - failResult.attempts;
           setErrorMessage(
-            `${res.error || 'Invalid verification code.'} (${remainingTries} attempt${remainingTries !== 1 ? 's' : ''} remaining before a 4-hour lock)`
+            `${res.error || t.errors.invalidCodeGeneric} ${t.errors.attemptsRemaining(remainingTries)}`
           );
         }
       }
@@ -201,7 +203,7 @@ export default function AuthPage({
       } else {
         const remainingTries = MAX_OTP_ATTEMPTS - failResult.attempts;
         setErrorMessage(
-          `${err.message || 'Verification failed. Please try again.'} (${remainingTries} attempt${remainingTries !== 1 ? 's' : ''} remaining before a 4-hour lock)`
+          `${err.message || t.errors.verificationFailedGeneric} ${t.errors.attemptsRemaining(remainingTries)}`
         );
       }
     } finally {
@@ -231,7 +233,7 @@ export default function AuthPage({
       } catch (retryErr) {
         console.warn('retryMsg91Otp failed, falling back to a fresh send:', retryErr);
         const res = await sendPhoneLoginOtp(finalPhone);
-        if (!res.success) throw new Error(res.error || 'Failed to resend the code. Please try again.');
+        if (!res.success) throw new Error(res.error || t.errors.resendFailedGeneric);
         await sendMsg91Otp(toMsg91Identifier(finalPhone));
       }
 
@@ -240,12 +242,12 @@ export default function AuthPage({
       setOtpCode('');
       setSuccessMessage(
         attemptResult.isLocked
-          ? 'New code sent. That was your last code request — new codes are locked for 1 hour.'
-          : `New verification code sent. (${attemptResult.attempts} of ${MAX_OTP_ATTEMPTS} requests used)`
+          ? t.success.newCodeSentLastRequest
+          : t.success.newCodeSentWithCount(attemptResult.attempts, MAX_OTP_ATTEMPTS)
       );
       setCountdown(30);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to resend code. Please try again.');
+      setErrorMessage(err.message || t.errors.resendFailedGeneric);
     } finally {
       setIsSubmitting(false);
     }
@@ -261,11 +263,11 @@ export default function AuthPage({
           className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-[#14120C]/60 hover:text-[#14120C] transition-colors cursor-pointer py-1.5 px-3 rounded-full hover:bg-[#14120C]/[0.04]"
         >
           <ArrowLeft size={16} />
-          <span>Back to home</span>
+          <span>{t.backToHome}</span>
         </button>
 
         <span className="text-xs font-medium text-gray-500">
-          Client Account Access
+          {t.accountAccess}
         </span>
       </header>
 
@@ -277,7 +279,7 @@ export default function AuthPage({
             <button
               onClick={onBackHome}
               className="cursor-pointer focus:outline-hidden"
-              aria-label="RapiQR home"
+              aria-label={t.homeAriaLabel}
             >
               <AppLogo variant="light" className="h-8 w-auto object-contain" />
             </button>
@@ -286,12 +288,10 @@ export default function AuthPage({
           {/* Heading */}
           <div className="mb-6 text-center">
             <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-              {step === 'phone' ? 'Client Sign In' : 'Enter Verification Code'}
+              {step === 'phone' ? t.signInTitle : t.enterCodeTitle}
             </h1>
             <p className="text-xs sm:text-sm text-gray-500 mt-1.5">
-              {step === 'phone'
-                ? 'Sign in with Google or enter your mobile number'
-                : `We sent a verification code to ${phoneNumber}`}
+              {step === 'phone' ? t.signInSubtitle : t.codeSentTo(phoneNumber)}
             </p>
           </div>
 
@@ -300,12 +300,12 @@ export default function AuthPage({
             <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold flex items-start gap-2.5">
               <Clock size={16} className="shrink-0 mt-0.5 text-amber-700" />
               <div>
-                <p className="font-bold text-amber-900">Locked for 1 hour</p>
+                <p className="font-bold text-amber-900">{t.lockedForOneHour}</p>
                 <p className="text-[11.5px] text-amber-800 mt-0.5 leading-relaxed">
                   {step === 'otp'
-                    ? `${MAX_OTP_ATTEMPTS} incorrect codes entered.`
-                    : `${MAX_OTP_ATTEMPTS} attempts used.`}{' '}
-                  Try again in <span className="font-bold font-mono">{formatRemainingTime(bannerLockMs)}</span>.
+                    ? t.otpIncorrectCodesEntered(MAX_OTP_ATTEMPTS)
+                    : t.sendAttemptsUsed(MAX_OTP_ATTEMPTS)}{' '}
+                  {t.tryAgainIn} <span className="font-bold font-mono">{formatRemainingTime(bannerLockMs)}</span>.
                 </p>
               </div>
             </div>
@@ -339,7 +339,7 @@ export default function AuthPage({
                 {isGoogleSubmitting ? (
                   <>
                     <Loader2 size={16} className="animate-spin text-gray-700" />
-                    <span>Connecting to Google…</span>
+                    <span>{t.connectingToGoogle}</span>
                   </>
                 ) : (
                   <>
@@ -361,7 +361,7 @@ export default function AuthPage({
                         d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                       />
                     </svg>
-                    <span>Continue with Google</span>
+                    <span>{t.continueWithGoogle}</span>
                   </>
                 )}
               </button>
@@ -371,7 +371,7 @@ export default function AuthPage({
                   <div className="w-full border-t border-gray-200" />
                 </div>
                 <span className="relative bg-white px-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">
-                  Or with mobile number
+                  {t.orWithMobileNumber}
                 </span>
               </div>
 
@@ -379,7 +379,7 @@ export default function AuthPage({
               <form onSubmit={handleSendOtp} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1.5">
-                    Mobile Number
+                    {t.mobileNumberLabel}
                   </label>
                   <PhoneInputWithCountry
                     value={phoneNumber}
@@ -387,7 +387,7 @@ export default function AuthPage({
                       setPhoneNumber(full);
                       setPhoneDigits(digits);
                     }}
-                    placeholder="10-digit mobile number"
+                    placeholder={t.mobileNumberPlaceholder}
                     required
                   />
                 </div>
@@ -399,14 +399,14 @@ export default function AuthPage({
                   disabled={isGoogleSubmitting || phoneDigits.length < 10 || sendLockMs > 0}
                 >
                   {isSubmitting ? (
-                    'Sending Code…'
+                    t.sendingCode
                   ) : sendLockMs > 0 ? (
                     <>
                       <Clock size={15} className="text-amber-700" />
-                      Locked · {formatRemainingTime(sendLockMs)}
+                      {t.lockedWithTime(formatRemainingTime(sendLockMs))}
                     </>
                   ) : (
-                    'Send Verification Code'
+                    t.sendVerificationCode
                   )}
                 </FlowButton>
               </form>
@@ -416,7 +416,7 @@ export default function AuthPage({
             <form onSubmit={handleVerifyOtp} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1.5">
-                  Verification Code
+                  {t.verificationCodeLabel}
                 </label>
                 <div className="relative">
                   <input
@@ -426,7 +426,7 @@ export default function AuthPage({
                     maxLength={4}
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    placeholder="Enter code"
+                    placeholder={t.otpPlaceholder}
                     autoFocus
                     disabled={verifyLockMs > 0}
                     className="w-full text-center tracking-[0.4em] font-mono text-xl py-3 px-4 rounded-xl bg-white border border-gray-300 focus:border-black focus:ring-1 focus:ring-black outline-none transition-all text-gray-900 placeholder:text-gray-300 disabled:bg-gray-100"
@@ -441,14 +441,14 @@ export default function AuthPage({
                 disabled={otpCode.trim().length < 4 || verifyLockMs > 0}
               >
                 {isSubmitting ? (
-                  'Verifying Code…'
+                  t.verifyingCode
                 ) : verifyLockMs > 0 ? (
                   <>
                     <Clock size={15} className="text-amber-700" />
-                    Locked ({formatRemainingTime(verifyLockMs)})
+                    {t.lockedParenTime(formatRemainingTime(verifyLockMs))}
                   </>
                 ) : (
-                  'Verify & Enter Dashboard'
+                  t.verifyAndEnterDashboard
                 )}
               </FlowButton>
 
@@ -463,7 +463,7 @@ export default function AuthPage({
                   }}
                   className="text-gray-500 hover:text-black font-medium transition-colors cursor-pointer"
                 >
-                  Change phone number
+                  {t.changePhoneNumber}
                 </button>
 
                 <button
@@ -475,10 +475,10 @@ export default function AuthPage({
                   <RotateCcw size={12} />
                   <span>
                     {sendLockMs > 0
-                      ? `No more codes · ${formatRemainingTime(sendLockMs)}`
+                      ? t.noMoreCodes(formatRemainingTime(sendLockMs))
                       : countdown > 0
-                      ? `Resend in ${countdown}s`
-                      : 'Resend Code'}
+                      ? t.resendIn(countdown)
+                      : t.resendCode}
                   </span>
                 </button>
               </div>
@@ -488,7 +488,7 @@ export default function AuthPage({
           {/* Privacy Note */}
           <div className="mt-8 pt-5 border-t border-gray-100 text-center">
             <p className="text-[11px] text-gray-400">
-              By continuing, you agree to RapiQR’s Terms of Service &amp; Privacy Policy.
+              {t.privacyNote}
             </p>
           </div>
         </div>
@@ -496,7 +496,7 @@ export default function AuthPage({
 
       {/* ── Footer ── */}
       <footer className="w-full py-4 text-center text-xs text-gray-400">
-        &copy; {new Date().getFullYear()} RapiQR. Secure phone verification.
+        &copy; {new Date().getFullYear()} RapiQR. {t.footerSecurePhoneVerification}
       </footer>
     </div>
   );

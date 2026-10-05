@@ -21,6 +21,9 @@ router.get('/messages/stats', AdminController.getMessageStats);
 router.get('/messages', AdminController.listMessages);
 router.delete('/messages', AdminController.deleteAllMessages);
 
+router.get('/whatsapp/diagnostics', AdminController.getWhatsAppDiagnostics);
+router.post('/whatsapp/test-send', AdminController.testWhatsAppSend);
+
 router.get('/privacy/grievances', PrivacyController.adminListGrievances);
 router.patch('/privacy/grievances/:id', PrivacyController.adminUpdateGrievance);
 

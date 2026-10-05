@@ -19,6 +19,7 @@ import { QrRecord, Template, SystemAlertItem } from "./types";
 import { CodeVisibilityToggleButton } from "./StickerCodeComponents";
 import { stickerRef, useCodesRevealed } from "../../../lib/codeVisibility";
 import { getCategoryLabel } from "../../../stickerModules";
+import { mapRowToRecord } from "./helpers";
 import { apiClient } from "../../../lib/apiClient";
 import { usePolling } from "../../../hooks/usePolling";
 import ConfirmModal from "./ConfirmModal";
@@ -72,6 +73,7 @@ function getLocationMapsUrl(location: any): string {
 
 export default function AlertsPage({
   qrList,
+  setQrList,
   setToast,
   isAdmin,
   searchQuery,
@@ -91,23 +93,38 @@ export default function AlertsPage({
     setLocalSearch(searchQuery);
   }, [searchQuery]);
 
-  // The backend is the only source of alert reports. They used to be merged in
-  // from localStorage too, which showed ghost rows nobody could resolve
-  // server-side and kept reporter phones + GPS on disk.
+  // Fetches latest updates of incident alerts and activated QR tags from the backend
   const fetchReports = useCallback(async () => {
     if (!isAdmin) return;
     setIsLoading(true);
     try {
-      const res = await apiClient.alerts.getAlerts(200);
-      setIncidentReports(Array.isArray(res?.data) ? res.data : []);
-      setLoadError(null);
+      const [alertsRes, qrRes] = await Promise.allSettled([
+        apiClient.alerts.getAlerts(200),
+        setQrList ? apiClient.qr.getQrCodes(500) : Promise.resolve(null),
+      ]);
+
+      if (alertsRes.status === "fulfilled" && alertsRes.value) {
+        setIncidentReports(Array.isArray(alertsRes.value.data) ? alertsRes.value.data : []);
+        setLoadError(null);
+      } else if (alertsRes.status === "rejected") {
+        setLoadError(alertsRes.reason?.message || "Could not load alerts.");
+      }
+
+      if (qrRes.status === "fulfilled" && qrRes.value?.data && setQrList) {
+        setQrList(qrRes.value.data.map(mapRowToRecord));
+      }
     } catch (err: any) {
       setLoadError(err?.message || "Could not load alerts.");
-      throw err; // lets the poller back off instead of hammering a failing server
     } finally {
       setIsLoading(false);
     }
-  }, [isAdmin]);
+  }, [isAdmin, setQrList]);
+
+  const handleSelectCategory = (cat: AlertCategoryFilter) => {
+    setSelectedCategory(cat);
+    // When switching filters (e.g. SOS to All or Scans), immediately pull latest updates
+    fetchReports().catch(() => {});
+  };
 
   const refresh = usePolling(fetchReports, { intervalMs: 30_000, enabled: isAdmin });
 
@@ -318,7 +335,7 @@ export default function AlertsPage({
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => setSelectedCategory(tab.key as AlertCategoryFilter)}
+                onClick={() => handleSelectCategory(tab.key as AlertCategoryFilter)}
                 className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                   active
                     ? "bg-gray-900 text-white shadow-2xs"
@@ -344,10 +361,12 @@ export default function AlertsPage({
           })}
         </div>
 
-        <CodeVisibilityToggleButton
-          isRevealed={codesRevealed}
-          onToggleVisibility={() => setCodesRevealed(!codesRevealed)}
-        />
+        {selectedCategory === "activation" && (
+          <CodeVisibilityToggleButton
+            isRevealed={codesRevealed}
+            onToggleVisibility={() => setCodesRevealed(!codesRevealed)}
+          />
+        )}
 
         {/* Small Search */}
         <div className="relative w-full sm:w-44 flex-shrink-0">

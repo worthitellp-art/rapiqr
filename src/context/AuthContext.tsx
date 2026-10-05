@@ -5,7 +5,7 @@ import { readChatLinkToken, setChatLinkSession } from '../lib/chatLink';
 
 /**
  * Map a backend (Express/Render) user profile into the app's UserProfileData shape.
- * Backend returns { id, email, full_name, avatar_url, role, subscription_plan, is_subscribed }.
+ * Backend returns { id, email, full_name, avatar_url, role, metadata, email_verified, created_at }.
  */
 function backendUserToProfile(u: any): UserProfileData {
   const hasPhone = Boolean(u?.phone_number || u?.phoneNumber);
@@ -24,8 +24,6 @@ function backendUserToProfile(u: any): UserProfileData {
     phoneNumber: u?.phone_number || u?.phoneNumber || undefined,
     avatarUrl: u?.avatar_url || u?.avatarUrl,
     role: (u?.role as 'user' | 'admin') || 'user',
-    subscriptionPlan: u?.subscription_plan || u?.subscriptionPlan || 'free',
-    isSubscribed: u?.is_subscribed ?? u?.isSubscribed ?? false,
     twoFactorEnabled: Boolean(u?.metadata?.twoFactor?.enabled),
     isPhoneVerified: isVerified && hasPhone,
   };
@@ -103,7 +101,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfileData | null>(() => {
     const saved = localStorage.getItem('repiqr-auth-user') || localStorage.getItem('namoqr-auth-user');
     if (saved) {
-      return JSON.parse(saved);
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed) {
+          delete parsed.subscriptionPlan;
+          delete parsed.subscription_plan;
+          delete parsed.isSubscribed;
+          delete parsed.is_subscribed;
+          return parsed;
+        }
+      } catch {}
     }
     return null;
   });
@@ -220,7 +227,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         fullName,
         phoneNumber: phoneNumber || undefined,
         role: 'user',
-        subscriptionPlan: 'free'
       };
       setProfile(newUser);
       localStorage.setItem('repiqr-auth-user', JSON.stringify(newUser));
@@ -266,7 +272,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         fullName: isEmail ? cleanId.split('@')[0] : `User (${cleanId})`,
         phoneNumber: !isEmail ? cleanId : undefined,
         role: isAdminEmail ? 'admin' : 'user',
-        subscriptionPlan: 'free'
       };
       setProfile(demoUser);
       localStorage.setItem('repiqr-auth-user', JSON.stringify(demoUser));
@@ -458,8 +463,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               fullName,
               avatarUrl,
               role: email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() ? 'admin' : 'user',
-              subscriptionPlan: 'free',
-              isSubscribed: false,
             };
             setProfile(localProfile);
             localStorage.setItem('repiqr-auth-user', JSON.stringify(localProfile));
@@ -502,7 +505,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: cleanEmail,
         fullName: cleanEmail.split('@')[0],
         role: cleanEmail === ADMIN_EMAIL.toLowerCase() ? 'admin' : 'user',
-        subscriptionPlan: 'free',
       };
       setProfile(demoUser);
       localStorage.setItem('repiqr-auth-user', JSON.stringify(demoUser));
@@ -555,7 +557,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         fullName: `User ${cleanPhone.slice(-4)}`,
         phoneNumber: cleanPhone,
         role: 'user',
-        subscriptionPlan: 'free',
         isPhoneVerified: true,
       };
       setProfile(demoUser);
@@ -594,8 +595,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email: 'demo@rapiqr.com',
       fullName: 'Demo User',
       role: 'user',
-      subscriptionPlan: 'free',
-      isSubscribed: false,
     };
     setProfile(demoUser);
     localStorage.setItem('repiqr-auth-user', JSON.stringify(demoUser));

@@ -49,6 +49,8 @@ import {
   writeDraft,
 } from "../../lib/chatStorage";
 import type { Socket } from "socket.io-client";
+import { useLanguage } from "../../context/LanguageContext";
+import { chatTranslations } from "../../i18n/chatTranslations";
 
 interface RepiChatProps {
   mode: "customer" | "owner";
@@ -102,7 +104,10 @@ const MAX_PICK_BYTES = 25 * 1024 * 1024;
  * GIFs are passed through untouched: re-encoding one through a canvas would
  * flatten it to a single frame.
  */
-async function prepareImage(file: File): Promise<{
+async function prepareImage(
+  file: File,
+  errors: { readFailed: string; readFailedGeneric: string; browserUnsupported: string }
+): Promise<{
   dataUrl: string;
   width: number;
   height: number;
@@ -113,7 +118,7 @@ async function prepareImage(file: File): Promise<{
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const el = new Image();
       el.onload = () => resolve(el);
-      el.onerror = () => reject(new Error("That file could not be read as an image."));
+      el.onerror = () => reject(new Error(errors.readFailed));
       el.src = objectUrl;
     });
 
@@ -123,7 +128,7 @@ async function prepareImage(file: File): Promise<{
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error("That file could not be read."));
+        reader.onerror = () => reject(new Error(errors.readFailedGeneric));
         reader.readAsDataURL(file);
       });
       return { dataUrl, width: w, height: h, name: file.name };
@@ -137,7 +142,7 @@ async function prepareImage(file: File): Promise<{
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("This browser could not process the image.");
+    if (!ctx) throw new Error(errors.browserUnsupported);
     ctx.drawImage(img, 0, 0, width, height);
 
     // PNG only when the source had transparency worth keeping; JPEG otherwise,
@@ -190,14 +195,14 @@ function captionOf(msg: UiMessage): string {
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
-function dayLabel(iso: string) {
+function dayLabel(iso: string, labels: { today: string; yesterday: string }) {
   const date = new Date(iso);
   const today = new Date();
   const yesterday = new Date();
   yesterday.setDate(today.getDate() - 1);
 
-  if (sameDay(date, today)) return "Today";
-  if (sameDay(date, yesterday)) return "Yesterday";
+  if (sameDay(date, today)) return labels.today;
+  if (sameDay(date, yesterday)) return labels.yesterday;
   return date.toLocaleDateString([], {
     day: "numeric",
     month: "short",
@@ -222,7 +227,11 @@ type Row =
       lastOfGroup: boolean;
     };
 
-function buildRows(messages: UiMessage[], mode: "owner" | "customer"): Row[] {
+function buildRows(
+  messages: UiMessage[],
+  mode: "owner" | "customer",
+  dayLabels: { today: string; yesterday: string }
+): Row[] {
   const rows: Row[] = [];
 
   messages.forEach((msg, i) => {
@@ -232,7 +241,7 @@ function buildRows(messages: UiMessage[], mode: "owner" | "customer"): Row[] {
 
     const startsDay = !prev || !sameDay(new Date(prev.created_at), new Date(msg.created_at));
     if (startsDay) {
-      rows.push({ kind: "day", key: `day-${msg.id}`, label: dayLabel(msg.created_at) });
+      rows.push({ kind: "day", key: `day-${msg.id}`, label: dayLabel(msg.created_at, dayLabels) });
     }
 
     const groupedWithPrev =
@@ -267,7 +276,7 @@ function buildRows(messages: UiMessage[], mode: "owner" | "customer"): Row[] {
 const URL_SPLIT = /(https?:\/\/[^\s]+)/g;
 const IS_URL = /^https?:\/\//;
 
-function renderBody(text: string, isOwn: boolean) {
+function renderBody(text: string, isOwn: boolean, openLocationLabel: string) {
   return text.split(URL_SPLIT).map((part, i) => {
     if (!IS_URL.test(part)) return <span key={i}>{part}</span>;
     const isMap = /maps|google\.[a-z.]+\/maps|maps\?q=/.test(part);
@@ -281,7 +290,7 @@ function renderBody(text: string, isOwn: boolean) {
           isOwn ? "text-white decoration-white/50" : "text-[#2B5FD9] decoration-[#2B5FD9]/40"
         }`}
       >
-        {isMap ? "📍 Open location" : part.length > 42 ? `${part.slice(0, 39)}…` : part}
+        {isMap ? openLocationLabel : part.length > 42 ? `${part.slice(0, 39)}…` : part}
       </a>
     );
   });
@@ -323,7 +332,10 @@ export default function RepiChat({
   const [dragActive, setDragActive] = useState(false);
   const [lightbox, setLightbox] = useState<{ url: string; name?: string | null } | null>(null);
 
-  const headerTitle = resolvedTitle || title || (mode === "owner" ? "Visitor" : "Vehicle Owner");
+  const { language } = useLanguage();
+  const t = chatTranslations[language];
+
+  const headerTitle = resolvedTitle || title || (mode === "owner" ? t.defaultTitles.visitor : t.defaultTitles.vehicleOwner);
 
   // Read inside socket callbacks without making the transport effect depend on
   // it — the title resolves a moment after connecting, and having it in the
@@ -416,7 +428,7 @@ export default function RepiChat({
         });
 
         if (res.session && mode === "owner") {
-          setResolvedTitle((t) => t || title || res.session.customer_name || "Visitor");
+          setResolvedTitle((current) => current || title || res.session.customer_name || t.defaultTitles.visitor);
         }
       } catch (err: any) {
         if (mode === "customer" && qrId && err?.message?.includes("Session not found")) {
@@ -425,7 +437,7 @@ export default function RepiChat({
         }
       }
     },
-    [sessionId, mode, customerToken, title, qrId]
+    [sessionId, mode, customerToken, title, qrId, t]
   );
 
   /* ── Bootstrap ───────────────────────────────────────────────────────── */
@@ -455,7 +467,7 @@ export default function RepiChat({
           success: true,
           sessionId: fallbackSess,
           customerToken: fallbackTok,
-          ownerName: title || "Vehicle Owner",
+          ownerName: title || t.defaultTitles.vehicleOwner,
         };
       }
 
@@ -546,12 +558,12 @@ export default function RepiChat({
         const preview = msg.attachment_url
           ? msg.body
             ? `📷 ${msg.body}`
-            : "📷 Photo"
+            : `📷 ${t.photoPreview}`
           : msg.body;
         soundNotification.notifyIncomingMessage({
           id: msg.id,
           threadId: msg.session_id,
-          title: headerTitleRef.current || "New Chat Message",
+          title: headerTitleRef.current || t.defaultTitles.newChatMessage,
           body: preview.length > 60 ? `${preview.slice(0, 60)}…` : preview,
         });
         if (document.visibilityState === "visible") socket.emit("mark_read", { sessionId });
@@ -599,7 +611,7 @@ export default function RepiChat({
       socket.off("delivered", onDelivered);
       socket.off("live_location", onLiveLocation);
     };
-  }, [ready, sessionId, mode, customerToken, upsertMessage, syncHistory]);
+  }, [ready, sessionId, mode, customerToken, upsertMessage, syncHistory, t]);
 
   /* Coming back to a backgrounded tab is the other moment live events get missed. */
   useEffect(() => {
@@ -802,11 +814,11 @@ export default function RepiChat({
       if (!sessionId) return;
 
       if (!file.type.startsWith("image/")) {
-        setAttachError("Only images can be attached.");
+        setAttachError(t.errors.onlyImages);
         return;
       }
       if (file.size > MAX_PICK_BYTES) {
-        setAttachError(`That image is ${(file.size / 1024 / 1024).toFixed(1)} MB — please pick one under 25 MB.`);
+        setAttachError(t.errors.tooLarge((file.size / 1024 / 1024).toFixed(1)));
         return;
       }
       setAttachError(null);
@@ -844,7 +856,7 @@ export default function RepiChat({
         );
 
       try {
-        const prepared = await prepareImage(file);
+        const prepared = await prepareImage(file, t.errors);
         setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, uploadProgress: 0.35 } : m)));
 
         const res = await apiClient.chat.sendAttachment(
@@ -859,7 +871,7 @@ export default function RepiChat({
           mode === "customer" ? customerToken : undefined
         );
 
-        if (!res?.success || !res.data) throw new Error(res?.error || "Upload failed");
+        if (!res?.success || !res.data) throw new Error(res?.error || t.errors.uploadFailedShort);
 
         setMessages((prev) => {
           const at = prev.findIndex((m) => m.id === tempId);
@@ -869,11 +881,11 @@ export default function RepiChat({
           return next;
         });
       } catch (err: any) {
-        setAttachError(err?.message || "That image couldn't be sent.");
+        setAttachError(err?.message || t.errors.uploadFailed);
         fail();
       }
     },
-    [sessionId, mode, customerToken]
+    [sessionId, mode, customerToken, t]
   );
 
   // Fire the quick-issue-tile's prefilled message once the thread is ready.
@@ -994,15 +1006,15 @@ export default function RepiChat({
     }
   };
 
-  const rows = useMemo(() => buildRows(messages, mode), [messages, mode]);
+  const rows = useMemo(() => buildRows(messages, mode, t.day), [messages, mode, t]);
 
   const statusLine = peerTyping
-    ? "Typing…"
+    ? t.status.typing
     : !ready
-      ? "Connecting…"
+      ? t.status.connecting
       : connected
-        ? subtitle || "Online"
-        : "Reconnecting…";
+        ? subtitle || t.status.online
+        : t.status.reconnecting;
 
   // Esc closes the chat; when the image lightbox is open it takes Esc first.
   useEffect(() => {
@@ -1031,7 +1043,7 @@ export default function RepiChat({
           <button
             onClick={onClose}
             className="sm:hidden w-9 h-9 -ml-1 rounded-full hover:bg-[#F6F6F3] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
-            aria-label="Back"
+            aria-label={t.aria.back}
           >
             <ChevronLeft size={22} />
           </button>
@@ -1058,7 +1070,7 @@ export default function RepiChat({
           <button
             onClick={onClose}
             className="hidden sm:flex w-9 h-9 rounded-full hover:bg-[#F6F6F3] items-center justify-center shrink-0 transition-colors cursor-pointer"
-            aria-label="Close chat"
+            aria-label={t.aria.closeChat}
           >
             <X size={17} />
           </button>
@@ -1092,8 +1104,8 @@ export default function RepiChat({
                 <MessageCircle size={26} />
               </div>
               <div>
-                <p className="text-sm font-bold text-[#211922]">No messages yet</p>
-                <p className="text-xs text-[#91918C] font-medium mt-1 max-w-[16rem]">Say hello</p>
+                <p className="text-sm font-bold text-[#211922]">{t.empty.title}</p>
+                <p className="text-xs text-[#91918C] font-medium mt-1 max-w-[16rem]">{t.empty.subtitle}</p>
               </div>
             </div>
           ) : (
@@ -1138,12 +1150,12 @@ export default function RepiChat({
           <button
             onClick={() => scrollToBottom("smooth")}
             className="absolute bottom-3 right-3 sm:right-4 z-10 flex items-center gap-1.5 pl-2.5 pr-3 py-2 rounded-full bg-white shadow-md border border-[#EAEAE5] text-[#211922] hover:bg-[#F6F6F3] transition-colors cursor-pointer"
-            aria-label="Scroll to latest messages"
+            aria-label={t.aria.scrollToLatest}
           >
             <ArrowDown size={15} />
             {unseenCount > 0 && (
               <span className="text-[11px] font-bold">
-                {unseenCount} new
+                {unseenCount} {t.newMessages}
               </span>
             )}
           </button>
@@ -1159,7 +1171,7 @@ export default function RepiChat({
             <button
               onClick={() => setAttachError(null)}
               className="shrink-0 text-[#9E0A0A]/60 hover:text-[#9E0A0A] cursor-pointer"
-              aria-label="Dismiss"
+              aria-label={t.aria.dismiss}
             >
               <X size={13} />
             </button>
@@ -1187,8 +1199,8 @@ export default function RepiChat({
             onClick={() => fileInputRef.current?.click()}
             disabled={!sessionId}
             className="w-10 h-10 sm:w-9 sm:h-9 shrink-0 rounded-full text-[#62625B] hover:text-[#211922] hover:bg-[#F6F6F3] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors cursor-pointer active:scale-95"
-            aria-label="Attach an image"
-            title="Attach an image"
+            aria-label={t.aria.attachImage}
+            title={t.aria.attachImage}
           >
             <ImagePlus size={19} />
           </button>
@@ -1200,17 +1212,17 @@ export default function RepiChat({
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder={ready ? "Message" : "Connecting…"}
+            placeholder={ready ? t.composer.placeholderReady : t.composer.placeholderConnecting}
             disabled={!ready && !sessionId}
             enterKeyHint="send"
-            aria-label="Message"
+            aria-label={t.aria.message}
             className="flex-1 min-w-0 resize-none max-h-[132px] bg-[#F6F6F3] border border-transparent focus:border-[#111111] focus:bg-white rounded-2xl px-3.5 py-2.5 text-[15px] sm:text-sm leading-snug text-[#211922] placeholder-[#91918C] outline-none disabled:opacity-50 transition-colors"
           />
           <button
             type="submit"
             disabled={!input.trim() || (!ready && !sessionId)}
             className="w-11 h-11 sm:w-10 sm:h-10 shrink-0 rounded-full bg-[#111111] hover:bg-black disabled:bg-[#EFEFEA] disabled:text-[#91918C] disabled:cursor-not-allowed text-[#FFFFFF] flex items-center justify-center transition-colors cursor-pointer active:scale-95"
-            aria-label="Send message"
+            aria-label={t.aria.sendMessage}
           >
             <Send size={17} />
           </button>
@@ -1222,7 +1234,7 @@ export default function RepiChat({
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#111111]/10 backdrop-blur-[2px] pointer-events-none">
           <div className="flex flex-col items-center gap-2 px-6 py-5 rounded-2xl bg-white border-2 border-dashed border-[#111111] shadow-xl">
             <ImagePlus size={26} className="text-[#111111]" />
-            <p className="text-sm font-bold text-gray-700">Drop to send</p>
+            <p className="text-sm font-bold text-gray-700">{t.composer.dropToSend}</p>
           </div>
         </div>
       )}
@@ -1242,6 +1254,9 @@ function Lightbox({
   image: { url: string; name?: string | null };
   onClose: () => void;
 }) {
+  const { language } = useLanguage();
+  const t = chatTranslations[language];
+
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -1256,7 +1271,7 @@ function Lightbox({
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="Image preview"
+      aria-label={t.aria.imagePreview}
     >
       <div className="flex items-center justify-end gap-1 p-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <a
@@ -1266,14 +1281,14 @@ function Lightbox({
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
           className="w-10 h-10 rounded-full text-white/90 hover:bg-white/15 flex items-center justify-center transition-colors"
-          aria-label="Open full size"
+          aria-label={t.aria.openFullSize}
         >
           <Download size={19} />
         </a>
         <button
           onClick={onClose}
           className="w-10 h-10 rounded-full text-white/90 hover:bg-white/15 flex items-center justify-center transition-colors cursor-pointer"
-          aria-label="Close preview"
+          aria-label={t.aria.closePreview}
         >
           <X size={21} />
         </button>
@@ -1281,7 +1296,7 @@ function Lightbox({
       <div className="flex-1 min-h-0 flex items-center justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <img
           src={image.url}
-          alt={image.name || "Shared image"}
+          alt={image.name || t.image.sharedImageAlt}
           onClick={(e) => e.stopPropagation()}
           className="max-w-full max-h-full object-contain rounded-lg"
         />
@@ -1305,6 +1320,8 @@ interface MessageBubbleProps {
  * every few seconds. "Live" while fixes keep arriving; greyed once they stop.
  */
 function LiveLocationCard({ loc }: { loc: { lat: number; lng: number; updated_at: string } }) {
+  const { language } = useLanguage();
+  const t = chatTranslations[language];
   const [, setTick] = useState(0);
   useEffect(() => {
     const id = window.setInterval(() => setTick((n) => n + 1), 1000);
@@ -1319,10 +1336,10 @@ function LiveLocationCard({ loc }: { loc: { lat: number; lng: number; updated_at
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 text-[12.5px] font-bold text-[#211922]">
           <span className={`w-2 h-2 rounded-full ${live ? "bg-emerald-500 animate-pulse" : "bg-gray-300"}`} aria-hidden />
-          {live ? "Live location" : "Location shared"}
+          {live ? t.liveLocation.live : t.liveLocation.shared}
         </span>
         <span className="text-[10.5px] font-medium text-[#91918C] tabular-nums">
-          {ageSec < 5 ? "just now" : `updated ${ageSec}s ago`}
+          {ageSec < 5 ? t.liveLocation.justNow : t.liveLocation.updatedAgo(ageSec)}
         </span>
       </div>
       <a
@@ -1331,13 +1348,15 @@ function LiveLocationCard({ loc }: { loc: { lat: number; lng: number; updated_at
         rel="noopener noreferrer"
         className="mt-2 flex items-center justify-center gap-1.5 rounded-xl bg-[#111111] hover:bg-black text-white text-xs font-bold py-2 transition-colors"
       >
-        Open map
+        {t.liveLocation.openMap}
       </a>
     </div>
   );
 }
 
 function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubbleProps) {
+  const { language } = useLanguage();
+  const t = chatTranslations[language];
   const { msg, isOwn, firstOfGroup, lastOfGroup } = row;
   const attachment = attachmentOf(msg);
   const caption = captionOf(msg);
@@ -1388,7 +1407,7 @@ function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubble
             >
               <img
                 src={attachment.url}
-                alt={caption || attachment.name || "Shared image"}
+                alt={caption || attachment.name || t.image.sharedImageAlt}
                 loading="lazy"
                 decoding="async"
                 className={`w-full h-full object-cover max-h-[22rem] transition-[filter,opacity] duration-300 ${
@@ -1409,7 +1428,7 @@ function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubble
                 attachment ? "px-2.5 pt-1.5" : ""
               }`}
             >
-              {renderBody(caption, isOwn)}
+              {renderBody(caption, isOwn, t.openLocation)}
             </p>
           )}
 
@@ -1429,7 +1448,7 @@ function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubble
             className="flex items-center gap-1 mt-1 px-1 text-[10.5px] font-bold text-[#9E0A0A] hover:text-[#7A0808] cursor-pointer"
           >
             <RotateCw size={11} />
-            {msg.retryFile ? "Image not sent · tap to retry" : "Not sent · tap to retry"}
+            {msg.retryFile ? t.retry.imageNotSent : t.retry.notSent}
           </button>
         )}
       </div>
@@ -1438,9 +1457,11 @@ function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubble
 }
 
 function DeliveryTick({ msg }: { msg: UiMessage }) {
-  if (msg.failed) return <AlertCircle size={13} className="text-[#9E0A0A]" aria-label="Not sent" />;
-  if (msg.pending) return <Clock size={12} className="text-white/60" aria-label="Sending" />;
-  if (msg.read_at) return <CheckCheck size={14} className="text-[#7DD3FC]" aria-label="Read" />;
-  if (msg.delivered_at) return <CheckCheck size={14} className="text-white/70" aria-label="Delivered" />;
-  return <Check size={13} className="text-white/70" aria-label="Sent" />;
+  const { language } = useLanguage();
+  const t = chatTranslations[language];
+  if (msg.failed) return <AlertCircle size={13} className="text-[#9E0A0A]" aria-label={t.deliveryStatus.notSent} />;
+  if (msg.pending) return <Clock size={12} className="text-white/60" aria-label={t.deliveryStatus.sending} />;
+  if (msg.read_at) return <CheckCheck size={14} className="text-[#7DD3FC]" aria-label={t.deliveryStatus.read} />;
+  if (msg.delivered_at) return <CheckCheck size={14} className="text-white/70" aria-label={t.deliveryStatus.delivered} />;
+  return <Check size={13} className="text-white/70" aria-label={t.deliveryStatus.sent} />;
 }

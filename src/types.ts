@@ -125,7 +125,5 @@ export interface UserProfile {
   email: string;
   fullName: string;
   isLoggedIn: boolean;
-  isSubscribed: boolean;
-  subscriptionPlan: 'free' | 'pro';
   createdAt: string;
 }

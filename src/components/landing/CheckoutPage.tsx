@@ -14,6 +14,8 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { orderTranslations } from '../../i18n/orderTranslations';
 import { apiClient } from '../../lib/apiClient';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
 import AutocompleteField from '../common/AutocompleteField';
@@ -101,6 +103,8 @@ export default function CheckoutPage({
   onRegisterSticker,
 }: CheckoutPageProps) {
   const { isLoggedIn, profile, refreshProfile } = useAuth();
+  const { language } = useLanguage();
+  const t = orderTranslations[language].checkout;
 
   // Checkout steps: 'details' → 'processing' → 'success'
   const [step, setStep] = useState<'details' | 'processing' | 'success'>('details');
@@ -457,9 +461,7 @@ export default function CheckoutPage({
   const runCheckout = async (isRecognized: boolean) => {
     if (!Number.isFinite(total) || total <= 0) {
       setStep('details');
-      setError(
-        'Your cart total looks invalid. Please remove and re-add the affected item, then try again.'
-      );
+      setError(t.errors.invalidTotal);
       return;
     }
 
@@ -526,9 +528,7 @@ export default function CheckoutPage({
         newOrderId = fallbackRes.data.id;
       } else {
         setStep('details');
-        setError(
-          "We couldn't confirm your order. Please check your connection and try again."
-        );
+        setError(t.errors.orderNotConfirmed);
         return;
       }
     }
@@ -536,9 +536,7 @@ export default function CheckoutPage({
     const scriptOk = await loadRazorpayScript();
     if (!scriptOk) {
       setStep('details');
-      setError(
-        'Could not load the payment gateway. Please check your connection and try again.'
-      );
+      setError(t.errors.gatewayLoadFailed);
       return;
     }
 
@@ -574,7 +572,7 @@ export default function CheckoutPage({
     if (!rpData) {
       setStep('details');
       setError(
-        `${rpError || "We couldn't reach the payment gateway."} Your order ${newOrderId} has been saved — nothing was charged. Please try paying again in a moment.`
+        `${rpError || t.errors.gatewayUnreachable}${t.errors.orderSavedSuffix(newOrderId)}`
       );
       return;
     }
@@ -633,9 +631,7 @@ export default function CheckoutPage({
         } catch (err: any) {
           setStep('details');
           setError(
-            `${
-              err?.message || 'Payment verification failed.'
-            } If money was deducted it will be reconciled automatically — quote order ID ${newOrderId} if you need to contact support.`
+            `${err?.message || t.errors.verificationFailedDefault}${t.errors.verificationFailedSuffix(newOrderId)}`
           );
           return;
         }
@@ -673,9 +669,7 @@ export default function CheckoutPage({
       modal: {
         ondismiss: () => {
           setStep('details');
-          setError(
-            'Payment was cancelled — nothing was charged. You can try paying again.'
-          );
+          setError(t.errors.paymentCancelled);
         },
       },
     };
@@ -686,7 +680,7 @@ export default function CheckoutPage({
 
     rzp.on('payment.failed', (resp: any) => {
       setStep('details');
-      setError(`Payment failed: ${resp?.error?.description || 'please try again.'}`);
+      setError(`${t.errors.paymentFailedPrefix}${resp?.error?.description || t.errors.paymentFailedDefaultSuffix}`);
     });
 
     rzp.open();
@@ -702,15 +696,15 @@ export default function CheckoutPage({
       !city.trim() ||
       !pincode.trim()
     ) {
-      setError('Please fill in all required fields.');
+      setError(t.errors.requiredFields);
       return;
     }
     if (email.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
-      setError('Please enter a valid email address.');
+      setError(t.errors.invalidEmail);
       return;
     }
     if (cleanDigits(phone).length < 10) {
-      setError('Please enter a valid 10-digit phone number.');
+      setError(t.errors.invalidPhone);
       return;
     }
 
@@ -729,16 +723,16 @@ export default function CheckoutPage({
           <button
             onClick={onBack}
             className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-gray-500 transition-colors hover:text-gray-900"
-            aria-label="Back to shop"
+            aria-label={t.backToShopAria}
           >
             <ArrowLeft size={16} />
-            <span className="hidden sm:inline">Back to Shop</span>
-            <span className="sm:hidden">Back</span>
+            <span className="hidden sm:inline">{t.backToShopFull}</span>
+            <span className="sm:hidden">{t.backToShopShort}</span>
           </button>
 
           <div className="flex items-center gap-2">
             <AppLogo variant="light" className="h-6 w-auto object-contain sm:h-7" />
-            <span className="text-gray-300 font-medium text-sm">| Checkout</span>
+            <span className="text-gray-300 font-medium text-sm">| {t.checkoutLabel}</span>
           </div>
 
         </div>
@@ -753,12 +747,12 @@ export default function CheckoutPage({
             <div className="w-14 h-14 rounded-md bg-gray-100 text-[#111111] flex items-center justify-center mx-auto mb-4">
               <ShoppingBag size={26} />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Your Cart is Empty</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">{t.emptyCart.title}</h3>
             <p className="text-sm text-gray-500 mb-6">
-              Add a weatherproof smart QR safety tag to protect your vehicle, pet, or valuable assets.
+              {t.emptyCart.description}
             </p>
             <FlowButton tone="dark" fullWidth onClick={onBack}>
-              Browse Products
+              {t.emptyCart.browseButton}
             </FlowButton>
           </div>
         )}
@@ -774,11 +768,11 @@ export default function CheckoutPage({
               <div className="p-4 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start gap-3">
                 <CheckCircle2 size={20} className="text-emerald-600 shrink-0 mt-0.5" />
                 <div className="min-w-0">
-                  <p className="font-bold text-sm sm:text-base">Your sticker is free!</p>
+                  <p className="font-bold text-sm sm:text-base">{t.freeStickerBanner.title}</p>
                   <p className="text-xs sm:text-sm text-emerald-800 mt-0.5 leading-relaxed">
-                    You only pay ₹{total}, and the full ₹{total} is added to your RepiQR balance.
+                    {t.freeStickerBanner.description(total)}
                     {isLoggedIn && (
-                      <> Linked to <strong className="break-all">{profile?.email || email}</strong>.</>
+                      <> {t.freeStickerBanner.linkedTo} <strong className="break-all">{profile?.email || email}</strong>.</>
                     )}
                   </p>
                 </div>
@@ -789,14 +783,14 @@ export default function CheckoutPage({
                 <div className="p-3.5 rounded-md bg-gray-50 border border-gray-200 text-gray-900 text-xs sm:text-sm flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <User size={16} className="text-[#111111] shrink-0" />
-                    <span>Quick guest checkout — no password required.</span>
+                    <span>{t.guestBanner.message}</span>
                   </div>
                   <button
                     type="button"
                     onClick={onOpenLogin}
                     className="font-bold text-gray-950 underline hover:text-black shrink-0 cursor-pointer"
                   >
-                    Log In
+                    {t.guestBanner.logIn}
                   </button>
                 </div>
               )}
@@ -810,20 +804,20 @@ export default function CheckoutPage({
                       1
                     </span>
                     <div>
-                      <h2 className="font-extrabold text-sm sm:text-base text-[#14120C]">Contact Information</h2>
-                      <p className="text-[11px] text-[#14120C]/50">Where should we send your order confirmation and tag updates?</p>
+                      <h2 className="font-extrabold text-sm sm:text-base text-[#14120C]">{t.contactSection.title}</h2>
+                      <p className="text-[11px] text-[#14120C]/50">{t.contactSection.subtitle}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
                     <div>
                       <label className="block text-sm font-medium text-gray-900 mb-1.5">
-                        Full Name *
+                        {t.contactSection.fullNameLabel}
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. Rahul Sharma"
-                        aria-label="Full Name"
+                        placeholder={t.contactSection.fullNamePlaceholder}
+                        aria-label={t.contactSection.fullNameAria}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         className="w-full h-11 px-3.5 rounded-md border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
@@ -832,7 +826,7 @@ export default function CheckoutPage({
 
                     <div>
                       <label className="block text-sm font-medium text-gray-900 mb-1.5">
-                        Phone Number *
+                        {t.contactSection.phoneLabel}
                       </label>
                       <PhoneInputWithCountry
                         value={phone}
@@ -843,13 +837,13 @@ export default function CheckoutPage({
 
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-1.5">
-                      Email Address (Optional)
+                      {t.contactSection.emailLabel}
                     </label>
                     <div className="relative">
                       <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input
                         type="email"
-                        placeholder="e.g. rahul@example.com (optional)"
+                        placeholder={t.contactSection.emailPlaceholder}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="w-full h-11 pl-10 pr-3.5 rounded-md border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
@@ -865,20 +859,20 @@ export default function CheckoutPage({
                       2
                     </span>
                     <div>
-                      <h2 className="font-semibold text-sm sm:text-base text-gray-900">Shipping Address</h2>
-                      <p className="text-xs text-gray-500">Physical stickers delivered in 2–3 business days across India</p>
+                      <h2 className="font-semibold text-sm sm:text-base text-gray-900">{t.addressSection.title}</h2>
+                      <p className="text-xs text-gray-500">{t.addressSection.subtitle}</p>
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-1.5">
-                      Street Address / House / Flat *
+                      {t.addressSection.streetLabel}
                     </label>
                     <div className="relative">
                       <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input
                         type="text"
-                        placeholder="Flat 402, Green Heights, Opp. City Park"
+                        placeholder={t.addressSection.streetPlaceholder}
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
                         className="w-full h-11 pl-10 pr-3.5 rounded-md border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
@@ -889,11 +883,11 @@ export default function CheckoutPage({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-900 mb-1.5">
-                        Pincode *
+                        {t.addressSection.pincodeLabel}
                       </label>
                       <input
                         type="text"
-                        placeholder="560001"
+                        placeholder={t.addressSection.pincodePlaceholder}
                         inputMode="numeric"
                         maxLength={6}
                         value={pincode}
@@ -904,24 +898,24 @@ export default function CheckoutPage({
                       />
                       {pincodeStatus === 'looking' && (
                         <span className="text-xs text-gray-500 mt-1 block">
-                          Looking up location…
+                          {t.addressSection.pincodeLookingUp}
                         </span>
                       )}
                       {pincodeStatus === 'found' && (
                         <span className="text-xs text-emerald-600 font-medium mt-1 block">
-                          ✓ City &amp; State found
+                          {t.addressSection.pincodeFound}
                         </span>
                       )}
                       {pincodeStatus === 'not-found' && (
                         <span className="text-xs text-gray-500 mt-1 block">
-                          Enter city manually
+                          {t.addressSection.pincodeNotFound}
                         </span>
                       )}
                     </div>
 
                     <AutocompleteField
-                      label="City *"
-                      placeholder="Bengaluru"
+                      label={t.addressSection.cityLabel}
+                      placeholder={t.addressSection.cityPlaceholder}
                       value={city}
                       onChange={setCity}
                       onSelect={(selected) => {
@@ -932,8 +926,8 @@ export default function CheckoutPage({
                     />
 
                     <AutocompleteField
-                      label="State *"
-                      placeholder="Karnataka"
+                      label={t.addressSection.stateLabel}
+                      placeholder={t.addressSection.statePlaceholder}
                       value={state}
                       onChange={setState}
                       suggestions={INDIAN_STATES}
@@ -952,11 +946,11 @@ export default function CheckoutPage({
                 {/* Submit Action */}
                 <FlowButton type="submit" tone="dark" fullWidth>
                   <Lock size={14} />
-                  Pay ₹{total} &amp; Add to Balance
+                  {t.payButton(total)}
                 </FlowButton>
 
                 <p className="text-center text-xs text-gray-500 leading-relaxed">
-                  By proceeding you agree to RepiQR Terms of Service &amp; Privacy Policy. Free replacement within 7 days.
+                  {t.termsNotice}
                 </p>
 
               </form>
@@ -969,10 +963,10 @@ export default function CheckoutPage({
                 <div className="flex items-center justify-between pb-3.5 border-b border-gray-100">
                   <div className="flex items-center gap-2 font-semibold text-gray-900 text-base">
                     <Lock size={16} className="text-gray-900" />
-                    <span>Order Summary</span>
+                    <span>{t.orderSummary.title}</span>
                   </div>
                   <span className="text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-md">
-                    {cart.reduce((s, i) => s + i.qty, 0)} Items
+                    {t.orderSummary.itemsCount(cart.reduce((s, i) => s + i.qty, 0))}
                   </span>
                 </div>
 
@@ -992,10 +986,10 @@ export default function CheckoutPage({
                         <div className="font-bold text-[13px] text-[#14120C] truncate">
                           {item.product.name}
                         </div>
-                        <div className="text-[11px] text-[#14120C]/50 font-semibold mt-0.5">Qty: {item.qty}</div>
+                        <div className="text-[11px] text-[#14120C]/50 font-semibold mt-0.5">{t.orderSummary.qty(item.qty)}</div>
                       </div>
                       <div className="font-bold text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                        FREE
+                        {t.orderSummary.free}
                       </div>
                     </div>
                   ))}
@@ -1004,23 +998,23 @@ export default function CheckoutPage({
                 {/* Price Breakdown */}
                 <div className="space-y-2.5 pt-4 border-t border-[#14120C]/8 text-[13px]">
                   <div className="flex items-center justify-between text-[#14120C]/70 font-medium">
-                    <span>Stickers</span>
-                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md text-xs">FREE</span>
+                    <span>{t.orderSummary.stickersLabel}</span>
+                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md text-xs">{t.orderSummary.free}</span>
                   </div>
                   <div className="flex items-center justify-between text-[#14120C]/70 font-medium">
-                    <span>Delivery (2-3 Days)</span>
-                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md text-xs">FREE</span>
+                    <span>{t.orderSummary.deliveryLabel}</span>
+                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md text-xs">{t.orderSummary.free}</span>
                   </div>
                   <div className="flex items-center justify-between text-[#14120C]/70 font-medium">
-                    <span>Balance top-up</span>
+                    <span>{t.orderSummary.balanceTopupLabel}</span>
                     <span className="font-bold text-[#14120C]">₹{total}</span>
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-[#14120C]/10 text-lg font-extrabold text-[#14120C]">
-                    <span>Total Amount</span>
+                    <span>{t.orderSummary.totalAmountLabel}</span>
                     <span className="text-[#14120C] font-black">₹{total}</span>
                   </div>
                   <p className="text-xs font-semibold text-emerald-700">
-                    ₹{total} will be added to your balance.
+                    {t.orderSummary.balanceAddedNote(total)}
                   </p>
                 </div>
 
@@ -1028,11 +1022,11 @@ export default function CheckoutPage({
                 <div className="pt-3 border-t border-[#14120C]/8 space-y-2">
                   <div className="flex items-center gap-2 text-[11px] font-semibold text-[#14120C]/60">
                     <ShieldCheck size={14} className="text-[#16A34A] shrink-0" />
-                    <span>256-bit SSL encrypted &amp; verified payment</span>
+                    <span>{t.orderSummary.sslBadge}</span>
                   </div>
                   <div className="flex items-center gap-2 text-[11px] font-semibold text-[#14120C]/60">
                     <Truck size={14} className="text-[#14120C] shrink-0" />
-                    <span>Free replacement within 7 days if damaged</span>
+                    <span>{t.orderSummary.replacementBadge}</span>
                   </div>
                 </div>
 
@@ -1046,9 +1040,9 @@ export default function CheckoutPage({
         {step === 'processing' && (
           <div className="max-w-md mx-auto my-16 p-8 bg-white rounded-lg border border-gray-200 shadow-lg text-center space-y-3.5">
             <div className="w-14 h-14 rounded-full border-4 border-[#111111] border-t-transparent animate-spin mx-auto" />
-            <h3 className="text-lg font-bold text-gray-950">Processing Payment Securely</h3>
+            <h3 className="text-lg font-bold text-gray-950">{t.processing.title}</h3>
             <p className="text-sm text-gray-500">
-              Please do not close or refresh this page. Connecting to Razorpay…
+              {t.processing.description}
             </p>
           </div>
         )}
@@ -1061,13 +1055,13 @@ export default function CheckoutPage({
             </div>
 
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Order Confirmed!</h2>
+              <h2 className="text-2xl font-bold text-gray-900">{t.success.title}</h2>
               <p className="text-sm text-gray-600 mt-1.5">
-                Thank you, <span className="font-semibold text-gray-900">{name.trim()}</span>! Your order{' '}
+                {t.success.thankYouPrefix}<span className="font-semibold text-gray-900">{name.trim()}</span>{t.success.orderPrefix}
                 <span className="font-mono font-medium text-gray-900 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
                   {orderId}
-                </span>{' '}
-                is confirmed and <span className="font-semibold text-gray-900">₹{confirmedTotal}</span> has been added to your balance.
+                </span>
+                {t.success.confirmedPrefix}<span className="font-semibold text-gray-900">₹{confirmedTotal}</span>{t.success.balanceSuffix}
               </p>
             </div>
 
@@ -1076,7 +1070,7 @@ export default function CheckoutPage({
                 onClick={() => setIsInvoiceModalOpen(true)}
                 className="text-xs font-semibold text-gray-600 hover:text-black underline underline-offset-2 cursor-pointer"
               >
-                View Invoice
+                {t.success.viewInvoice}
               </button>
             )}
 
@@ -1091,7 +1085,7 @@ export default function CheckoutPage({
                       onClick={() => onRegisterSticker(s.id)}
                       className="w-full py-2.5 px-4 rounded-md bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-between gap-2 cursor-pointer shadow-xs"
                     >
-                      <span className="capitalize">Register {cleanName} Tag</span>
+                      <span className="capitalize">{t.success.registerTag(cleanName)}</span>
                       <ArrowRight size={13} />
                     </button>
                   );
@@ -1102,24 +1096,24 @@ export default function CheckoutPage({
             {recognized ? (
               <div className="flex flex-col sm:flex-row gap-2">
                 <FlowButton tone="dark" size="sm" className="flex-1" onClick={onViewDashboard}>
-                  Open Client Dashboard
+                  {t.success.openDashboard}
                 </FlowButton>
                 {onTrackOrder && (
                   <FlowButton size="sm" onClick={() => onTrackOrder(orderId, phone.trim())}>
                     <Truck size={13} />
-                    Track Order
+                    {t.success.trackOrder}
                   </FlowButton>
                 )}
               </div>
             ) : (
               <div className="flex flex-col sm:flex-row gap-2">
                 <FlowButton tone="dark" size="sm" className="flex-1" onClick={() => setDashboardAccessOpen(true)}>
-                  Access Dashboard
+                  {t.success.accessDashboard}
                 </FlowButton>
                 {onTrackOrder && (
                   <FlowButton size="sm" onClick={() => onTrackOrder(orderId, phone.trim())}>
                     <Truck size={13} />
-                    Track Order
+                    {t.success.trackOrder}
                   </FlowButton>
                 )}
               </div>

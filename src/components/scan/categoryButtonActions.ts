@@ -47,9 +47,9 @@ export interface CategoryActionDeps {
    `strict`, where boolean-literal discriminants don't narrow reliably. */
 export type CategoryActionResult =
   | { kind: "providers"; providers: ServiceProvider[] }
-  | { kind: "sms"; ownerNotified: boolean; simulated: boolean; message: string }
+  | { kind: "sms"; ownerNotified: boolean; simulated: boolean; message: string; smsResult?: any }
   | { kind: "chat" }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; errorDetails?: any };
 
 export const NO_PROVIDER_MESSAGE = "No service provider is currently available.";
 
@@ -112,9 +112,14 @@ export async function handleCategoryButtonAction(
           ownerNotified: Boolean(res.smsResult?.sent),
           simulated: Boolean(res.smsResult?.simulated),
           message: body,
+          smsResult: res.smsResult,
         };
-      } catch {
-        return { kind: "error", message: "Couldn't reach the server — the owner was not notified. Try again." };
+      } catch (err: any) {
+        return {
+          kind: "error",
+          message: err?.message || "Couldn't reach the server — the owner was not notified. Try again.",
+          errorDetails: err,
+        };
       }
     }
 

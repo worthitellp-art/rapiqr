@@ -3,6 +3,8 @@ import { X, ShieldCheck, AlertCircle, RotateCcw } from 'lucide-react';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
 import { FlowButton } from '../ui/flow-button';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { joinUsTranslations } from '../../i18n/joinUsTranslations';
 import { sendMsg91Otp, verifyMsg91Otp, retryMsg91Otp, toMsg91Identifier } from '../../lib/msg91Widget';
 import {
   checkOtpRateLimit,
@@ -13,11 +15,6 @@ import {
   MAX_OTP_ATTEMPTS,
 } from '../../lib/otpRateLimit';
 import { useOtpLock } from '../../lib/useOtpLock';
-
-const sendLockedMessage = (time: string) =>
-  `You've used all ${MAX_OTP_ATTEMPTS} code requests. For your security, new codes are locked for 1 hour — try again in ${time}.`;
-const verifyLockedMessage = (time: string) =>
-  `Too many incorrect codes (${MAX_OTP_ATTEMPTS}/${MAX_OTP_ATTEMPTS}). For your security, verification is locked for 1 hour — try again in ${time}.`;
 
 interface DashboardAccessModalProps {
   isOpen: boolean;
@@ -35,6 +32,8 @@ interface DashboardAccessModalProps {
  */
 export default function DashboardAccessModal({ isOpen, initialPhone, onClose, onSuccess }: DashboardAccessModalProps) {
   const { sendPhoneLoginOtp, verifyPhoneLoginOtp } = useAuth();
+  const { language } = useLanguage();
+  const t = joinUsTranslations[language].dashboardAccessModal;
 
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [phoneNumber, setPhoneNumber] = useState(initialPhone ? `+91 ${initialPhone.replace(/\D/g, '').slice(-10)}` : '');
@@ -63,7 +62,7 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
     event.preventDefault();
     setErrorMessage(null);
     if (phoneDigits.length < 10) {
-      setErrorMessage('Please enter a valid 10-digit mobile number.');
+      setErrorMessage(t.invalidPhone);
       return;
     }
 
@@ -72,8 +71,8 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
     if (rateStatus.isLocked) {
       refreshLock();
       setErrorMessage(rateStatus.verifyAttempts >= MAX_OTP_ATTEMPTS
-        ? verifyLockedMessage(rateStatus.remainingTimeStr)
-        : sendLockedMessage(rateStatus.remainingTimeStr));
+        ? t.verifyLockedMessage(MAX_OTP_ATTEMPTS, rateStatus.remainingTimeStr)
+        : t.sendLockedMessage(MAX_OTP_ATTEMPTS, rateStatus.remainingTimeStr));
       return;
     }
 
@@ -81,7 +80,7 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
     try {
       const preflight = await sendPhoneLoginOtp(finalPhone);
       if (!preflight.success) {
-        setErrorMessage(preflight.error || 'Failed to send verification code.');
+        setErrorMessage(preflight.error || t.sendFailed);
         return;
       }
       await sendMsg91Otp(toMsg91Identifier(finalPhone));
@@ -93,7 +92,7 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
       setStep('otp');
       setCountdown(30);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to send verification code.');
+      setErrorMessage(err.message || t.sendFailed);
     } finally {
       setIsSubmitting(false);
     }
@@ -107,13 +106,13 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
     const rateStatus = checkOtpRateLimit(finalPhone, 'verify');
     if (rateStatus.isLocked) {
       refreshLock();
-      setErrorMessage(verifyLockedMessage(rateStatus.remainingTimeStr));
+      setErrorMessage(t.verifyLockedMessage(MAX_OTP_ATTEMPTS, rateStatus.remainingTimeStr));
       return;
     }
 
     const cleanOtp = otpCode.trim();
     if (!cleanOtp) {
-      setErrorMessage('Please enter the verification code.');
+      setErrorMessage(t.pleaseEnterCode);
       return;
     }
     setIsSubmitting(true);
@@ -124,11 +123,11 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
         const failResult = recordOtpVerifyFailure(finalPhone);
         refreshLock();
         if (failResult.isLocked) {
-          setErrorMessage(verifyLockedMessage(failResult.remainingTimeStr));
+          setErrorMessage(t.verifyLockedMessage(MAX_OTP_ATTEMPTS, failResult.remainingTimeStr));
         } else {
           const remainingTries = MAX_OTP_ATTEMPTS - failResult.attempts;
           setErrorMessage(
-            `${result.error || 'Verification failed.'} (${remainingTries} attempt${remainingTries !== 1 ? 's' : ''} left before 4-hour lock)`
+            `${result.error || t.verificationFailed}${t.attemptsLeftSuffix(remainingTries)}`
           );
         }
         return;
@@ -140,11 +139,11 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
       const failResult = recordOtpVerifyFailure(finalPhone);
       refreshLock();
       if (failResult.isLocked) {
-        setErrorMessage(verifyLockedMessage(failResult.remainingTimeStr));
+        setErrorMessage(t.verifyLockedMessage(MAX_OTP_ATTEMPTS, failResult.remainingTimeStr));
       } else {
         const remainingTries = MAX_OTP_ATTEMPTS - failResult.attempts;
         setErrorMessage(
-          `${err.message || 'Incorrect code — please try again.'} (${remainingTries} attempt${remainingTries !== 1 ? 's' : ''} left before 4-hour lock)`
+          `${err.message || t.incorrectCodeTryAgain}${t.attemptsLeftSuffix(remainingTries)}`
         );
       }
     } finally {
@@ -160,7 +159,7 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
     const rateStatus = checkOtpRateLimit(finalPhone, 'send');
     if (rateStatus.isLocked) {
       refreshLock();
-      setErrorMessage(sendLockedMessage(rateStatus.remainingTimeStr));
+      setErrorMessage(t.sendLockedMessage(MAX_OTP_ATTEMPTS, rateStatus.remainingTimeStr));
       return;
     }
 
@@ -173,7 +172,7 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
       } catch (retryErr) {
         console.warn('retryMsg91Otp failed, falling back to a fresh send:', retryErr);
         const preflight = await sendPhoneLoginOtp(finalPhone);
-        if (!preflight.success) throw new Error(preflight.error || 'Failed to resend the code.');
+        if (!preflight.success) throw new Error(preflight.error || t.resendFailed);
         await sendMsg91Otp(toMsg91Identifier(finalPhone));
       }
 
@@ -182,7 +181,7 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
       setOtpCode('');
       setCountdown(30);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to resend the code.');
+      setErrorMessage(err.message || t.resendFailed);
     } finally {
       setIsSubmitting(false);
     }
@@ -191,7 +190,7 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
   return (
     <div className="fixed inset-0 z-[510] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in" onClick={onClose}>
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden relative border border-slate-100/80 p-7 sm:p-8 space-y-5" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-5 right-5 w-9 h-9 rounded-md bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors cursor-pointer" aria-label="Close">
+        <button onClick={onClose} className="absolute top-5 right-5 w-9 h-9 rounded-md bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors cursor-pointer" aria-label={t.close}>
           <X size={18} />
         </button>
 
@@ -199,11 +198,11 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
           <div className="w-13 h-13 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto mb-3.5">
             <ShieldCheck size={24} />
           </div>
-          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Access Your Dashboard</h2>
+          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">{t.title}</h2>
           <p className="mt-1.5 text-xs text-slate-500">
             {step === 'phone'
-              ? 'Verify your number — your tag is already linked to it.'
-              : `Enter the code sent to ${phoneNumber}`}
+              ? t.verifyPrompt
+              : t.enterCodeSentTo(phoneNumber)}
           </p>
         </div>
 
@@ -211,12 +210,12 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
           <div className="p-3.5 rounded-md bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold flex items-start gap-2">
             <AlertCircle size={15} className="mt-0.5 shrink-0 text-amber-700" />
             <div>
-              <p className="font-bold">Locked for 1 hour</p>
+              <p className="font-bold">{t.lockedTitle}</p>
               <p className="text-[11.5px] text-amber-800 mt-0.5">
                 {step === 'otp'
-                  ? `${MAX_OTP_ATTEMPTS} incorrect codes entered.`
-                  : `${MAX_OTP_ATTEMPTS} attempts used.`}{' '}
-                Try again in <span className="font-bold font-mono">{formatRemainingTime(bannerLockMs)}</span>.
+                  ? `${MAX_OTP_ATTEMPTS} ${t.incorrectCodesEntered}`
+                  : `${MAX_OTP_ATTEMPTS} ${t.attemptsUsed}`}{' '}
+                {t.tryAgainIn} <span className="font-bold font-mono">{formatRemainingTime(bannerLockMs)}</span>.
               </p>
             </div>
           </div>
@@ -234,7 +233,7 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
             <PhoneInputWithCountry
               value={phoneNumber}
               onChange={(full, digits) => { setPhoneNumber(full); setPhoneDigits(digits); }}
-              placeholder="10-digit mobile number"
+              placeholder={t.phonePlaceholder}
             />
             <FlowButton
               type="submit"
@@ -242,7 +241,7 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
               loading={isSubmitting}
               disabled={phoneDigits.length < 10 || sendLockMs > 0}
             >
-              {sendLockMs > 0 ? `Locked · ${formatRemainingTime(sendLockMs)}` : 'Send Verification Code'}
+              {sendLockMs > 0 ? t.locked(formatRemainingTime(sendLockMs)) : t.sendCode}
             </FlowButton>
           </form>
         ) : (
@@ -254,7 +253,7 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
               maxLength={4}
               value={otpCode}
               onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              placeholder="Enter code"
+              placeholder={t.otpPlaceholder}
               autoFocus
               disabled={verifyLockMs > 0}
               className="w-full text-center tracking-[0.4em] font-mono text-xl h-12 rounded-md border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black outline-none text-gray-900 placeholder:text-gray-300 disabled:bg-gray-100"
@@ -265,11 +264,11 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
               loading={isSubmitting}
               disabled={!otpCode.trim() || verifyLockMs > 0}
             >
-              {verifyLockMs > 0 ? `Locked (${formatRemainingTime(verifyLockMs)})` : 'Verify & Continue'}
+              {verifyLockMs > 0 ? `${t.lockedWord} (${formatRemainingTime(verifyLockMs)})` : t.verifyAndContinue}
             </FlowButton>
             <div className="flex items-center justify-between pt-1 text-xs">
               <button type="button" onClick={() => { setStep('phone'); setOtpCode(''); setErrorMessage(null); }} className="text-gray-500 hover:text-black font-medium transition-colors cursor-pointer">
-                Change phone number
+                {t.changePhoneNumber}
               </button>
               <button
                 type="button"
@@ -280,10 +279,10 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
                 <RotateCcw size={12} />
                 <span>
                   {sendLockMs > 0
-                    ? `No more codes · ${formatRemainingTime(sendLockMs)}`
+                    ? t.noMoreCodes(formatRemainingTime(sendLockMs))
                     : countdown > 0
-                    ? `Resend in ${countdown}s`
-                    : 'Resend code'}
+                    ? t.resendIn(countdown)
+                    : t.resendCode}
                 </span>
               </button>
             </div>

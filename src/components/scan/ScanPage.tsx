@@ -9,6 +9,7 @@ import { getCategoryVariant, BESPOKE_CATEGORIES, type VariantAction } from "./ca
 import type { CategoryButtonAction, ServiceProvider } from "./tileActions";
 import { handleCategoryButtonAction } from "./categoryButtonActions";
 import SentToast, { type SentToastTone } from "./SentToast";
+import WhatsAppErrorModal, { type WhatsAppErrorDetails } from "./WhatsAppErrorModal";
 import { apiClient } from "../../lib/apiClient";
 import { isRunningInstalled, useInstallPrompt } from "../../lib/pwaInstall";
 import PwaInstallModal from "../common/PwaInstallModal";
@@ -689,6 +690,29 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
   const [maskedCallBusy, setMaskedCallBusy] = useState(false);
   const [maskedCallError, setMaskedCallError] = useState<string | null>(null);
 
+  // Structured WhatsApp error modal state — displays what failed, why, origin (App vs MSG91), and next safe action
+  const [waErrorModal, setWaErrorModal] = useState<WhatsAppErrorDetails | null>(null);
+
+  const triggerWhatsAppErrorModal = (errorData: any, fallback?: Partial<WhatsAppErrorDetails>) => {
+    const target = errorData?.error || errorData;
+    const parsed: WhatsAppErrorDetails = {
+      code: target?.code || fallback?.code || "WHATSAPP_DISPATCH_FAILED",
+      source: target?.source || fallback?.source || "app",
+      sourceLabel: target?.sourceLabel || fallback?.sourceLabel || (target?.source === "msg91" ? "MSG91 Gateway" : "RepiQR Application"),
+      whatFailed: target?.whatFailed || fallback?.whatFailed || "WhatsApp alert delivery failed",
+      whyFailed: target?.whyFailed || fallback?.whyFailed || target?.detail || target?.message || "The WhatsApp notification could not be dispatched.",
+      safeNextAction: target?.safeNextAction || fallback?.safeNextAction || "You can use the in-app chat to message the owner directly, or initiate a masked call.",
+      retryAfterSec: target?.retryAfterSec ?? fallback?.retryAfterSec ?? null,
+      technicalDetails: target?.technicalDetails || fallback?.technicalDetails || {
+        statusCode: target?.statusCode,
+        originalError: target?.originalError || target?.message,
+        originalCode: target?.originalCode || target?.code,
+        rawResponse: target?.rawResponse,
+      },
+    };
+    setWaErrorModal(parsed);
+  };
+
   const fetchMaskedCallNumber = async (target: { label: string; contactName?: string; helplineId?: string }) => {
     if (!qrData && !target.helplineId) return;
     setMaskedCallBusy(true);
@@ -832,7 +856,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
     // 2. Post alert to backend server
     let delivered = true;
-    let smsResult: { sent?: boolean; simulated?: boolean; reason?: string; detail?: string | null; retryAfterSec?: number | null } | null = null;
+    let smsResult: { sent?: boolean; simulated?: boolean; reason?: string; detail?: string | null; retryAfterSec?: number | null; error?: any } | null = null;
     let contactsNotified = 0;
     try {
       const res = await apiClient.alerts.createAlert({
@@ -852,30 +876,40 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       });
       smsResult = res?.smsResult ?? null;
       contactsNotified = res?.contactsNotified || 0;
-    } catch {
+    } catch (err: any) {
       delivered = false;
+      triggerWhatsAppErrorModal(err, {
+        code: "NETWORK_UNREACHABLE",
+        source: "network",
+        sourceLabel: "Network / Connection Issue",
+        whatFailed: "Could not reach RepiQR API Server",
+        whyFailed: "The network request to dispatch the emergency WhatsApp alert failed or timed out.",
+        safeNextAction: "Check your internet connection or use the direct Masked Call option.",
+      });
     }
 
     // 3. WhatsApp is dispatched automatically by the backend (via MSG91) straight
     // to the owner — the visitor never sees the owner's number. Opening
     // api.whatsapp.com here would leak that number, so it is deliberately not done.
-    // The toast reports what the server actually did, so a held-back WhatsApp
-    // (cooldown) or a failed one is never shown as "sent".
     if (!delivered) {
-      showSentToast("Couldn't reach the server — please try again.", "error");
+      showSentToast("Couldn't reach server. WhatsApp alert could not be sent.", "error");
     } else if (smsResult?.sent) {
       showSentToast(
-        `Message sent to the owner via WhatsApp${contactsNotified > 0 ? ` · ${contactsNotified} emergency contact${contactsNotified === 1 ? "" : "s"} notified` : ""}`,
+        `Message sent to owner via WhatsApp${contactsNotified > 0 ? ` · ${contactsNotified} emergency contact${contactsNotified === 1 ? "" : "s"} notified` : ""}`,
         "success"
       );
     } else if (smsResult?.simulated) {
       showSentToast("Saved for the owner — WhatsApp is in test mode.", "warning");
     } else {
-      // The server's own explanation (cooldown with time left, monthly cap, provider
-      // error) is shown as-is, so the reason is never a guess.
       const heldBack = smsResult?.reason === "thread_cooldown" || smsResult?.reason === "debounce" || smsResult?.reason === "duplicate";
-      const reason = smsResult?.detail ?? "WhatsApp did not go out and the server gave no reason.";
-      showSentToast(`Saved to the owner's chat. WhatsApp not sent: ${reason}`, heldBack ? "warning" : "error");
+      const errDetails = smsResult?.error?.error || smsResult?.error;
+      const origin = errDetails?.sourceLabel || (errDetails?.source === 'msg91' ? 'MSG91 Gateway' : 'RepiQR Application');
+      const failReason = errDetails?.whyFailed || smsResult?.detail || "Notification dispatch failed.";
+      showSentToast(`[${origin}] ${failReason}`, heldBack ? "warning" : "error");
+
+      if (smsResult?.error) {
+        triggerWhatsAppErrorModal(smsResult.error);
+      }
     }
     if (smsResult?.retryAfterSec) setOwnerRetryAt(Date.now() + smsResult.retryAfterSec * 1000);
 
@@ -1085,15 +1119,38 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         alerts.unshift({ ...payload, id: Date.now(), status: "sent" });
         localStorage.setItem("namoqr-alerts", JSON.stringify(alerts));
 
-        // 2. Post alert to backend API server (triggers server logs & real Twilio SMS to the owner, if configured)
+        // 2. Post alert to backend API server (triggers server logs & real WhatsApp to the owner, if configured)
         let smsSent = false;
+        let alertRes: any = null;
         try {
-          const res = await apiClient.alerts.createAlert(payload);
-          smsSent = Boolean(res.smsResult?.sent);
-        } catch { /* alert still saved to localStorage above; server may be unreachable */ }
+          alertRes = await apiClient.alerts.createAlert(payload);
+          smsSent = Boolean(alertRes?.smsResult?.sent);
+          if (!smsSent && !alertRes?.smsResult?.simulated && alertRes?.smsResult?.error) {
+            triggerWhatsAppErrorModal(alertRes.smsResult.error);
+          }
+        } catch (err: any) {
+          triggerWhatsAppErrorModal(err, {
+            code: "NETWORK_UNREACHABLE",
+            source: "network",
+            sourceLabel: "Network / Connection Issue",
+            whatFailed: "Failed to dispatch message to server",
+            whyFailed: "The network request to send your message timed out or could not reach the server.",
+            safeNextAction: "Check your internet connection and try sending again.",
+          });
+        }
 
         const preview = `"${textToSend.slice(0, 35)}${textToSend.length > 35 ? '...' : ''}"`;
-        setCustomMsgSentBanner(smsSent ? `SMS & Alert dispatched to owner: ${preview}` : `Alert logged for owner: ${preview}`);
+        const errObj = alertRes?.smsResult?.error?.error || alertRes?.smsResult?.error;
+        const origin = errObj?.sourceLabel || (errObj?.source === 'msg91' ? 'MSG91' : 'RepiQR');
+        setCustomMsgSentBanner(
+          smsSent
+            ? `WhatsApp & Alert dispatched to owner: ${preview}`
+            : alertRes?.smsResult?.simulated
+              ? `Alert logged for owner (test mode): ${preview}`
+              : errObj?.whyFailed
+                ? `[${origin}] WhatsApp failed: ${errObj.whyFailed} (Message saved to history)`
+                : `Alert logged for owner: ${preview}`
+        );
         setVisitorMessage("");
 
         setTimeout(() => {
@@ -1166,14 +1223,30 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       setLiveSharing(true);
       if (notifiedOwner || contactsNotified > 0) {
         setLocationShareBanner(`Sharing live location — owner${contactsNotified > 0 ? ` & ${contactsNotified} emergency contact${contactsNotified === 1 ? "" : "s"}` : ""} notified.`);
+      } else if (res.smsResult?.simulated) {
+        setLocationShareBanner("Sharing live location — saved to owner's history (WhatsApp simulated).");
       } else {
-        setLocationShareBanner("Sharing live location — saved to the owner's alert history.");
+        const errObj = res.smsResult?.error?.error || res.smsResult?.error;
+        const origin = errObj?.sourceLabel || (errObj?.source === "msg91" ? "MSG91" : "RepiQR");
+        const reason = errObj?.whyFailed || res.smsResult?.detail || "WhatsApp could not be delivered.";
+        setLocationShareBanner(`Location saved to history, but WhatsApp failed [${origin}]: ${reason}`);
+        if (res.smsResult?.error) {
+          triggerWhatsAppErrorModal(res.smsResult.error);
+        }
       }
-    } catch {
-      setLocationShareBanner("Couldn't reach the server — please try again.");
+    } catch (err: any) {
+      setLocationShareBanner("Couldn't reach the server to share location — please try again.");
+      triggerWhatsAppErrorModal(err, {
+        code: "NETWORK_TIMEOUT",
+        source: "network",
+        sourceLabel: "Network / Gateway Timeout",
+        whatFailed: "Location share request timed out",
+        whyFailed: "The request took longer than 15 seconds to connect to the RepiQR server.",
+        safeNextAction: "Check your data connectivity and retry sharing location.",
+      });
     } finally {
       setLocationSharing(false);
-      setTimeout(() => setLocationShareBanner(null), 6000);
+      setTimeout(() => setLocationShareBanner(null), 8000);
     }
   };
 
@@ -1411,6 +1484,12 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         if (action.actionType === "SEND_SMS") {
           // Replace the "Sending…" pending toast rather than leaving it stuck.
           showSentToast(result.message, "error");
+          if (result.errorDetails) {
+            triggerWhatsAppErrorModal(result.errorDetails, {
+              whatFailed: "Category alert message failed to send",
+              whyFailed: result.message,
+            });
+          }
         } else {
           flashVariantBanner(result.message);
         }
@@ -1418,14 +1497,20 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       }
 
       if (result.kind === "sms") {
-        // Report what actually happened — the alert is always saved, but the
-        // WhatsApp itself can be simulated (no provider configured) or fail.
+        const errObj = result.smsResult?.error?.error || result.smsResult?.error;
+        const origin = errObj?.sourceLabel || (errObj?.source === "msg91" ? "MSG91 Gateway" : "RepiQR Application");
+        const failReason = errObj?.whyFailed || result.smsResult?.detail || "WhatsApp could not be delivered.";
+
+        if (!result.ownerNotified && !result.simulated && result.smsResult?.error) {
+          triggerWhatsAppErrorModal(result.smsResult.error);
+        }
+
         showSentToast(
           result.ownerNotified
             ? "Message sent to the owner via WhatsApp"
             : result.simulated
               ? "Logged for the owner — WhatsApp is in test mode, so nothing was delivered."
-              : "Saved to the owner's alert history, but the WhatsApp could not be delivered.",
+              : `[${origin}] ${failReason} (Saved to chat history)`,
           result.ownerNotified ? "success" : result.simulated ? "warning" : "error"
         );
       }
@@ -3429,6 +3514,22 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           </div>
         </div>
       )}
+
+      {/* WhatsApp Delivery Diagnostics & Error Modal */}
+      <WhatsAppErrorModal
+        isOpen={Boolean(waErrorModal)}
+        error={waErrorModal}
+        onClose={() => setWaErrorModal(null)}
+        onOpenChat={() => {
+          setWaErrorModal(null);
+          setChatOpen(true);
+        }}
+        onCallMasked={() => {
+          setWaErrorModal(null);
+          openMaskedCall("Owner");
+        }}
+        ownerPhoneAvailable={Boolean(qrData?.phoneNumber || qrData?.details?.ownerPhone || qrData?.details?.phone)}
+      />
     </div>
   );
 }

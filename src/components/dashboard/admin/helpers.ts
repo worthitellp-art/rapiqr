@@ -71,6 +71,28 @@ export function fmtDateTime(d: string) {
   }
 }
 
+export function mapRowToRecord(r: any): QrRecord {
+  return {
+    id: r.id,
+    qrUrl: qrFullUrl(r.id),
+    clientId: r.client_id,
+    createdAt: r.created_at,
+    scans: r.scans_count || 0,
+    status: r.status || "inactive",
+    template: r.template_name || "Default",
+    category: r.category || "car",
+    fg: r.fg_color || "D9581F",
+    bg: r.bg_color || "FFFFFF",
+    ownerPhone: r.owner_phone || undefined,
+    ownerName: r.owner_name || undefined,
+    vehicleNumber: r.vehicle_number || undefined,
+    activatedAt: r.activated_at || undefined,
+    labelName: r.label_name || undefined,
+    labelColor: r.label_color || undefined,
+    isPrinted: Boolean(r.is_printed),
+  };
+}
+
 // Sticker ids and recovery codes are no longer generated client-side — the
 // server derives the id FROM a server-generated recovery code (id-scheme v2,
 // HMAC-SHA256; see Server/services/stickerCrypto.js) so the two can never
@@ -159,4 +181,64 @@ export async function generateStickerBlob(rec: QrRecord, pos: StickerPos): Promi
     return null;
   }
 }
+
+const STABLE_SLOTS_STORAGE_KEY = "repiqr_stable_sticker_slots_v1";
+
+/**
+ * Ensures permanent, non-shifting slot numbering for stickers.
+ * If sticker #3 is deleted, sticker #4 remains #4 and does NOT become #3.
+ * New stickers receive the next unused slot number.
+ */
+export function getStableSlotMap(records: QrRecord[]): Map<string, number> {
+  let stored: Record<string, number> = {};
+  try {
+    const raw = localStorage.getItem(STICKABLE_SLOTS_STORAGE_KEY_SAFE());
+    if (raw) stored = JSON.parse(raw);
+  } catch {
+    stored = {};
+  }
+
+  const map = new Map<string, number>(Object.entries(stored));
+  let maxSlot = 0;
+  for (const s of map.values()) {
+    if (typeof s === "number" && s > maxSlot) maxSlot = s;
+  }
+
+  // Sort chronological (oldest first) so initial assignments are natural
+  const sorted = [...records].sort((a, b) => {
+    const ta = new Date(a.createdAt || 0).getTime();
+    const tb = new Date(b.createdAt || 0).getTime();
+    return ta - tb;
+  });
+
+  let changed = false;
+  for (const r of sorted) {
+    if (!map.has(r.id)) {
+      maxSlot += 1;
+      map.set(r.id, maxSlot);
+      stored[r.id] = maxSlot;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    try {
+      localStorage.setItem(STICKABLE_SLOTS_STORAGE_KEY_SAFE(), JSON.stringify(stored));
+    } catch {
+      // safe fallback
+    }
+  }
+
+  return map;
+}
+
+function STICKABLE_SLOTS_STORAGE_KEY_SAFE(): string {
+  return STABLE_SLOTS_STORAGE_KEY;
+}
+
+export function formatSlotNumber(slotNum?: number): string {
+  if (!slotNum || slotNum <= 0) return "#--";
+  return `#${String(slotNum).padStart(2, "0")}`;
+}
+
 
