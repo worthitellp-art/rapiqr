@@ -153,11 +153,11 @@ export default function Sidebar({
       </div>
 
       {/* ── Middle Section: Grouped Navigation Links ─────────── */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {groupedSections.map((group) => (
           <div key={group.section} className="space-y-0.5">
             {/* Section Header */}
-            <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--fx-sidebar-ink)]">
+            <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--fx-sidebar-ink)]">
               {group.section}
             </div>
 
@@ -176,7 +176,7 @@ export default function Sidebar({
                   type="button"
                   onClick={() => handleSelectPage(item.id)}
                   className={`
-                    w-full h-10 flex items-center justify-between px-3 rounded-[var(--fx-radius-control)] text-[17px] font-semibold transition-colors cursor-pointer group
+                    w-full h-9 flex items-center justify-between px-2.5 rounded-[8px] text-[13.5px] font-semibold transition-colors cursor-pointer group
                     ${
                       isActive
                         ? "bg-[var(--fx-accent)] text-white"

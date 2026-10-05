@@ -83,7 +83,7 @@ export default function QrCodesPage({
   const [labels, setLabels] = useLocalStorage<StickerLabel[]>("repiqr-custom-labels", DEFAULT_PRESET_LABELS);
 
   // Layout View Mode & Tab Segment
-  const [viewMode, setViewMode] = useState<ViewMode>("cards");
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [activeTab, setActiveTab] = useState<TabFilter>("all");
 
   // Single Unified Filter Bar State
@@ -481,7 +481,7 @@ export default function QrCodesPage({
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-950 text-white font-semibold text-xs hover:bg-black active:scale-98 transition-all shadow-xs cursor-pointer"
           >
             <Plus size={16} strokeWidth={2.4} />
-            <span>+ Create</span>
+            <span>Create</span>
           </button>
 
           {/* Export Fleet CSV */}

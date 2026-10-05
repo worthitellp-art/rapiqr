@@ -79,6 +79,10 @@ button, input, select, textarea {
 .custom-scrollbar-light::-webkit-scrollbar-thumb { background: #D0D5DD; border-radius: 3px; }
 .custom-scrollbar-light::-webkit-scrollbar-thumb:hover { background: #98A2B3; }
 
+/* Hides the scrollbar visually while still allowing scroll (used in admin sidebar nav) */
+.scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+
 @media(prefers-reduced-motion:reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
@@ -352,17 +356,12 @@ button, input, select, textarea {
   color: var(--fx-ink);
 }
 
-/* ── Dashboard theme (client + admin) ─────────────────────────────────────
-   Ported 1:1 from dashui.html's own token set (see that file's :root) — a
-   dark shell holding a floating white rounded "main" card, blue accent,
-   green progress fill. Distributor stays on the neutral palette above; this
-   stacks on `.fx-shell` via higher selector specificity, so everything
-   already written in var(--fx-*) repaints for free. Client and admin share
-   one value set (kept as one rule so they can't drift out of sync by
-   accident) — admin's sidebar is its own bespoke component, not the shared
-   FxSidebar, so this override never reaches Distributor's sidebar. */
-.fx-shell.client-theme,
-.fx-shell.admin-theme {
+/* ── Dashboard theme (client) ──────────────────────────────────────────────
+   Client dashboard keeps the original blue accent.  Admin dashboard has its
+   own rule below that overrides accent to near-black so every primary button
+   reads as black-on-white — matching the neutral house style the user expects.
+   Distributor stays on the base neutral palette; this never reaches it. */
+.fx-shell.client-theme {
   --fx-canvas: #F7F8FC;
   --fx-ink: #1B1E2E;
   --fx-ink-2: #6B7086;
@@ -373,6 +372,32 @@ button, input, select, textarea {
   --fx-accent-hover: #1557CC;
   --fx-accent-ink: #1A6BFF;
   --fx-accent-soft: #CFE0FB;
+  --fx-sidebar-bg: #111111;
+  --fx-sidebar-hover: #1F2230;
+  --fx-sidebar-ink: #5F6371;
+  --fx-radius-card: 18px;
+  --fx-radius-tile: 14px;
+  --fx-radius-control: 12px;
+  --fx-radius-pill: 10px;
+  --fx-radius-surface: 24px;
+}
+
+/* ── Dashboard theme (admin) ───────────────────────────────────────────────
+   Same layout/radius tokens as the client theme but accent is near-black so
+   every primary action button (fx-btn-primary, bg-[var(--fx-accent)], focus
+   rings, badges etc.) renders as black-on-white rather than blue, giving the
+   admin panel a clean, professional neutral palette. */
+.fx-shell.admin-theme {
+  --fx-canvas: #F7F8FC;
+  --fx-ink: #1B1E2E;
+  --fx-ink-2: #6B7086;
+  --fx-faint: #A0A5B8;
+  --fx-border: #EEF0F6;
+  --fx-border-strong: #D7DBE8;
+  --fx-accent: #17191F;
+  --fx-accent-hover: #2C2F3A;
+  --fx-accent-ink: #17191F;
+  --fx-accent-soft: #EFF1F3;
   --fx-sidebar-bg: #111111;
   --fx-sidebar-hover: #1F2230;
   --fx-sidebar-ink: #5F6371;

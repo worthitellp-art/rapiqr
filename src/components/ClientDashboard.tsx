@@ -1032,7 +1032,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   </div>
                   <button
                     onClick={() => handleBuyProduct(product)}
-                    className="mt-4 flex items-center justify-center gap-1.5 rounded-[var(--fx-radius-control)] bg-[var(--fx-accent)] py-2.5 text-xs font-bold text-white hover:bg-[var(--fx-accent-hover)] transition-colors cursor-pointer"
+                    className="mt-4 flex items-center justify-center gap-1.5 rounded-[var(--fx-radius-control)] bg-[var(--fx-ink)] py-2.5 text-xs font-bold text-white hover:bg-black transition-colors cursor-pointer"
                   >
                     {t.gate.getFreePrefix} <ArrowRight size={13} />
                   </button>
