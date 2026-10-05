@@ -4,7 +4,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { dashboardTranslations } from '../i18n/dashboardTranslations';
 import LanguageSwitcher from './common/LanguageSwitcher';
 import { FlowButton } from './ui/flow-button';
-import { ActivityDropdown } from './ui/activity-dropdown';
+import { Button } from './ui/button';
 import { getCategoryIcon, getCategoryLabel } from '../stickerModules';
 import {
   Bell,
@@ -27,7 +27,6 @@ import {
   ArrowRightLeft,
   Power,
   RefreshCw,
-  Sparkles,
   QrCode,
   Tag,
   Plus,
@@ -41,11 +40,10 @@ import {
   Zap,
   Wallet,
   Globe,
-  PanelLeftClose,
-  PanelLeftOpen,
+  PanelLeft,
+  Menu,
   BellRing,
   ShieldAlert,
-  ChevronRight,
   Clock,
   MapPin,
   Flame,
@@ -70,6 +68,7 @@ import { connectAsOwner } from '../lib/socketClient';
 import { soundNotification } from '../utils/soundNotification';
 import { sendMsg91Otp, verifyMsg91Otp, toMsg91Identifier } from '../lib/msg91Widget';
 import { stickerRef, useCodesRevealed } from '../lib/codeVisibility';
+import { isPushSupported, getExistingSubscription, subscribeToPush } from '../lib/push';
 import { CodeVisibilityToggleButton } from './dashboard/admin/StickerCodeComponents';
 
 async function getProductsFromDb(opts: { sync?: boolean } = {}): Promise<any[]> {
@@ -165,7 +164,7 @@ interface ClientDashboardProps {
   switchToDistributor?: () => void;
 }
 
-type TabId = 'setup' | 'overview' | 'products' | 'chat' | 'contacts' | 'history' | 'settings' | 'support';
+type TabId = 'overview' | 'products' | 'chat' | 'contacts' | 'history' | 'settings' | 'support';
 
 // `section` groups the flat list in the sidebar (a small uppercase label
 // renders above each run of items sharing a section); items with no
@@ -179,8 +178,7 @@ function buildNavItems(t: typeof dashboardTranslations['en']['client']): {
   return [
     { id: 'overview', label: t.nav.overview, icon: LayoutDashboard },
     { id: 'chat', label: t.nav.chat, icon: MessageSquareText },
-    { id: 'setup', label: t.nav.setup, icon: Sparkles, section: t.navSections.myTag },
-    { id: 'products', label: t.nav.products, icon: PackageCheck, section: t.navSections.myTag },
+    { id: 'products', label: t.nav.products, icon: PackageCheck },
     { id: 'contacts', label: t.nav.contacts, icon: Contact2, section: t.navSections.communication },
     { id: 'history', label: t.nav.history, icon: BellRing, section: t.navSections.communication },
     { id: 'settings', label: t.nav.settings, icon: SlidersHorizontal, section: t.navSections.account },
@@ -290,6 +288,12 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     });
   };
 
+  // Below `md` the docked sidebar (with its own collapse-to-icons mode) isn't
+  // used at all — there's no room for it, which is why it was unusable on
+  // phones. Mobile gets its own full-screen nav overlay instead, toggled
+  // independently of the desktop collapse state.
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   // ─── DASHBOARD PREPARATION SPLASH ANIMATION (Shopify Minimal Clean Look) ───
   const [isPreparing, setIsPreparing] = useState(true);
 
@@ -397,6 +401,41 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     }
   }, [profile?.phoneNumber]);
 
+  // Push-notification nudge: unlike the phone banner this has no "mark as
+  // done forever" write — permission state lives in the browser, not our
+  // account record, so every fresh page load re-checks it. Dismissing only
+  // hides it for this load (matches `profilePopupDismissed` above), which is
+  // deliberate: a denied/undecided permission should keep getting surfaced
+  // rather than going quiet after one dismissal.
+  const [notifSupported, setNotifSupported] = useState(false);
+  const [notifEnabled, setNotifEnabled] = useState(true); // assume granted until checked, so the banner never flashes on
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default');
+  const [notifBannerDismissed, setNotifBannerDismissed] = useState(false);
+  const [notifEnabling, setNotifEnabling] = useState(false);
+
+  useEffect(() => {
+    if (!isPushSupported()) {
+      setNotifSupported(false);
+      return;
+    }
+    setNotifSupported(true);
+    setNotifPermission(Notification.permission);
+    getExistingSubscription().then((sub) => setNotifEnabled(Boolean(sub))).catch(() => setNotifEnabled(false));
+  }, []);
+
+  const handleEnableNotifications = async () => {
+    setNotifEnabling(true);
+    const res = await subscribeToPush();
+    setNotifPermission(Notification.permission);
+    if (res.success) {
+      setNotifEnabled(true);
+      showToast('Notifications enabled');
+    } else {
+      showToast(res.error || 'Failed to enable notifications');
+    }
+    setNotifEnabling(false);
+  };
+
   const handleDismissProfilePopup = () => {
     setProfilePopupDismissed(true);
     try {
@@ -419,7 +458,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
       const saved = localStorage.getItem('repiqr-client-active-tab') || localStorage.getItem('namoqr-client-active-tab');
       // 'chat' is never restored from storage: a reload lands on the sticker
       // list, and chat opens only from an explicit tab=chat link or a click.
-      if (saved && ['setup', 'overview', 'products', 'contacts', 'history', 'settings', 'support'].includes(saved)) {
+      if (saved && ['overview', 'products', 'contacts', 'history', 'settings', 'support'].includes(saved)) {
         return saved as TabId;
       }
     } catch { /* fallback */ }
@@ -891,8 +930,6 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   const isPhoneComplete = isAdminAccount || Boolean(profile?.isPhoneVerified && profile?.phoneNumber);
   const isContactsComplete = totalContacts > 0;
   const isStickersComplete = activeCount > 0;
-  const completedSetupCount = [isPhoneComplete, isContactsComplete, isStickersComplete].filter(Boolean).length;
-  const setupPercent = Math.round((completedSetupCount / 3) * 100);
 
   // ─── DASHBOARD PREPARATION SPLASH LOADING ANIMATION (Vercel-style full-screen) ───
   if (isPreparing) {
@@ -929,7 +966,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   const hasPaidOrder = myOrders.some((o) => o?.payment?.status === 'paid');
   if (!isAdminAccount && !productsLoading && !myOrdersLoading && products.length === 0 && !hasPaidOrder && !skipPurchaseGate) {
     return (
-      <div className="fx-shell min-h-screen w-full bg-[var(--fx-canvas)] text-[var(--fx-ink)] font-body">
+      <div className="fx-shell client-theme min-h-screen w-full text-[var(--fx-ink)] font-body" style={{ background: 'var(--fx-canvas)' }}>
         <header className="flex items-center justify-between border-b border-[var(--fx-border)] bg-white px-5 py-4 sm:px-8">
           <button onClick={onBack} className="flex items-center gap-2 cursor-pointer">
             <AppLogo variant="light" className="h-8 w-auto object-contain" />
@@ -944,7 +981,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
             </span>
             <button
               onClick={handleSignOut}
-              className="flex items-center gap-1.5 rounded-lg border border-[var(--fx-border)] px-3 py-2 text-xs font-semibold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] cursor-pointer"
+              className="flex items-center gap-1.5 rounded-[var(--fx-radius-control)] border border-[var(--fx-border)] px-3 py-2 text-xs font-semibold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] cursor-pointer"
             >
               <LogOut size={14} /> {t.gate.logOut}
             </button>
@@ -954,7 +991,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
         <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
           <div className="mb-10 text-center">
 
-            <h1 className="text-2xl font-black tracking-tight text-[var(--fx-ink)] sm:text-3xl">
+            <h1 className="fx-text-heading-page text-[var(--fx-ink)]">
               {t.gate.heading}
             </h1>
 
@@ -980,11 +1017,11 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
             {shopProducts.map((product) => (
               <div
                 key={product.id}
-                className="flex flex-col overflow-hidden rounded-2xl border border-[var(--fx-border)] bg-white shadow-sm"
+                className="flex flex-col overflow-hidden rounded-[var(--fx-radius-card)] border border-[var(--fx-border)] bg-white shadow-sm"
               >
                 <div className="relative aspect-[16/10] overflow-hidden">
                   <img src={product.img} alt={product.name} className="h-full w-full object-cover" />
-                  <span className="absolute left-3 top-3 rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-medium text-white backdrop-blur-sm">
+                  <span className="absolute left-3 top-3 rounded-[var(--fx-radius-pill)] bg-black/50 px-2.5 py-1 text-[10px] font-medium text-white backdrop-blur-sm">
                     {product.badge}
                   </span>
                 </div>
@@ -995,7 +1032,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   </div>
                   <button
                     onClick={() => handleBuyProduct(product)}
-                    className="mt-4 flex items-center justify-center gap-1.5 rounded-lg bg-[var(--fx-ink)] py-2.5 text-xs font-bold text-white hover:opacity-90 cursor-pointer"
+                    className="mt-4 flex items-center justify-center gap-1.5 rounded-[var(--fx-radius-control)] bg-[var(--fx-accent)] py-2.5 text-xs font-bold text-white hover:bg-[var(--fx-accent-hover)] transition-colors cursor-pointer"
                   >
                     {t.gate.getFreePrefix} <ArrowRight size={13} />
                   </button>
@@ -1014,7 +1051,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
         )}
 
         {toastMsg && (
-          <div className="fixed bottom-6 right-6 z-[120] rounded-[9px] border border-[var(--fx-accent)] bg-[var(--fx-ink)] px-4 py-2.5 font-mono text-[13px] text-white shadow-lg">
+          <div className="fixed bottom-6 right-6 z-[120] rounded-[var(--fx-radius-control)] border border-[var(--fx-accent)] bg-[var(--fx-ink)] px-4 py-2.5 font-mono text-[13px] text-white shadow-lg">
             {toastMsg}
           </div>
         )}
@@ -1033,7 +1070,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
     <div className="flex min-h-0 flex-1">
       <section className={`${selectedChatSession ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col border-r border-[var(--fx-border)] bg-white md:w-[340px]`}>
         <div className="flex items-center justify-between px-4 pb-2 pt-4">
-          <h1 className="font-display text-[20px] font-bold text-[var(--fx-ink)]">{t.chatInbox.title}</h1>
+          <h1 className="fx-text-heading-brand text-[var(--fx-ink)]">{t.chatInbox.title}</h1>
           <button
             type="button"
             onClick={loadOwnerSessions}
@@ -1047,7 +1084,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
         </div>
 
         <div className="px-4 pb-3">
-          <label className="flex h-9 items-center gap-2 rounded-xl bg-[var(--fx-canvas)] px-3">
+          <label className="flex h-9 items-center gap-2 rounded-[var(--fx-radius-control)] bg-[var(--fx-canvas)] px-3">
             <Search size={15} className="text-[var(--fx-faint)]" />
             <input
               value={chatSearch}
@@ -1062,7 +1099,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                 key={f}
                 type="button"
                 onClick={() => setChatFilter(f)}
-                className={`h-7 rounded-full px-3 text-xs font-semibold cursor-pointer transition-colors ${
+                className={`h-7 rounded-[var(--fx-radius-pill)] px-3 text-xs font-semibold cursor-pointer transition-colors ${
                   chatFilter === f
                     ? 'bg-[var(--fx-accent-soft)] text-[var(--fx-accent)]'
                     : 'border border-[var(--fx-border)] text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]'
@@ -1157,33 +1194,33 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
   );
 
   return (
-    <div className="fx-shell flex h-screen w-full overflow-hidden text-[var(--fx-ink)] bg-[var(--fx-canvas)] font-body">
+    <div className="fx-shell client-theme flex h-screen w-full overflow-hidden text-[var(--fx-ink)] font-body" style={{ background: 'var(--fx-sidebar-bg)' }}>
 
       <div className="flex min-h-0 min-w-0 flex-1">
         {/* ─── COLLAPSIBLE SIDEBAR: expandable / collapsible navigation ─── */}
         <nav
           aria-label="Dashboard sections"
-          className={`flex shrink-0 flex-col border-r border-[var(--fx-border)] bg-white transition-[width] duration-300 ease-in-out z-30 ${
+          className={`hidden md:flex shrink-0 flex-col py-6 transition-[width] duration-300 ease-in-out z-30 ${
             isSidebarCollapsed ? 'w-[68px]' : 'w-[245px]'
           }`}
         >
           {/* Header Branding */}
-          <div className="flex h-[62px] shrink-0 items-center justify-between border-b border-[var(--fx-border)] px-3.5">
+          <div className="flex h-[62px] shrink-0 items-center justify-between px-3.5">
             {isSidebarCollapsed ? (
               <button
                 type="button"
                 onClick={onBack}
                 aria-label={t.chrome.home}
                 title={t.chrome.home}
-                className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--fx-ink)] text-sm font-black text-white cursor-pointer"
+                className="mx-auto flex h-9 w-9 items-center justify-center rounded-[var(--fx-radius-tile)] bg-[var(--fx-accent)] text-sm font-black text-white cursor-pointer"
               >
                 R
               </button>
             ) : (
               <>
                 <button onClick={onBack} className="flex items-center gap-2 cursor-pointer text-left">
-                  <AppLogo variant="light" className="h-7 w-auto object-contain" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--fx-accent)] bg-[var(--fx-accent-soft)] px-1.5 py-0.5 rounded">
+                  <AppLogo variant="dark" className="h-7 w-auto object-contain" />
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-white bg-[var(--fx-accent)] px-1.5 py-0.5 rounded-full">
                     {t.chrome.clientBadge}
                   </span>
                 </button>
@@ -1192,26 +1229,44 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   onClick={toggleSidebar}
                   title={t.chrome.collapseSidebar}
                   aria-label={t.chrome.collapseSidebar}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] cursor-pointer transition-colors"
+                  className="flex h-8 w-8 items-center justify-center rounded-[var(--fx-radius-control)] text-[var(--fx-sidebar-ink)] hover:text-white hover:bg-white/10 cursor-pointer transition-colors"
                 >
-                  <PanelLeftClose size={16} />
+                  <PanelLeft size={18} />
                 </button>
               </>
             )}
           </div>
 
+          {/* Account */}
+          {!isSidebarCollapsed && (
+            <div className="flex items-center gap-3 px-3.5 pb-5 pt-1">
+              <div className="relative w-[46px] h-[46px] shrink-0 rounded-[var(--fx-radius-tile)] bg-[#2b2f3c] flex items-center justify-center text-lg font-extrabold text-white">
+                {(profile?.fullName || profile?.email || 'U').charAt(0).toUpperCase()}
+                {totalUnreadChats > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#e53935] border-2 border-[var(--fx-sidebar-bg)] flex items-center justify-center text-[10px] font-bold text-white">
+                    {totalUnreadChats}
+                  </span>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-[15px] font-bold text-white">{profile?.fullName || t.chrome.user}</p>
+                <p className="truncate text-xs text-[var(--fx-sidebar-ink)]">{profile?.phoneNumber || profile?.email || t.chrome.owner}</p>
+              </div>
+            </div>
+          )}
+
           {/* Navigation Items */}
-          <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
+          <div className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
             {NAV_ITEMS.map((item, idx) => {
-              const Icon = item.icon;
               const active = activeTab === item.id;
-              const showSectionHeader = !isSidebarCollapsed && item.section && (idx === 0 || NAV_ITEMS[idx - 1]?.section !== item.section);
+              const showSectionHeader = !isSidebarCollapsed && (idx === 0 || NAV_ITEMS[idx - 1]?.section !== item.section);
+              const sectionLabel = item.section || 'Main';
 
               return (
                 <React.Fragment key={item.id}>
                   {showSectionHeader && (
-                    <div className="px-3 pt-3.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--fx-faint)]">
-                      {item.section}
+                    <div className="px-3 pt-4 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--fx-sidebar-ink)]">
+                      {sectionLabel}
                     </div>
                   )}
                   <button
@@ -1220,26 +1275,15 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                     title={item.label}
                     aria-label={item.label}
                     aria-current={active ? 'page' : undefined}
-                    className={`group relative flex items-center rounded-xl transition-all cursor-pointer ${
+                    className={`relative flex items-center rounded-[var(--fx-radius-control)] transition-colors cursor-pointer font-semibold ${
                       isSidebarCollapsed
-                        ? 'h-10 w-10 mx-auto justify-center'
-                        : 'h-10 w-full px-3 justify-start gap-3'
-                    } ${
-                      active
-                        ? 'bg-[var(--fx-accent-soft)] text-[var(--fx-accent)] font-bold shadow-2xs'
-                        : 'text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)]'
-                    }`}
+                        ? 'h-10 w-10 mx-auto justify-center text-[17px]'
+                        : 'h-10 w-full px-3 justify-start text-[17px]'
+                    } ${active ? 'text-white' : 'text-[var(--fx-sidebar-ink)] hover:text-white'}`}
                   >
-                    <Icon size={18} strokeWidth={active ? 2.2 : 1.8} className="shrink-0" />
-                    {!isSidebarCollapsed && (
-                      <span className="truncate text-xs font-semibold">{item.label}</span>
-                    )}
-                    {item.id === 'chat' && totalUnreadChats > 0 && (
-                      <span
-                        className={`${
-                          isSidebarCollapsed ? 'absolute -right-0.5 -top-0.5 text-[9px] px-1' : 'ml-auto text-[10px] px-1.5'
-                        } flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--fx-accent)] font-bold text-white`}
-                      >
+                    {isSidebarCollapsed ? item.label.charAt(0) : item.label}
+                    {item.id === 'chat' && totalUnreadChats > 0 && !isSidebarCollapsed && (
+                      <span className="ml-auto flex h-5 min-w-[20px] px-1 items-center justify-center rounded-full bg-[#e53935] text-[10px] font-bold text-white">
                         {totalUnreadChats}
                       </span>
                     )}
@@ -1250,33 +1294,17 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
           </div>
 
           {/* Footer Actions */}
-          <div className="mt-auto border-t border-[var(--fx-border)] p-2 space-y-1">
+          <div className="mt-auto p-2 space-y-0.5">
             {isSidebarCollapsed && (
               <button
                 type="button"
                 onClick={toggleSidebar}
                 title={t.chrome.expandSidebar}
                 aria-label={t.chrome.expandSidebar}
-                className="flex h-10 w-10 mx-auto items-center justify-center rounded-xl text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] cursor-pointer"
+                className="flex h-10 w-10 mx-auto items-center justify-center rounded-[var(--fx-radius-control)] text-[var(--fx-sidebar-ink)] hover:text-white hover:bg-white/10 cursor-pointer"
               >
-                <PanelLeftOpen size={18} />
+                <PanelLeft size={18} className="rotate-180" />
               </button>
-            )}
-
-            {!isSidebarCollapsed && (
-              <div className="flex items-center gap-2.5 px-2.5 py-2 mb-1 rounded-xl bg-[var(--fx-canvas)] border border-[var(--fx-border)]">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--fx-accent-soft)] text-xs font-bold text-[var(--fx-accent)]">
-                  {(profile?.fullName || profile?.email || 'U').charAt(0).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-bold text-[var(--fx-ink)]">
-                    {profile?.fullName || t.chrome.user}
-                  </p>
-                  <p className="truncate text-[10px] text-[var(--fx-faint)]">
-                    {profile?.phoneNumber || profile?.email || t.chrome.owner}
-                  </p>
-                </div>
-              </div>
             )}
 
             <button
@@ -1284,11 +1312,11 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
               onClick={onBack}
               title={t.chrome.backToSite}
               aria-label={t.chrome.backToSite}
-              className={`flex items-center rounded-xl text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] cursor-pointer transition-colors ${
-                isSidebarCollapsed ? 'h-10 w-10 mx-auto justify-center' : 'h-9 w-full px-3 gap-2.5 text-xs font-medium'
+              className={`flex items-center rounded-[var(--fx-radius-control)] text-[var(--fx-sidebar-ink)] hover:text-white cursor-pointer transition-colors font-semibold ${
+                isSidebarCollapsed ? 'h-10 w-10 mx-auto justify-center' : 'h-9 w-full px-3 gap-2.5 text-sm'
               }`}
             >
-              <Globe size={16} />
+              <Globe size={15} />
               {!isSidebarCollapsed && <span>{t.chrome.backToSite}</span>}
             </button>
 
@@ -1297,92 +1325,185 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
               onClick={handleSignOut}
               title={`${t.chrome.logOut} (${profile?.fullName || profile?.email || t.chrome.owner})`}
               aria-label={t.chrome.logOut}
-              className={`flex items-center rounded-xl text-[#DC2626] hover:bg-[#FEE2E2] cursor-pointer transition-colors ${
-                isSidebarCollapsed ? 'h-10 w-10 mx-auto justify-center' : 'h-9 w-full px-3 gap-2.5 text-xs font-medium'
+              className={`flex items-center rounded-[var(--fx-radius-control)] text-[#e53935] hover:bg-white/5 cursor-pointer transition-colors font-semibold ${
+                isSidebarCollapsed ? 'h-10 w-10 mx-auto justify-center' : 'h-9 w-full px-3 gap-2.5 text-sm'
               }`}
             >
-              <LogOut size={16} />
+              <LogOut size={15} />
               {!isSidebarCollapsed && <span>{t.chrome.logOut}</span>}
             </button>
           </div>
         </nav>
 
-        {/* ─── MAIN CONTENT CANVAS ─── */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          
-          {/* Top Bar */}
-          <header className="h-[62px] flex-shrink-0 bg-[var(--fx-canvas)] border-b border-[var(--fx-border)] flex items-center justify-between gap-2 sm:gap-4 px-3 sm:px-8 lg:px-10 z-20">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
+        {/* ─── MOBILE FULL-SCREEN MENU ─── replaces the docked sidebar below
+             `md` — no collapse-to-icons mode here, just one big tappable list. */}
+        {mobileMenuOpen && (
+          <div
+            className="fixed inset-0 z-50 flex md:hidden flex-col"
+            style={{ background: 'var(--fx-sidebar-bg)' }}
+          >
+            <div className="flex h-16 shrink-0 items-center justify-between px-4 border-b border-white/10">
+              <button onClick={onBack} className="flex items-center gap-2 cursor-pointer">
+                <AppLogo variant="dark" className="h-7 w-auto object-contain" />
+                <span className="text-[9px] font-bold uppercase tracking-wider text-white bg-[var(--fx-accent)] px-1.5 py-0.5 rounded-full">
+                  {t.chrome.clientBadge}
+                </span>
+              </button>
               <button
                 type="button"
-                onClick={toggleSidebar}
-                title={isSidebarCollapsed ? t.chrome.expandSidebar : t.chrome.collapseSidebar}
-                aria-label={isSidebarCollapsed ? t.chrome.expandSidebar : t.chrome.collapseSidebar}
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--fx-border)] bg-white text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="Close menu"
+                className="flex h-10 w-10 items-center justify-center rounded-[var(--fx-radius-control)] text-[var(--fx-sidebar-ink)] hover:text-white hover:bg-white/10 cursor-pointer"
               >
-                {isSidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+                <X size={22} />
               </button>
+            </div>
 
-              {/* My Balance — sum of this account's Razorpay-paid top-ups */}
-              <div
-                className="inline-flex items-center gap-2 h-9 pl-2 pr-3 rounded-full bg-white border border-[var(--fx-border)] min-w-0"
-                title={t.chrome.balanceTooltip}
-              >
-                <span className="w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                  <Wallet size={13} />
-                </span>
-                <span className="hidden sm:inline text-[11px] text-[var(--fx-ink-2)] font-medium">{t.chrome.myBalance}</span>
-                <span className="text-sm font-bold text-[var(--fx-ink)] tabular-nums">
-                  {myOrdersLoading ? '…' : `₹${balance.toLocaleString('en-IN')}`}
-                </span>
+            <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10 shrink-0">
+              <div className="relative w-12 h-12 shrink-0 rounded-[var(--fx-radius-tile)] bg-[#2b2f3c] flex items-center justify-center text-xl font-extrabold text-white">
+                {(profile?.fullName || profile?.email || 'U').charAt(0).toUpperCase()}
+                {totalUnreadChats > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#e53935] border-2 border-[var(--fx-sidebar-bg)] flex items-center justify-center text-[10px] font-bold text-white">
+                    {totalUnreadChats}
+                  </span>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-base font-bold text-white">{profile?.fullName || t.chrome.user}</p>
+                <p className="truncate text-sm text-[var(--fx-sidebar-ink)]">{profile?.phoneNumber || profile?.email || t.chrome.owner}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 sm:gap-3 text-xs flex-shrink-0">
+            <div className="flex-1 overflow-y-auto px-3 py-3">
+              {NAV_ITEMS.map((item, idx) => {
+                const active = activeTab === item.id;
+                const showSectionHeader = idx === 0 || NAV_ITEMS[idx - 1]?.section !== item.section;
+                const sectionLabel = item.section || 'Main';
+                return (
+                  <React.Fragment key={item.id}>
+                    {showSectionHeader && (
+                      <div className="px-3 pt-5 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--fx-sidebar-ink)]">
+                        {sectionLabel}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
+                      aria-current={active ? 'page' : undefined}
+                      className={`w-full flex items-center justify-between h-14 px-3 rounded-[var(--fx-radius-control)] text-[19px] font-semibold transition-colors cursor-pointer ${
+                        active ? 'bg-[var(--fx-accent)] text-white' : 'text-[var(--fx-sidebar-ink)] hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      <span>{item.label}</span>
+                      {item.id === 'chat' && totalUnreadChats > 0 && (
+                        <span className="flex h-6 min-w-[24px] px-1.5 items-center justify-center rounded-full bg-[#e53935] text-xs font-bold text-white">
+                          {totalUnreadChats}
+                        </span>
+                      )}
+                    </button>
+                  </React.Fragment>
+                );
+              })}
+            </div>
+
+            <div className="p-3 border-t border-white/10 space-y-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => { setMobileMenuOpen(false); onBack(); }}
+                className="w-full flex items-center gap-3 h-12 px-3 rounded-[var(--fx-radius-control)] text-[var(--fx-sidebar-ink)] hover:text-white hover:bg-white/10 text-base font-semibold transition-colors cursor-pointer"
+              >
+                <Globe size={18} /> <span>{t.chrome.backToSite}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMobileMenuOpen(false); handleSignOut(); }}
+                className="w-full flex items-center gap-3 h-12 px-3 rounded-[var(--fx-radius-control)] text-[#e53935] hover:bg-white/5 text-base font-semibold transition-colors cursor-pointer"
+              >
+                <LogOut size={18} /> <span>{t.chrome.logOut}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── MAIN CONTENT CANVAS — floating white card inset from the dark shell ─── */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col m-2 sm:m-3.5 sm:ml-0 rounded-[var(--fx-radius-surface)] bg-white overflow-hidden">
+
+          {/* Top Bar */}
+          <header className="flex-shrink-0 flex items-start justify-between gap-3 flex-wrap px-4 sm:px-8 pt-5 sm:pt-7 pb-1">
+            {/* Mobile nav trigger — the docked sidebar is `hidden` below `md`,
+                this full-screen menu button is its only replacement there. */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              title={t.chrome.expandSidebar}
+              aria-label={t.chrome.expandSidebar}
+              className="flex md:hidden h-9 w-9 shrink-0 items-center justify-center rounded-[var(--fx-radius-control)] bg-[var(--fx-canvas)] text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] transition-colors cursor-pointer"
+            >
+              <Menu size={18} />
+            </button>
+
+            {isSidebarCollapsed && (
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                title={t.chrome.expandSidebar}
+                aria-label={t.chrome.expandSidebar}
+                className="hidden md:flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--fx-radius-control)] bg-[var(--fx-canvas)] text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] transition-colors cursor-pointer"
+              >
+                <PanelLeft size={18} className="rotate-180" />
+              </button>
+            )}
+
+            <div className="flex-1" />
+
+            <div className="flex items-center gap-2.5 flex-wrap justify-end">
               <LanguageSwitcher />
 
-              {/* md+ has this action in the sidebar; keep it reachable on phones. */}
+              <div
+                className="inline-flex items-center h-9 px-3.5 rounded-[var(--fx-radius-control)] bg-[var(--fx-canvas)] text-xs font-semibold text-[var(--fx-ink)]"
+                title={t.chrome.balanceTooltip}
+              >
+                {t.chrome.myBalance} {myOrdersLoading ? '…' : `₹${balance.toLocaleString('en-IN')}`}
+              </div>
+
               <button
                 onClick={handlePurchaseStickerClick}
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[#111111] hover:bg-black active:scale-[0.99] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                className="inline-flex items-center h-9 px-4 rounded-[var(--fx-radius-control)] bg-[var(--fx-ink)] hover:bg-black text-white font-bold text-[11px] uppercase tracking-wide transition-colors cursor-pointer"
                 aria-label={t.chrome.getFreeSticker}
               >
-                <Plus size={14} />
-                <span className="hidden sm:inline">{t.chrome.getFreeSticker}</span>
+                + {t.chrome.getFreeSticker}
               </button>
 
               <button
                 onClick={() => setActiveTab('chat')}
-                className="relative p-2 text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:bg-black/5 rounded-full cursor-pointer transition-colors"
+                className="relative h-9 w-9 rounded-[var(--fx-radius-control)] bg-[var(--fx-canvas)] text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] cursor-pointer transition-colors"
                 title={totalUnreadChats > 0 ? `${totalUnreadChats} ${t.chrome.unreadMessagesSuffix}` : t.chrome.liveChatNotifications}
               >
-                <Bell size={18} />
+                <Bell size={16} className="mx-auto" />
                 {totalUnreadChats > 0 && (
-                  <span className="absolute top-0.5 right-0.5 bg-[var(--fx-accent)] text-white rounded-full text-[9px] px-1.5 font-bold animate-pulse">
-                    {totalUnreadChats}
-                  </span>
+                  <span className="absolute top-2 right-2.5 w-2 h-2 rounded-full bg-[#e53935]" />
                 )}
               </button>
             </div>
           </header>
 
-          {/* Page Container (expanded for spacious and zoomed look) */}
+          {/* Page Container */}
           {activeTab === 'chat' ? renderChatInbox() : (
-          <main className="max-w-[1360px] w-full mx-auto p-4 sm:p-7 lg:p-9 space-y-7 min-h-0 flex-1 overflow-y-auto">
+          <main className="w-full p-4 sm:p-8 lg:px-12 space-y-7 min-h-0 flex-1 overflow-y-auto">
 
             {/* ── MANDATORY PHONE VERIFICATION ALERT BANNER ── */}
             {(!isAdminAccount && !profile?.isPhoneVerified && (!profile?.phoneNumber || profile?.isPhoneVerified === false) && !profilePopupDismissed) && (
-              <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-fade-in relative">
+              <div className="bg-[var(--fx-accent-soft)] rounded-[var(--fx-radius-card)] p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in relative">
                 <div className="flex items-start gap-3.5">
-                  <div className="w-10 h-10 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-700 flex-shrink-0 mt-0.5 sm:mt-0">
+                  <div className="w-10 h-10 rounded-[var(--fx-radius-tile)] bg-white text-[var(--fx-accent)] flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0">
                     <AlertTriangle size={20} />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+                    <h4 className="text-sm font-bold text-[var(--fx-ink)] flex items-center gap-2">
                       <span>{profile?.phoneNumber ? t.phoneBanner.titlePending : t.phoneBanner.titleAdd}</span>
-                      <span className="text-[10px] uppercase tracking-wider bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-bold">{t.phoneBanner.unverified}</span>
+                      <span className="text-[10px] uppercase tracking-wider bg-white text-[var(--fx-accent)] px-2 py-0.5 rounded-[var(--fx-radius-pill)] font-bold">{t.phoneBanner.unverified}</span>
                     </h4>
-                    <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                    <p className="text-xs text-[var(--fx-ink-2)] mt-1 leading-relaxed">
                       {profile?.phoneNumber
                         ? `${t.phoneBanner.descPendingPrefix} ${profile.phoneNumber} ${t.phoneBanner.descPendingSuffix}`
                         : t.phoneBanner.descAdd
@@ -1396,7 +1517,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                       setActiveTab('settings');
                       setOtpStep('input');
                     }}
-                    className="flex-1 sm:flex-initial px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-2 flex-shrink-0 shadow-xs cursor-pointer"
+                    className="flex-1 sm:flex-initial px-4 py-2 bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-hover)] text-white font-bold text-xs rounded-[var(--fx-radius-control)] transition-colors flex items-center justify-center gap-2 flex-shrink-0 cursor-pointer"
                   >
                     <Smartphone size={14} />
                     <span>{profile?.phoneNumber ? t.phoneBanner.verifyBtn : t.phoneBanner.addBtn}</span>
@@ -1404,7 +1525,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   </button>
                   <button
                     onClick={handleDismissProfilePopup}
-                    className="p-2 text-amber-700 hover:text-amber-900 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer"
+                    className="p-2 text-[var(--fx-accent)] hover:bg-white/60 rounded-[var(--fx-radius-control)] transition-colors cursor-pointer"
                     title={t.phoneBanner.dismiss}
                     aria-label={t.phoneBanner.dismiss}
                   >
@@ -1414,115 +1535,147 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
               </div>
             )}
 
-
-            {/* ════ SETUP GUIDE PAGE ════ */}
-            {activeTab === 'setup' && (
-              <div className="space-y-6 animate-fade-in">
-                <div className="bg-white border border-[var(--fx-border)] rounded-lg p-4 sm:p-6 shadow-xs space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b border-[var(--fx-border)] pb-4">
-                    <div>
-                      <h1 className="text-xl sm:text-2xl font-bold text-[var(--fx-ink)]">{t.setup.welcomePrefix} {profile?.fullName || t.chrome.clientBadge}!</h1>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs">
-                      <span className="font-semibold text-[var(--fx-ink)]">{completedSetupCount}/3 {t.setup.completedSuffix}</span>
-                      <div className="w-32 h-1.5 bg-[var(--fx-border)] rounded-full overflow-hidden">
-                        <div className="h-full bg-[#4FC47A] rounded-full transition-all duration-500" style={{ width: `${setupPercent}%` }} />
-                      </div>
-                    </div>
+            {/* ── PUSH NOTIFICATIONS NUDGE ── re-checked (not just dismissed) on every
+                load since the real state lives in the browser, not our account record. */}
+            {(!isAdminAccount && notifSupported && !notifEnabled && !notifBannerDismissed) && (
+              <div className="bg-[var(--fx-accent-soft)] rounded-[var(--fx-radius-card)] p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in relative">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-[var(--fx-radius-tile)] bg-white text-[var(--fx-accent)] flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0">
+                    <Bell size={20} />
                   </div>
-
-                  <div className="space-y-3">
-                    {/* Step 1: Phone Verification */}
-                    <div className="border border-[var(--fx-border)] rounded-md p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded-full ${isPhoneComplete ? 'bg-[#55C77D]' : 'bg-amber-400'} text-white flex items-center justify-center text-xs font-bold`}>
-                          {isPhoneComplete ? '✓' : '!'}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-sm text-[var(--fx-ink)]">{t.setup.step1Title}</p>
-                          <p className="text-xs text-[var(--fx-ink-2)]">
-                            {isPhoneComplete
-                              ? `${t.setup.step1VerifiedPrefix} ${profile?.phoneNumber}`
-                              : profile?.phoneNumber
-                                ? `${t.setup.step1PendingPrefix} ${profile.phoneNumber}`
-                                : t.setup.step1None}
-                          </p>
-                        </div>
-                      </div>
-                      {isPhoneComplete ? (
-                        <span className="text-xs font-bold text-[#2E9E5B]">{t.setup.completedLabel}</span>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setActiveTab('settings');
-                            setOtpStep('input');
-                          }}
-                          className="text-xs font-bold text-amber-600 hover:underline cursor-pointer"
-                        >
-                          {t.setup.verifyLink}
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Step 2: Emergency Contacts */}
-                    <div className="border border-[var(--fx-border)] rounded-md p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded-full ${isContactsComplete ? 'bg-[#55C77D]' : 'bg-slate-300'} text-white flex items-center justify-center text-xs font-bold`}>
-                          {isContactsComplete ? '✓' : '2'}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-sm text-[var(--fx-ink)]">{t.setup.step2Title}</p>
-                          <p className="text-xs text-[var(--fx-ink-2)]">{totalContacts} {t.setup.step2DescSuffix}</p>
-                        </div>
-                      </div>
-                      <button onClick={() => setActiveTab('contacts')} className="text-xs font-bold text-[var(--fx-accent)] hover:underline cursor-pointer">
-                        {isContactsComplete ? t.setup.configureLink : t.setup.addContactsLink}
-                      </button>
-                    </div>
-
-                    {/* Step 3: Safety Stickers */}
-                    <div className="border border-[var(--fx-border)] rounded-md p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded-full ${isStickersComplete ? 'bg-[#55C77D]' : 'bg-slate-300'} text-white flex items-center justify-center text-xs font-bold`}>
-                          {isStickersComplete ? '✓' : '3'}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-sm text-[var(--fx-ink)]">{t.setup.step3Title}</p>
-                          <p className="text-xs text-[var(--fx-ink-2)]">{activeCount} {t.setup.step3DescSuffix}</p>
-                        </div>
-                      </div>
-                      <button onClick={() => setActiveTab('overview')} className="text-xs font-bold text-[var(--fx-accent)] hover:underline cursor-pointer">
-                        {t.setup.viewStickersLink}
-                      </button>
-                    </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-[var(--fx-ink)]">
+                      {notifPermission === 'denied' ? 'Notifications are blocked' : 'Turn on notifications'}
+                    </h4>
+                    {notifPermission === 'denied' ? (
+                      <p className="text-xs text-[var(--fx-ink-2)] mt-1 leading-relaxed">
+                        You'll miss emergency scan alerts and chat messages. Tap the lock/info icon next to this page's address, open <strong>Permissions</strong> → <strong>Notifications</strong>, set it to <strong>Allow</strong>, then reload.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-[var(--fx-ink-2)] mt-1 leading-relaxed">
+                        Get notified instantly when your sticker is scanned or a visitor messages you — even when this tab isn't open.
+                      </p>
+                    )}
                   </div>
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  {notifPermission !== 'denied' && (
+                    <button
+                      onClick={handleEnableNotifications}
+                      disabled={notifEnabling}
+                      className="flex-1 sm:flex-initial px-4 py-2 bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-hover)] text-white font-bold text-xs rounded-[var(--fx-radius-control)] transition-colors flex items-center justify-center gap-2 flex-shrink-0 cursor-pointer disabled:opacity-60"
+                    >
+                      {notifEnabling ? <Loader2 size={14} className="animate-spin" /> : <Bell size={14} />}
+                      <span>{notifEnabling ? 'Enabling…' : 'Enable notifications'}</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setNotifBannerDismissed(true)}
+                    className="p-2 text-[var(--fx-accent)] hover:bg-white/60 rounded-[var(--fx-radius-control)] transition-colors cursor-pointer"
+                    title="Dismiss"
+                    aria-label="Dismiss"
+                  >
+                    <X size={16} />
+                  </button>
                 </div>
               </div>
             )}
 
             {/* ════ HOME OVERVIEW PAGE (Exact design.html layout) ════ */}
-            {activeTab === 'overview' && (
+            {activeTab === 'overview' && (() => {
+              const now = new Date();
+              const toKey = (d: Date) => d.toISOString().slice(0, 10);
+              const todayKey = toKey(now);
+              const yesterdayKey = toKey(new Date(now.getTime() - 86400000));
+
+              const chartDays = Array.from({ length: 14 }, (_, i) => {
+                const d = new Date(now);
+                d.setDate(d.getDate() - (13 - i));
+                return { key: toKey(d), day: d.getDate() };
+              });
+              const countsByDay = new Map<string, number>();
+              allHistory.forEach((h) => {
+                const k = toKey(new Date(h.created_at));
+                countsByDay.set(k, (countsByDay.get(k) || 0) + 1);
+              });
+              const maxDayCount = Math.max(1, ...chartDays.map((d) => countsByDay.get(d.key) || 0));
+
+              const activityGroups: { key: string; label: string; items: any[] }[] = [];
+              allHistory.slice(0, 30).forEach((h) => {
+                const d = new Date(h.created_at);
+                const k = toKey(d);
+                const label = k === todayKey ? 'Today' : k === yesterdayKey ? 'Yesterday' : d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' });
+                let group = activityGroups.find((g) => g.key === k);
+                if (!group) { group = { key: k, label, items: [] }; activityGroups.push(group); }
+                group.items.push(h);
+              });
+
+              const stickerBreakdown = products.map((p) => ({
+                id: p.id,
+                label: stickerRef(p, codesRevealed, p.nickname || 'Vehicle Tag'),
+                count: allHistory.filter((h) => h.sticker_id === p.id || h.stickerCode === p.qrCodeId).length,
+              })).sort((a, b) => b.count - a.count).slice(0, 5);
+              const maxStickerCount = Math.max(1, ...stickerBreakdown.map((s) => s.count));
+
+              const eventVisual = (type?: string) => {
+                const s = (type || '').toLowerCase();
+                if (s.includes('emergency') || s.includes('sos') || s.includes('alert')) return { Icon: ShieldAlert, bg: '#FDE8E5', fg: '#B42318' };
+                if (s.includes('chat') || s.includes('message')) return { Icon: MessageCircle, bg: 'var(--fx-accent-soft)', fg: 'var(--fx-accent)' };
+                if (s.includes('location') || s.includes('gps')) return { Icon: MapPin, bg: '#EFF6FF', fg: '#2563EB' };
+                return { Icon: QrCode, bg: '#F0FDF4', fg: '#147A3A' };
+              };
+
+              const tip = !isPhoneComplete
+                ? { Icon: Smartphone, title: 'Verify your phone', desc: 'Add a verified number so people who scan your sticker can reach you.', cta: t.setup.verifyLink.replace(' ›', ''), onClick: () => { setActiveTab('settings'); setOtpStep('input'); } }
+                : !isContactsComplete
+                ? { Icon: Contact2, title: t.overview.noContactsYet, desc: 'Responders can reach the right people faster in an emergency.', cta: t.overview.addResponders, onClick: () => setActiveTab('contacts') }
+                : { Icon: ShieldCheck, title: 'Your stickers are active', desc: 'Everything looks good — scans will reach you instantly.', cta: t.history.fullLog, onClick: () => setActiveTab('history') };
+
+              return (
               <div className="space-y-6">
-                
-                {/* Hero Greeting Section */}
-                <div className="pt-2 pb-4">
-                  <div className="text-xs text-[var(--fx-ink-2)] mb-1">
-                    {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+
+                {/* Header */}
+                <div className="flex flex-wrap items-start justify-between gap-4 pt-2">
+                  <div>
+                    <h1 className="fx-text-heading-page text-[var(--fx-ink)]">
+                      {t.overview.welcomeBackPrefix} {profile?.fullName?.split(' ')[0] || t.chrome.clientBadge}
+                    </h1>
+                    <p className="text-xs text-[var(--fx-ink-2)] mt-1.5">
+                      {activeCount} {t.overview.statActive.toLowerCase()} · {totalScans} {t.overview.statScans.toLowerCase()} · {totalContacts} {t.overview.statContacts.toLowerCase()}
+                    </p>
                   </div>
-                  <h1 className="text-2xl sm:text-[28px] font-bold text-[var(--fx-ink)] leading-tight tracking-tight">
-                    {t.overview.welcomeBackPrefix} {profile?.fullName?.split(' ')[0] || t.chrome.clientBadge}
-                  </h1>
+                  <div className="flex items-center gap-2">
+                    {[
+                      { Icon: MessageSquareText, label: t.overview.openChat, onClick: () => setActiveTab('chat'), disabled: false },
+                      { Icon: Contact2, label: t.overview.addContact, onClick: () => setActiveTab('contacts'), disabled: false },
+                      { Icon: QrCode, label: t.overview.viewQr, onClick: () => setModal({ type: 'qrCode', sticker: products[0] }), disabled: !products[0] },
+                      { Icon: RefreshCw, label: t.overview.syncStickers, onClick: async () => { const found = await loadProducts({ sync: true }); showToast(`Refreshed ${found?.length || 0} stickers`); }, disabled: false },
+                      { Icon: Search, label: t.overview.recoverLink, onClick: () => setModal({ type: 'recover' }), disabled: false },
+                    ].map(({ Icon, label, onClick, disabled }) => (
+                      <button
+                        key={label}
+                        type="button"
+                        title={label}
+                        aria-label={label}
+                        onClick={onClick}
+                        disabled={disabled}
+                        className="h-10 w-10 flex items-center justify-center rounded-full border border-[var(--fx-border)] bg-white text-[var(--fx-ink-2)] hover:text-[var(--fx-accent)] hover:border-[var(--fx-accent)] transition-colors cursor-pointer disabled:opacity-40"
+                      >
+                        <Icon size={16} />
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* ─── STICKER PURCHASE REQUIRED HERO CARD (When 0 stickers) ─── */}
                 {products.length === 0 && !productsLoading && (
-                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0F1015] via-[#161822] to-[#0A0B0E] text-white p-6 sm:p-7 border border-white/15 shadow-xl">
+                  <div className="relative overflow-hidden rounded-[var(--fx-radius-card)] bg-gradient-to-br from-[#0F1015] via-[#161822] to-[#0A0B0E] text-white p-6 sm:p-7 border border-white/15 shadow-xl">
                     <div className="pointer-events-none absolute -top-16 -right-16 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
 
                     <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
                       <div className="max-w-xl space-y-2 text-left">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white text-[11px] font-bold tracking-wide uppercase">
-                          <Sparkles size={13} /> {t.overview.heroBadge}
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[var(--fx-radius-pill)] bg-white/10 border border-white/20 text-white text-[11px] font-bold tracking-wide uppercase">
+                          <Tag size={13} /> {t.overview.heroBadge}
                         </div>
                         <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white font-display">
                           {t.overview.heroTitle}
@@ -1540,14 +1693,14 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                       <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 shrink-0">
                         <button
                           onClick={handlePurchaseStickerClick}
-                          className="h-11 px-6 rounded-xl bg-white hover:bg-neutral-100 active:scale-[0.99] text-black font-extrabold text-sm shadow-lg shadow-black/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                          className="h-11 px-6 rounded-[var(--fx-radius-control)] bg-white hover:bg-neutral-100 active:scale-[0.99] text-black font-extrabold text-sm shadow-lg shadow-black/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
                         >
                           <ShoppingBag size={17} />
                           <span>{t.overview.getFreeStickerBtn}</span>
                         </button>
                         <button
                           onClick={() => setModal({ type: 'recover' })}
-                          className="h-9 px-4 rounded-lg border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 active:scale-[0.99] text-zinc-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                          className="h-9 px-4 rounded-[var(--fx-radius-control)] border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 active:scale-[0.99] text-zinc-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                         >
                           <QrCode size={13} />
                           <span>{t.overview.haveTagLink}</span>
@@ -1557,139 +1710,98 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   </div>
                 )}
 
-                {/* HoneyBook Stats Bar (4 columns) */}
-                <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.04)] grid grid-cols-2 lg:grid-cols-4 rounded-lg overflow-hidden divide-x divide-y lg:divide-y-0 divide-[var(--fx-border)]">
-                  <div className="p-4 sm:p-6">
-                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">{t.overview.statActive}</div>
-                    <div className="text-2xl sm:text-3xl font-light tracking-tight text-[var(--fx-ink)]">{activeCount}</div>
-                  </div>
-                  <div className="p-4 sm:p-6">
-                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">{t.overview.statScans}</div>
-                    <div className="text-2xl sm:text-3xl font-light tracking-tight text-[var(--fx-ink)]">{totalScans}</div>
-                  </div>
-                  <div className="p-4 sm:p-6">
-                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">{t.overview.statContacts}</div>
-                    <div className="text-2xl sm:text-3xl font-light tracking-tight text-[var(--fx-ink)]">{totalContacts}</div>
-                  </div>
-                  <div className="p-4 sm:p-6">
-                    <div className="text-xs text-[var(--fx-ink-2)] mb-1">{t.overview.statSecurity}</div>
-                    <div className="text-xl sm:text-2xl font-semibold text-[#4FC47A] tracking-tight mt-1">{t.overview.protectedLabel}</div>
-                  </div>
-                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  {/* ── MAIN COLUMN ── */}
+                  <div className="lg:col-span-8 space-y-6">
 
-                {/* Latest chat — compact, newest few threads, above the stickers */}
-                <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-xs font-semibold text-[var(--fx-ink)]">
-                      {t.overview.latestChat}{totalUnreadChats > 0 ? ` (${totalUnreadChats} ${t.overview.unreadSuffix})` : ''}
-                    </h3>
-                    <button onClick={() => setActiveTab('chat')} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">
-                      {t.overview.viewInbox}
-                    </button>
-                  </div>
-
-                  {ownerSessionsLoading ? (
-                    <div className="py-4 text-center text-xs text-[var(--fx-ink-2)]">{t.overview.loadingChats}</div>
-                  ) : latestSessions.length === 0 ? (
-                    <div className="py-4 text-center text-xs text-[var(--fx-ink-2)]">{t.overview.noChatsYet}</div>
-                  ) : (
-                    <div className="divide-y divide-[var(--fx-canvas)]">
-                      {latestSessions.map((sess) => (
-                        <button
-                          key={sess.id}
-                          type="button"
-                          onClick={() => {
-                            setActiveTab('chat');
-                            openChatSession(sess);
-                          }}
-                          className="w-full flex items-center justify-between gap-3 py-2.5 px-1 text-left rounded hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-[var(--fx-ink)] truncate">
-                              {sess.customer_name || t.chatInbox.visitor}
-                              {sess.vehicle_label && <span className="font-medium text-[var(--fx-ink-2)]"> · {sess.vehicle_label}</span>}
-                            </p>
-                            <p className="text-[11px] text-[var(--fx-ink-2)] truncate">{sess.last_message_preview || t.overview.noMessagesYet}</p>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {(sess.unread_owner_count || 0) > 0 && (
-                              <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--fx-accent)] text-white text-[10px] font-bold flex items-center justify-center">
-                                {sess.unread_owner_count}
-                              </span>
-                            )}
-                            <span className="text-[11px] font-mono text-[var(--fx-faint)]">
-                              {sess.last_message_at ? new Date(sess.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                            </span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Bento Grid (3 Columns) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  
-                  {/* Card 1: Create New */}
-                  <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4 flex flex-col justify-between md:min-h-[360px]">
+                    {/* Scan activity bar chart */}
                     <div>
-                      <h3 className="text-xs font-semibold text-[var(--fx-ink)] mb-3.5">{t.overview.quickActions}</h3>
-                      <div className="space-y-2">
-                        <button
-                          onClick={() => setActiveTab('chat')}
-                          className="w-full h-11 border border-[var(--fx-border)] bg-[var(--fx-canvas)] rounded hover:border-[var(--fx-accent)] flex items-center px-3 gap-2.5 text-xs text-[var(--fx-ink)] font-bold hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
-                        >
-                          <MessageSquareText size={15} className="text-[var(--fx-accent)]" /> {t.overview.openChat}
-                        </button>
-                        <button
-                          onClick={() => setActiveTab('contacts')}
-                          className="w-full h-11 border border-[var(--fx-border)] rounded hover:border-[var(--fx-accent)] flex items-center px-3 gap-2.5 text-xs text-[var(--fx-ink)] font-medium hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
-                        >
-                          <Contact2 size={15} className="text-[var(--fx-accent)]" /> {t.overview.addContact}
-                        </button>
-                        <button
-                          onClick={async () => {
-                            const found = await loadProducts({ sync: true });
-                            showToast(`Refreshed ${found?.length || 0} stickers`);
-                          }}
-                          className="w-full h-11 border border-[var(--fx-border)] rounded hover:border-[var(--fx-accent)] flex items-center px-3 gap-2.5 text-xs text-[var(--fx-ink)] font-medium hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
-                        >
-                          <RefreshCw size={15} className="text-[var(--fx-accent)]" /> {t.overview.syncStickers}
-                        </button>
-                        <button
-                          onClick={() => setModal({ type: 'qrCode', sticker: products[0] })}
-                          disabled={!products[0]}
-                          className="w-full h-11 border border-[var(--fx-border)] rounded hover:border-[var(--fx-accent)] flex items-center px-3 gap-2.5 text-xs text-[var(--fx-ink)] font-medium hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer disabled:opacity-50"
-                        >
-                          <QrCode size={15} className="text-[var(--fx-accent)]" /> {t.overview.viewQr}
-                        </button>
-                        <button
-                          onClick={() => setActiveTab('history')}
-                          className="w-full h-11 border border-[var(--fx-border)] rounded hover:border-[var(--fx-accent)] flex items-center px-3 gap-2.5 text-xs text-[var(--fx-ink)] font-medium hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer"
-                        >
-                          <BellRing size={15} className="text-[var(--fx-accent)]" /> {t.overview.scanLogs}
-                        </button>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-[15px] font-bold text-[var(--fx-ink)]">Scan activity</h3>
+                        <span className="text-[13px] text-[var(--fx-ink-2)]">Last 14 days</span>
+                      </div>
+                      <div className="flex items-end gap-1.5 h-[90px] mt-5">
+                        {chartDays.map((d) => {
+                          const c = countsByDay.get(d.key) || 0;
+                          const barHeight = Math.max(8, Math.round((c / maxDayCount) * 90));
+                          const isToday = d.key === todayKey;
+                          return (
+                            <div key={d.key} className="flex-1 h-full flex flex-col justify-end" title={`${c} scan${c === 1 ? '' : 's'}`}>
+                              <div
+                                className={`w-full rounded-[6px] transition-all ${isToday ? 'bg-[var(--fx-accent)]' : 'bg-[var(--fx-accent-soft)]'}`}
+                                style={{ height: `${barHeight}px` }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex gap-1.5 mt-2">
+                        {chartDays.map((d) => (
+                          <span key={d.key} className="flex-1 text-center text-[10px] text-[var(--fx-ink-2)]">{d.day}</span>
+                        ))}
                       </div>
                     </div>
-                  </div>
 
-                  {/* Card 2: Active Stickers */}
-                  <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4 flex flex-col justify-between md:min-h-[360px]">
-                    <div>
-                      <div className="flex justify-between items-center mb-3">
-                        <h3 className="text-xs font-semibold text-[var(--fx-ink)]">{t.overview.mySafetyStickersPrefix} ({products.length})</h3>
-                        <div className="flex items-center gap-2.5">
-                          <CodeVisibilityToggleButton isRevealed={codesRevealed} onToggleVisibility={() => setCodesRevealed(!codesRevealed)} />
-                          <button onClick={() => setModal({ type: 'recover' })} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">{t.overview.recoverLink}</button>
-                          <button onClick={() => loadProducts({ sync: true })} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">{t.overview.refreshLink}</button>
+                    {/* Scan activity feed, grouped by day */}
+                    <div className="mt-[22px]">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-[15px] font-bold text-[var(--fx-ink)]">{t.overview.recentScans}</h3>
+                        <button onClick={() => setActiveTab('history')} className="text-[13px] font-semibold text-[var(--fx-accent)] hover:underline cursor-pointer">{t.history.fullLog}</button>
+                      </div>
+
+                      {allHistoryLoading && allHistory.length === 0 ? (
+                        <div className="py-9 text-center text-sm text-[var(--fx-ink-2)]">{t.history.fetching}</div>
+                      ) : activityGroups.length === 0 ? (
+                        <div className="py-9 text-center text-sm text-[var(--fx-ink-2)]">{t.overview.noScansYet}</div>
+                      ) : (
+                        <div className="max-h-[480px] overflow-y-auto">
+                          {activityGroups.map((group) => (
+                            <div key={group.key} className="mt-5 first:mt-4">
+                              <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--fx-ink-2)]">{group.label}</div>
+                              {group.items.map((h, i) => {
+                                const { Icon, bg, fg } = eventVisual(h.event_type);
+                                return (
+                                  <div key={h.id ?? i} className="flex items-center gap-3.5 py-3 border-t border-[var(--fx-border)]">
+                                    <span className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center" style={{ background: bg, color: fg }}>
+                                      <Icon size={17} />
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-sm font-semibold text-[var(--fx-ink)] truncate">
+                                        {codesRevealed ? h.stickerCode : (h.stickerVehicle || h.stickerNickname || t.history.vehicleSafetyTag)}
+                                      </p>
+                                      <p className="text-xs text-[var(--fx-ink-2)] truncate">
+                                        {new Date(h.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {h.event_type || t.history.scanRecorded}
+                                      </p>
+                                    </div>
+                                    {h.location && (
+                                      <span className="shrink-0 text-xs text-[var(--fx-ink-2)] flex items-center gap-1">
+                                        <MapPin size={11} /> {h.location}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ))}
                         </div>
-                      </div>
+                      )}
+                    </div>
+                  </div>
 
+                  {/* ── RIGHT RAIL ── */}
+                  <div className="lg:col-span-4 bg-[var(--fx-canvas)] rounded-[var(--fx-radius-card)] p-5 sm:p-6 space-y-[18px] self-start">
+
+                    {/* Where your scans come from — per-sticker breakdown */}
+                    <div className="bg-white rounded-[var(--fx-radius-card)] p-[18px]">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-[15px] font-bold text-[var(--fx-ink)]">{t.overview.mySafetyStickersPrefix}</h3>
+                        <CodeVisibilityToggleButton isRevealed={codesRevealed} onToggleVisibility={() => setCodesRevealed(!codesRevealed)} />
+                      </div>
                       {productsLoading ? (
-                        <div className="py-12 text-center text-xs text-[var(--fx-ink-2)]">{t.overview.loadingStickers}</div>
-                      ) : products.length === 0 ? (
-                        <div className="py-8 text-center text-xs text-[var(--fx-ink-2)] space-y-3">
-                          <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center">
+                        <div className="py-8 text-center text-xs text-[var(--fx-ink-2)]">{t.overview.loadingStickers}</div>
+                      ) : stickerBreakdown.length === 0 ? (
+                        <div className="py-6 text-center text-xs text-[var(--fx-ink-2)] space-y-3">
+                          <div className="w-12 h-12 mx-auto rounded-[var(--fx-radius-tile)] bg-slate-100 text-slate-500 flex items-center justify-center">
                             <ShoppingBag size={22} />
                           </div>
                           <div>
@@ -1701,133 +1813,106 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                           </FlowButton>
                         </div>
                       ) : (
-                        <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
-                          {products.slice(0, 4).map((p) => (
-                            <div key={p.id} className="p-3 border border-[var(--fx-border)] rounded-md bg-[var(--fx-canvas)] flex items-center justify-between gap-2">
-                              <div>
-                                <p className="font-bold text-xs text-[var(--fx-ink)]">{stickerRef(p, codesRevealed, p.nickname || 'Vehicle Tag')}</p>
-                                {codesRevealed && p.nickname && (
-                                  <p className="text-[11px] text-[var(--fx-ink-2)] font-medium">{p.nickname}</p>
-                                )}
+                        <div>
+                          {stickerBreakdown.map((s) => (
+                            <div key={s.id} className="mb-3.5 last:mb-0">
+                              <div className="flex items-center justify-between text-sm font-semibold">
+                                <span className="text-[var(--fx-ink)] truncate">{s.label}</span>
+                                <span className="text-[var(--fx-ink-2)] shrink-0 ml-2">{s.count}</span>
                               </div>
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  onClick={() => setModal({ type: 'qrCode', sticker: p })}
-                                  className="px-2 py-1 bg-[var(--fx-accent-soft)] border border-[var(--fx-accent-ink)] text-[var(--fx-accent-ink)] text-[11px] font-bold rounded cursor-pointer"
-                                >
-                                  {t.overview.qrBtn}
-                                </button>
-                                <button
-                                  onClick={() => setModal({ type: 'editDetails', sticker: p })}
-                                  className="px-2 py-1 bg-white border border-[var(--fx-border)] text-[var(--fx-ink)] text-[11px] font-semibold rounded cursor-pointer"
-                                >
-                                  {t.overview.editBtn}
-                                </button>
+                              <div className="h-[5px] rounded-full bg-[var(--fx-border)] mt-2 overflow-hidden">
+                                <div className="h-full rounded-full bg-[#2EBD8E]" style={{ width: `${Math.max(4, (s.count / maxStickerCount) * 100)}%` }} />
                               </div>
                             </div>
                           ))}
                         </div>
                       )}
-
-
                       {removedStickers.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-[var(--fx-canvas)] space-y-2">
+                        <div className="mt-4 pt-3 border-t border-[var(--fx-canvas)] space-y-2">
                           {removedStickers.map((s) => (
-                            <div key={s.id} className="p-2.5 border border-[#FBE3B8] bg-[#FFFBF2] rounded-md flex items-center justify-between gap-2">
+                            <div key={s.id} className="p-3 border border-[#FBE3B8] bg-[#FFFBF2] rounded-[var(--fx-radius-control)] flex items-center justify-between gap-2">
                               <div className="min-w-0">
                                 <p className="text-[11px] font-bold text-[#8A5A00] truncate">{s.nickname || 'A sticker'} {t.overview.noLongerShowsSuffix}</p>
-                                {codesRevealed && <p className="text-[10px] text-[#A67C1F] font-mono truncate">{s.qrCodeId}</p>}
                               </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                <button
-                                  onClick={() => handleQuickRecover(s.qrCodeId)}
-                                  disabled={recoveringId === s.qrCodeId}
-                                  className="px-2 py-1 bg-white border border-[var(--fx-accent-ink)] text-[var(--fx-accent-ink)] text-[10px] font-bold rounded cursor-pointer disabled:opacity-60"
-                                >
-                                  {recoveringId === s.qrCodeId ? t.overview.recovering : t.overview.recoverBtn}
-                                </button>
-                                <button
-                                  onClick={() => dismissRemovedSticker(s.id)}
-                                  className="px-1.5 py-1 text-[#A67C1F] hover:text-[var(--fx-accent-ink)] cursor-pointer"
-                                  title="Dismiss"
-                                >
-                                  <X size={12} />
-                                </button>
-                              </div>
+                              <button
+                                onClick={() => handleQuickRecover(s.qrCodeId)}
+                                disabled={recoveringId === s.qrCodeId}
+                                className="px-2 py-1 bg-white border border-[var(--fx-accent-ink)] text-[var(--fx-accent-ink)] text-[10px] font-bold rounded-[var(--fx-radius-control)] cursor-pointer disabled:opacity-60 shrink-0"
+                              >
+                                {recoveringId === s.qrCodeId ? t.overview.recovering : t.overview.recoverBtn}
+                              </button>
                             </div>
                           ))}
                         </div>
                       )}
-                    </div>
-                    <div className="pt-2 text-xs font-semibold text-[var(--fx-accent)] cursor-pointer hover:underline" onClick={() => setActiveTab('overview')}>
-                      {t.overview.viewAllStickers}
-                    </div>
-                  </div>
-
-                  {/* Card 3: Emergency Responders */}
-                  <div className="bg-white border border-[var(--fx-border)] shadow-[0_1px_4px_rgba(0,0,0,0.03)] rounded-lg p-4 flex flex-col justify-between md:min-h-[360px]">
-                    <div>
-                      <div className="flex justify-between items-center mb-3">
-                        <h3 className="text-xs font-semibold text-[var(--fx-ink)]">{t.overview.emergencyContactsPrefix} ({totalContacts})</h3>
-                        <button onClick={() => setActiveTab('contacts')} className="text-xs text-[var(--fx-accent)] hover:underline cursor-pointer">{t.overview.addContactShort}</button>
+                      <div className="pt-3 text-[13px] font-semibold text-[var(--fx-accent)] cursor-pointer hover:underline" onClick={() => setActiveTab('products')}>
+                        {t.overview.viewAllStickers} ›
                       </div>
+                    </div>
 
-                      <div className="space-y-3 mt-4">
-                        {products[0]?.contacts?.length ? (
-                          products[0].contacts.map((c, i) => (
-                            <div key={i} className="flex justify-between items-center text-xs pb-2 border-b border-[var(--fx-canvas)]">
-                              <div>
-                                <span className="font-bold text-[var(--fx-ink)] block">{c.name}</span>
-                                <span className="text-[11px] text-[var(--fx-ink-2)]">{c.relation || 'Emergency Contact'}</span>
+                    {/* Latest chat — compact */}
+                    <div className="bg-white rounded-[var(--fx-radius-card)] p-[18px]">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="text-[15px] font-bold text-[var(--fx-ink)]">
+                          {t.overview.latestChat}{totalUnreadChats > 0 ? ` (${totalUnreadChats} ${t.overview.unreadSuffix})` : ''}
+                        </h3>
+                        <button onClick={() => setActiveTab('chat')} className="text-[13px] font-semibold text-[var(--fx-accent)] hover:underline cursor-pointer">
+                          {t.overview.viewInbox} ›
+                        </button>
+                      </div>
+                      {ownerSessionsLoading ? (
+                        <div className="py-4 text-center text-xs text-[var(--fx-ink-2)]">{t.overview.loadingChats}</div>
+                      ) : latestSessions.length === 0 ? (
+                        <div className="py-4 text-center text-xs text-[var(--fx-ink-2)]">{t.overview.noChatsYet}</div>
+                      ) : (
+                        <div className="divide-y divide-[var(--fx-canvas)]">
+                          {latestSessions.slice(0, 3).map((sess) => (
+                            <button
+                              key={sess.id}
+                              type="button"
+                              onClick={() => { setActiveTab('chat'); openChatSession(sess); }}
+                              className="w-full flex items-center justify-between gap-3 py-2.5 text-left cursor-pointer"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-[var(--fx-ink)] truncate">{sess.customer_name || t.chatInbox.visitor}</p>
+                                <p className="text-[11px] text-[var(--fx-ink-2)] truncate">{sess.last_message_preview || t.overview.noMessagesYet}</p>
                               </div>
-                              <span className="font-mono text-[11px] font-semibold text-[var(--fx-accent)]">{c.phone}</span>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="py-10 text-center text-xs text-[var(--fx-ink-2)]">
-                            <p>{t.overview.noContactsYet}</p>
-                            <button onClick={() => setActiveTab('contacts')} className="text-[var(--fx-accent)] font-bold mt-2 hover:underline">{t.overview.addResponders}</button>
-                          </div>
-                        )}
-                      </div>
+                              {(sess.unread_owner_count || 0) > 0 && (
+                                <span className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--fx-accent)] text-white text-[10px] font-bold flex items-center justify-center">
+                                  {sess.unread_owner_count}
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div className="pt-2 text-xs font-semibold text-[var(--fx-accent)] cursor-pointer hover:underline" onClick={() => setActiveTab('contacts')}>
-                      {t.overview.manageContacts}
+
+                    {/* Tip / promo card */}
+                    <div className="bg-[#111111] rounded-[var(--fx-radius-card)] p-5 text-white">
+                      <div className="w-11 h-11 rounded-[var(--fx-radius-tile)] bg-[#2a2f3d] flex items-center justify-center">
+                        <tip.Icon size={20} />
+                      </div>
+                      <h3 className="text-[16px] font-bold mt-3.5">{tip.title}</h3>
+                      <p className="text-[13px] text-[#9aa1b5] mt-1.5 mb-4 leading-relaxed">{tip.desc}</p>
+                      <button
+                        onClick={tip.onClick}
+                        className="w-full py-3 rounded-[var(--fx-radius-control)] bg-white text-[#111111] text-sm font-bold cursor-pointer"
+                      >
+                        {tip.cta}
+                      </button>
                     </div>
                   </div>
-
-                </div>
-
-                {/* Recent scans — expands into the latest scan events */}
-                <div className="pt-2">
-                  <ActivityDropdown
-                    title={t.overview.recentScans}
-                    subtitle={
-                      allHistory.length > 0
-                        ? `${allHistory.length} scan event${allHistory.length === 1 ? '' : 's'}`
-                        : t.overview.noScansYet
-                    }
-                    icon={<QrCode className="h-5 w-5" />}
-                    items={allHistory.slice(0, 5).map((h, i) => ({
-                      id: h.id ?? i,
-                      icon: <QrCode className="h-4 w-4" />,
-                      title: `${codesRevealed ? h.stickerCode : (h.stickerVehicle || h.stickerNickname || 'Sticker')} scanned`,
-                      description: h.event_type || 'Vehicle QR scan recorded',
-                      time: new Date(h.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
-                    }))}
-                    emptyText={t.history.noScanEventsRecent}
-                    action={{ label: t.history.fullLog, onClick: () => setActiveTab('history') }}
-                    defaultOpen
-                  />
                 </div>
 
               </div>
-            )}
+              );
+            })()}
 
             {/* ════ VIEW 1B: PRODUCTS & ORDERS ════ */}
             {activeTab === 'products' && (
               <div className="space-y-6">
-                <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--fx-ink)]">
+                <h1 className="fx-text-heading-page text-[var(--fx-ink)]">
                   {t.products.title}
                 </h1>
 
@@ -1843,7 +1928,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                     }`}
                   >
                     <span>{t.products.availableTags}</span>
-                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-neutral-100 text-neutral-600">
+                    <span className="px-1.5 py-0.5 rounded-[var(--fx-radius-pill)] text-[10px] font-bold bg-neutral-100 text-neutral-600">
                       {shopProducts.length}
                     </span>
                   </button>
@@ -1857,7 +1942,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                     }`}
                   >
                     <span>{t.products.myOrders}</span>
-                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-neutral-100 text-neutral-600">
+                    <span className="px-1.5 py-0.5 rounded-[var(--fx-radius-pill)] text-[10px] font-bold bg-neutral-100 text-neutral-600">
                       {myOrders.length}
                     </span>
                   </button>
@@ -1869,22 +1954,22 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                     {shopProductsLoading ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                         {[1, 2, 3, 4].map((n) => (
-                          <div key={n} className="rounded-2xl border border-[var(--fx-border)] bg-white p-4 space-y-3 animate-pulse">
-                            <div className="aspect-[16/10] bg-neutral-100 rounded-xl" />
+                          <div key={n} className="rounded-[var(--fx-radius-card)] border border-[var(--fx-border)] bg-white p-4 space-y-3 animate-pulse">
+                            <div className="aspect-[16/10] bg-neutral-100 rounded-[var(--fx-radius-card)]" />
                             <div className="h-4 bg-neutral-100 rounded w-3/4" />
                             <div className="h-3 bg-neutral-100 rounded w-full" />
-                            <div className="h-9 bg-neutral-100 rounded-lg mt-4" />
+                            <div className="h-9 bg-neutral-100 rounded-[var(--fx-radius-control)] mt-4" />
                           </div>
                         ))}
                       </div>
                     ) : shopProducts.length === 0 ? (
-                      <div className="bg-white border border-[var(--fx-border)] rounded-2xl py-12 px-6 text-center">
+                      <div className="bg-white border border-[var(--fx-border)] rounded-[var(--fx-radius-card)] py-12 px-6 text-center">
                         <ShoppingBag size={38} className="mx-auto mb-3 opacity-40 text-[var(--fx-accent)]" />
                         <h3 className="text-sm font-bold text-[var(--fx-ink)]">{t.products.noProductsTitle}</h3>
                         <p className="text-xs text-[var(--fx-ink-2)] mt-1">{t.products.noProductsDesc}</p>
                         <button
                           onClick={loadShopProducts}
-                          className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-[var(--fx-accent)] text-white hover:opacity-90 cursor-pointer"
+                          className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-[var(--fx-radius-control)] text-xs font-semibold bg-[var(--fx-accent)] text-white hover:opacity-90 cursor-pointer"
                         >
                           <RefreshCw size={13} /> {t.products.refreshCatalog}
                         </button>
@@ -1894,7 +1979,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                         {shopProducts.map((product) => (
                           <div
                             key={product.id}
-                            className="group flex flex-col overflow-hidden rounded-2xl border border-[var(--fx-border)] bg-white shadow-2xs hover:shadow-md transition-all duration-200"
+                            className="group flex flex-col overflow-hidden rounded-[var(--fx-radius-card)] border border-[var(--fx-border)] bg-white shadow-2xs hover:shadow-md transition-all duration-200"
                           >
                             <div className="relative aspect-[16/10] overflow-hidden bg-neutral-100">
                               <img
@@ -1906,11 +1991,11 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                                 }}
                               />
                               {product.badge && (
-                                <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-xs shadow-xs">
+                                <span className="absolute left-3 top-3 rounded-[var(--fx-radius-pill)] bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-xs shadow-xs">
                                   {product.badge}
                                 </span>
                               )}
-                              <span className="absolute right-3 top-3 rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-neutral-700 shadow-2xs backdrop-blur-xs">
+                              <span className="absolute right-3 top-3 rounded-[var(--fx-radius-pill)] bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-neutral-700 shadow-2xs backdrop-blur-xs">
                                 {product.category || t.products.safetyTagCategory}
                               </span>
                             </div>
@@ -1948,7 +2033,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                                       </span>
                                     )}
                                   </div>
-                                  <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                  <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-[var(--fx-radius-pill)]">
                                     {t.products.privacyBadge}
                                   </span>
                                 </div>
@@ -1956,7 +2041,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                                 <button
                                   type="button"
                                   onClick={() => handleBuyProduct(product)}
-                                  className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-neutral-900 py-2.5 text-xs font-bold text-white hover:bg-black transition-all active:scale-[0.99] cursor-pointer shadow-xs"
+                                  className="w-full flex items-center justify-center gap-1.5 rounded-[var(--fx-radius-control)] bg-[var(--fx-accent)] py-2.5 text-xs font-bold text-white hover:bg-[var(--fx-accent-hover)] transition-all active:scale-[0.99] cursor-pointer"
                                 >
                                   <span>{product.price === 0 ? t.products.getFreeTagBtn : t.products.orderNowBtn}</span>
                                   <ArrowRight size={13} />
@@ -1990,13 +2075,13 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                             placeholder={t.products.searchOrders}
                             value={orderSearch}
                             onChange={(e) => setOrderSearch(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink)] outline-none focus:border-[var(--fx-accent)] focus:ring-2 focus:ring-[var(--fx-accent)]/20 shadow-2xs"
+                            className="w-full pl-9 pr-3 py-2 text-xs rounded-[var(--fx-radius-control)] border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink)] outline-none focus:border-[var(--fx-accent)] focus:ring-2 focus:ring-[var(--fx-accent)]/20 shadow-2xs"
                           />
                         </div>
                         <select
                           value={orderStatusFilter}
                           onChange={(e) => setOrderStatusFilter(e.target.value as any)}
-                          className="px-3 py-2 text-xs font-semibold rounded-lg border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink-2)] outline-none cursor-pointer focus:border-[var(--fx-accent)] shadow-2xs"
+                          className="px-3 py-2 text-xs font-semibold rounded-[var(--fx-radius-control)] border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink-2)] outline-none cursor-pointer focus:border-[var(--fx-accent)] shadow-2xs"
                         >
                           <option value="all">{t.products.allStatus}</option>
                           <option value="placed">{t.products.placed}</option>
@@ -2008,17 +2093,17 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                     )}
 
                     {myOrdersLoading ? (
-                      <div className="bg-white border border-[var(--fx-border)] rounded-2xl py-10 px-6 text-center text-[var(--fx-faint)]">
+                      <div className="bg-white border border-[var(--fx-border)] rounded-[var(--fx-radius-card)] py-10 px-6 text-center text-[var(--fx-faint)]">
                         <Loader2 size={32} className="animate-spin mx-auto mb-2 text-[var(--fx-accent)]" />
                         <p className="text-[13.5px] font-semibold text-[var(--fx-ink)]">{t.products.loadingOrders}</p>
                       </div>
                     ) : myOrdersError ? (
-                      <div className="bg-white border border-[var(--fx-border)] rounded-2xl py-10 px-6 text-center text-[var(--fx-faint)]">
+                      <div className="bg-white border border-[var(--fx-border)] rounded-[var(--fx-radius-card)] py-10 px-6 text-center text-[var(--fx-faint)]">
                         <AlertTriangle size={32} className="mx-auto mb-2 text-[#DC2626]" />
                         <p className="text-[13.5px] font-semibold text-[var(--fx-ink)]">{myOrdersError}</p>
                       </div>
                     ) : myOrders.length === 0 ? (
-                      <div className="bg-white border border-[var(--fx-border)] rounded-2xl py-12 px-6 text-center">
+                      <div className="bg-white border border-[var(--fx-border)] rounded-[var(--fx-radius-card)] py-12 px-6 text-center">
                         <ShoppingBag size={38} className="mx-auto mb-3 opacity-40 text-[var(--fx-accent)]" />
                         <p className="text-sm text-[var(--fx-ink)] font-bold">{t.products.noOrdersTitle}</p>
                         <p className="text-xs text-[var(--fx-ink-2)] mt-1 max-w-sm mx-auto">
@@ -2027,22 +2112,23 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                         <button
                           type="button"
                           onClick={() => setProductViewTab('catalog')}
-                          className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-neutral-900 text-white hover:bg-black cursor-pointer shadow-xs"
+                          className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-[var(--fx-radius-control)] text-xs font-bold bg-[var(--fx-accent)] text-white hover:bg-[var(--fx-accent-hover)] cursor-pointer"
                         >
                           <PackageCheck size={14} /> {t.products.browseTagsBtn}
                         </button>
                       </div>
                     ) : filteredOrders.length === 0 ? (
-                      <div className="bg-white border border-[var(--fx-border)] rounded-xl py-10 px-6 text-center">
+                      <div className="bg-white border border-[var(--fx-border)] rounded-[var(--fx-radius-card)] py-10 px-6 text-center">
                         <Search size={28} className="mx-auto mb-2 opacity-40 text-[var(--fx-accent)]" />
                         <p className="text-sm text-[var(--fx-ink)] font-bold">{t.products.noOrdersMatch}</p>
-                        <button
+                        <Button
                           type="button"
+                          size="sm"
                           onClick={() => { setOrderSearch(''); setOrderStatusFilter('all'); }}
-                          className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg bg-[var(--fx-canvas)] text-[var(--fx-ink-2)] hover:bg-[var(--fx-border)] transition-colors cursor-pointer"
+                          className="mt-3 gap-1.5"
                         >
                           <RefreshCw size={12} /> {t.products.clearFilters}
-                        </button>
+                        </Button>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -2056,7 +2142,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                         o.status === 'shipped' ? 'text-[var(--fx-accent)] bg-[var(--fx-accent-soft)]' :
                         'text-[#B8863F] bg-[#FBF3E4]';
                       return (
-                        <div key={o.id} className="bg-white border border-[var(--fx-border)] rounded-[14px] p-5">
+                        <div key={o.id} className="bg-white border border-[var(--fx-border)] rounded-[var(--fx-radius-card)] p-4 sm:p-6">
                           <div className="flex items-center justify-between gap-3 flex-wrap">
                             <div>
                               <div className="flex items-center gap-2">
@@ -2069,8 +2155,8 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                               </p>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className={`px-2.5 py-1 rounded-[4px] text-[11px] font-bold uppercase tracking-wide ${payColor}`}>{payLabel}</span>
-                              <span className={`px-2.5 py-1 rounded-[4px] text-[11px] font-bold uppercase tracking-wide capitalize ${fulfillColor}`}>{o.status}</span>
+                              <span className={`px-2.5 py-1 rounded-[var(--fx-radius-pill)] text-[11px] font-bold uppercase tracking-wide ${payColor}`}>{payLabel}</span>
+                              <span className={`px-2.5 py-1 rounded-[var(--fx-radius-pill)] text-[11px] font-bold uppercase tracking-wide capitalize ${fulfillColor}`}>{o.status}</span>
                             </div>
                           </div>
                           <div className="mt-3 pt-3 border-t border-[var(--fx-canvas)] divide-y divide-[var(--fx-canvas)]">
@@ -2119,7 +2205,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                                 <button
                                   onClick={() => handleTrackOrder(o.id)}
                                   disabled={trackLoading[o.id]}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[12px] font-semibold bg-[var(--fx-canvas)] text-[var(--fx-ink)] border border-[var(--fx-border)] hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer disabled:opacity-50"
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--fx-radius-control)] text-[12px] font-semibold bg-[var(--fx-canvas)] text-[var(--fx-ink)] border border-[var(--fx-border)] hover:bg-[var(--fx-canvas)] transition-colors cursor-pointer disabled:opacity-50"
                                 >
                                   {trackLoading[o.id]
                                     ? <Loader2 size={13} className="animate-spin" />
@@ -2131,7 +2217,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                                     href={o.shiprocket.trackingUrl}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[12px] font-semibold text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] transition-colors"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--fx-radius-control)] text-[12px] font-semibold text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] transition-colors"
                                   >
                                     {t.products.courierSite}
                                     <ArrowRight size={12} />
@@ -2192,14 +2278,14 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
               <div className="space-y-6">
                 {/* Header with Title and Manual Refresh */}
                 <div className="flex items-center justify-between gap-3">
-                  <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--fx-ink)]">
+                  <h1 className="fx-text-heading-page text-[var(--fx-ink)]">
                     {t.history.title}
                   </h1>
                   <button
                     type="button"
                     onClick={() => fetchAlertHistory(true)}
                     disabled={allHistoryLoading}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--fx-border)] bg-white text-xs font-semibold text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] transition-colors self-start sm:self-auto cursor-pointer disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--fx-radius-control)] border border-[var(--fx-border)] bg-white text-xs font-semibold text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] transition-colors self-start sm:self-auto cursor-pointer disabled:opacity-50"
                   >
                     <RefreshCw size={13} className={allHistoryLoading ? 'animate-spin text-[var(--fx-accent)]' : ''} />
                     <span>{allHistoryLoading ? t.history.refreshing : t.history.refreshAlerts}</span>
@@ -2207,12 +2293,12 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                 </div>
 
                 {allHistoryLoading && allHistory.length === 0 ? (
-                  <div className="bg-white border border-[var(--fx-border)] rounded-2xl py-12 px-6 text-center text-[var(--fx-faint)]">
+                  <div className="bg-white border border-[var(--fx-border)] rounded-[var(--fx-radius-card)] py-12 px-6 text-center text-[var(--fx-faint)]">
                     <Loader2 size={32} className="animate-spin mx-auto mb-2 text-[var(--fx-accent)]" />
                     <p className="text-[13.5px] font-semibold text-[var(--fx-ink)]">{t.history.fetching}</p>
                   </div>
                 ) : allHistory.length === 0 ? (
-                  <div className="bg-white border border-[var(--fx-border)] rounded-2xl py-12 px-6 text-center text-[var(--fx-faint)]">
+                  <div className="bg-white border border-[var(--fx-border)] rounded-[var(--fx-radius-card)] py-12 px-6 text-center text-[var(--fx-faint)]">
                     <BellRing size={36} className="mx-auto mb-3 opacity-40 text-[var(--fx-accent)]" />
                     <p className="text-sm text-[var(--fx-ink)] font-bold">{t.history.noAlertsTitle}</p>
                     <p className="text-xs text-[var(--fx-ink-2)] mt-1 max-w-sm mx-auto">
@@ -2223,9 +2309,9 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                   <div className="space-y-6">
                     {/* ── LATEST ALERT HERO CARD ── */}
                     {allHistory[0] && (
-                      <div className="rounded-2xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50/70 via-white to-neutral-50/40 p-5 sm:p-6 shadow-xs">
+                      <div className="rounded-[var(--fx-radius-card)] border border-emerald-200/90 bg-gradient-to-br from-emerald-50/70 via-white to-neutral-50/40 p-5 sm:p-6 shadow-xs">
                         <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
-                          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100/90 text-emerald-800 border border-emerald-300/60">
+                          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-[var(--fx-radius-pill)] text-xs font-bold bg-emerald-100/90 text-emerald-800 border border-emerald-300/60">
                             <span className="relative flex h-2 w-2">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600" />
@@ -2242,11 +2328,11 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
 
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                           <div>
-                            <h2 className="text-base sm:text-lg font-bold text-neutral-900">
+                            <h2 className="text-base sm:text-lg font-bold text-[var(--fx-ink)]">
                               {codesRevealed ? allHistory[0].stickerCode : (allHistory[0].stickerVehicle || allHistory[0].stickerNickname || t.history.vehicleSafetyTag)}
                             </h2>
                             <div className="text-xs text-neutral-600 mt-1.5 flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-200">
+                              <span className="font-semibold text-emerald-800 bg-white px-2 py-0.5 rounded-[var(--fx-radius-pill)] border border-emerald-200">
                                 {allHistory[0].event_type || t.history.scanRecorded}
                               </span>
                               {allHistory[0].location && (
@@ -2263,20 +2349,20 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <button
+                            <Button
                               type="button"
+                              size="sm"
                               onClick={() => {
                                 const found = products.find((p) => p.id === allHistory[0].sticker_id || p.qrCodeId === allHistory[0].stickerCode);
                                 if (found) setModal({ type: 'qrCode', sticker: found });
                               }}
-                              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white border border-neutral-200 text-neutral-800 hover:bg-neutral-50 shadow-2xs transition-colors cursor-pointer"
                             >
                               {t.history.viewPlate}
-                            </button>
+                            </Button>
                             <button
                               type="button"
                               onClick={() => setActiveTab('chat')}
-                              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white hover:bg-black shadow-2xs transition-colors cursor-pointer"
+                              className="px-3.5 py-2 rounded-[var(--fx-radius-control)] text-xs font-semibold bg-[var(--fx-accent)] text-white hover:bg-[var(--fx-accent-hover)] transition-colors cursor-pointer"
                             >
                               {t.history.openVisitorChat}
                             </button>
@@ -2298,7 +2384,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                             placeholder={t.history.searchLogs}
                             value={historySearch}
                             onChange={(e) => setHistorySearch(e.target.value)}
-                            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink)] outline-none focus:border-[var(--fx-accent)] focus:ring-2 focus:ring-[var(--fx-accent)]/20 shadow-2xs"
+                            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-[var(--fx-radius-control)] border border-[var(--fx-border-strong)] bg-white text-[var(--fx-ink)] outline-none focus:border-[var(--fx-accent)] focus:ring-2 focus:ring-[var(--fx-accent)]/20 shadow-2xs"
                           />
                         </div>
                       </div>
@@ -2309,11 +2395,11 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                             .some((v) => (v || '').toLowerCase().includes(needle))
                         );
                         return filteredHistory.length === 0 ? (
-                          <div className="bg-white border border-[var(--fx-border)] rounded-2xl py-8 px-6 text-center text-xs text-[var(--fx-ink-2)] font-semibold">
+                          <div className="bg-white border border-[var(--fx-border)] rounded-[var(--fx-radius-card)] py-8 px-6 text-center text-xs text-[var(--fx-ink-2)] font-semibold">
                             {t.history.noLogsMatchPrefix} "{historySearch}".
                           </div>
                         ) : (
-                        <div className="bg-white rounded-2xl border border-[var(--fx-border)] overflow-hidden shadow-2xs">
+                        <div className="bg-white rounded-[var(--fx-radius-card)] border border-[var(--fx-border)] overflow-hidden shadow-2xs">
                           <table className="w-full min-w-[520px] text-sm text-[var(--fx-ink)]">
                             <thead>
                               <tr className="text-left font-display text-[12px] font-semibold text-[var(--fx-ink-2)] tracking-normal bg-[var(--fx-canvas)] border-b border-[var(--fx-border)]">
@@ -2330,7 +2416,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                                     {codesRevealed ? h.stickerCode : (h.stickerVehicle || h.stickerNickname || t.history.stickerFallback)}
                                   </td>
                                   <td className="px-4 py-3.5 text-xs">
-                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-700">
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--fx-radius-pill)] text-[11px] font-semibold bg-neutral-100 text-neutral-700">
                                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                                       {h.event_type || t.history.scanRecorded}
                                     </span>
@@ -2415,7 +2501,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
       )}
 
       {toastMsg && (
-        <div className="fixed bottom-[max(1.5rem,calc(env(safe-area-inset-bottom)+0.5rem))] right-6 z-[120] bg-[var(--fx-ink)] text-white px-4 py-2.5 rounded-[9px] shadow-lg font-mono text-[13px] border border-[var(--fx-accent)]">
+        <div className="fixed bottom-[max(1.5rem,calc(env(safe-area-inset-bottom)+0.5rem))] right-6 z-[120] bg-[var(--fx-ink)] text-white px-4 py-2.5 rounded-[var(--fx-radius-control)] shadow-lg font-mono text-[13px] border border-[var(--fx-accent)]">
           {toastMsg}
         </div>
       )}

@@ -184,3 +184,81 @@ Then walk the main user task step by step (tap by tap). Count steps and words be
 7. **Still weak** (if any)
 8. **Updated Section 6** — ready to paste back
 
+
+
+# CLAUDE.md — RepiQR Client Dashboard Redesign
+
+## Mission
+Restyle the existing RepiQR **client dashboard** (React.js, Cloudflare Workers) to match the reference design in `docs/design/repiqr-dashboard.html`, wire every menu item to a working route, then **commit and push**. Keep existing data, API calls and auth logic. Change only layout, styling and navigation.
+
+## Execution rules (do not stop)
+- Work autonomously until every item in the Checklist is done and pushed. Do not pause for confirmation or ask questions; make the most sensible decision and note it in the final summary.
+- Stop only for a hard blocker (missing secret, failing external service). Report it plainly, then continue with everything unblocked.
+- Never leave the build broken. After each step run build, lint and tests (whatever `package.json` defines) and fix failures before moving on.
+- Do not touch `.env*`, secrets, `wrangler.toml` bindings or backend/API code.
+- Do not add new colors, fonts or UI libraries beyond what is specified here.
+
+## Git workflow
+1. `git pull --rebase`, then `git checkout -b feat/dashboard-redesign`.
+2. Commit after each checklist step: `feat(dashboard): <what changed>`.
+3. `git push -u origin feat/dashboard-redesign` after every 2–3 commits and at the end.
+4. Never force-push. Never push to `main`/`master` directly. Open a PR if `gh` is available.
+
+## Design source of truth
+Open `docs/design/repiqr-dashboard.html` (copy it into the repo first if missing). Match it pixel-for-pixel for layout, spacing and behavior. It runs full screen.
+
+### Palette (do not change)
+| Token | Value | Use |
+|---|---|---|
+| `--shell` | `#111111` | sidebar / outer shell |
+| `--bg` | `#dfe2f0` | page background (mobile gutters) |
+| `--panel` | `#ffffff` | main white panel |
+| `--side` | `#f7f8fc` | right column |
+| `--ink` | `#1b1e2e` | primary text |
+| `--mute` | `#a0a5b8` | secondary text |
+| `--line` | `#eef0f6` | dividers |
+| `--chip` | `#f3f5fa` | chips, inputs |
+| `--blue` | `#1a6bff` | active bar, links, badges |
+| `--blue-soft` | `#cfe0fb` | inactive bars, icon tiles |
+| `--green` | `#2ebd8e` | progress bars |
+| Buttons | `#111111` bg, white text | primary CTA |
+| Alert dot | `#e53935` | notification badge, logout |
+
+Font: Inter (400–800). Light theme only; no dark mode, no orange.
+
+### Layout
+- Full viewport: `width:100%; height:100vh`, no outer padding or floating card.
+- Grid: sidebar `280px` + main. Main is a white panel with `24px` radius and `14px` margin (top/right/bottom), containing center content (padding `40px 48px`) and a `340px` right column on **Home only**; other pages are single column.
+- Sidebar: logo + CLIENT badge, user block (initial avatar with red unread badge, name, phone), menu text `17px / 600`, inactive `#5f6371`, active `#fff`, no section headings. Footer: Back to site, Log out (red).
+- Mobile (≤900px): sidebar becomes a top bar with horizontally scrollable menu pills; right column stacks below content.
+
+## Menu → routes (all must work, active state highlighted)
+| Item | Route | Content |
+|---|---|---|
+| Home Overview | `/dashboard` | Welcome header, 14-day scan bars (last bar blue), Recent Scans, right column: My Safety Stickers, Latest chat, Add Emergency Responders card |
+| Live Visitor Chat | `/dashboard/chat` | Existing chat inbox in the new style |
+| Setup Guide | `/dashboard/setup` | Checklist with progress |
+| Products | `/dashboard/products` | Sticker cards + Get free |
+| Emergency Contacts | `/dashboard/contacts` | Add / remove list (use existing API) |
+| Alert History | `/dashboard/alerts` | Scan and alert log, empty state |
+| Account Settings | `/dashboard/account` | Name / phone form |
+| Support & Help | `/dashboard/support` | FAQ accordion |
+
+Top bar of every page: balance chip (`₹`), language selector, **Get Free Sticker** button, bell (links to Alert History).
+Use the existing router; keep current route paths if they differ and map the menu to them.
+
+## Checklist
+- [ ] Add CSS variables/tokens above in the global stylesheet (or Tailwind theme)
+- [ ] Build `DashboardShell` (sidebar + panel + conditional right column)
+- [ ] Build `Sidebar` with active-route highlighting and mobile pill layout
+- [ ] Rebuild Home: scan bars, Recent Scans, right column cards
+- [ ] Restyle Chat, Setup, Products, Contacts, Alerts, Account, Support pages
+- [ ] Connect real data (stickers, scans, contacts, balance) instead of placeholders
+- [ ] Empty, loading and error states for every page
+- [ ] Responsive check at 1440, 1024, 768 and 390 px widths
+- [ ] Keyboard focus styles and `aria-label`s on icon-only buttons
+- [ ] Build + lint + tests pass
+- [ ] Push branch, open PR, post a short summary (what changed, decisions made, anything unfinished)
+
+## Definition of done
+Dashboard matches the reference visually at all breakpoints, every menu item routes correctly with real data, build is green, and the branch is pushed.

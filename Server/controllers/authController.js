@@ -47,7 +47,9 @@ const DUMMY_HASH = '$2a$10$CwTycUXWue0Thq9StjUM0uJ8Vp1G3XLxaR7dyx7NcgCkJ6RxYWMKa
  */
 async function completeSignIn({ req, profile, ip, userAgent, method }) {
   const securityMeta = await UserModel.getSecurityMeta(profile.id);
-  const token = jwt.sign({ id: profile.id, email: profile.email, role: profile.role }, JWT_SECRET, { expiresIn: '7d' });
+  // Standard logins (password, OTP, chat link) always issue role 'user' session tokens.
+  // The 'admin' role is EXCLUSIVELY granted via /api/auth/admin-login.
+  const token = jwt.sign({ id: profile.id, email: profile.email, role: 'user' }, JWT_SECRET, { expiresIn: '7d' });
 
   if (securityMeta?.last_login_ip && securityMeta.last_login_ip !== ip) {
     logger.security('NEW_DEVICE_LOGIN', `Sign-in for ${profile.email} from a new IP (previously ${securityMeta.last_login_ip})`, { userId: profile.id, previousIp: securityMeta.last_login_ip, ip, userAgent }, { userId: profile.id });
@@ -63,12 +65,12 @@ async function completeSignIn({ req, profile, ip, userAgent, method }) {
 
   await logAuditEvent({
     eventType: SecurityEventTypes.AUTH_LOGIN_SUCCESS,
-    actorType: profile.role === 'admin' ? 'ADMIN' : 'USER',
+    actorType: 'USER',
     req,
     userId: profile.id,
     userEmail: profile.email,
     statusCode: 200,
-    metadata: { role: profile.role, method },
+    metadata: { role: 'user', method },
   });
 
   return token;
@@ -129,7 +131,6 @@ class AuthController {
       }
 
       const passwordHash = await hashPassword(password);
-      const isDesignatedAdmin = targetEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
       let profile;
       try {
@@ -138,7 +139,7 @@ class AuthController {
           passwordHash,
           fullName: fullName || (email ? email.split('@')[0] : formattedPhone),
           phoneNumber: formattedPhone || undefined,
-          role: isDesignatedAdmin ? 'admin' : 'user',
+          role: 'user',
           emailVerified: true,
         });
       } catch (createErr) {
@@ -149,7 +150,7 @@ class AuthController {
       }
 
       const token = jwt.sign(
-        { id: profile.id, email: profile.email, role: profile.role },
+        { id: profile.id, email: profile.email, role: 'user' },
         JWT_SECRET,
         { expiresIn: '7d' }
       );
@@ -242,13 +243,13 @@ class AuthController {
 
       loginAttemptTracker.clear(normalizedEmail);
 
-      const profile = await UserModel.reconcileAdminRole(await UserModel.findById(authUser._id));
+      const profile = await UserModel.findById(authUser._id);
       const token = await completeSignIn({ req, profile, ip, userAgent, method: 'password' });
 
       return res.json({
         success: true,
         token,
-        user: profile
+        user: { ...profile, role: 'user' }
       });
     } catch (err) {
       logger.error('AUTH_SIGNIN', 'Sign in internal failure', err);
@@ -279,13 +280,13 @@ class AuthController {
         return res.status(401).json({ success: false, error: 'This link has expired. Sign in to open your chat.' });
       }
 
-      const profile = await UserModel.reconcileAdminRole(await UserModel.findById(link.userId));
+      const profile = await UserModel.findById(link.userId);
       if (!profile) {
         return res.status(401).json({ success: false, error: 'This link has expired. Sign in to open your chat.' });
       }
 
       const token = await completeSignIn({ req, profile, ip, userAgent, method: 'chat_link' });
-      return res.json({ success: true, token, user: profile, sessionId: link.sessionId });
+      return res.json({ success: true, token, user: { ...profile, role: 'user' }, sessionId: link.sessionId });
     } catch (err) {
       logger.error('AUTH_CHAT_LINK', 'Chat link sign-in failed', err);
       return res.status(500).json({ success: false, error: 'Could not open your chat. Please sign in.' });
@@ -348,15 +349,13 @@ class AuthController {
 
       logger.info('AUTH_GOOGLE', `Google OAuth verification for: ${email} (sub: ${sub || 'none'})`);
 
-      const isDesignatedAdmin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-
       let profile = await UserModel.findByEmail(email);
       if (!profile) {
         profile = await UserModel.createUser({
           email,
           fullName: fullName || email.split('@')[0],
           googleId: sub || null,
-          role: isDesignatedAdmin ? 'admin' : 'user',
+          role: 'user',
           emailVerified: true,
         });
         if (avatarUrl) {
@@ -384,9 +383,6 @@ class AuthController {
           });
         }
 
-        if (isDesignatedAdmin && profile.role !== 'admin') {
-          profile = await UserModel.reconcileAdminRole(profile);
-        }
         if (sub && authRecord?.google_id !== sub) {
           await UserModel.linkGoogleId(profile.id, sub);
         }
@@ -422,8 +418,10 @@ class AuthController {
         logger.error('ORDER_STICKER_CLAIM', 'Failed to claim order-linked stickers after Google sign-in', err);
       }
 
+      // Google sign-in is strictly for client/customer dashboard access.
+      // Admin role is NEVER issued via Google sign-in.
       const token = jwt.sign(
-        { id: profile.id, email: profile.email, role: profile.role },
+        { id: profile.id, email: profile.email, role: 'user' },
         JWT_SECRET,
         { expiresIn: '7d' }
       );
@@ -433,7 +431,7 @@ class AuthController {
       return res.json({
         success: true,
         token,
-        user: profile
+        user: { ...profile, role: 'user' }
       });
     } catch (err) {
       logger.error('AUTH_GOOGLE', 'Google auth failure', err);
@@ -500,18 +498,14 @@ class AuthController {
         return res.status(400).json({ success: false, error: messages[result.reason] || 'Verification failed.' });
       }
 
-      const isDesignatedAdmin = normalizedEmail === ADMIN_EMAIL.toLowerCase();
-
       let profile = await UserModel.findByEmail(normalizedEmail);
       if (!profile) {
         profile = await UserModel.createUser({
           email: normalizedEmail,
           fullName: normalizedEmail.split('@')[0],
-          role: isDesignatedAdmin ? 'admin' : 'user',
+          role: 'user',
           emailVerified: true,
         });
-      } else if (isDesignatedAdmin && profile.role !== 'admin') {
-        profile = await UserModel.reconcileAdminRole(profile);
       }
 
       const ip = getClientIp(req);
@@ -544,7 +538,7 @@ class AuthController {
       }
 
       const token = jwt.sign(
-        { id: profile.id, email: profile.email, role: profile.role },
+        { id: profile.id, email: profile.email, role: 'user' },
         JWT_SECRET,
         { expiresIn: '7d' }
       );
@@ -553,15 +547,15 @@ class AuthController {
 
       await logAuditEvent({
         eventType: SecurityEventTypes.AUTH_LOGIN_SUCCESS,
-        actorType: profile.role === 'admin' ? 'ADMIN' : 'USER',
+        actorType: 'USER',
         req,
         userId: profile.id,
         userEmail: profile.email,
         statusCode: 200,
-        metadata: { role: profile.role, method: 'email_otp' },
+        metadata: { role: 'user', method: 'email_otp' },
       });
 
-      return res.json({ success: true, token, user: profile });
+      return res.json({ success: true, token, user: { ...profile, role: 'user' } });
     } catch (err) {
       logger.error('EMAIL_OTP_VERIFY', 'Failed to verify email sign-in code', err);
       return res.status(500).json({ success: false, error: err.message });
@@ -613,7 +607,10 @@ class AuthController {
         // with a token it had already discarded.
         return res.status(401).json({ success: false, error: 'Session no longer valid — please sign in again.' });
       }
-      return res.json({ success: true, user: profile });
+      // If the current JWT session is a regular user token, the returned profile role
+      // must remain 'user'. Only an admin-issued JWT token carries role: 'admin'.
+      const effectiveRole = req.user.role === 'admin' ? 'admin' : 'user';
+      return res.json({ success: true, user: { ...profile, role: effectiveRole } });
     } catch (err) {
       logger.error('AUTH_ME', 'Failed to fetch user profile', err);
       return res.status(500).json({ success: false, error: err.message });

@@ -1,3 +1,5 @@
+const path = require('path');
+const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
 const UserModel = require('../models/userModel');
 const { JWT_SECRET, ADMIN_EMAIL } = require('../middleware/authMiddleware');
@@ -15,9 +17,8 @@ function getUserAgent(req) {
 }
 
 /**
- * Admin Fleet Panel sign-in: email + password. Only ADMIN_EMAIL can sign in, and
- * the password is checked against a bcrypt hash in Server/.env (ADMIN_PASSWORD_HASH),
- * so no plain-text password exists anywhere in the code or the database.
+ * Admin Fleet Panel sign-in: email + password. Only ADMIN_EMAIL can sign in.
+ * Password is verified against ADMIN_PASSWORD_HASH (bcrypt) or ADMIN_PASSWORD in .env.
  * POST /api/auth/admin-login   Body: { email, password }
  */
 exports.adminLogin = async (req, res) => {
@@ -26,9 +27,26 @@ exports.adminLogin = async (req, res) => {
     const password = String(req.body?.password || '');
     const ip = getClientIp(req);
     const userAgent = getUserAgent(req);
-    const passwordHash = process.env.ADMIN_PASSWORD_HASH;
 
-    if (!passwordHash) {
+    // If neither password hash nor plain password is in process.env, reload .env dynamically
+    let passwordHash = (process.env.ADMIN_PASSWORD_HASH || '').trim().replace(/^["']|["']$/g, '');
+    let plainPassword = (process.env.ADMIN_PASSWORD || '').trim().replace(/^["']|["']$/g, '');
+
+    if (!passwordHash && !plainPassword) {
+      try {
+        dotenv.config({ path: path.join(__dirname, '..', '.env'), override: true });
+        dotenv.config({ path: path.join(__dirname, '..', '..', '.env'), override: true });
+        passwordHash = (process.env.ADMIN_PASSWORD_HASH || '').trim().replace(/^["']|["']$/g, '');
+        plainPassword = (process.env.ADMIN_PASSWORD || '').trim().replace(/^["']|["']$/g, '');
+      } catch {}
+    }
+
+    const configuredAdminEmail = (process.env.ADMIN_EMAIL || ADMIN_EMAIL || 'worthitellp@gmail.com')
+      .trim()
+      .replace(/^["']|["']$/g, '')
+      .toLowerCase();
+
+    if (!passwordHash && !plainPassword) {
       return res.status(503).json({ success: false, error: 'Admin sign-in is not configured on the server.' });
     }
     if (!email || !password) {
@@ -36,8 +54,16 @@ exports.adminLogin = async (req, res) => {
     }
 
     const attemptKey = `admin-login:${ip}`;
-    const credentialsOk =
-      email === ADMIN_EMAIL.toLowerCase() && (await verifyPassword(password, passwordHash));
+    let credentialsOk = false;
+
+    if (email === configuredAdminEmail) {
+      if (passwordHash) {
+        credentialsOk = await verifyPassword(password, passwordHash);
+      }
+      if (!credentialsOk && plainPassword) {
+        credentialsOk = (password === plainPassword);
+      }
+    }
 
     if (!credentialsOk) {
       const failCount = loginAttemptTracker.recordFailure(attemptKey);
@@ -56,10 +82,10 @@ exports.adminLogin = async (req, res) => {
 
     loginAttemptTracker.clear(attemptKey);
 
-    let profile = await UserModel.findByEmail(ADMIN_EMAIL);
+    let profile = await UserModel.findByEmail(configuredAdminEmail);
     if (!profile) {
       profile = await UserModel.createUser({
-        email: ADMIN_EMAIL,
+        email: configuredAdminEmail,
         fullName: 'Fleet Admin',
         role: 'admin',
         emailVerified: true,
@@ -76,13 +102,13 @@ exports.adminLogin = async (req, res) => {
 
     const token = jwt.sign({ id: profile.id, email: profile.email, role: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
 
-    logger.success('AUTH_ADMIN_SIGNIN', `Admin signed in with email and password: ${ADMIN_EMAIL}`, { ip, userAgent }, { userId: profile.id });
+    logger.success('AUTH_ADMIN_SIGNIN', `Admin signed in with email and password: ${configuredAdminEmail}`, { ip, userAgent }, { userId: profile.id });
     await logAuditEvent({
       eventType: SecurityEventTypes.ADMIN_ACCESS,
       actorType: 'ADMIN',
       req,
       userId: profile.id,
-      userEmail: ADMIN_EMAIL,
+      userEmail: configuredAdminEmail,
       statusCode: 200,
       metadata: { action: 'ADMIN_SIGNIN', method: 'password' },
     });

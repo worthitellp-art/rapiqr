@@ -81,35 +81,35 @@ export default function Sidebar({
   return (
     <aside
       className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200/80 flex flex-col justify-between select-none
+        fixed inset-y-0 left-0 z-50 w-[245px] bg-[var(--fx-sidebar-bg)] flex flex-col justify-between select-none
         transition-transform duration-200 ease-in-out md:static md:translate-x-0
         ${isOpen ? "translate-x-0" : "-translate-x-full"}
       `}
     >
       {/* ── Top Section: Workspace Selector & Close (mobile) ────── */}
-      <div className="p-4 border-b border-gray-100 flex flex-col gap-3">
+      <div className="p-4 border-b border-white/10 flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          {/* Workspace Switcher Card matching image copy 2.png */}
+          {/* Workspace Switcher — the panel it opens stays light (a transient
+              popover over the dark rail), the trigger itself follows the rail. */}
           <div className="relative w-full">
             <button
               type="button"
               onClick={() => setIsWorkspaceMenuOpen((prev) => !prev)}
-              className="w-full flex items-center justify-between p-2 rounded-xl border border-gray-200/70 bg-white hover:bg-gray-50/80 hover:border-gray-300 transition-all text-left cursor-pointer group shadow-2xs"
+              className="w-full flex items-center justify-between p-2 rounded-[var(--fx-radius-control)] hover:bg-white/5 transition-colors text-left cursor-pointer group"
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                {/* Brand Squircle Icon Container */}
-                <div className="w-8 h-8 rounded-lg bg-linear-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shrink-0 shadow-xs font-bold text-sm tracking-tight">
+                <div className="w-8 h-8 rounded-[var(--fx-radius-tile)] bg-[var(--fx-accent)] flex items-center justify-center text-white shrink-0 font-bold text-sm tracking-tight">
                   <span className="font-sans font-black text-xs">R</span>
                 </div>
                 <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-1">
-                    <span className="font-semibold text-xs text-gray-900 truncate">RapiQR Fleet</span>
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="font-semibold text-xs text-white truncate">RapiQR Fleet</span>
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
                   </div>
-                  <span className="text-[11px] text-gray-400 font-medium truncate">Operations Console</span>
+                  <span className="text-[11px] text-[var(--fx-sidebar-ink)] font-medium truncate">Operations Console</span>
                 </div>
               </div>
-              <ChevronsUpDown size={14} className="text-gray-400 group-hover:text-gray-600 shrink-0 ml-1.5" />
+              <ChevronsUpDown size={14} className="text-[var(--fx-sidebar-ink)] group-hover:text-white shrink-0 ml-1.5" />
             </button>
 
             {/* Workspace Dropdown */}
@@ -119,8 +119,8 @@ export default function Sidebar({
                   className="fixed inset-0 z-20"
                   onClick={() => setIsWorkspaceMenuOpen(false)}
                 />
-                <div className="absolute top-full left-0 right-0 mt-1 z-30 bg-white rounded-xl border border-gray-200 shadow-lg p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-100">
-                  <div className="px-2.5 py-1.5 flex items-center justify-between text-[11px] font-semibold text-gray-900 bg-gray-50 rounded-lg">
+                <div className="absolute top-full left-0 right-0 mt-1 z-30 bg-white rounded-[var(--fx-radius-card)] border border-[var(--fx-border)] shadow-lg p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-2.5 py-1.5 flex items-center justify-between text-[11px] font-semibold text-[var(--fx-ink)] bg-[var(--fx-canvas)] rounded-[var(--fx-radius-control)]">
                     <span>RapiQR Fleet (Live)</span>
                     <Check size={13} className="text-emerald-600" />
                   </div>
@@ -130,7 +130,7 @@ export default function Sidebar({
                       setIsWorkspaceMenuOpen(false);
                       onBack();
                     }}
-                    className="w-full text-left px-2.5 py-1.5 text-[11px] text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer flex items-center gap-2"
+                    className="w-full text-left px-2.5 py-1.5 text-[11px] text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] rounded-[var(--fx-radius-control)] transition-colors cursor-pointer flex items-center gap-2"
                   >
                     <Globe size={13} />
                     <span>Public Storefront</span>
@@ -144,7 +144,7 @@ export default function Sidebar({
           <button
             type="button"
             onClick={onClose}
-            className="md:hidden p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 cursor-pointer ml-1"
+            className="md:hidden p-1.5 text-[var(--fx-sidebar-ink)] hover:text-white rounded-[var(--fx-radius-control)] hover:bg-white/10 cursor-pointer ml-1"
             aria-label="Close navigation"
           >
             <X size={18} />
@@ -153,15 +153,17 @@ export default function Sidebar({
       </div>
 
       {/* ── Middle Section: Grouped Navigation Links ─────────── */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5 custom-scrollbar-light">
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
         {groupedSections.map((group) => (
           <div key={group.section} className="space-y-0.5">
             {/* Section Header */}
-            <div className="px-3 py-1 text-[10.5px] font-bold uppercase tracking-wider text-gray-400">
+            <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--fx-sidebar-ink)]">
               {group.section}
             </div>
 
-            {/* Nav Items */}
+            {/* Nav Items — same type scale as the client sidebar (17px/semibold,
+                h-10), just with an icon in front since admin's nav is denser
+                and benefits from the extra wayfinding. */}
             {group.items.map((item) => {
               const Icon = item.icon;
               const isActive = page === item.id;
@@ -174,21 +176,19 @@ export default function Sidebar({
                   type="button"
                   onClick={() => handleSelectPage(item.id)}
                   className={`
-                    w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer group
+                    w-full h-10 flex items-center justify-between px-3 rounded-[var(--fx-radius-control)] text-[17px] font-semibold transition-colors cursor-pointer group
                     ${
                       isActive
-                        ? "bg-gray-100/90 text-gray-950 font-semibold shadow-2xs"
-                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50/80"
+                        ? "bg-[var(--fx-accent)] text-white"
+                        : "text-[var(--fx-sidebar-ink)] hover:text-white hover:bg-white/10"
                     }
                   `}
                 >
-                  <div className="flex items-center gap-2.5 truncate">
+                  <div className="flex items-center gap-2.5 min-w-0">
                     <Icon
-                      size={16}
-                      className={`
-                        shrink-0 transition-colors
-                        ${isActive ? "text-gray-900" : "text-gray-400 group-hover:text-gray-600"}
-                      `}
+                      size={17}
+                      strokeWidth={2}
+                      className={`shrink-0 transition-colors ${isActive ? "text-white" : "text-[var(--fx-sidebar-ink)] group-hover:text-white"}`}
                     />
                     <span className="truncate">{item.label}</span>
                   </div>
@@ -200,8 +200,8 @@ export default function Sidebar({
                         text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0
                         ${
                           isAlertItem
-                            ? "bg-red-50 text-red-600 border border-red-200/60"
-                            : "bg-gray-100 text-gray-600 border border-gray-200/60"
+                            ? "bg-[#3A1810] text-[#FF8166]"
+                            : "bg-white/15 text-white"
                         }
                       `}
                     >
@@ -216,23 +216,23 @@ export default function Sidebar({
       </div>
 
       {/* ── Bottom Section: User Profile & Account Controls ──── */}
-      <div className="p-3 border-t border-gray-100 relative">
+      <div className="p-3 border-t border-white/10 relative">
         <div className="relative">
           <button
             type="button"
             onClick={() => setIsAccountMenuOpen((prev) => !prev)}
-            className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer text-left group"
+            className="w-full flex items-center justify-between p-2 rounded-[var(--fx-radius-control)] hover:bg-white/5 transition-colors cursor-pointer text-left group"
           >
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+              <div className="w-8 h-8 rounded-full bg-[var(--fx-accent)] text-white flex items-center justify-center font-bold text-xs shrink-0">
                 {userInitials}
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="font-semibold text-xs text-gray-900 truncate">{admin.name || "Admin"}</span>
-                <span className="text-[11px] text-gray-400 truncate">{admin.role || "Administrator"}</span>
+                <span className="font-semibold text-xs text-white truncate">{admin.name || "Admin"}</span>
+                <span className="text-[11px] text-[var(--fx-sidebar-ink)] truncate">{admin.role || "Administrator"}</span>
               </div>
             </div>
-            <ChevronsUpDown size={14} className="text-gray-400 group-hover:text-gray-600 shrink-0" />
+            <ChevronsUpDown size={14} className="text-[var(--fx-sidebar-ink)] group-hover:text-white shrink-0" />
           </button>
 
           {/* Account Popover Menu */}
@@ -242,10 +242,10 @@ export default function Sidebar({
                 className="fixed inset-0 z-20"
                 onClick={() => setIsAccountMenuOpen(false)}
               />
-              <div className="absolute bottom-full left-0 right-0 mb-1.5 z-30 bg-white rounded-xl border border-gray-200 shadow-xl p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-100">
-                <div className="px-3 py-2 border-b border-gray-100">
-                  <p className="text-xs font-bold text-gray-900 truncate">{admin.name}</p>
-                  <p className="text-[11px] text-gray-400 truncate">{admin.email || "admin@rapiqr.com"}</p>
+              <div className="absolute bottom-full left-0 right-0 mb-1.5 z-30 bg-white rounded-[var(--fx-radius-card)] border border-[var(--fx-border)] shadow-xl p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-100">
+                <div className="px-3 py-2 border-b border-[var(--fx-border)]">
+                  <p className="text-xs font-bold text-[var(--fx-ink)] truncate">{admin.name}</p>
+                  <p className="text-[11px] text-[var(--fx-ink-2)] truncate">{admin.email || "admin@rapiqr.com"}</p>
                 </div>
 
                 <button
@@ -254,9 +254,9 @@ export default function Sidebar({
                     setIsAccountMenuOpen(false);
                     onBack();
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] rounded-[var(--fx-radius-control)] transition-colors cursor-pointer"
                 >
-                  <Globe size={14} className="text-gray-400" />
+                  <Globe size={14} className="text-[var(--fx-faint)]" />
                   <span>Back to site</span>
                 </button>
 
@@ -266,7 +266,7 @@ export default function Sidebar({
                     setIsAccountMenuOpen(false);
                     onSignOut();
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-[#DC2626] hover:bg-[#FEE2E2] rounded-[var(--fx-radius-control)] transition-colors cursor-pointer"
                 >
                   <LogOut size={14} />
                   <span>Sign out</span>

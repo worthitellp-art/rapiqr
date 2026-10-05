@@ -13,7 +13,7 @@
  */
 
 import { apiClient } from "../../lib/apiClient";
-import { resolveServiceProviders, type CategoryActionType, type ServiceProvider } from "./tileActions";
+import { getServiceType, resolveServiceProviders, type CategoryActionType, type ServiceProvider } from "./tileActions";
 
 /** Matches the generic shape asked for in task.md. */
 export interface CategoryActionParams {
@@ -24,6 +24,8 @@ export interface CategoryActionParams {
   message?: string;
   /** Stable id for this issue — becomes the alert `type` in the admin feed. */
   issue?: string;
+  /** Visitor's own number — only set for a SERVICE_PROVIDER request with no provider configured. */
+  reporterPhone?: string;
 }
 
 /** Everything the handler needs from the surrounding scan page. */
@@ -48,6 +50,7 @@ export interface CategoryActionDeps {
 export type CategoryActionResult =
   | { kind: "providers"; providers: ServiceProvider[] }
   | { kind: "sms"; ownerNotified: boolean; simulated: boolean; message: string; smsResult?: any }
+  | { kind: "requested"; message: string; smsResult?: any }
   | { kind: "chat" }
   | { kind: "error"; message: string; errorDetails?: any };
 
@@ -57,7 +60,12 @@ export const NO_PROVIDER_MESSAGE = "No service provider is currently available."
  * Run one button.
  *
  * SERVICE_PROVIDER → match an active provider for this service type + sticker
- *                    category, then show its name and number to call.
+ *                    category, then show its name and number to call. With no
+ *                    provider configured yet, the visitor can leave their own
+ *                    number instead of hitting a dead end — that becomes a
+ *                    request in the admin's alert feed (reporter phone
+ *                    included, unmasked) so the admin arranges someone and
+ *                    calls the visitor back directly.
  * SEND_SMS         → resolve the owner from the scanned tag server-side and SMS
  *                    them this button's message. Never the contact list, never
  *                    exposing either number.
@@ -67,17 +75,55 @@ export async function handleCategoryButtonAction(
   params: CategoryActionParams,
   deps: CategoryActionDeps
 ): Promise<CategoryActionResult> {
-  const { actionType, tagId, category, serviceType, message, issue } = params;
+  const { actionType, tagId, category, serviceType, message, issue, reporterPhone } = params;
 
   switch (actionType) {
     case "SERVICE_PROVIDER": {
       if (!serviceType) return { kind: "error", message: NO_PROVIDER_MESSAGE };
 
       const providers = resolveServiceProviders(deps.providers, serviceType, category);
-      if (providers.length === 0) return { kind: "error", message: NO_PROVIDER_MESSAGE };
+      if (providers.length > 0) {
+        deps.showProviders({ serviceType, providers });
+        return { kind: "providers", providers };
+      }
 
-      deps.showProviders({ serviceType, providers });
-      return { kind: "providers", providers };
+      const phone = (reporterPhone || "").trim();
+      if (!phone) return { kind: "error", message: NO_PROVIDER_MESSAGE };
+      if (!tagId) return { kind: "error", message: "This tag couldn't be identified — try scanning again." };
+
+      try {
+        const label = getServiceType(serviceType)?.label || "a service provider";
+        const res = await apiClient.alerts.createAlert({
+          qrId: tagId,
+          qrUrl: deps.qrUrl,
+          latitude: deps.location?.lat || 0,
+          longitude: deps.location?.lng || 0,
+          accuracy: deps.location?.accuracy || 0,
+          deviceId: navigator.userAgent.slice(0, 40),
+          timestamp: new Date().toISOString(),
+          message: `Requested ${label} — no provider configured yet for this area. Call the visitor back on the number below.`,
+          vehicleName: deps.tagName,
+          vehicleNumber: deps.tagNumber,
+          customerName: deps.visitorName,
+          customerToken: deps.customerToken,
+          reporterPhone: phone,
+          type: `service_request_${serviceType}`,
+          // This is a request for the admin to arrange and call back — not the owner.
+          notifyContacts: false,
+        });
+
+        return {
+          kind: "requested",
+          message: "Request sent — our team will arrange a provider and call you back.",
+          smsResult: res.smsResult,
+        };
+      } catch (err: any) {
+        return {
+          kind: "error",
+          message: err?.message || "Couldn't send your request — try again.",
+          errorDetails: err,
+        };
+      }
     }
 
     case "SEND_SMS": {

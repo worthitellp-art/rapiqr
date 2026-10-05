@@ -14,7 +14,7 @@ function LegalModal({ title, onClose, children }: { title: string; onClose: () =
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 border border-gray-100 max-h-[85vh] overflow-y-auto"
+        className="bg-white rounded-[var(--fx-radius-card)] shadow-2xl w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
@@ -76,7 +76,7 @@ function ReportModal({
       <div>
         <label className="block text-xs font-bold text-[var(--fx-ink-2)] mb-1">Details</label>
         <textarea
-          className="w-full px-3.5 py-2.5 text-sm bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-xl outline-none focus:border-[var(--fx-ink)] min-h-[100px]"
+          className="w-full px-3.5 py-2.5 text-sm bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-[var(--fx-radius-control)] outline-none focus:border-[var(--fx-accent)] min-h-[100px]"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder={type === 'lost' ? 'Which sticker, when/where you noticed it missing…' : 'What looked suspicious or fraudulent…'}
@@ -84,8 +84,8 @@ function ReportModal({
       </div>
       {error && <p className="text-xs font-bold text-[#DC2626]">{error}</p>}
       <div className="flex gap-3 pt-2">
-        <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer">Cancel</button>
-        <button onClick={submit} disabled={sending} className="flex-1 py-2.5 rounded-xl bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm shadow-[var(--fx-accent)]/20 transition-all">
+        <button onClick={onClose} className="flex-1 py-2.5 rounded-[var(--fx-radius-control)] border border-[var(--fx-border-strong)] text-xs font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] cursor-pointer">Cancel</button>
+        <button onClick={submit} disabled={sending} className="flex-1 py-2.5 rounded-[var(--fx-radius-control)] bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-hover)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 transition-colors">
           {sending && <Loader2 size={13} className="animate-spin" />} Submit Report
         </button>
       </div>
@@ -99,39 +99,40 @@ export default function SupportLegalPanel({ showToast }: { showToast: (msg: stri
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--fx-ink)]">Support &amp; Legal</h1>
+        <h1 className="fx-text-heading-page text-[var(--fx-ink)]">Support &amp; Legal</h1>
+        <p className="text-[13px] text-[var(--fx-ink-2)] mt-1">Quick answers, and how to reach us</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div className="bg-white border border-[var(--fx-border)] rounded-xl p-6 space-y-4">
-          <h3 className="font-bold text-sm text-[var(--fx-ink)]">Customer Support</h3>
-          <a href={`tel:${SUPPORT_PHONE.replace(/\s/g, '')}`} className="flex items-center gap-3 text-sm font-semibold text-[var(--fx-ink)] hover:text-[var(--fx-ink)]">
-            <span className="w-9 h-9 rounded-lg bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><Phone size={15} /></span>
+        <div className="bg-white rounded-[var(--fx-radius-card)] p-[18px] space-y-4">
+          <h3 className="text-[15px] font-bold text-[var(--fx-ink)]">Customer Support</h3>
+          <a href={`tel:${SUPPORT_PHONE.replace(/\s/g, '')}`} className="flex items-center gap-3 text-sm font-semibold text-[var(--fx-ink)]">
+            <span className="w-9 h-9 rounded-[var(--fx-radius-tile)] bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><Phone size={15} /></span>
             {SUPPORT_PHONE}
           </a>
-          <a href={`mailto:${SUPPORT_EMAIL}`} className="flex items-center gap-3 text-sm font-semibold text-[var(--fx-ink)] hover:text-[var(--fx-ink)]">
-            <span className="w-9 h-9 rounded-lg bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><Mail size={15} /></span>
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="flex items-center gap-3 text-sm font-semibold text-[var(--fx-ink)]">
+            <span className="w-9 h-9 rounded-[var(--fx-radius-tile)] bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><Mail size={15} /></span>
             {SUPPORT_EMAIL}
           </a>
           <div className="flex gap-2 pt-2">
-            <button onClick={() => setOpenModal('lost')} className="flex-1 py-2 rounded-lg bg-[var(--fx-amber-soft)] hover:bg-[var(--fx-amber-soft)] text-[var(--fx-amber)] text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5">
+            <button onClick={() => setOpenModal('lost')} className="flex-1 py-2 rounded-[var(--fx-radius-control)] bg-[var(--fx-amber-soft)] text-[var(--fx-amber)] text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5">
               <AlertOctagon size={13} /> Report Lost Sticker
             </button>
-            <button onClick={() => setOpenModal('fraud')} className="flex-1 py-2 rounded-lg bg-[#FEE2E2] hover:bg-[#FECACA] text-[#DC2626] text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5">
+            <button onClick={() => setOpenModal('fraud')} className="flex-1 py-2 rounded-[var(--fx-radius-control)] bg-[#FEE2E2] hover:bg-[#FECACA] text-[#DC2626] text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5">
               <AlertOctagon size={13} /> Report Fraud
             </button>
           </div>
         </div>
 
-        <div className="bg-white border border-[var(--fx-border)] rounded-xl p-6 space-y-4">
-          <h3 className="font-bold text-sm text-[var(--fx-ink)]">Legal</h3>
+        <div className="bg-white rounded-[var(--fx-radius-card)] p-[18px] space-y-4">
+          <h3 className="text-[15px] font-bold text-[var(--fx-ink)]">Legal</h3>
           <a
             href="/privacy"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full flex items-center gap-3 text-sm font-semibold text-[var(--fx-ink)] hover:text-[var(--fx-ink)]"
+            className="w-full flex items-center gap-3 text-sm font-semibold text-[var(--fx-ink)]"
           >
-            <span className="w-9 h-9 rounded-lg bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><FileText size={15} /></span>
+            <span className="w-9 h-9 rounded-[var(--fx-radius-tile)] bg-[var(--fx-canvas)] flex items-center justify-center flex-shrink-0"><FileText size={15} /></span>
             Privacy Policy
           </a>
         </div>

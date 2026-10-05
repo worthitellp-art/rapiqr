@@ -217,8 +217,8 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
 
   return (
     <div
-      className="fx-shell h-screen w-full flex overflow-hidden text-[var(--fx-ink)]"
-      style={{ background: "var(--fx-canvas)" } as React.CSSProperties}
+      className="fx-shell admin-theme h-screen w-full flex overflow-hidden text-[var(--fx-ink)]"
+      style={{ background: "var(--fx-sidebar-bg)" } as React.CSSProperties}
     >
       {/* Mobile drawer backdrop — md+ docks the sidebar so it never renders there */}
       {sidebarOpen && (
@@ -235,11 +235,14 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
         isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)}
       />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: "var(--fx-canvas)" }}>
+      <div
+        className="flex-1 flex flex-col min-w-0 overflow-hidden m-2 sm:m-3.5 sm:ml-0 rounded-[var(--fx-radius-surface)]"
+        style={{ background: "var(--fx-canvas)" }}
+      >
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
-          className="md:hidden m-3 w-8 h-8 flex-shrink-0 rounded-md bg-[var(--fx-surface)] border border-[var(--fx-border)] flex items-center justify-center text-[var(--fx-ink)] cursor-pointer"
+          className="md:hidden m-3 w-8 h-8 flex-shrink-0 rounded-[var(--fx-radius-control)] bg-[var(--fx-surface)] border border-[var(--fx-border)] flex items-center justify-center text-[var(--fx-ink)] cursor-pointer"
           aria-label="Open navigation menu"
         >
           <Menu size={16} />

@@ -63,9 +63,10 @@ function verifyAdmin(req, res, next) {
     return res.status(401).json({ success: false, error: 'Unauthorized: Authentication required' });
   }
 
-  const isAdmin = req.user.role === 'admin' || req.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-  if (!isAdmin) {
-    return res.status(403).json({ success: false, error: 'Forbidden: Admin privileges required' });
+  // Admin privileges are strictly role-based and ONLY granted via /api/auth/admin-login.
+  // Signing in with Google or normal login never grants admin access.
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Forbidden: Admin privileges required. Please sign in via /admin' });
   }
 
   next();

@@ -244,6 +244,7 @@ export default function CategoryScanView({
 }: CategoryScanViewProps) {
   const [openTile, setOpenTile] = useState<VariantTile | null>(null);
   const [message, setMessage] = useState("");
+  const [requestPhone, setRequestPhone] = useState("");
 
   /* Opening or leaving a sheet clears whatever the parent resolved for the
      previous tile, so a vet list never lingers on a towing sheet. */
@@ -271,8 +272,8 @@ export default function CategoryScanView({
 
     /* A SERVICE_PROVIDER button is only worth showing if the admin has actually
        configured someone for this service and category — otherwise the sheet
-       shows the empty state in its place rather than a button that can only
-       fail. */
+       shows a request-callback form in its place, so the visitor still has
+       something to do rather than a dead button. */
     const serviceButton = buttons.find((b) => b.action.actionType === "SERVICE_PROVIDER");
     const serviceType =
       serviceButton?.action.actionType === "SERVICE_PROVIDER" ? serviceButton.action.serviceType : null;
@@ -280,9 +281,12 @@ export default function CategoryScanView({
       ? resolveServiceProviders(providers, serviceType, category).length > 0
       : false;
 
-    /* Service buttons stay on screen; with no provider serving the visitor's
-       area they are blurred and cannot be tapped. */
-    const showEmptyProviderNote = Boolean(serviceButton) && !hasProvider;
+    /* No provider configured yet — the visitor leaves their number instead of
+       calling anyone directly; it lands in the admin's alert feed (unmasked)
+       for the admin to arrange someone and call the visitor back. Never
+       blurred/disabled — it is a real, working action either way. */
+    const showRequestForm = Boolean(serviceButton) && !hasProvider;
+    const requestPhoneValid = /^\d{10}$/.test(requestPhone.replace(/\D/g, ""));
 
     return (
       <div className="space-y-3 animate-fade-in">
@@ -301,29 +305,51 @@ export default function CategoryScanView({
           </div>
 
           <div className="px-4 pb-4 space-y-3">
-            {/* Action buttons as a grid of flat boxes, not a stacked list */}
+            {/* Action buttons as a grid of flat boxes, not a stacked list. The
+                SERVICE_PROVIDER button only appears here once a provider is
+                actually configured — with none configured, the request form
+                below is the real (unblurred, working) action instead. */}
             <div className="grid grid-cols-2 gap-2.5">
-              {buttons.map((b, i) => {
-                const unavailable = b.action.actionType === "SERVICE_PROVIDER" && !hasProvider;
-                return (
+              {buttons
+                .filter((b) => b.action.actionType !== "SERVICE_PROVIDER" || hasProvider)
+                .map((b, i) => (
                   <button
                     key={i}
-                    disabled={busy || unavailable}
-                    aria-disabled={unavailable}
+                    disabled={busy}
                     onClick={() => onButton(b.action, openTile.title)}
-                    className={`${BUTTON_STYLES[b.style] || BUTTON_STYLES.ghost} font-bold text-[12.5px] rounded-2xl flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${unavailable ? "blur-[2.5px] opacity-50 pointer-events-none" : ""}`}
+                    className={`${BUTTON_STYLES[b.style] || BUTTON_STYLES.ghost} font-bold text-[12.5px] rounded-2xl flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed`}
                   >
                     {buttonIcon(b.action)}
                     <span className="text-center leading-tight">{b.label}</span>
                   </button>
-                );
-              })}
+                ))}
             </div>
 
-            {showEmptyProviderNote && (
-              <p className="text-[11.5px] font-semibold text-[#62625B] bg-[#F6F6F3] rounded-2xl px-4 py-3 text-center">
-                {(serviceType && getServiceType(serviceType)?.label) || "This service"} is not available in your area.
-              </p>
+            {showRequestForm && serviceType && (
+              <div className="rounded-2xl border border-[#EAEAE5] bg-[#F6F6F3] p-3.5 space-y-2.5">
+                <p className="text-[11.5px] font-semibold text-[#62625B]">
+                  No {(getServiceType(serviceType)?.label || "provider").toLowerCase()} is set up here yet. Leave your
+                  number — our team will arrange one and call you back.
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    value={requestPhone}
+                    onChange={(e) => setRequestPhone(e.target.value)}
+                    placeholder="Your 10-digit mobile number"
+                    className="flex-1 min-w-0 rounded-xl border border-[#EAEAE5] bg-white px-3 py-2.5 text-[13px] font-semibold text-[#211922] focus:outline-none focus:ring-2 focus:ring-[#111111]/10"
+                  />
+                  <button
+                    type="button"
+                    disabled={busy || !requestPhoneValid}
+                    onClick={() => onButton({ actionType: "SERVICE_PROVIDER", serviceType, reporterPhone: requestPhone }, openTile.title)}
+                    className="flex-shrink-0 bg-[#111111] hover:bg-black disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs px-3.5 py-2.5 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Request callback
+                  </button>
+                </div>
+              </div>
             )}
 
             {/* Resolved providers — name, number, a real dial link */}

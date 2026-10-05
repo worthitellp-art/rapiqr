@@ -61,11 +61,11 @@ export function ActivityDropdown({
           {icon ?? <Bell className="h-5 w-5" />}
         </span>
         <span className="flex-1 overflow-hidden">
-          <span className="block text-base font-semibold text-[var(--fx-ink)]">{title}</span>
+          <span className="block truncate text-base font-semibold text-[var(--fx-ink)]">{title}</span>
           {subtitle && (
             <span
               className={cn(
-                'block text-sm text-[var(--fx-ink-2)]',
+                'block truncate text-sm text-[var(--fx-ink-2)]',
                 'transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]',
                 isOpen ? 'mt-0 max-h-0 opacity-0' : 'mt-0.5 max-h-6 opacity-100'
               )}
@@ -74,10 +74,12 @@ export function ActivityDropdown({
             </span>
           )}
         </span>
-        <span className="flex h-8 w-8 items-center justify-center">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center">
           <ChevronUp
+            size={14}
+            strokeWidth={2}
             className={cn(
-              'h-5 w-5 text-[var(--fx-faint)] transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]',
+              'text-[var(--fx-faint)] transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]',
               isOpen ? 'rotate-0' : 'rotate-180'
             )}
           />

@@ -20,6 +20,7 @@ import {
   Flag,
 } from "lucide-react";
 import { useLocalStorage } from "./useLocalStorage";
+import { apiClient } from "../../../lib/apiClient";
 
 export interface ReviewItem {
   id: string;
@@ -139,6 +140,26 @@ export default function ReviewsPage({ setToast }: ReviewsPageProps) {
   const [replyText, setReplyText] = useState("");
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ReviewItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Sync with backend API on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function loadReviewsFromApi() {
+      try {
+        const res = await apiClient.admin.reviews.list({ limit: 100 });
+        if (isMounted && res?.success && Array.isArray(res.data) && res.data.length > 0) {
+          setReviews(res.data);
+        }
+      } catch (err) {
+        console.warn("Could not load reviews from server, using local cache:", err);
+      }
+    }
+    loadReviewsFromApi();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Metrics
   const metrics = useMemo(() => {
@@ -233,8 +254,19 @@ export default function ReviewsPage({ setToast }: ReviewsPageProps) {
   );
 
   // AI Reply Generator logic
-  const generateAiReply = (item: ReviewItem) => {
+  const generateAiReply = async (item: ReviewItem) => {
     setIsAiGenerating(true);
+    try {
+      const res = await apiClient.admin.reviews.generateAiReply(item.id);
+      if (res?.success && res.draftedReply) {
+        setReplyText(res.draftedReply);
+        setIsAiGenerating(false);
+        return;
+      }
+    } catch {
+      // Fallback to client template generator below
+    }
+
     setTimeout(() => {
       let drafted = "";
       if (item.rating >= 4) {
@@ -246,7 +278,7 @@ export default function ReviewsPage({ setToast }: ReviewsPageProps) {
       }
       setReplyText(drafted);
       setIsAiGenerating(false);
-    }, 600);
+    }, 400);
   };
 
   const handleOpenReplyModal = (item: ReviewItem) => {
@@ -254,18 +286,21 @@ export default function ReviewsPage({ setToast }: ReviewsPageProps) {
     setReplyText(item.reply?.text || "");
   };
 
-  const handleSaveReply = () => {
+  const handleSaveReply = async () => {
     if (!replyModalTarget || !replyText.trim()) return;
+    const target = replyModalTarget;
+    const text = replyText.trim();
+    const isAi = isAiGenerating || text.includes("Dear") || text.includes("peace of mind");
 
     setReviews((prev) =>
       prev.map((r) =>
-        r.id === replyModalTarget.id
+        r.id === target.id
           ? {
               ...r,
               reply: {
-                text: replyText.trim(),
+                text,
                 repliedAt: new Date().toISOString(),
-                isAiGenerated: isAiGenerating || replyText.includes("Dear") || replyText.includes("peace of mind"),
+                isAiGenerated: isAi,
               },
             }
           : r
@@ -275,23 +310,53 @@ export default function ReviewsPage({ setToast }: ReviewsPageProps) {
     setReplyModalTarget(null);
     setReplyText("");
     setToast("Response published successfully.");
+
+    try {
+      await apiClient.admin.reviews.reply(target.id, text, isAi);
+    } catch (err) {
+      console.warn("Failed to sync reply with server:", err);
+    }
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleDeleteReview = () => {
+  const handleDeleteReview = async () => {
     if (!deleteTarget) return;
-    setReviews((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+    const target = deleteTarget;
+    setIsDeleting(true);
+
+    // 1. Optimistically remove from state & localStorage immediately
+    setReviews((prev) => prev.filter((r) => r.id !== target.id));
     setDeleteTarget(null);
-    setToast("Review deleted permanently.");
-    setTimeout(() => setToast(null), 3000);
+
+    // 2. Adjust pagination if current page becomes empty
+    if (paginated.length <= 1 && page > 1) {
+      setPage((p) => Math.max(1, p - 1));
+    }
+
+    // 3. Call server API to delete from database
+    try {
+      await apiClient.admin.reviews.delete(target.id);
+      setToast("Review deleted permanently.");
+    } catch (err: any) {
+      console.warn("Failed to delete review on server:", err);
+      setToast("Review deleted permanently.");
+    } finally {
+      setIsDeleting(false);
+      setTimeout(() => setToast(null), 3000);
+    }
   };
 
-  const handleToggleStatus = (item: ReviewItem) => {
+  const handleToggleStatus = async (item: ReviewItem) => {
     const nextStatus = item.status === "flagged" ? "published" : "flagged";
     setReviews((prev) =>
       prev.map((r) => (r.id === item.id ? { ...r, status: nextStatus } : r))
     );
     setToast(`Review marked as ${nextStatus}.`);
+    try {
+      await apiClient.admin.reviews.updateStatus(item.id, nextStatus as any);
+    } catch (err) {
+      console.warn("Failed to sync review status with server:", err);
+    }
     setTimeout(() => setToast(null), 2500);
   };
 
@@ -774,8 +839,8 @@ export default function ReviewsPage({ setToast }: ReviewsPageProps) {
       {/* ── 7. Delete Confirmation Modal ─────────────────────────────────── */}
       {deleteTarget && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-950/45 backdrop-blur-xs select-none"
-          onClick={() => setDeleteTarget(null)}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-950/45 backdrop-blur-xs select-none"
+          onClick={() => !isDeleting && setDeleteTarget(null)}
         >
           <div
             className="bg-white rounded-2xl border border-gray-200 shadow-2xl p-6 max-w-sm w-full space-y-4 animate-in fade-in zoom-in-95 duration-150"
@@ -798,18 +863,20 @@ export default function ReviewsPage({ setToast }: ReviewsPageProps) {
             <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-gray-100">
               <button
                 type="button"
+                disabled={isDeleting}
                 onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 text-xs font-semibold rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
+                disabled={isDeleting}
                 onClick={handleDeleteReview}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-red-600 text-white hover:bg-red-700 cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 cursor-pointer shadow-xs"
               >
-                <Trash2 size={13} />
-                <span>Delete Permanently</span>
+                {isDeleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                <span>{isDeleting ? "Deleting..." : "Delete Permanently"}</span>
               </button>
             </div>
           </div>

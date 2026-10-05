@@ -19,6 +19,7 @@ import { apiClient } from "../../../lib/apiClient";
 import { STICKER_CATEGORIES, getCategoryLabel } from "../../../stickerModules";
 import QrCodeImage from "./QrCodeImage";
 import LabelBadge from "./labels/LabelBadge";
+import { Button } from "../../ui/button";
 
 function normalizePhone(phone: string): string | null {
   const digits = String(phone ?? "").replace(/\D/g, "");
@@ -420,13 +421,9 @@ export default function GenerateTagModal({
 
               {/* Actions */}
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-900 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
-                >
+                <Button type="button" onClick={onClose}>
                   Cancel
-                </button>
+                </Button>
                 <button
                   type="button"
                   onClick={mode === "single" ? handleGenerateSingle : handleGenerateBulk}

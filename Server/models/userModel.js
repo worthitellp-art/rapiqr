@@ -44,9 +44,7 @@ class UserModel {
    * that also reconciles the designated-admin role.
    */
   static async ensureProfile(userId) {
-    const existing = await this.findById(userId);
-    if (!existing) return null;
-    return this.reconcileAdminRole(existing);
+    return this.findById(userId);
   }
 
   /**

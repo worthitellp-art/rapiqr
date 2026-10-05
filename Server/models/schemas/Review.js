@@ -1,6 +1,7 @@
 const { Schema, model } = require('mongoose');
 
 const reviewSchema = new Schema({
+  custom_id: { type: String, default: null, index: true },
   customer_name: { type: String, required: true },
   customer_phone: { type: String, default: null },
   customer_email: { type: String, default: null },

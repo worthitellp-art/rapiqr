@@ -1449,7 +1449,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     if (!qrData || variantBusy) return;
 
     setVariantBusy(true);
-    if (action.actionType === "SEND_SMS") {
+    if (action.actionType === "SEND_SMS" || (action.actionType === "SERVICE_PROVIDER" && action.reporterPhone)) {
       // Instant feedback the moment the button is tapped — the success/error
       // toast below replaces this one once the send actually completes.
       showSentToast("Sending message…", "pending");
@@ -1463,6 +1463,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
           serviceType: action.actionType === "SERVICE_PROVIDER" ? action.serviceType : undefined,
           message: action.actionType === "SERVICE_PROVIDER" ? undefined : action.message,
           issue: action.actionType === "SEND_SMS" ? action.issue : undefined,
+          reporterPhone: action.actionType === "SERVICE_PROVIDER" ? action.reporterPhone : undefined,
         },
         {
           providers: helplines,
@@ -1513,6 +1514,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
               : `[${origin}] ${failReason} (Saved to chat history)`,
           result.ownerNotified ? "success" : result.simulated ? "warning" : "error"
         );
+      }
+
+      if (result.kind === "requested") {
+        // The DB write (and admin visibility) already succeeded regardless of
+        // WhatsApp delivery to the owner — that's a best-effort side notice,
+        // never the reason to tell the visitor their request failed.
+        showSentToast(result.message, "success");
       }
     } finally {
       setVariantBusy(false);
@@ -1587,6 +1595,30 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   }, []);
+
+  /* ---- Passive "already denied" detection ----
+   * This page is the landing screen for ANY scan, including a stranger's
+   * idle curiosity tap — it must not pop the native location prompt just
+   * because that screen mounted (this product's whole pitch is "100% number
+   * masking", a blind permission grab on load would cut against that). But
+   * a visitor who PREVIOUSLY denied location here should see the "blocked"
+   * screen and its how-to-re-enable instructions right away on return,
+   * instead of only discovering it after tapping Share Location — hence
+   * `navigator.permissions.query`, which reads existing state without
+   * prompting. Unsupported (Safari) or `prompt` (undecided) → do nothing,
+   * same as today: location is requested only when the visitor acts.
+   */
+  useEffect(() => {
+    if (phase !== "emergency" || !navigator.permissions?.query) return;
+    let cancelled = false;
+    navigator.permissions
+      .query({ name: "geolocation" as PermissionName })
+      .then((status) => {
+        if (!cancelled && status.state === "denied") setPhase("location-denied");
+      })
+      .catch(() => { /* Permissions API not fully supported — fall back to on-demand request */ });
+    return () => { cancelled = true; };
+  }, [phase]);
 
   /* ---- QR Direct Lookup (no loading screen) ----
    * The database is the only source of truth for a generated QR's category,

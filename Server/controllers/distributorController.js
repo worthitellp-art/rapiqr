@@ -10,7 +10,7 @@ const FIELD_MAX = 200;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function isAdminCaller(user) {
-  return user?.role === 'admin' || String(user?.email || '').toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  return user?.role === 'admin';
 }
 
 class DistributorController {

@@ -5,6 +5,7 @@ import { QrRecord } from "./types";
 import { qrFullUrl } from "./helpers";
 import { apiClient } from "../../../lib/apiClient";
 import { FxModal } from "../shared";
+import { Button } from "../../ui/button";
 
 function recordFromPublicQr(data: any, recoveryCode: string): QrRecord {
   return {
@@ -129,7 +130,7 @@ export default function RestoreStickerModal({
 
         {error && <p className="text-xs font-semibold text-[var(--fx-red)]">{error}</p>}
         <div className="flex gap-3 pt-2">
-          <button type="button" onClick={handleClose} className="fx-btn fx-btn-secondary flex-1">Cancel</button>
+          <Button type="button" onClick={handleClose} className="flex-1">Cancel</Button>
           <button type="submit" disabled={submitting} className="fx-btn fx-btn-primary flex-1 disabled:opacity-60">
             <RefreshCw size={12} /> {submitting ? "Restoring…" : "Restore"}
           </button>

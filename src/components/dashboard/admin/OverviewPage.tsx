@@ -83,7 +83,7 @@ function AttentionCard({ summary, setPage }: { summary: AdminSummary | null; set
                 className="w-full flex items-center gap-3 h-11 text-left cursor-pointer group"
               >
                 <span
-                  className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 ${
+                  className={`w-7 h-7 rounded-[var(--fx-radius-tile)] flex items-center justify-center flex-shrink-0 ${
                     live && r.hot ? "bg-[var(--fx-red-soft)] text-[var(--fx-red)]" : live ? "bg-[var(--fx-amber-soft)] text-[var(--fx-amber)]" : "bg-[var(--fx-canvas)] text-[var(--fx-faint)]"
                   }`}
                 >

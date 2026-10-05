@@ -181,7 +181,7 @@ export const SERVICE_TILES: Record<string, string> = {
 export type CategoryActionType = "SERVICE_PROVIDER" | "SEND_SMS" | "CHAT_OWNER" | "OTHER";
 
 export type CategoryButtonAction =
-  | { actionType: "SERVICE_PROVIDER"; serviceType: string }
+  | { actionType: "SERVICE_PROVIDER"; serviceType: string; reporterPhone?: string }
   | { actionType: "SEND_SMS"; issue: string; message: string }
   | { actionType: "CHAT_OWNER"; message?: string }
   /* Carried through from the variant unchanged — public dial, maps, pin, write, ask. */

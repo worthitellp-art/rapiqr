@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RepiQR Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#dfe2f0;--shell:#111;--panel:#fff;--side:#f7f8fc;--ink:#1b1e2e;--mute:#a0a5b8;--line:#eef0f6;--chip:#f3f5fa;--or:#111;--blue:#1a6bff;--orsoft:#cfe0fb;--green:#2ebd8e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;margin:0}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;display:block;padding:0}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.shell{width:100%;height:100vh;background:var(--shell);display:grid;grid-template-columns:280px 1fr;overflow:hidden}
+aside{padding:28px 18px 18px 22px;display:flex;flex-direction:column;color:#fff;overflow-y:auto}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px}
+.logo i{width:30px;height:30px;border-radius:9px;background:var(--blue);display:grid;place-items:center;font-style:normal;font-size:15px}
+.logo b{font-size:9px;letter-spacing:.06em;background:var(--blue);padding:3px 7px;border-radius:99px}
+.me{margin:26px 0 20px;display:flex;gap:12px;align-items:center}
+.av{width:46px;height:46px;border-radius:14px;background:#2b2f3c;display:grid;place-items:center;font-weight:800;font-size:18px;position:relative}
+.av em{position:absolute;top:-6px;right:-6px;background:#e53935;font-size:10px;font-style:normal;min-width:18px;height:18px;border-radius:99px;display:grid;place-items:center;border:2px solid var(--shell)}
+.me strong{display:block;font-size:15px}.me small{color:#8a90a3;font-size:12px}
+nav{flex:1}
+nav h6{display:none;font-size:10px;letter-spacing:.12em;color:#5f6578;margin:18px 0 6px 12px;font-weight:700}
+nav button{display:block;width:100%;text-align:left;padding:10px 12px;border-radius:12px;color:#5f6371;font-weight:600;font-size:17px;transition:.15s}
+nav button:hover{color:#fff}
+nav button.on{color:#fff}
+.foot button{display:block;padding:9px 12px;color:#8a90a3;font-weight:600;font-size:14px}
+.foot .out{color:#e53935}
+main{background:var(--panel);margin:14px 14px 14px 0;border-radius:24px;display:grid;grid-template-columns:1fr 340px;overflow:hidden;min-width:0}
+main.solo{grid-template-columns:1fr}
+.center{padding:40px 48px;overflow-y:auto;min-width:0}
+.right{background:var(--side);padding:30px 24px;overflow-y:auto;display:flex;flex-direction:column;gap:18px}
+.solo .right{display:none}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+h1{font-size:30px;font-weight:800;letter-spacing:-.02em}
+.sub{color:var(--mute);font-size:13px;margin-top:4px}
+.tools{display:flex;gap:10px;align-items:center}
+.chip{background:var(--chip);padding:9px 14px;border-radius:12px;font-size:13px;font-weight:600}
+.cta{background:#111;color:#fff;padding:10px 16px;border-radius:10px;font-weight:700;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+.bell{width:38px;height:38px;border-radius:12px;background:var(--chip);position:relative}
+.bell:after{content:"";position:absolute;top:9px;right:10px;width:8px;height:8px;border-radius:50%;background:#e53935}
+.card{margin-top:22px}
+.card h3,.right h3{font-size:15px;font-weight:700}
+.row{display:flex;justify-content:space-between;align-items:center}
+.row a,.link{color:var(--blue);font-size:13px;font-weight:600;cursor:pointer;background:none}
+.bars{display:flex;gap:7px;align-items:flex-end;height:90px;margin-top:20px}
+.bars div{flex:1;border-radius:6px;background:var(--orsoft);min-height:8px;position:relative;transition:.2s}
+.bars div.last{background:var(--blue)}
+.bars div:hover{filter:brightness(.92)}
+.lbl{display:flex;gap:7px;margin-top:8px;font-size:10px;color:var(--mute)}.lbl span{flex:1;text-align:center}
+.empty{color:var(--mute);text-align:center;padding:36px 0;font-size:14px}
+.item{display:flex;align-items:center;gap:14px;padding:13px 0;border-top:1px solid var(--line)}
+.ico{width:40px;height:40px;border-radius:50%;background:var(--orsoft);display:grid;place-items:center;font-size:17px;flex:none}
+.item .t{flex:1;font-weight:600;font-size:14px}.item small{display:block;color:var(--mute);font-weight:500;font-size:12px}
+.prog{height:5px;background:var(--line);border-radius:9px;margin:8px 0 14px}.prog i{display:block;height:100%;background:var(--green);border-radius:9px}
+.box{background:var(--panel);border-radius:18px;padding:18px}
+.dark{background:#111;color:#fff;border-radius:20px;padding:20px}
+.dark p{color:#9aa1b5;font-size:13px;margin:6px 0 16px}
+.dark .cta{width:100%;padding:13px;background:#fff;color:#111}
+input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--chip);color:var(--ink);font:inherit;font-size:14px;margin-top:6px}
+label{font-size:12px;font-weight:600;color:var(--mute);display:block;margin-top:14px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;margin-top:22px}
+.pc{border:1px solid var(--line);border-radius:18px;padding:18px}.pc .ico{border-radius:14px;width:48px;height:48px;margin-bottom:12px}
+.pc p{color:var(--mute);font-size:12px;margin:4px 0 14px}
+.chat{display:flex;flex-direction:column;gap:8px;margin-top:20px;min-height:220px;max-height:340px;overflow-y:auto}
+.msg{max-width:75%;padding:10px 14px;border-radius:16px;font-size:14px;background:var(--chip)}.msg.me2{align-self:flex-end;background:var(--blue);color:#fff}
+.send{display:flex;gap:10px;margin-top:14px}.send input{margin:0}
+.step{display:flex;gap:14px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:16px;margin-top:10px;cursor:pointer}
+.step .ck{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:13px;color:#fff;flex:none}
+.step.done .ck{background:var(--blue);border-color:var(--blue)}.step.done .t{text-decoration:line-through;color:var(--mute)}
+details{border-top:1px solid var(--line);padding:14px 0}summary{font-weight:600;cursor:pointer}details p{color:var(--mute);font-size:14px;margin-top:8px}
+.toast{position:fixed;bottom:calc(24px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:11px 18px;border-radius:12px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:.25s}.toast.show{opacity:1}
+@media(max-width:900px){
+body{padding:0;display:block}
+.shell{grid-template-columns:1fr;height:auto;min-height:100vh}
+aside{padding:16px}.me{margin:14px 0 6px}
+nav{display:flex;gap:6px;overflow-x:auto;flex:none;padding-bottom:6px}nav h6,.foot{display:none}
+nav button{white-space:nowrap;width:auto;padding:9px 14px;background:rgba(255,255,255,.06)}
+main{grid-template-columns:1fr;margin:0 8px 8px;border-radius:20px}
+.center{padding:22px 18px}.right{padding:20px 18px}
+h1{font-size:24px}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside>
+    <div class="logo"><i>▣</i>RepiQR <b>CLIENT</b></div>
+    <div class="me"><div class="av">M<em id="badge">2</em></div><div><strong>Mihir Rathod</strong><small>7874873338</small></div></div>
+    <nav id="nav"></nav>
+    <div class="foot"><button>🌐 Back to site</button><button class="out">⎋ Log out</button></div>
+  </aside>
+  <main id="main"><div class="center" id="center"></div><div class="right" id="right"></div></main>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+var MENU=[["MAIN",[["home","Home Overview"],["chat","Live Visitor Chat"]]],["MY TAG",[["setup","Setup Guide"],["products","Products"]]],["COMMUNICATION",[["contacts","Emergency Contacts"],["alerts","Alert History"]]],["ACCOUNT",[["account","Account Settings"],["support","Support & Help"]]]];
+var S={view:"home",contacts:[],msgs:[["Hi! Scan this sticker to reach the owner.",0]],steps:[["Verify your phone number",1],["Add an emergency contact",0],["Order your free car sticker",0],["Stick it on your windshield",0]],name:"Mihir Rathod",phone:"7874873338"};
+var $=function(i){return document.getElementById(i)};
+function toast(t){var e=$("toast");e.textContent=t;e.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(function(){e.classList.remove("show")},1800)}
+function go(v){S.view=v;render()}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function head(t,s,extra){return '<div class="top"><div><h1>'+t+'</h1><div class="sub">'+s+'</div></div><div class="tools"><span class="chip">My Balance ₹0</span><button class="cta" onclick="go(\'products\')">+ Get Free Sticker</button><button class="bell" aria-label="Alerts" onclick="go(\'alerts\')"></button></div></div>'}
+var V={
+home:function(){
+  var d=[22,23,24,25,26,27,28,29,30,1,2,3,4,5],h=[4,4,4,4,4,4,4,4,4,4,4,4,4,6];
+  return head("Welcome back, Mihir","0 active stickers · 0 total scans · "+S.contacts.length+" emergency contacts")+
+  '<div class="card"><div class="row"><h3>Scan activity</h3><span class="sub">Last 14 days</span></div><div class="bars">'+h.map(function(x,i){return '<div class="'+(i==13?"last":"")+'" title="0 scans" style="height:'+(x*3+8)+'px"></div>'}).join("")+'</div><div class="lbl">'+d.map(function(x){return '<span>'+x+'</span>'}).join("")+'</div></div>'+
+  '<div class="card"><div class="row"><h3>Recent Scans</h3><a class="link" onclick="go(\'alerts\')">Full log</a></div><div class="empty">No scans recorded yet</div></div>'},
+chat:function(){return head("Live Visitor Chat","Talk to people who scan your sticker")+'<div class="card"><div class="chat" id="chatbox">'+S.msgs.map(function(m){return '<div class="msg '+(m[1]?"me2":"")+'">'+esc(m[0])+'</div>'}).join("")+'</div><div class="send"><input id="cin" placeholder="Type a message…" onkeydown="if(event.key===\'Enter\')sendMsg()"><button class="cta" onclick="sendMsg()">Send</button></div></div>'},
+setup:function(){var n=S.steps.filter(function(s){return s[1]}).length;return head("Setup Guide",n+" of "+S.steps.length+" steps done")+'<div class="prog" style="margin-top:18px"><i style="width:'+n/S.steps.length*100+'%"></i></div>'+S.steps.map(function(s,i){return '<div class="step '+(s[1]?"done":"")+'" onclick="S.steps['+i+'][1]^=1;render()"><div class="ck">'+(s[1]?"✓":"")+'</div><div class="t">'+s[0]+'</div></div>'}).join("")},
+products:function(){var p=[["🚗","Car Sticker","Windshield QR safety sticker"],["🏍","Bike Sticker","Weatherproof tank / helmet tag"],["🔑","Key Tag","Lost-and-found for keys & bags"]];return head("Products","Choose a safety sticker")+'<div class="grid3">'+p.map(function(x){return '<div class="pc"><div class="ico">'+x[0]+'</div><h3>'+x[1]+'</h3><p>'+x[2]+'</p><button class="cta" onclick="toast(\''+x[1]+' requested\')">Get free</button></div>'}).join("")+'</div>'},
+contacts:function(){return head("Emergency Contacts",S.contacts.length+" added")+'<div class="card"><div class="box" style="background:var(--side)"><label style="margin-top:0">Name</label><input id="cn" placeholder="Full name"><label>Phone</label><input id="cp" placeholder="+91 …" inputmode="tel"><button class="cta" style="margin-top:16px" onclick="addC()">Add Emergency Responder</button></div></div><div class="card">'+(S.contacts.length?S.contacts.map(function(c,i){return '<div class="item"><div class="ico">👤</div><div class="t">'+esc(c[0])+'<small>'+esc(c[1])+'</small></div><button class="link" onclick="S.contacts.splice('+i+',1);render()">Remove</button></div>'}).join(""):'<div class="empty">No emergency contacts added yet.</div>')+'</div>'},
+alerts:function(){return head("Alert History","Every scan and emergency alert appears here")+'<div class="card"><div class="empty">No alerts yet.</div></div>'},
+account:function(){return head("Account Settings","Manage your profile")+'<div class="card" style="max-width:460px"><label style="margin-top:0">Full name</label><input id="an" value="'+esc(S.name)+'"><label>Phone</label><input id="ap" value="'+esc(S.phone)+'"><button class="cta" style="margin-top:18px" onclick="saveA()">Save changes</button></div>'},
+support:function(){return head("Support & Help","Quick answers")+'<div class="card"><details><summary>How do I activate my sticker?</summary><p>Open Setup Guide and complete the steps, then stick it on your vehicle.</p></details><details><summary>Who sees my phone number?</summary><p>Scanners can chat with you without seeing your number.</p></details><details><summary>What happens in an emergency?</summary><p>Your emergency contacts are notified instantly.</p></details></div>'}
+};
+function rightPanel(){return '<div class="box"><div class="row"><h3>My Safety Stickers</h3><button class="chip" onclick="go(\'products\')">◉ See</button></div><div class="row" style="margin-top:16px;font-size:14px;font-weight:600"><span>Car Sticker</span><span class="sub">0</span></div><div class="prog"><i style="width:8%"></i></div><a class="link" onclick="go(\'products\')">View all safety stickers ›</a></div>'+
+'<div class="box"><div class="row"><h3>Latest chat</h3><a class="link" onclick="go(\'chat\')">View inbox ›</a></div><div class="empty">No chats yet.</div></div>'+
+'<div class="dark"><div class="ico" style="background:#2a2f3d;border-radius:12px">👤</div><h3 style="margin-top:14px;font-size:16px">'+(S.contacts.length?S.contacts.length+" emergency contact"+(S.contacts.length>1?"s":"")+" ready":"No emergency contacts added yet.")+'</h3><p>Responders can reach the right people faster in an emergency.</p><button class="cta" onclick="go(\'contacts\')">Add Emergency Responders</button></div>'}
+function render(){
+  $("nav").innerHTML=MENU.map(function(g){return '<h6>'+g[0]+'</h6>'+g[1].map(function(m){return '<button class="'+(S.view==m[0]?"on":"")+'" onclick="go(\''+m[0]+'\')">'+m[1]+'</button>'}).join("")}).join("");
+  $("center").innerHTML=V[S.view]();
+  $("main").className=S.view=="home"?"":"solo";
+  $("right").innerHTML=S.view=="home"?rightPanel():"";
+  $("badge").textContent=S.contacts.length?"0":"2";
+  var b=$("chatbox");if(b)b.scrollTop=b.scrollHeight;
+}
+function sendMsg(){var i=$("cin"),v=i.value.trim();if(!v)return;S.msgs.push([v,1]);render();setTimeout(function(){S.msgs.push(["Thanks, the owner has been notified.",0]);render()},700)}
+function addC(){var n=$("cn").value.trim(),p=$("cp").value.trim();if(!n||!p){toast("Enter name and phone");return}S.contacts.push([n,p]);render();toast("Contact added")}
+function saveA(){S.name=$("an").value;S.phone=$("ap").value;toast("Saved");}
+render();
+</script>
+</body>
+</html>

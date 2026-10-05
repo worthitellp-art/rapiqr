@@ -7,6 +7,7 @@ import { generateRepeatedStickerSheetBlob, downloadSheetBlob, PRINT_SHEET_CONSTA
 import { DEFAULT_STICKER_POS, generateQrDataUrl } from '../admin/helpers';
 import QrCodeImage from '../admin/QrCodeImage';
 import type { QrRecord } from '../admin/types';
+import { Button } from '../../ui/button';
 
 function ModalShell({
   onClose,
@@ -100,9 +101,9 @@ export function EditDetailsModal({
         </div>
       </div>
       <div className="flex gap-3 mt-6">
-        <button onClick={onClose} className="flex-1 h-11 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer transition-all">
+        <Button onClick={onClose} size="lg" className="flex-1">
           Cancel
-        </button>
+        </Button>
         <button
           onClick={handleSave}
           disabled={saving}
@@ -227,9 +228,9 @@ export function EditContactsModal({
         </button>
       </div>
       <div className="flex gap-3 mt-6">
-        <button onClick={onClose} className="flex-1 h-11 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer transition-all">
+        <Button onClick={onClose} size="lg" className="flex-1">
           Cancel
-        </button>
+        </Button>
         <button
           onClick={handleSave}
           disabled={saving}
@@ -296,9 +297,9 @@ export function TransferModal({
         <p className="text-xs font-bold text-[#B45309] mt-2">Click "Confirm Transfer" again to finalize — this cannot be undone.</p>
       )}
       <div className="flex gap-3 mt-6">
-        <button onClick={onClose} className="flex-1 h-11 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer transition-all">
+        <Button onClick={onClose} size="lg" className="flex-1">
           Cancel
-        </button>
+        </Button>
         <button
           onClick={handleSubmit}
           disabled={busy}
@@ -393,9 +394,9 @@ export function ConfirmActionModal({
       </div>
       <div className="text-sm text-gray-600 font-medium leading-relaxed mb-6">{description}</div>
       <div className="flex gap-3">
-        <button onClick={onCancel} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer">
+        <Button onClick={onCancel} className="flex-1">
           Cancel
-        </button>
+        </Button>
         <button
           onClick={onConfirm}
           disabled={busy}
@@ -472,9 +473,9 @@ export function RecoverStickerModal({
         </div>
         {error && <p className="text-xs font-semibold text-[#EF4444]">{error}</p>}
         <div className="flex gap-3 pt-2">
-          <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer">
+          <Button type="button" onClick={onClose} className="flex-1">
             Cancel
-          </button>
+          </Button>
           <button
             type="submit"
             disabled={submitting}

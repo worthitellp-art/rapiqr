@@ -24,6 +24,8 @@ import {
   ExternalLink,
   Shield,
   FileSpreadsheet,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import { QrRecord, Template, StickerPos, StickerLabel } from "./types";
 import { qrFullUrl, fmtDate, getStableSlotMap, formatSlotNumber } from "./helpers";
@@ -696,9 +698,21 @@ export default function QrCodesPage({
           )}
         </div>
 
-        {/* Count summary */}
-        <div className="text-xs text-gray-500 font-medium whitespace-nowrap">
-          Showing <span className="font-bold text-gray-900">{filtered.length}</span> matching stickers
+        {/* Count summary + Select All — visible regardless of card/table view,
+            so bulk print/label actions aren't buried in the table-only header checkbox. */}
+        <div className="flex items-center gap-3 whitespace-nowrap">
+          <button
+            type="button"
+            onClick={toggleSelectAllCurrent}
+            disabled={paginated.length === 0}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-gray-950 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {isAllCurrentPageSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+            <span>{isAllCurrentPageSelected ? "Deselect All" : "Select All"}</span>
+          </button>
+          <div className="text-xs text-gray-500 font-medium">
+            Showing <span className="font-bold text-gray-900">{filtered.length}</span> matching stickers
+          </div>
         </div>
       </div>
 
@@ -925,7 +939,7 @@ export default function QrCodesPage({
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleTriggerPrint(q, [q])}
+                      onClick={() => handleExportPdf([q])}
                       className="p-1.5 rounded-xl border border-gray-200/80 hover:bg-gray-50 text-gray-600 transition-colors cursor-pointer"
                       title="Print Sticker"
                     >
@@ -1085,7 +1099,7 @@ export default function QrCodesPage({
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleTriggerPrint(q, [q])}
+                            onClick={() => handleExportPdf([q])}
                             className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg cursor-pointer"
                             title="Print"
                           >

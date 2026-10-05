@@ -237,14 +237,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Standard login: assigns role = 'user' for everyone EXCEPT the designated admin
-  // email, which unlocks the Admin Fleet Dashboard. Admin access is otherwise gated
-  // behind adminLogin() in AdminAuthModal (secret /admin route).
+  // Standard login: ALWAYS assigns role = 'user' for client/customer dashboard.
+  // Admin access is EXCLUSIVELY granted via adminLogin() in AdminAuthModal (secret /admin route).
   const signIn = async (identifier: string, password?: string) => {
     try {
       const cleanId = identifier.trim();
       const isEmail = cleanId.includes('@');
-      const isAdminEmail = isEmail && cleanId.toLowerCase() === ADMIN_EMAIL.toLowerCase();
       const effectivePassword = password || 'default-pass';
 
       // Backend-first signin when the Render API is configured
@@ -256,7 +254,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         if (res?.user) {
           const userProfile = backendUserToProfile(res.user);
-          if (isAdminEmail) userProfile.role = 'admin';
+          userProfile.role = 'user'; // Standard login is strictly for client dashboard
           if (!isEmail) userProfile.phoneNumber = cleanId;
           setProfile(userProfile);
           localStorage.setItem('repiqr-auth-user', JSON.stringify(userProfile));
@@ -271,7 +269,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: isEmail ? cleanId : `${cleanId.replace(/\s+/g, '')}@repiqr.local`,
         fullName: isEmail ? cleanId.split('@')[0] : `User (${cleanId})`,
         phoneNumber: !isEmail ? cleanId : undefined,
-        role: isAdminEmail ? 'admin' : 'user',
+        role: 'user',
       };
       setProfile(demoUser);
       localStorage.setItem('repiqr-auth-user', JSON.stringify(demoUser));
@@ -448,6 +446,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
               if (res?.user) {
                 const p = backendUserToProfile(res.user);
+                p.role = 'user'; // Google sign-in is strictly for client dashboard
                 setProfile(p);
                 localStorage.setItem('repiqr-auth-user', JSON.stringify(p));
                 localStorage.setItem('namoqr-auth-user', JSON.stringify(p));
@@ -462,7 +461,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               email,
               fullName,
               avatarUrl,
-              role: email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() ? 'admin' : 'user',
+              role: 'user',
             };
             setProfile(localProfile);
             localStorage.setItem('repiqr-auth-user', JSON.stringify(localProfile));
@@ -504,7 +503,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: 'demo-' + Date.now(),
         email: cleanEmail,
         fullName: cleanEmail.split('@')[0],
-        role: cleanEmail === ADMIN_EMAIL.toLowerCase() ? 'admin' : 'user',
+        role: 'user',
       };
       setProfile(demoUser);
       localStorage.setItem('repiqr-auth-user', JSON.stringify(demoUser));

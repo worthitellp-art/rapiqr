@@ -5,7 +5,7 @@ import type { DashboardSticker, EmergencyContact } from './types';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
 
 const MAX_EMERGENCY_CONTACTS = 7;
-const inputCls = 'w-full px-3 py-2 text-xs bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-lg outline-none focus:border-[var(--fx-ink)] font-semibold';
+const inputCls = 'w-full px-3 py-2 text-xs bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-[var(--fx-radius-control)] outline-none focus:border-[var(--fx-accent)] font-semibold';
 
 function StickerContactsCard({
   sticker,
@@ -80,20 +80,20 @@ function StickerContactsCard({
   };
 
   return (
-    <div className="bg-white border border-[var(--fx-border)] rounded-xl p-5 space-y-3.5 shadow-xs">
+    <div className="bg-white rounded-[var(--fx-radius-card)] p-[18px] space-y-3.5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-[var(--fx-canvas)] border border-[var(--fx-border)] flex items-center justify-center text-lg flex-shrink-0">
+          <div className="w-10 h-10 rounded-[var(--fx-radius-tile)] bg-[var(--fx-canvas)] flex items-center justify-center text-lg flex-shrink-0">
             {getCategoryIcon(sticker.category as any) || '🏷️'}
           </div>
           <div>
             <h3 className="font-bold text-sm text-[var(--fx-ink)] leading-tight">{sticker.nickname}</h3>
-            <p className="text-[11px] font-semibold text-[var(--fx-faint)]">
+            <p className="text-[11px] font-semibold text-[var(--fx-ink-2)]">
               {getCategoryLabel(sticker.category as any) || sticker.code}
             </p>
           </div>
         </div>
-        <span className="text-[11px] font-semibold text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded-md">
+        <span className="text-[11px] font-semibold text-[var(--fx-ink-2)] bg-[var(--fx-canvas)] px-2 py-0.5 rounded-[var(--fx-radius-pill)]">
           {contacts.length}/{MAX_EMERGENCY_CONTACTS}
         </span>
       </div>
@@ -122,7 +122,7 @@ function StickerContactsCard({
             <button
               onClick={() => removeContact(idx)}
               title="Remove"
-              className="w-9 h-9 flex-shrink-0 rounded-lg bg-[#FEE2E2] text-[#DC2626] hover:bg-[#FECACA] flex items-center justify-center cursor-pointer mt-0.5 transition-colors"
+              className="w-9 h-9 flex-shrink-0 rounded-[var(--fx-radius-control)] bg-[#FEE2E2] text-[#DC2626] hover:bg-[#FECACA] flex items-center justify-center cursor-pointer mt-0.5 transition-colors"
             >
               <Trash2 size={14} />
             </button>
@@ -131,7 +131,7 @@ function StickerContactsCard({
       </div>
 
       {validationError && (
-        <div className="flex items-center gap-1.5 p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs font-medium text-red-700">
+        <div className="flex items-center gap-1.5 p-2.5 rounded-[var(--fx-radius-control)] bg-red-50 text-xs font-medium text-red-700">
           <AlertCircle size={14} className="shrink-0" />
           <span>{validationError}</span>
         </div>
@@ -141,7 +141,7 @@ function StickerContactsCard({
         <button
           onClick={addContact}
           disabled={contacts.length >= MAX_EMERGENCY_CONTACTS}
-          className="flex-1 py-2 rounded-lg border border-dashed border-[var(--fx-border)] text-[11px] font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="flex-1 py-2 rounded-[var(--fx-radius-control)] border border-dashed border-[var(--fx-border-strong)] text-[11px] font-bold text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)] flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           <Plus size={12} />
           {contacts.length >= MAX_EMERGENCY_CONTACTS ? 'Max 7 Contacts Reached' : 'Add Contact'}
@@ -150,7 +150,7 @@ function StickerContactsCard({
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 py-2 rounded-lg bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-[11px] font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 shadow-xs shadow-[var(--fx-accent)]/20 transition-all"
+            className="flex-1 py-2 rounded-[var(--fx-radius-control)] bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-hover)] text-white text-[11px] font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 transition-colors"
           >
             {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Save Contacts
           </button>
@@ -170,11 +170,12 @@ export default function EmergencyContactsPanel({
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--fx-ink)]">Emergency Contacts</h1>
+        <h1 className="fx-text-heading-page text-[var(--fx-ink)]">Emergency Contacts</h1>
+        <p className="text-[13px] text-[var(--fx-ink-2)] mt-1">{products.length} sticker{products.length === 1 ? '' : 's'} with contacts attached</p>
       </div>
 
       {products.length === 0 ? (
-        <div className="bg-white border border-[var(--fx-border)] rounded-xl p-10 text-center space-y-3 shadow-xs">
+        <div className="bg-white rounded-[var(--fx-radius-card)] p-10 text-center space-y-3">
           <Users size={32} className="mx-auto text-[var(--fx-faint)]" />
           <h3 className="text-base font-bold text-[var(--fx-ink)]">No stickers yet</h3>
           <p className="text-xs text-[var(--fx-ink-2)] max-w-sm mx-auto">

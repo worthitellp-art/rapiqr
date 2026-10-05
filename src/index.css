@@ -352,6 +352,48 @@ button, input, select, textarea {
   color: var(--fx-ink);
 }
 
+/* ── Dashboard theme (client + admin) ─────────────────────────────────────
+   Ported 1:1 from dashui.html's own token set (see that file's :root) — a
+   dark shell holding a floating white rounded "main" card, blue accent,
+   green progress fill. Distributor stays on the neutral palette above; this
+   stacks on `.fx-shell` via higher selector specificity, so everything
+   already written in var(--fx-*) repaints for free. Client and admin share
+   one value set (kept as one rule so they can't drift out of sync by
+   accident) — admin's sidebar is its own bespoke component, not the shared
+   FxSidebar, so this override never reaches Distributor's sidebar. */
+.fx-shell.client-theme,
+.fx-shell.admin-theme {
+  --fx-canvas: #F7F8FC;
+  --fx-ink: #1B1E2E;
+  --fx-ink-2: #6B7086;
+  --fx-faint: #A0A5B8;
+  --fx-border: #EEF0F6;
+  --fx-border-strong: #D7DBE8;
+  --fx-accent: #1A6BFF;
+  --fx-accent-hover: #1557CC;
+  --fx-accent-ink: #1A6BFF;
+  --fx-accent-soft: #CFE0FB;
+  --fx-sidebar-bg: #111111;
+  --fx-sidebar-hover: #1F2230;
+  --fx-sidebar-ink: #5F6371;
+  --fx-radius-card: 18px;
+  --fx-radius-tile: 14px;
+  --fx-radius-control: 12px;
+  --fx-radius-pill: 10px;
+  --fx-radius-surface: 24px;
+}
+.client-theme .fx-text-heading-page,
+.admin-theme .fx-text-heading-page {
+  font-size: 24px;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+@media (min-width: 640px) {
+  .client-theme .fx-text-heading-page,
+  .admin-theme .fx-text-heading-page { font-size: 30px; }
+}
+
 .fx-shell button,
 .fx-shell a,
 .fx-shell [role="button"] {
