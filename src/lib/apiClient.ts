@@ -549,6 +549,7 @@ export const apiClient = {
       template?: string;
       labelName?: string;
       labelColor?: string;
+      folderName?: string;
       isPrinted?: boolean;
     }) {
       return request<{ success: boolean; data?: any; error?: string }>('/qr/v2', {

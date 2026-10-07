@@ -48,6 +48,7 @@ import FolderGrid from "./folders/FolderGrid";
 import FolderBreadcrumbs from "./folders/FolderBreadcrumbs";
 import CreateFolderModal from "./folders/CreateFolderModal";
 import MoveToFolderModal from "./folders/MoveToFolderModal";
+import RenameFolderModal from "./folders/RenameFolderModal";
 import {
   StickerFolder,
   getStoredFolders,
@@ -132,6 +133,7 @@ export default function QrCodesPage({
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [isMoveToFolderOpen, setIsMoveToFolderOpen] = useState(false);
   const [moveToFolderTargetIds, setMoveToFolderTargetIds] = useState<string[]>([]);
+  const [folderToRename, setFolderToRename] = useState<StickerFolder | null>(null);
 
   // Count unassigned stickers
   const unassignedCount = useMemo(() => {
@@ -520,6 +522,48 @@ export default function QrCodesPage({
     setTimeout(() => setToast(null), 2500);
   };
 
+  const handleRenameFolder = async (folder: StickerFolder, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === folder.name) return;
+
+    const oldName = folder.name;
+    // 1. Rename in storage
+    const updated = renameFolder(folder.id, trimmed);
+    setFolders(updated);
+
+    // 2. Update affected stickers in local state
+    const affectedStickers = qrList.filter(
+      (q) => (q.folderName || "").toLowerCase() === oldName.toLowerCase()
+    );
+    setQrList((prev) =>
+      prev.map((q) =>
+        (q.folderName || "").toLowerCase() === oldName.toLowerCase()
+          ? { ...q, folderName: trimmed }
+          : q
+      )
+    );
+
+    // 3. Update activeFolder if user was viewing it
+    if (activeFolder?.toLowerCase() === oldName.toLowerCase()) {
+      setActiveFolder(trimmed);
+    }
+
+    // 4. Update in backend database
+    if (affectedStickers.length > 0) {
+      try {
+        await apiClient.qr.bulkUpdateFolder(
+          affectedStickers.map((q) => q.id),
+          trimmed
+        );
+      } catch (err) {
+        console.warn("Could not sync folder rename to server:", err);
+      }
+    }
+
+    setToast(`Folder renamed to "${trimmed}".`);
+    setTimeout(() => setToast(null), 3000);
+  };
+
   const handleDeleteFolder = async (folder: StickerFolder) => {
     const affectedStickers = qrList.filter(
       (q) => (q.folderName || "").toLowerCase() === folder.name.toLowerCase()
@@ -831,6 +875,7 @@ export default function QrCodesPage({
             }
           }}
           onDeleteFolder={handleDeleteFolder}
+          onRenameFolder={(f) => setFolderToRename(f)}
           onCreateFolderClick={() => setIsCreateFolderOpen(true)}
         />
       ) : (
@@ -845,6 +890,20 @@ export default function QrCodesPage({
             }}
             onPrintFolder={handlePrintActiveFolder}
             onAssignFolderLabel={handleAssignActiveFolderLabel}
+            onRenameFolder={() => {
+              const currentF = allDisplayFolders.find(
+                (f) => f.name.toLowerCase() === activeFolder.toLowerCase()
+              );
+              if (currentF) {
+                setFolderToRename(currentF);
+              } else {
+                setFolderToRename({
+                  id: "f-" + activeFolder.toLowerCase(),
+                  name: activeFolder,
+                  createdAt: new Date().toISOString(),
+                });
+              }
+            }}
             onCreateStickerInFolder={() => setCreateModalOpen(true)}
           />
 
@@ -1675,6 +1734,8 @@ export default function QrCodesPage({
         setQrList={setQrList}
         initialCategory={categoryFilter !== "all" ? categoryFilter : "car"}
         labels={labels}
+        folders={allDisplayFolders}
+        activeFolderName={activeFolder}
         setToast={setToast}
         onPrint={(target, batch) => handleTriggerPrint(target, batch)}
       />
@@ -1764,6 +1825,13 @@ export default function QrCodesPage({
           handleMoveToFolder(folderName);
         }}
         onCreateNewFolder={() => setIsCreateFolderOpen(true)}
+      />
+
+      <RenameFolderModal
+        isOpen={Boolean(folderToRename)}
+        onClose={() => setFolderToRename(null)}
+        folder={folderToRename}
+        onRename={handleRenameFolder}
       />
     </div>
   );
