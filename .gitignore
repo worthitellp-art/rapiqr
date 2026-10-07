@@ -10,3 +10,5 @@ lighthouse-report.*
 !.env.example
 !.env.production
 keys/
+# Super admin one-time access file — delete after first login
+SUPERADMIN_ACCESS.local.md

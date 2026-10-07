@@ -108,6 +108,10 @@ export default function QrCodesPage({
   const [isAssignLabelOpen, setIsAssignLabelOpen] = useState(false);
   const [isBulkPrintByLabelOpen, setIsBulkPrintByLabelOpen] = useState(false);
   const [assignLabelTargetIds, setAssignLabelTargetIds] = useState<string[]>([]);
+  // Bulk / Delete-all confirmation modals
+  const [showDeleteSelectedConfirm, setShowDeleteSelectedConfirm] = useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
   // Recovery codes reveal & print progress
   const [revealedCodes, setRevealedCodes] = useCodesRevealed();
@@ -319,6 +323,53 @@ export default function QrCodesPage({
     }
   };
 
+  // ── Delete Selected stickers ────────────────────────────────────────────
+  const handleDeleteSelected = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setIsDeletingBulk(true);
+    let successCount = 0;
+    let failCount = 0;
+    for (const id of ids) {
+      try {
+        const res = await apiClient.qr.deleteQrCode(id);
+        if (res?.success) successCount++;
+        else failCount++;
+      } catch {
+        failCount++;
+      }
+    }
+    setQrList((prev) => prev.filter((q) => !ids.includes(q.id)));
+    setSelectedIds(new Set());
+    setShowDeleteSelectedConfirm(false);
+    setIsDeletingBulk(false);
+    if (failCount === 0) {
+      setToast(`${successCount} sticker${successCount !== 1 ? 's' : ''} permanently deleted.`);
+    } else {
+      setToast(`${successCount} deleted, ${failCount} failed. Check connection.`);
+    }
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  // ── Delete ALL stickers ─────────────────────────────────────────────────
+  const handleDeleteAll = async () => {
+    setIsDeletingBulk(true);
+    try {
+      const res = await apiClient.qr.deleteAllQrCodes();
+      if (!res?.success) throw new Error((res as any)?.error || 'Delete all failed');
+      setQrList([]);
+      setSelectedIds(new Set());
+      setShowDeleteAllConfirm(false);
+      setToast('All stickers permanently deleted from the database.');
+      setTimeout(() => setToast(null), 4000);
+    } catch (err: any) {
+      setToast(`Failed to delete all stickers: ${err?.message || 'Please check connection'}`);
+      setTimeout(() => setToast(null), 4000);
+    } finally {
+      setIsDeletingBulk(false);
+    }
+  };
+
   // Trigger print modal
   function handleTriggerPrint(target?: QrRecord, batch?: QrRecord[]) {
     if (openPrintSheet) {
@@ -515,6 +566,18 @@ export default function QrCodesPage({
           >
             <RefreshCw size={13} />
             <span className="hidden md:inline">Restore</span>
+          </button>
+
+          {/* ── Delete All Stickers (nuclear, red, always visible) ─────── */}
+          <button
+            type="button"
+            onClick={() => setShowDeleteAllConfirm(true)}
+            disabled={qrList.length === 0}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 font-semibold text-xs hover:bg-red-100 hover:border-red-300 hover:text-red-800 transition-colors shadow-2xs cursor-pointer disabled:opacity-40"
+            title="Permanently delete ALL stickers from the database"
+          >
+            <Trash2 size={13} />
+            <span>Delete All</span>
           </button>
         </div>
       </div>
@@ -769,6 +832,16 @@ export default function QrCodesPage({
             >
               <Printer size={13} />
               <span>Print Sheet Modal ({selectedIds.size})</span>
+            </button>
+
+            {/* ── Delete Selected (destructive, red) ───────────────── */}
+            <button
+              type="button"
+              onClick={() => setShowDeleteSelectedConfirm(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+            >
+              <Trash2 size={13} />
+              <span>Delete Selected ({selectedIds.size})</span>
             </button>
 
             <button
@@ -1208,7 +1281,110 @@ export default function QrCodesPage({
         </div>
       )}
 
-      {/* ── 8. Create Tag Modal (Hidden by default; open ONLY on [+ Create]) ─ */}
+      {/* ── 8. Delete Selected Confirmation Modal ─────────────────────────── */}
+      {showDeleteSelectedConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-950/50 backdrop-blur-xs select-none"
+          onClick={() => !isDeletingBulk && setShowDeleteSelectedConfirm(false)}
+        >
+          <div
+            className="bg-white rounded-2xl border border-red-200 shadow-2xl p-6 max-w-sm w-full space-y-4 animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0 border border-red-200">
+                <Trash2 size={20} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-gray-950">
+                  Delete {selectedIds.size} selected sticker{selectedIds.size !== 1 ? 's' : ''}?
+                </h3>
+                <p className="text-xs text-gray-500 font-normal leading-relaxed">
+                  This will permanently remove{' '}
+                  <strong className="text-gray-800">{selectedIds.size} sticker{selectedIds.size !== 1 ? 's' : ''}</strong>{' '}
+                  from the database. This action <strong className="text-red-700">cannot be undone</strong>.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                disabled={isDeletingBulk}
+                onClick={() => setShowDeleteSelectedConfirm(false)}
+                className="px-4 py-2 text-xs font-semibold rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingBulk}
+                onClick={handleDeleteSelected}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-red-600 text-white hover:bg-red-700 active:scale-98 transition-all cursor-pointer disabled:opacity-50 shadow-xs"
+              >
+                {isDeletingBulk ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                <span>{isDeletingBulk ? 'Deleting…' : `Delete ${selectedIds.size} Stickers`}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 9. Delete ALL Confirmation Modal (nuclear) ─────────────────────── */}
+      {showDeleteAllConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-950/60 backdrop-blur-sm select-none"
+          onClick={() => !isDeletingBulk && setShowDeleteAllConfirm(false)}
+        >
+          <div
+            className="bg-white rounded-2xl border-2 border-red-300 shadow-2xl p-6 max-w-sm w-full space-y-4 animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-700 flex items-center justify-center shrink-0 border border-red-300">
+                <AlertTriangle size={20} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-red-700">Delete ALL {qrList.length} stickers?</h3>
+                <p className="text-xs text-gray-600 font-normal leading-relaxed">
+                  This will <strong className="text-red-700">permanently wipe every sticker</strong> from the database —{' '}
+                  <strong className="text-gray-900">{qrList.length} record{qrList.length !== 1 ? 's' : ''}</strong> total.
+                  Activated stickers will become unreachable. This action{' '}
+                  <strong className="text-red-700">cannot be undone.</strong>
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-red-50 border border-red-200">
+              <p className="text-xs text-red-700 font-semibold text-center">
+                ⚠ All QR codes, owner phone numbers and scan history will be lost.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                disabled={isDeletingBulk}
+                onClick={() => setShowDeleteAllConfirm(false)}
+                className="px-4 py-2 text-xs font-semibold rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingBulk}
+                onClick={handleDeleteAll}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-red-700 text-white hover:bg-red-800 active:scale-98 transition-all cursor-pointer disabled:opacity-50 shadow-xs"
+              >
+                {isDeletingBulk ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                <span>{isDeletingBulk ? 'Deleting all…' : 'Yes, Delete Everything'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 10. Create Tag Modal (Hidden by default; open ONLY on [+ Create]) ─ */}
       <GenerateTagModal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}

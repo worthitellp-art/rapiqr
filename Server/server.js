@@ -38,6 +38,7 @@ const pushRoutes = require('./routes/pushRoutes');
 const privacyRoutes = require('./routes/privacyRoutes');
 const geoRoutes = require('./routes/geoRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
+const superAdminRoutes = require('./routes/superAdminRoutes');
 const { initChatSocket } = require('./sockets/chatSocket');
 
 const app = express();
@@ -149,6 +150,9 @@ app.use('/api/push', pushRoutes);
 app.use('/api/privacy', privacyRoutes);
 app.use('/api/geo', geoRoutes);
 app.use('/api/admin/reviews', reviewRoutes);
+
+// Super Admin panel — separate namespace, short-lived JWT (15 min) + rotating httpOnly refresh
+app.use('/api/super-admin', superAdminRoutes);
 
 // Rescue for stickers printed while APP_URL was misconfigured to this backend's
 // own origin instead of the frontend (see qrModel.js's QR_HOST): their QR image
