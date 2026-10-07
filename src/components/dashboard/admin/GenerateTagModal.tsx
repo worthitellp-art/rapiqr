@@ -12,11 +12,13 @@ import {
   QrCode,
   Layers,
   FileSpreadsheet,
+  Folder,
 } from "lucide-react";
 import { QrRecord, StickerLabel } from "./types";
 import { qrFullUrl, generateQrDataUrl, dispatchActivationToUserDashboard } from "./helpers";
 import { apiClient } from "../../../lib/apiClient";
 import { STICKER_CATEGORIES, getCategoryLabel } from "../../../stickerModules";
+import { StickerFolder } from "./folders/folderStorage";
 import QrCodeImage from "./QrCodeImage";
 import LabelBadge from "./labels/LabelBadge";
 import { Button } from "../../ui/button";
@@ -34,6 +36,8 @@ interface GenerateTagModalProps {
   setQrList: React.Dispatch<React.SetStateAction<QrRecord[]>>;
   initialCategory: string;
   labels?: StickerLabel[];
+  folders?: StickerFolder[];
+  activeFolderName?: string | null;
   setToast: (msg: string | null) => void;
   onPrint?: (target?: QrRecord, batch?: QrRecord[]) => void;
 }
@@ -44,7 +48,8 @@ function recordFromV2Response(
   fallbackCategory: string,
   ownerPhone?: string,
   labelName?: string,
-  labelColor?: string
+  labelColor?: string,
+  folderName?: string
 ): QrRecord {
   const rec: QrRecord = {
     id: data.id,
@@ -60,6 +65,7 @@ function recordFromV2Response(
     recoveryCode: data.recoveryCode,
     labelName: data.label_name || labelName || undefined,
     labelColor: data.label_color || labelColor || undefined,
+    folderName: data.folder_name || folderName || undefined,
     isPrinted: false,
   };
   if (ownerPhone && ownerPhone.trim()) rec.ownerPhone = ownerPhone.trim();
@@ -73,6 +79,8 @@ export default function GenerateTagModal({
   setQrList,
   initialCategory,
   labels = [],
+  folders = [],
+  activeFolderName = null,
   setToast,
   onPrint,
 }: GenerateTagModalProps) {
@@ -82,6 +90,13 @@ export default function GenerateTagModal({
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [selectedLabelId, setSelectedLabelId] = useState<string>("none");
+
+  const initialFolderChoice =
+    activeFolderName && activeFolderName.toLowerCase() !== "unassigned stock"
+      ? activeFolderName
+      : "none";
+  const [selectedFolderName, setSelectedFolderName] = useState<string>(initialFolderChoice);
+
   const [created, setCreated] = useState<QrRecord | null>(null);
   const [recoveryCode, setRecoveryCode] = useState("");
   const [urlCopied, setUrlCopied] = useState(false);
@@ -100,6 +115,11 @@ export default function GenerateTagModal({
       setPhone("");
       setPhoneError(null);
       setSelectedLabelId("none");
+      const initFolder =
+        activeFolderName && activeFolderName.toLowerCase() !== "unassigned stock"
+          ? activeFolderName
+          : "none";
+      setSelectedFolderName(initFolder);
       setCreated(null);
       setRecoveryCode("");
       setUrlCopied(false);
@@ -107,7 +127,7 @@ export default function GenerateTagModal({
       setBulkProgress(null);
       setBulkSummary(null);
     }
-  }, [isOpen, initialCategory]);
+  }, [isOpen, initialCategory, activeFolderName]);
 
   if (!isOpen) return null;
 
@@ -122,6 +142,7 @@ export default function GenerateTagModal({
   }
 
   const chosenLabel = labels.find((l) => l.id === selectedLabelId);
+  const targetFolder = selectedFolderName !== "none" ? selectedFolderName : undefined;
 
   async function handleGenerateSingle() {
     setPhoneError(null);
@@ -144,16 +165,25 @@ export default function GenerateTagModal({
         ownerPhone: phone.trim() || undefined,
         labelName: chosenLabel?.name || undefined,
         labelColor: chosenLabel?.color || undefined,
+        folderName: targetFolder,
       });
       if (!res?.success || !res.data) throw new Error(res?.error || "Failed to create tag");
 
-      const rec = recordFromV2Response(res.data, category, phone, chosenLabel?.name, chosenLabel?.color);
+      const rec = recordFromV2Response(
+        res.data,
+        category,
+        phone,
+        chosenLabel?.name,
+        chosenLabel?.color,
+        targetFolder
+      );
       setQrList((prev) => [rec, ...prev]);
       setCreated(rec);
       setRecoveryCode(rec.recoveryCode || "");
       dispatchActivationToUserDashboard(rec);
       setStep("success");
-      setToast("New QR sticker generated and saved.");
+      const folderInfo = targetFolder ? ` in folder "${targetFolder}"` : "";
+      setToast(`New QR sticker generated and saved${folderInfo}.`);
       setTimeout(() => setToast(null), 3000);
     } catch (err: any) {
       setStep("form");
@@ -183,9 +213,17 @@ export default function GenerateTagModal({
           category,
           labelName: chosenLabel?.name || undefined,
           labelColor: chosenLabel?.color || undefined,
+          folderName: targetFolder,
         });
         if (!res?.success || !res.data) throw new Error(res?.error || "save failed");
-        const rec = recordFromV2Response(res.data, category, undefined, chosenLabel?.name, chosenLabel?.color);
+        const rec = recordFromV2Response(
+          res.data,
+          category,
+          undefined,
+          chosenLabel?.name,
+          chosenLabel?.color,
+          targetFolder
+        );
         newRecords.push(rec);
         if (rec.recoveryCode) recoveryRows.push([rec.id, rec.recoveryCode]);
       } catch (err) {
@@ -210,8 +248,9 @@ export default function GenerateTagModal({
     setBulkSummary({ total: count, success: count - failedCount, failed: failedCount });
     setStep("success");
 
+    const folderInfo = targetFolder ? ` in folder "${targetFolder}"` : "";
     const labelInfo = chosenLabel ? ` with label "${chosenLabel.name}"` : "";
-    setToast(`${count - failedCount} QR stickers generated & synced${labelInfo}`);
+    setToast(`${count - failedCount} QR stickers generated & synced${folderInfo}${labelInfo}`);
     setTimeout(() => setToast(null), 4000);
   }
 
@@ -359,6 +398,32 @@ export default function GenerateTagModal({
                   )}
                 </div>
               )}
+
+              {/* Target Folder Selector */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-gray-700">Target Folder</label>
+                  {targetFolder && (
+                    <span className="text-[10px] text-amber-700 font-semibold px-1.5 py-0.5 bg-amber-50 rounded border border-amber-200/60">
+                      Active: {targetFolder}
+                    </span>
+                  )}
+                </div>
+                <select
+                  value={selectedFolderName}
+                  onChange={(e) => setSelectedFolderName(e.target.value)}
+                  className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-gray-200/90 bg-white text-gray-900 outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 transition-all cursor-pointer"
+                >
+                  <option value="none">📁 Unassigned Stock (Root)</option>
+                  {folders
+                    .filter((f) => f.name.toLowerCase() !== "unassigned stock")
+                    .map((f) => (
+                      <option key={f.id} value={f.name}>
+                        📁 {f.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
 
               {/* Mode-Specific Fields */}
               {mode === "single" ? (

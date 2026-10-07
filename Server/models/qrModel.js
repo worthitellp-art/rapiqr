@@ -400,6 +400,7 @@ class QrModel {
         rendered_image_sha256: sha256,
         label_name: qrData.labelName || qrData.label_name || null,
         label_color: qrData.labelColor || qrData.label_color || null,
+        folder_name: qrData.folderName || qrData.folder_name || null,
         is_printed: Boolean(qrData.isPrinted || qrData.is_printed),
         printed_at: (qrData.isPrinted || qrData.is_printed) ? new Date() : null,
         created_at: qrData.createdAt || new Date(),

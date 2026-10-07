@@ -1,7 +1,7 @@
 import React from "react";
 import FolderIcon from "./FolderIcon";
 import { StickerFolder } from "./folderStorage";
-import { ChevronRight, ArrowLeft, Printer, Tag, Folder, Plus, Search } from "lucide-react";
+import { ChevronRight, ArrowLeft, Printer, Tag, Folder, Plus, Search, Edit3 } from "lucide-react";
 
 interface FolderBreadcrumbsProps {
   currentFolder: string;
@@ -9,6 +9,7 @@ interface FolderBreadcrumbsProps {
   onBackToAll: () => void;
   onPrintFolder?: () => void;
   onAssignFolderLabel?: () => void;
+  onRenameFolder?: () => void;
   onCreateStickerInFolder?: () => void;
   searchInFolder?: string;
   onSearchChange?: (val: string) => void;
@@ -20,6 +21,7 @@ export default function FolderBreadcrumbs({
   onBackToAll,
   onPrintFolder,
   onAssignFolderLabel,
+  onRenameFolder,
   onCreateStickerInFolder,
   searchInFolder = "",
   onSearchChange,
@@ -54,6 +56,16 @@ export default function FolderBreadcrumbs({
               <FolderIcon size={18} variant="empty" />
               <span>{currentFolder}</span>
             </div>
+            {onRenameFolder && (
+              <button
+                type="button"
+                onClick={onRenameFolder}
+                className="p-1 text-gray-400 hover:text-gray-900 rounded-md hover:bg-gray-200/60 transition-colors cursor-pointer"
+                title="Rename this folder"
+              >
+                <Edit3 size={12} />
+              </button>
+            )}
           </div>
 
           <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
@@ -63,6 +75,18 @@ export default function FolderBreadcrumbs({
 
         {/* Action Buttons for Folder (Print & Add Label) */}
         <div className="flex items-center gap-2 flex-wrap">
+          {onRenameFolder && (
+            <button
+              type="button"
+              onClick={onRenameFolder}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-gray-200 text-gray-800 text-xs font-bold hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs"
+              title="Rename folder"
+            >
+              <Edit3 size={13} className="text-gray-500" />
+              <span>Rename</span>
+            </button>
+          )}
+
           {onAssignFolderLabel && (
             <button
               type="button"
