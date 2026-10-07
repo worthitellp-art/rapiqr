@@ -27,6 +27,14 @@ export const chatTranslations: Record<Language, {
   photoPreview: string;
   openLocation: string;
   retry: { notSent: string; imageNotSent: string };
+  message: {
+    actionsLabel: string;
+    deleted: string;
+    deleteForMe: string;
+    deleteForEveryone: string;
+    cancel: string;
+    deleteFailed: string;
+  };
   liveLocation: {
     live: string;
     shared: string;
@@ -68,6 +76,14 @@ export const chatTranslations: Record<Language, {
     photoPreview: 'Photo',
     openLocation: '📍 Open location',
     retry: { notSent: 'Not sent · tap to retry', imageNotSent: 'Image not sent · tap to retry' },
+    message: {
+      actionsLabel: 'Message options',
+      deleted: 'This message was deleted',
+      deleteForMe: 'Delete for me',
+      deleteForEveryone: 'Delete for everyone',
+      cancel: 'Cancel',
+      deleteFailed: "Couldn't delete the message. Try again.",
+    },
     liveLocation: {
       live: 'Live location',
       shared: 'Location shared',
@@ -109,6 +125,14 @@ export const chatTranslations: Record<Language, {
     photoPreview: 'फोटो',
     openLocation: '📍 लोकेशन खोलें',
     retry: { notSent: 'नहीं भेजा गया · पुनः प्रयास करें', imageNotSent: 'इमेज नहीं भेजी गई · पुनः प्रयास करें' },
+    message: {
+      actionsLabel: 'मैसेज विकल्प',
+      deleted: 'यह मैसेज डिलीट कर दिया गया',
+      deleteForMe: 'मेरे लिए डिलीट करें',
+      deleteForEveryone: 'सभी के लिए डिलीट करें',
+      cancel: 'रद्द करें',
+      deleteFailed: 'मैसेज डिलीट नहीं हो सका। फिर से कोशिश करें।',
+    },
     liveLocation: {
       live: 'लाइव लोकेशन',
       shared: 'लोकेशन साझा की गई',
@@ -150,6 +174,14 @@ export const chatTranslations: Record<Language, {
     photoPreview: 'ફોટો',
     openLocation: '📍 લોકેશન ખોલો',
     retry: { notSent: 'મોકલાયું નથી · ફરી પ્રયાસ કરો', imageNotSent: 'ઇમેજ મોકલાઈ નથી · ફરી પ્રયાસ કરો' },
+    message: {
+      actionsLabel: 'મેસેજ વિકલ્પો',
+      deleted: 'આ મેસેજ ડિલીટ થઈ ગયો',
+      deleteForMe: 'મારા માટે ડિલીટ કરો',
+      deleteForEveryone: 'બધા માટે ડિલીટ કરો',
+      cancel: 'રદ કરો',
+      deleteFailed: 'મેસેજ ડિલીટ થઈ શક્યો નથી. ફરી પ્રયાસ કરો.',
+    },
     liveLocation: {
       live: 'લાઇવ લોકેશન',
       shared: 'લોકેશન શેર કરાયું',

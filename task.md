@@ -46,3 +46,15 @@ en
 
 location_shared this templates are working or not test sending this number  +91 9574713004 
 
+
+
+
+
+
+
+ remove track order from landing page no need beaucse alredy have in clienrr dashboard orders page
+  , from landing page remove this Apps Required for Finders, redesign the checkout page
+  proofessional clean
+
+
+  remove ccode matrxi and  windsheild view button remove , , remove car sticker other toptions  by defalt show proper

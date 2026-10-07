@@ -23,7 +23,7 @@ self.addEventListener('activate', () => {
  * (Server/services/pushService.js): { title, body, url, tag }.
  */
 self.addEventListener('push', (event: PushEvent) => {
-  let data: { title?: string; body?: string; url?: string; tag?: string } = {};
+  let data: { title?: string; body?: string; url?: string; tag?: string; alwaysShow?: boolean } = {};
   try {
     data = event.data ? event.data.json() : {};
   } catch {
@@ -41,9 +41,11 @@ self.addEventListener('push', (event: PushEvent) => {
 
   // If an owner tab is already open and visible, the in-app chime and toast cover
   // it — an OS notification on top would just be a second alert for one message.
+  // Admin alerts set `alwaysShow`: the admin console doesn't have an in-app toast
+  // for them, so an open dashboard would otherwise swallow SOS and new requests.
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    if (windows.some((client) => client.visibilityState === 'visible')) return;
+    if (!data.alwaysShow && windows.some((client) => client.visibilityState === 'visible')) return;
     await self.registration.showNotification(title, options);
   })());
 });

@@ -27,6 +27,7 @@
     "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "lighthouse": "^13.4.1",
+    "lottie-web": "^5.13.0",
     "lucide-react": "^0.546.0",
     "qrcode": "^1.5.4",
     "qrcode-with-logos": "^1.2.1",

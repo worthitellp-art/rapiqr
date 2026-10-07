@@ -34,6 +34,7 @@ interface AuthPageProps {
 }
 
 export default function AuthPage({
+  initialMode,
   onBackHome,
   onSuccess,
 }: AuthPageProps) {
@@ -45,6 +46,7 @@ export default function AuthPage({
   const verifyLockedMessage = (time: string) => t.errors.verifyLocked(MAX_OTP_ATTEMPTS, time);
 
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -53,6 +55,9 @@ export default function AuthPage({
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [countdown, setCountdown] = useState(0);
+  // Log in is the default: most people coming back already have an account.
+  // Register only appears for a number that has none (or when asked for).
+  const [mode, setMode] = useState<'login' | 'register'>(initialMode === 'signup' ? 'register' : 'login');
 
   // Active phone number
   const activePhone = phoneNumber || phoneDigits;
@@ -101,6 +106,12 @@ export default function AuthPage({
     setErrorMessage('');
     setSuccessMessage('');
 
+    const cleanName = fullName.trim();
+    if (mode === 'register' && cleanName.length < 2) {
+      setErrorMessage('Please enter your full name (at least 2 letters).');
+      return;
+    }
+
     const clean = phoneDigits.replace(/\D/g, '');
     if (clean.length < 10) {
       setErrorMessage(t.errors.invalidPhone);
@@ -127,6 +138,21 @@ export default function AuthPage({
         setErrorMessage(res.error || t.errors.sendFailedGeneric);
         return;
       }
+
+      // Each form only signs in or creates an account for the number it fits.
+      // Switching instead of sending keeps the profile from being created twice
+      // or left with a placeholder name.
+      if (mode === 'login' && res.exists === false) {
+        setMode('register');
+        setSuccessMessage("This number isn't registered yet. Add your name to create your account.");
+        return;
+      }
+      if (mode === 'register' && res.exists) {
+        setMode('login');
+        setSuccessMessage('This number already has an account, so just log in.');
+        return;
+      }
+
       await sendMsg91Otp(toMsg91Identifier(finalPhone));
 
       // Record the send. The 3rd code is still valid, so we move on to the OTP
@@ -169,7 +195,20 @@ export default function AuthPage({
     setIsSubmitting(true);
     try {
       const accessToken = await verifyMsg91Otp(trimmedOtp);
-      const res = await verifyPhoneLoginOtp(phoneNumber, accessToken);
+      const res = await verifyPhoneLoginOtp(
+        phoneNumber,
+        accessToken,
+        mode === 'register' ? fullName.trim() : undefined,
+        mode
+      );
+      if (res.code === 'ACCOUNT_NOT_FOUND') {
+        // Not a failed code, so no attempt is recorded — just send them to create the account.
+        setMode('register');
+        setStep('phone');
+        setOtpCode('');
+        setErrorMessage('No account is registered with this number yet. Add your name to create one.');
+        return;
+      }
       if (res.success) {
         // Clear rate limiting upon successful login
         clearOtpRateLimit(finalPhone);
@@ -288,10 +327,14 @@ export default function AuthPage({
           {/* Heading */}
           <div className="mb-6 text-center">
             <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-              {step === 'phone' ? t.signInTitle : t.enterCodeTitle}
+              {step === 'phone' ? (mode === 'register' ? 'Create your account' : t.signInTitle) : t.enterCodeTitle}
             </h1>
             <p className="text-xs sm:text-sm text-gray-500 mt-1.5">
-              {step === 'phone' ? t.signInSubtitle : t.codeSentTo(phoneNumber)}
+              {step === 'phone'
+                ? mode === 'register'
+                  ? 'Add your name and mobile number to get started.'
+                  : t.signInSubtitle
+                : t.codeSentTo(phoneNumber)}
             </p>
           </div>
 
@@ -375,11 +418,27 @@ export default function AuthPage({
                 </span>
               </div>
 
-              {/* ── Step 1: Phone Number Input ── */}
+              {/* ── Step 1: Name + Phone Number Input ── */}
               <form onSubmit={handleSendOtp} className="space-y-4">
+                {mode === 'register' && (
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1.5">
-                    {t.mobileNumberLabel}
+                    Your Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Enter your name"
+                    required
+                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-300 focus:border-[#446FF2] focus:ring-2 focus:ring-[#446FF2]/20 outline-none transition-all font-medium text-gray-900 bg-white placeholder:text-gray-400"
+                  />
+                </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1.5">
+                    {t.mobileNumberLabel} <span className="text-red-500">*</span>
                   </label>
                   <PhoneInputWithCountry
                     value={phoneNumber}
@@ -396,7 +455,7 @@ export default function AuthPage({
                   type="submit"
                   fullWidth
                   loading={isSubmitting}
-                  disabled={isGoogleSubmitting || phoneDigits.length < 10 || sendLockMs > 0}
+                  disabled={isGoogleSubmitting || (mode === 'register' && !fullName.trim()) || phoneDigits.length < 10 || sendLockMs > 0}
                 >
                   {isSubmitting ? (
                     t.sendingCode
@@ -410,6 +469,21 @@ export default function AuthPage({
                   )}
                 </FlowButton>
               </form>
+
+              <p className="text-center text-xs text-gray-500">
+                {mode === 'login' ? 'New here?' : 'Already have an account?'}{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode(mode === 'login' ? 'register' : 'login');
+                    setErrorMessage('');
+                    setSuccessMessage('');
+                  }}
+                  className="font-semibold text-gray-900 hover:underline cursor-pointer"
+                >
+                  {mode === 'login' ? 'Create an account' : 'Log in'}
+                </button>
+              </p>
             </div>
           ) : (
             /* ── Step 2: OTP Verification ── */

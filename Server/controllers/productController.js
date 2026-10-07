@@ -5,6 +5,7 @@ const OrderModel = require('../models/orderModel');
 const { logger } = require('../middleware/loggerMiddleware');
 const { notifyContactsAdded } = require('../services/notificationService');
 const { sendServerError } = require('../utils/httpErrors');
+const { clampLimit } = require('../utils/pagination');
 
 // GET /products also auto-claims unowned stickers (a phone match plus three
 // order lookups — several DB round-trips). It used to do that on EVERY call, so
@@ -326,10 +327,23 @@ class ProductController {
     }
   }
 
-  /** GET /api/products/history — every alert/scan event across the caller's own stickers. */
+  /**
+   * GET /api/products/history — alert/scan events across the caller's own stickers.
+   * Optional `from` / `to` (ISO dates, `to` exclusive) load just that window, so the
+   * dashboard's date picker fetches the records for the day or range it shows.
+   */
   static async getAllHistory(req, res) {
     try {
-      const data = await ProductModel.getHistoryForUser(req.user.id);
+      const parseDate = (value) => {
+        if (!value) return null;
+        const d = new Date(String(value));
+        return Number.isNaN(d.getTime()) ? null : d;
+      };
+      const from = parseDate(req.query.from);
+      const to = parseDate(req.query.to);
+      const limit = clampLimit(req.query.limit, { fallback: 300, max: 1000 });
+
+      const data = await ProductModel.getHistoryForUser(req.user.id, { limit, from, to });
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('PRODUCT_HISTORY_ALL', 'Failed to fetch combined history', err);

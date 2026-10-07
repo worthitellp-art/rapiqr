@@ -1,4 +1,6 @@
 const Alert = require('./schemas/Alert');
+const Sticker = require('./schemas/Sticker');
+const { registeredName } = require('../utils/stickerNames');
 const { logger } = require('../middleware/loggerMiddleware');
 
 class AlertModel {
@@ -54,13 +56,28 @@ class AlertModel {
   /**
    * Get Alerts Log
    */
-  static async getAlerts(limit = 50) {
+  static async getAlerts(limit = 50, { type = null } = {}) {
     try {
-      const docs = await Alert.find().sort({ created_at: -1 }).limit(limit).lean();
+      // Live-location pings aren't alerts any more — they live in location trails.
+      // A `type` narrows the list (the Communication tab asks for service requests).
+      const filter = type ? { type } : { type: { $ne: 'location_ping' } };
+      const docs = await Alert.find(filter).sort({ created_at: -1 }).limit(limit).lean();
+
+      // The registered name lives on the sticker, not the alert, so look up each
+      // alerted sticker once and attach its name (null when there isn't one).
+      const stickerIds = [...new Set(docs.map((d) => d.sticker_id).filter(Boolean))];
+      const stickers = stickerIds.length
+        ? await Sticker.find({ _id: { $in: stickerIds } }).select('name assigned_to').lean()
+        : [];
+      const nameById = new Map(
+        stickers.map((s) => [String(s._id), registeredName(s.name) || registeredName(s.assigned_to)])
+      );
+
       return docs.map((d) => ({
         id: String(d._id),
         qr_code_id: d.sticker_id,
         product_id: d.sticker_id,
+        sticker_name: nameById.get(d.sticker_id) || null,
         product_label: d.product_label,
         license_plate: d.license_plate,
         type: d.type,
@@ -101,6 +118,22 @@ class AlertModel {
       console.error('AlertModel.getByStickerIds Error:', err);
       logger.error('DB_ALERT', 'AlertModel.getByStickerIds failed', err);
       return [];
+    }
+  }
+
+  /** A service inquiry already filed for this sticker with the same wording since `since`. */
+  static async findRecentServiceInquiry(stickerId, message, since) {
+    try {
+      const doc = await Alert.findOne({
+        type: 'service_inquiry',
+        sticker_id: stickerId,
+        message,
+        created_at: { $gte: since },
+      }).lean();
+      return Boolean(doc);
+    } catch (err) {
+      logger.error('DB_ALERT', 'AlertModel.findRecentServiceInquiry failed', err);
+      return false;
     }
   }
 

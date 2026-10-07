@@ -39,6 +39,36 @@ interface StickerLike {
  * vehicle number, otherwise the supplied fallback (e.g. the category name) —
  * never the ID by default.
  */
+// Stand-ins the server writes when no owner name was given — not a registered name.
+const GENERIC_NAME = /^(vehicle owner|sticker owner|owner)$/i;
+const PLACEHOLDER_NAME = /^(vehicle|tag) \(/i;
+
+/** The sticker's registered name, or null when it's missing or only a placeholder. */
+export function registeredNameOf(name?: string | null): string | null {
+  const clean = (name || '').trim();
+  if (!clean || GENERIC_NAME.test(clean) || PLACEHOLDER_NAME.test(clean)) return null;
+  return clean;
+}
+
+interface AdminStickerLike {
+  id?: string | null;
+  qrCodeId?: string | null;
+  /** Registered owner name on admin QR records (`owner_name` from the API). */
+  ownerName?: string | null;
+  /** Registered name on alert rows (`sticker_name` from the API). */
+  registeredName?: string | null;
+}
+
+/**
+ * Admin label: the tag's registered name when it has one, otherwise the tag id.
+ * The id is never shown next to a name.
+ */
+export function adminStickerLabel(sticker: AdminStickerLike, fallback = 'Sticker'): string {
+  const id = sticker.id || sticker.qrCodeId || '';
+  const name = registeredNameOf(sticker.registeredName ?? sticker.ownerName);
+  return name || id || fallback;
+}
+
 export function stickerRef(sticker: StickerLike, isRevealed: boolean, fallback = 'Sticker'): string {
   const id = sticker.id || sticker.qrCodeId || '';
   if (isRevealed && id) return id;

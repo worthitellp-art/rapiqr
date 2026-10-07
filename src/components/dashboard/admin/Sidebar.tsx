@@ -19,6 +19,8 @@ interface SidebarProps {
   onSignOut: () => void;
   /** Count per nav id (alerts, orders, distributors, messages, repichat); 0/absent shows nothing. */
   badges?: Record<string, number>;
+  /** Shown above the account block, e.g. the notifications toggle. */
+  footerExtra?: React.ReactNode;
   /** Mobile drawer state — ignored at md+ where the sidebar is always docked. */
   isOpen?: boolean;
   onClose?: () => void;
@@ -31,6 +33,7 @@ export default function Sidebar({
   onBack,
   onSignOut,
   badges = {},
+  footerExtra,
   isOpen = false,
   onClose,
 }: SidebarProps) {
@@ -217,6 +220,7 @@ export default function Sidebar({
 
       {/* ── Bottom Section: User Profile & Account Controls ──── */}
       <div className="p-3 border-t border-white/10 relative">
+        {footerExtra && <div className="mb-2">{footerExtra}</div>}
         <div className="relative">
           <button
             type="button"

@@ -76,6 +76,18 @@ async function completeSignIn({ req, profile, ip, userAgent, method }) {
   return token;
 }
 
+/**
+ * The account a phone number belongs to: matched on its phone field, else on the
+ * phone-derived email that phone-only accounts are created with. Used by both
+ * phone-login steps, so the "does this number have an account?" answer and the
+ * sign-in itself can't disagree.
+ */
+async function findAccountByPhone(phoneNumber, normalized) {
+  const byPhone = await UserModel.findByPhone(phoneNumber);
+  if (byPhone) return byPhone;
+  return UserModel.findByEmail(`${normalized}@repiqr.local`);
+}
+
 class AuthController {
   /**
    * Public client configuration for the MSG91 OTP Widget.
@@ -1227,8 +1239,12 @@ class AuthController {
         return res.status(400).json({ success: false, error: 'Enter a valid 10-digit mobile number.' });
       }
 
-      logger.user('PHONE_LOGIN_OTP', `Phone login pre-flight passed for ${normalized} — widget will send the OTP`);
-      return res.json({ success: true, message: 'Verification code sent to your phone number.' });
+      // Tells the page whether this number already has an account, so it can
+      // offer "log in" for an existing one and "create account" for a new one.
+      const account = await findAccountByPhone(phoneNumber, normalized);
+
+      logger.user('PHONE_LOGIN_OTP', `Phone login pre-flight passed for ${normalized} (existing account: ${Boolean(account)}) — widget will send the OTP`);
+      return res.json({ success: true, exists: Boolean(account), message: 'Verification code sent to your phone number.' });
     } catch (err) {
       logger.error('PHONE_LOGIN_OTP', 'Failed to run phone login pre-flight', err);
       return res.status(500).json({ success: false, error: err.message });
@@ -1259,18 +1275,29 @@ class AuthController {
         return res.status(400).json({ success: false, error: 'Verified number does not match — please retry.' });
       }
 
-      // Find or create user
-      let profile = await UserModel.findByPhone(phoneNumber);
+      // `login` only signs into an existing account. `register` creates one with
+      // the name the user typed. Neither path silently invents an account, which
+      // is what used to leave a "User 1234" profile that didn't match the person.
+      const mode = req.body?.mode === 'register' ? 'register' : 'login';
       const fallbackEmail = `${normalized}@repiqr.local`;
 
-      if (!profile) {
-        profile = await UserModel.findByEmail(fallbackEmail);
-      }
+      let profile = await findAccountByPhone(phoneNumber, normalized);
 
       if (!profile) {
+        if (mode === 'login') {
+          return res.status(404).json({
+            success: false,
+            code: 'ACCOUNT_NOT_FOUND',
+            error: 'No account is registered with this number. Create an account instead.',
+          });
+        }
+        const requestedName = String(req.body?.fullName || '').trim().slice(0, 80);
+        if (requestedName.length < 2) {
+          return res.status(400).json({ success: false, error: 'Please enter your full name to create an account.' });
+        }
         profile = await UserModel.createUser({
           email: fallbackEmail,
-          fullName: `User ${normalized.slice(-4)}`,
+          fullName: requestedName,
           phoneNumber: normalized,
           isPhoneVerified: true,
           role: 'user',

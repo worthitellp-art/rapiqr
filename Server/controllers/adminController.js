@@ -342,12 +342,16 @@ class AdminController {
   static async getSummary(req, res) {
     try {
       const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      // Service requests the Communication tab hasn't shown yet: the admin sends the
+      // time they last opened it. Without one, count the last 24 hours.
+      const seenAt = new Date(String(req.query.inquiriesSince || ''));
+      const inquiriesSince = Number.isNaN(seenAt.getTime()) ? since24h : seenAt;
 
       // "Active" = the sticker is switched on OR already has an owner phone —
       // the same rule the fleet table applies row by row.
       const hasText = (path) => ({ $gt: [{ $strLenCP: { $convert: { input: `$${path}`, to: 'string', onError: '', onNull: '' } } }, 0] });
 
-      const [tagAgg, unresolvedAlerts, ordersToShip, pendingPartners, failedMessages24h] = await Promise.all([
+      const [tagAgg, unresolvedAlerts, newServiceInquiries, ordersToShip, pendingPartners, failedMessages24h] = await Promise.all([
         Sticker.aggregate([
           { $match: { deleted_at: null } },
           {
@@ -362,7 +366,9 @@ class AdminController {
             },
           },
         ]),
-        Alert.countDocuments({ status: { $ne: 'resolved' } }),
+        // Service requests have their own badge on Communication, so they aren't open alerts.
+        Alert.countDocuments({ status: { $ne: 'resolved' }, type: { $ne: 'service_inquiry' } }),
+        Alert.countDocuments({ type: 'service_inquiry', created_at: { $gt: inquiriesSince } }),
         // Paid orders still waiting to be shipped ('pending' = legacy 'placed').
         Order.countDocuments({ status: { $in: ['placed', 'pending'] }, 'payment.status': 'paid' }),
         DistributorApplication.countDocuments({ status: 'pending' }),
@@ -381,7 +387,7 @@ class AdminController {
             scans: tags.scans,
             lastCreatedAt: tags.lastCreatedAt || null,
           },
-          attention: { unresolvedAlerts, ordersToShip, pendingPartners, failedMessages24h },
+          attention: { unresolvedAlerts, newServiceInquiries, ordersToShip, pendingPartners, failedMessages24h },
           generatedAt: new Date().toISOString(),
         },
       });

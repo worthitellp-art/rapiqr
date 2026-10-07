@@ -8,7 +8,7 @@ const { notifyOwner } = require('../services/notificationService');
 const pushService = require('../services/pushService');
 const { logger } = require('../middleware/loggerMiddleware');
 const { sendServerError } = require('../utils/httpErrors');
-const { getIo, getOnlineOwners, markDeliveredIfPeerPresent } = require('../sockets/chatSocket');
+const { getIo, getOnlineOwners, markDeliveredIfPeerPresent, shouldWhatsAppOwner } = require('../sockets/chatSocket');
 const { createChatLoginLink } = require('../services/loginLinkService');
 
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif'];
@@ -72,7 +72,8 @@ async function fanOutMessage(session, message, isOwner, previewText) {
 
   if (!isOwner) {
     const label = session.vehicle_label || product?.name || 'your vehicle';
-    if (product?.details?.ownerPhone) {
+    // Both sides are on the thread right now, so the owner already sees this in-app.
+    if (product?.details?.ownerPhone && (await shouldWhatsAppOwner(session.id))) {
       notifyOwner({
         type: 'CHAT_MESSAGE',
         ownerPhone: product.details.ownerPhone,
@@ -244,7 +245,7 @@ class ChatController {
         return res.status(403).json({ success: false, error: 'Forbidden' });
       }
 
-      const messages = await ChatModel.listMessages(session.id);
+      const messages = await ChatModel.listMessages(session.id, isOwner ? 'owner' : 'customer');
       return res.json({ success: true, data: messages, session });
     } catch (err) {
       logger.error('CHAT_MESSAGES', 'Failed to fetch chat messages', err);
@@ -296,6 +297,53 @@ class ChatController {
       return res.json({ success: true, data: sessions });
     } catch (err) {
       logger.error('CHAT_INBOX', 'Failed to list owner chat sessions', err);
+      return sendServerError(res, err);
+    }
+  }
+
+  /**
+   * DELETE /api/chat/sessions/:id/messages/:messageId?scope=me|everyone
+   *
+   * `me` hides the message for the caller's side only. `everyone` blanks it for
+   * both sides, and only the person who sent it can do that.
+   */
+  static async deleteMessage(req, res) {
+    try {
+      const { id: sessionId, messageId } = req.params;
+      if (!/^[0-9a-fA-F]{24}$/.test(String(messageId))) {
+        return res.status(400).json({ success: false, error: 'Invalid message id' });
+      }
+
+      const session = await ChatModel.getSessionById(sessionId);
+      if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+
+      const isOwner = await isOwnerOfSession(req, session);
+      if (!isOwner && !isCustomerOfSession(req, session)) {
+        return res.status(403).json({ success: false, error: 'Forbidden' });
+      }
+      const side = isOwner ? 'owner' : 'customer';
+
+      if (req.query.scope !== 'everyone') {
+        await ChatModel.deleteMessageForSide(session.id, messageId, side);
+        return res.json({ success: true, scope: 'me', messageId });
+      }
+
+      const updated = await ChatModel.deleteMessageForEveryone(session.id, messageId, side);
+      if (!updated) {
+        return res.status(403).json({
+          success: false,
+          error: 'You can only delete your own messages for everyone, once.',
+        });
+      }
+
+      getIo()?.to(`session:${session.id}`).emit('message_deleted', {
+        sessionId: session.id,
+        messageId,
+        deletedAt: updated.deleted_at,
+      });
+      return res.json({ success: true, scope: 'everyone', data: updated });
+    } catch (err) {
+      logger.error('CHAT_DELETE_MESSAGE', 'Failed to delete chat message', err);
       return sendServerError(res, err);
     }
   }

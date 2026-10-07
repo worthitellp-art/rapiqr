@@ -37,6 +37,7 @@ function messageToApi(doc) {
     attachment_name: doc.attachment_name,
     attachment_width: doc.attachment_width,
     attachment_height: doc.attachment_height,
+    deleted_at: doc.deleted_at || null,
   };
 }
 
@@ -154,9 +155,12 @@ class ChatModel {
     }
   }
 
-  static async listMessages(sessionId) {
+  /** `side` hides rows that side has deleted for itself; the other side still sees them. */
+  static async listMessages(sessionId, side) {
     try {
-      const docs = await ChatMessage.find({ session_id: sessionId }).sort({ created_at: 1 }).lean();
+      const filter = { session_id: sessionId };
+      if (side) filter.deleted_for = { $ne: side };
+      const docs = await ChatMessage.find(filter).sort({ created_at: 1 }).lean();
       return docs.map(messageToApi);
     } catch (err) {
       console.error(`ChatModel.listMessages (${sessionId}) Error:`, err);
@@ -238,6 +242,44 @@ class ChatModel {
       console.error(`ChatModel.markRead (${sessionId}) Error:`, err);
       logger.error('DB_CHAT', `ChatModel.markRead failed (${sessionId})`, err);
       return false;
+    }
+  }
+
+  /** "Delete for me": hides the message for one side only. */
+  static async deleteMessageForSide(sessionId, messageId, side) {
+    await ChatMessage.updateOne(
+      { _id: messageId, session_id: sessionId },
+      { $addToSet: { deleted_for: side } }
+    );
+    return true;
+  }
+
+  /**
+   * "Delete for everyone": only the sender can do this, and only once. Returns
+   * null when the message isn't theirs, isn't there, or is already deleted.
+   */
+  static async deleteMessageForEveryone(sessionId, messageId, senderSide) {
+    try {
+      const doc = await ChatMessage.findOneAndUpdate(
+        { _id: messageId, session_id: sessionId, sender_type: senderSide, deleted_at: null },
+        {
+          $set: {
+            deleted_at: new Date(),
+            body: '',
+            attachment_url: null,
+            attachment_type: null,
+            attachment_name: null,
+            attachment_width: null,
+            attachment_height: null,
+          },
+        },
+        { new: true }
+      ).lean();
+      return messageToApi(doc);
+    } catch (err) {
+      console.error(`ChatModel.deleteMessageForEveryone (${messageId}) Error:`, err);
+      logger.error('DB_CHAT', `ChatModel.deleteMessageForEveryone failed (${messageId})`, err);
+      return null;
     }
   }
 

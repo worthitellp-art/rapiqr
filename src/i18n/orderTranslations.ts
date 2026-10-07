@@ -12,7 +12,7 @@ export const orderTranslations: Record<Language, {
     backToShopAria: string;
     checkoutLabel: string;
     emptyCart: { title: string; description: string; browseButton: string };
-    freeStickerBanner: { title: string; description: (amount: number) => string; linkedTo: string };
+    freeStickerBanner: { title: string; description: (amount: number) => string };
     guestBanner: { message: string; logIn: string };
     contactSection: {
       title: string; subtitle: string;
@@ -161,7 +161,6 @@ export const orderTranslations: Record<Language, {
       freeStickerBanner: {
         title: 'Your sticker is free!',
         description: (amount) => `You only pay ₹${amount}, and the full ₹${amount} is added to your RepiQR balance.`,
-        linkedTo: 'Linked to',
       },
       guestBanner: {
         message: 'Quick guest checkout — no password required.',
@@ -174,8 +173,8 @@ export const orderTranslations: Record<Language, {
         fullNamePlaceholder: 'e.g. Rahul Sharma',
         fullNameAria: 'Full Name',
         phoneLabel: 'Phone Number *',
-        emailLabel: 'Email Address (Optional)',
-        emailPlaceholder: 'e.g. rahul@example.com (optional)',
+        emailLabel: 'Email Address *',
+        emailPlaceholder: 'e.g. rahul@example.com',
       },
       addressSection: {
         title: 'Shipping Address',
@@ -328,7 +327,6 @@ export const orderTranslations: Record<Language, {
       freeStickerBanner: {
         title: 'आपका स्टिकर मुफ़्त है!',
         description: (amount) => `आपको केवल ₹${amount} का भुगतान करना है, और पूरे ₹${amount} आपके RepiQR बैलेंस में जोड़ दिए जाएंगे।`,
-        linkedTo: 'इससे जुड़ा हुआ',
       },
       guestBanner: {
         message: 'त्वरित गेस्ट चेकआउट — पासवर्ड की आवश्यकता नहीं।',
@@ -341,8 +339,8 @@ export const orderTranslations: Record<Language, {
         fullNamePlaceholder: 'उदा. राहुल शर्मा',
         fullNameAria: 'पूरा नाम',
         phoneLabel: 'फ़ोन नंबर *',
-        emailLabel: 'ईमेल पता (वैकल्पिक)',
-        emailPlaceholder: 'उदा. rahul@example.com (वैकल्पिक)',
+        emailLabel: 'ईमेल पता *',
+        emailPlaceholder: 'उदा. rahul@example.com',
       },
       addressSection: {
         title: 'शिपिंग पता',
@@ -495,7 +493,6 @@ export const orderTranslations: Record<Language, {
       freeStickerBanner: {
         title: 'તમારું સ્ટીકર મુક્ત છે!',
         description: (amount) => `તમે માત્ર ₹${amount} ચૂકવો છો, અને સંપૂર્ણ ₹${amount} તમારા RepiQR બેલેન્સમાં ઉમેરાશે.`,
-        linkedTo: 'સાથે લિંક્ડ',
       },
       guestBanner: {
         message: 'ઝડપી ગેસ્ટ ચેકઆઉટ — પાસવર્ડની જરૂર નથી.',
@@ -508,8 +505,8 @@ export const orderTranslations: Record<Language, {
         fullNamePlaceholder: 'દા.ત. રાહુલ શર્મા',
         fullNameAria: 'પૂરું નામ',
         phoneLabel: 'ફોન નંબર *',
-        emailLabel: 'ઇમેઇલ સરનામું (વૈકલ્પિક)',
-        emailPlaceholder: 'દા.ત. rahul@example.com (વૈકલ્પિક)',
+        emailLabel: 'ઇમેઇલ સરનામું *',
+        emailPlaceholder: 'દા.ત. rahul@example.com',
       },
       addressSection: {
         title: 'શિપિંગ સરનામું',

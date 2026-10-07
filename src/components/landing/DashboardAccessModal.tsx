@@ -36,6 +36,7 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
   const t = joinUsTranslations[language].dashboardAccessModal;
 
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState(initialPhone ? `+91 ${initialPhone.replace(/\D/g, '').slice(-10)}` : '');
   const [phoneDigits, setPhoneDigits] = useState(initialPhone.replace(/\D/g, '').slice(-10));
   const [otpCode, setOtpCode] = useState('');
@@ -61,6 +62,12 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
   const handleSendOtp = async (event: React.FormEvent) => {
     event.preventDefault();
     setErrorMessage(null);
+
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      setErrorMessage('Please enter your full name (at least 2 characters).');
+      return;
+    }
+
     if (phoneDigits.length < 10) {
       setErrorMessage(t.invalidPhone);
       return;
@@ -118,7 +125,7 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
     setIsSubmitting(true);
     try {
       const accessToken = await verifyMsg91Otp(cleanOtp);
-      const result = await verifyPhoneLoginOtp(phoneNumber, accessToken);
+      const result = await verifyPhoneLoginOtp(phoneNumber, accessToken, fullName.trim());
       if (!result.success) {
         const failResult = recordOtpVerifyFailure(finalPhone);
         refreshLock();
@@ -230,16 +237,34 @@ export default function DashboardAccessModal({ isOpen, initialPhone, onClose, on
 
         {step === 'phone' ? (
           <form onSubmit={handleSendOtp} className="space-y-4">
-            <PhoneInputWithCountry
-              value={phoneNumber}
-              onChange={(full, digits) => { setPhoneNumber(full); setPhoneDigits(digits); }}
-              placeholder={t.phonePlaceholder}
-            />
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                Your Full Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Enter your name"
+                required
+                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-200 focus:border-[#446FF2] focus:ring-2 focus:ring-[#446FF2]/20 outline-none transition-all font-medium text-slate-900 bg-white placeholder:text-slate-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                Mobile Number <span className="text-red-500">*</span>
+              </label>
+              <PhoneInputWithCountry
+                value={phoneNumber}
+                onChange={(full, digits) => { setPhoneNumber(full); setPhoneDigits(digits); }}
+                placeholder={t.phonePlaceholder}
+              />
+            </div>
             <FlowButton
               type="submit"
               fullWidth
               loading={isSubmitting}
-              disabled={phoneDigits.length < 10 || sendLockMs > 0}
+              disabled={!fullName.trim() || phoneDigits.length < 10 || sendLockMs > 0}
             >
               {sendLockMs > 0 ? t.locked(formatRemainingTime(sendLockMs)) : t.sendCode}
             </FlowButton>

@@ -30,7 +30,7 @@ import {
 import { QrRecord, Template, StickerPos, StickerLabel } from "./types";
 import { qrFullUrl, fmtDate, getStableSlotMap, formatSlotNumber } from "./helpers";
 import { apiClient } from "../../../lib/apiClient";
-import { stickerRef, useCodesRevealed } from "../../../lib/codeVisibility";
+import { adminStickerLabel, useCodesRevealed } from "../../../lib/codeVisibility";
 import { useLocalStorage } from "./useLocalStorage";
 import { generateStickerBatchPdfBlob, downloadSheetBlob } from "../../../services/stickerPrintSheetService";
 import { STICKER_CATEGORIES, getCategoryLabel, getCategoryIcon } from "../../../stickerModules";
@@ -1019,7 +1019,7 @@ export default function QrCodesPage({
                           onClick={() => openQuickLook(q)}
                           className="font-mono font-semibold text-gray-900 hover:text-orange-600 transition-colors cursor-pointer text-left"
                         >
-                          {stickerRef(q, revealedCodes, catLabel)}
+                          {adminStickerLabel(q, catLabel)}
                         </button>
                       </td>
                       <td className="px-4 py-3.5">

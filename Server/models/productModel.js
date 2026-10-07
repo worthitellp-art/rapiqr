@@ -1,6 +1,8 @@
 const Sticker = require('./schemas/Sticker');
 const Alert = require('./schemas/Alert');
+const LocationTrailModel = require('./locationTrailModel');
 const { normalizePhone, isSamePhone } = require('../utils/phone');
+const { sanitizeEmergencyContacts } = require('../utils/emergencyContacts');
 const { logger } = require('../middleware/loggerMiddleware');
 
 function isDuplicateError(err) {
@@ -367,8 +369,9 @@ class ProductModel {
    * the list every time this dashboard panel re-saves it (see
    * ProductController.updateContacts / notificationService.notifyContactsAdded).
    */
-  static async updateContacts(productId, contacts) {
+  static async updateContacts(productId, rawContacts) {
     try {
+      const contacts = sanitizeEmergencyContacts(rawContacts);
       const current = await Sticker.findById(productId).select('details').lean();
       if (!current) return null;
 
@@ -424,18 +427,25 @@ class ProductModel {
    * round-trips every time it opened); this is one `$in` lookup. Only that
    * owner's own live stickers are ever matched.
    */
-  static async getHistoryForUser(userId, limit = 300) {
+  static async getHistoryForUser(userId, { limit = 300, from = null, to = null } = {}) {
     try {
       if (!userId) return [];
       const owned = await Sticker.find({ user_id: userId, deleted_at: null }).select('_id').lean();
       if (owned.length === 0) return [];
 
-      const docs = await Alert.find({ sticker_id: { $in: owned.map((s) => s._id) } })
+      const filter = { sticker_id: { $in: owned.map((s) => s._id) } };
+      if (from || to) {
+        filter.created_at = {};
+        if (from) filter.created_at.$gte = from;
+        if (to) filter.created_at.$lt = to;
+      }
+
+      const docs = await Alert.find({ ...filter, type: { $ne: 'location_ping' } })
         .select('sticker_id type message reporter_phone location status created_at')
         .sort({ created_at: -1 })
         .limit(limit)
         .lean();
-      return docs.map((d) => ({
+      const alertRows = docs.map((d) => ({
         id: String(d._id),
         sticker_id: d.sticker_id,
         type: d.type,
@@ -445,6 +455,31 @@ class ProductModel {
         status: d.status,
         created_at: d.created_at,
       }));
+
+      // Live-location sessions: one history entry per session, not one per ping.
+      const trails = await LocationTrailModel.listSummaries({
+        from,
+        to,
+        limit,
+        stickerIds: owned.map((s) => String(s._id)),
+      });
+      const trailRows = trails.map((t) => ({
+        id: `trail-${t.id}`,
+        sticker_id: t.sticker_id,
+        type: 'location_trail',
+        event_type: 'Live location',
+        message: `${t.count} location update${t.count === 1 ? '' : 's'}`,
+        reporter_phone: null,
+        location: t.last_lat != null ? { lat: t.last_lat, lng: t.last_lng, accuracy: t.last_accuracy } : null,
+        status: 'info',
+        created_at: t.last_at,
+        trail_id: t.id,
+        count: t.count,
+      }));
+
+      return [...alertRows, ...trailRows]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, limit);
     } catch (err) {
       console.error(`ProductModel.getHistoryForUser (${userId}) Error:`, err);
       logger.error('DB_PRODUCT', `ProductModel.getHistoryForUser failed (${userId})`, err);

@@ -166,7 +166,7 @@ export function EditContactsModal({
         return;
       }
       if (phoneDigits.length < 10) {
-        setError(`Please enter a valid 10-digit mobile number for ${name}.`);
+        setError(`Please enter a valid 10-digit active WhatsApp number for ${name}.`);
         return;
       }
     }
@@ -184,6 +184,9 @@ export function EditContactsModal({
   return (
     <ModalShell onClose={onClose}>
       <ModalHeader title={`Emergency Contacts — ${sticker.nickname} (${contacts.length}/${MAX_EMERGENCY_CONTACTS})`} onClose={onClose} />
+      <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-medium">
+        Ensure contact numbers are active on WhatsApp to receive immediate emergency SOS alerts and location maps.
+      </div>
       <div className="space-y-3">
         {contacts.map((c, idx) => (
           <div key={idx} className="flex gap-2 items-start">
@@ -199,7 +202,7 @@ export function EditContactsModal({
               <PhoneInputWithCountry
                 value={c.phone}
                 onChange={(full) => updateContact(idx, 'phone', full)}
-                placeholder="10-digit mobile"
+                placeholder="10-digit WhatsApp number"
               />
             </div>
             <button

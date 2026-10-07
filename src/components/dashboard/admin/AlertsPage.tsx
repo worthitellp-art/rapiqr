@@ -17,12 +17,18 @@ import {
 } from "lucide-react";
 import { QrRecord, Template, SystemAlertItem } from "./types";
 import { CodeVisibilityToggleButton } from "./StickerCodeComponents";
-import { stickerRef, useCodesRevealed } from "../../../lib/codeVisibility";
+import { adminStickerLabel, useCodesRevealed } from "../../../lib/codeVisibility";
 import { getCategoryLabel } from "../../../stickerModules";
 import { mapRowToRecord } from "./helpers";
 import { apiClient } from "../../../lib/apiClient";
 import { usePolling } from "../../../hooks/usePolling";
 import ConfirmModal from "./ConfirmModal";
+import Pagination, { usePagination } from "../shared/Pagination";
+import AlertDateFilter, {
+  DEFAULT_ALERT_FILTER,
+  isInAlertRange,
+  type AlertDateFilterValue,
+} from "../shared/AlertDateFilter";
 
 interface AlertsPageProps {
   qrList: QrRecord[];
@@ -35,7 +41,10 @@ interface AlertsPageProps {
   onChanged?: () => void;
 }
 
-type AlertCategoryFilter = "all" | "emergency" | "assistance" | "activation" | "scan";
+type AlertCategoryFilter = "all" | "emergency" | "assistance" | "activation" | "scan" | "location";
+
+/** A live-location session's points, loaded when its row is expanded. */
+type TrailDetail = { status: "loading" } | { status: "error" } | { status: "ready"; points: { lat: number; lng: number; accuracy?: number | null; at: string }[]; count: number };
 
 function fmtTimeAgo(iso: string): string {
   try {
@@ -71,6 +80,60 @@ function getLocationMapsUrl(location: any): string {
   return "";
 }
 
+/** Expanded view for a live-location session: its totals and most recent fixes. */
+function TrailPanel({ detail, onRetry }: { detail?: TrailDetail; onRetry: () => void }) {
+  const shell = "px-3 pb-3 pt-2 border-t border-gray-100 bg-gray-50/50 text-[11px] text-gray-700";
+  if (!detail || detail.status === "loading") {
+    return <div className={shell}>Loading locations…</div>;
+  }
+  if (detail.status === "error") {
+    return (
+      <div className={shell}>
+        Couldn't load this session.{" "}
+        <button type="button" onClick={onRetry} className="font-semibold underline cursor-pointer">Retry</button>
+      </div>
+    );
+  }
+  const recent = [...detail.points].reverse().slice(0, 25);
+  return (
+    <div className={`${shell} space-y-2`}>
+      <div className="flex flex-wrap gap-4 font-semibold text-gray-800">
+        <span>{detail.count} update{detail.count === 1 ? "" : "s"}</span>
+        <span className="text-gray-400 font-normal">Showing the latest {recent.length}</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="text-gray-400 font-semibold">
+              <th className="py-1 pr-3">Time</th>
+              <th className="py-1 pr-3">Latitude</th>
+              <th className="py-1 pr-3">Longitude</th>
+              <th className="py-1 pr-3">Accuracy</th>
+              <th className="py-1">Map</th>
+            </tr>
+          </thead>
+          <tbody className="font-mono">
+            {recent.map((p, i) => (
+              <tr key={`${p.at}-${i}`} className="border-t border-gray-100">
+                <td className="py-1 pr-3 whitespace-nowrap">{new Date(p.at).toLocaleTimeString()}</td>
+                <td className="py-1 pr-3">{p.lat.toFixed(5)}</td>
+                <td className="py-1 pr-3">{p.lng.toFixed(5)}</td>
+                <td className="py-1 pr-3">{p.accuracy != null ? `${Math.round(p.accuracy)} m` : "—"}</td>
+                <td className="py-1">
+                  <a href={`https://www.google.com/maps?q=${p.lat},${p.lng}`} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">Open</a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {detail.count > detail.points.length && (
+        <p className="text-gray-400">Older updates aren't kept; only the latest {detail.points.length} are stored.</p>
+      )}
+    </div>
+  );
+}
+
 export default function AlertsPage({
   qrList,
   setQrList,
@@ -88,6 +151,9 @@ export default function AlertsPage({
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const [codesRevealed, setCodesRevealed] = useCodesRevealed();
+  const [dateFilter, setDateFilter] = useState<AlertDateFilterValue>(DEFAULT_ALERT_FILTER);
+  const [trails, setTrails] = useState<any[]>([]);
+  const [trailDetail, setTrailDetail] = useState<Record<string, TrailDetail>>({});
 
   useEffect(() => {
     setLocalSearch(searchQuery);
@@ -98,10 +164,17 @@ export default function AlertsPage({
     if (!isAdmin) return;
     setIsLoading(true);
     try {
-      const [alertsRes, qrRes] = await Promise.allSettled([
+      const [alertsRes, qrRes, trailsRes] = await Promise.allSettled([
         apiClient.alerts.getAlerts(200),
         setQrList ? apiClient.qr.getQrCodes(500) : Promise.resolve(null),
+        apiClient.alerts.getTrails(200),
       ]);
+
+      if (trailsRes.status === "fulfilled" && trailsRes.value) {
+        setTrails(Array.isArray(trailsRes.value.data) ? trailsRes.value.data : []);
+        // Points cached for an open session are stale after a refresh; the open panel reloads them.
+        setTrailDetail({});
+      }
 
       if (alertsRes.status === "fulfilled" && alertsRes.value) {
         setIncidentReports(Array.isArray(alertsRes.value.data) ? alertsRes.value.data : []);
@@ -119,6 +192,27 @@ export default function AlertsPage({
       setIsLoading(false);
     }
   }, [isAdmin, setQrList]);
+
+  // Loads the recent points for an expanded live-location row.
+  const loadTrail = useCallback(async (key: string) => {
+    setTrailDetail((prev) => ({ ...prev, [key]: { status: "loading" } }));
+    try {
+      const res = await apiClient.alerts.getTrail(key.slice("trail-".length));
+      const d = res.data;
+      setTrailDetail((prev) => ({
+        ...prev,
+        [key]: { status: "ready", points: d?.points || [], count: d?.count ?? 0 },
+      }));
+    } catch {
+      setTrailDetail((prev) => ({ ...prev, [key]: { status: "error" } }));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (expandedAlertId?.startsWith("trail-") && !trailDetail[expandedAlertId]) {
+      loadTrail(expandedAlertId);
+    }
+  }, [expandedAlertId, trailDetail, loadTrail]);
 
   const handleSelectCategory = (cat: AlertCategoryFilter) => {
     setSelectedCategory(cat);
@@ -186,7 +280,7 @@ export default function AlertsPage({
         id: `report-${report.id}`,
         category: isTrueEmergency ? "emergency" : "assistance",
         title: isTrueEmergency ? "SOS Emergency" : formattedType,
-        subtitle: report.product_label || report.license_plate || (codesRevealed ? report.qr_code_id : "") || "Vehicle",
+        subtitle: adminStickerLabel({ id: report.qr_code_id, registeredName: report.sticker_name }, "Vehicle"),
         timestamp: report.created_at || new Date().toISOString(),
         status: report.status === "resolved" ? "resolved" : "unread",
         qrId: report.qr_code_id,
@@ -200,6 +294,21 @@ export default function AlertsPage({
       });
     });
 
+    // Live-location sessions: one row per session, however many pings it holds.
+    trails.forEach((t) => {
+      list.push({
+        id: `trail-${t.id}`,
+        category: "location",
+        title: "Live location",
+        subtitle: adminStickerLabel({ id: t.sticker_id, registeredName: t.sticker_name }, "Sticker"),
+        timestamp: t.last_at || t.started_at || new Date().toISOString(),
+        status: "info",
+        qrId: t.sticker_id,
+        message: `${t.count} location update${t.count === 1 ? "" : "s"}`,
+        location: t.last_lat != null ? { lat: t.last_lat, lng: t.last_lng, accuracy: t.last_accuracy } : undefined,
+      });
+    });
+
     // Activation alerts: only stickers a client has successfully activated, and
     // only Sticker ID | status | phone — no failed attempts, codes or metadata.
     qrList
@@ -209,7 +318,7 @@ export default function AlertsPage({
           id: `activation-${qr.id}`,
           category: "activation",
           title: "Activated Successfully",
-          subtitle: stickerRef(qr, codesRevealed, getCategoryLabel((qr.category || "car") as any)),
+          subtitle: adminStickerLabel(qr, getCategoryLabel((qr.category || "car") as any)),
           timestamp: qr.activatedAt || qr.createdAt,
           status: "active",
           reporterPhone: qr.ownerPhone || qr.phoneNumber,
@@ -224,7 +333,7 @@ export default function AlertsPage({
           id: `scan-${qr.id}`,
           category: "scan",
           title: "Tag Scanned",
-          subtitle: `${stickerRef(qr, codesRevealed, getCategoryLabel((qr.category || "car") as any))} (${qr.scans} scans)`,
+          subtitle: `${adminStickerLabel(qr, getCategoryLabel((qr.category || "car") as any))} (${qr.scans} scans)`,
           timestamp: qr.createdAt,
           status: "info",
           qrId: qr.id,
@@ -241,19 +350,27 @@ export default function AlertsPage({
     });
 
     return list;
-  }, [incidentReports, qrList, codesRevealed]);
+  }, [incidentReports, qrList, trails, codesRevealed]);
+
+  // Only the alerts inside the chosen window are counted and listed — the page
+  // opens on the last 24 hours.
+  const rangeAlerts = useMemo(
+    () => unifiedAlerts.filter((a) => isInAlertRange(a.timestamp, dateFilter)),
+    [unifiedAlerts, dateFilter]
+  );
 
   const counts = useMemo(() => {
-    const total = unifiedAlerts.length;
-    const emergency = unifiedAlerts.filter((a) => a.category === "emergency" && a.status !== "resolved").length;
-    const assistance = unifiedAlerts.filter((a) => a.category === "assistance" && a.status !== "resolved").length;
-    const activation = unifiedAlerts.filter((a) => a.category === "activation").length;
-    const scan = unifiedAlerts.filter((a) => a.category === "scan").length;
-    return { total, emergency, assistance, activation, scan };
-  }, [unifiedAlerts]);
+    const total = rangeAlerts.length;
+    const emergency = rangeAlerts.filter((a) => a.category === "emergency" && a.status !== "resolved").length;
+    const assistance = rangeAlerts.filter((a) => a.category === "assistance" && a.status !== "resolved").length;
+    const activation = rangeAlerts.filter((a) => a.category === "activation").length;
+    const scan = rangeAlerts.filter((a) => a.category === "scan").length;
+    const location = rangeAlerts.filter((a) => a.category === "location").length;
+    return { total, emergency, assistance, activation, scan, location };
+  }, [rangeAlerts]);
 
   const filteredAlerts = useMemo(() => {
-    let list = unifiedAlerts;
+    let list = rangeAlerts;
     if (selectedCategory !== "all") {
       list = list.filter((a) => a.category === selectedCategory);
     }
@@ -270,7 +387,10 @@ export default function AlertsPage({
       );
     }
     return list;
-  }, [unifiedAlerts, selectedCategory, localSearch]);
+  }, [rangeAlerts, selectedCategory, localSearch]);
+
+  // 10 rows per page by default; a new filter or search starts again from page 1.
+  const pager = usePagination<SystemAlertItem>(filteredAlerts, [selectedCategory, localSearch, dateFilter.range, dateFilter.day]);
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-16 space-y-4 text-[var(--fx-ink)] font-body min-h-screen" style={{ background: "var(--fx-canvas)" }}>
@@ -320,6 +440,8 @@ export default function AlertsPage({
       )}
 
       {/* ── Filters & Search (Single Compact Row) ───────────────────────── */}
+      <AlertDateFilter value={dateFilter} onChange={setDateFilter} />
+
       <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
         {/* Minimal Category Tabs */}
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
@@ -329,6 +451,7 @@ export default function AlertsPage({
             { key: "assistance", label: "Assistance", count: counts.assistance },
             { key: "activation", label: "Activated", count: counts.activation },
             { key: "scan", label: "Scans", count: counts.scan },
+            { key: "location", label: "Live", count: counts.location },
           ].map((tab) => {
             const active = selectedCategory === tab.key;
             return (
@@ -386,10 +509,12 @@ export default function AlertsPage({
         {filteredAlerts.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-md p-8 text-center">
             <CheckCircle2 size={20} className="text-emerald-500 mx-auto mb-1.5" />
-            <p className="text-xs font-semibold text-gray-600">No alerts matching filter</p>
+            <p className="text-xs font-semibold text-gray-600">
+              {dateFilter.range === "1d" ? "No alerts in the last 24 hours" : "No alerts matching filter"}
+            </p>
           </div>
         ) : (
-          filteredAlerts.map((alert) => {
+          pager.pageItems.map((alert) => {
             const isExpanded = expandedAlertId === alert.id;
             const isResolved = alert.status === "resolved";
             const isEmergency = alert.category === "emergency";
@@ -409,6 +534,9 @@ export default function AlertsPage({
             } else if (alert.category === "activation") {
               dotColor = "bg-blue-500";
               borderColor = "border-l-blue-500";
+            } else if (alert.category === "location") {
+              dotColor = "bg-teal-500";
+              borderColor = "border-l-teal-500";
             }
 
             return (
@@ -521,7 +649,11 @@ export default function AlertsPage({
                 </div>
 
                 {/* Minimal Expanded Snippet */}
-                {isExpanded && (
+                {isExpanded && alert.category === "location" && (
+                  <TrailPanel detail={trailDetail[alert.id]} onRetry={() => loadTrail(alert.id)} />
+                )}
+
+                {isExpanded && alert.category !== "location" && (
                   <div className="px-3 pb-2.5 pt-1 border-t border-gray-100 bg-gray-50/50 text-[11px] text-gray-700 flex flex-wrap items-center gap-4">
                     {alert.message && (
                       <div className="w-full">
@@ -563,6 +695,14 @@ export default function AlertsPage({
             );
           })
         )}
+        <Pagination
+          page={pager.page}
+          pageCount={pager.pageCount}
+          pageSize={pager.pageSize}
+          total={pager.total}
+          onPageChange={pager.setPage}
+          onPageSizeChange={pager.setPageSize}
+        />
       </div>
 
       <ConfirmModal

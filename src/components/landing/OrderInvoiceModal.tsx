@@ -95,10 +95,10 @@ export default function OrderInvoiceModal({
               type="button"
               onClick={onPrintInvoice}
               className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-800 shadow-xs"
-              title={t.printTitle}
+              title="Download PDF"
             >
-              <Printer size={14} className="text-white" />
-              <span>{t.printButton}</span>
+              <Download size={14} className="text-white" />
+              <span>Download PDF</span>
             </button>
             <button
               type="button"
@@ -116,29 +116,30 @@ export default function OrderInvoiceModal({
           {/* Header row: Brand & Invoice Meta */}
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-950">
-                  RAPI<span className="text-[#111111]">QR</span>
-                </span>
-                <span className="rounded-sm bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-800 tracking-wider">
-                  {t.officialBadge}
+                  Repi<span className="text-[#EAB308]">QR</span>
                 </span>
               </div>
-              <div className="mt-1 font-bold text-slate-800">{seller.companyName}</div>
+              <div className="mt-1 font-bold text-slate-900 text-sm">Worthite LLP</div>
               <div className="text-[11px] text-slate-500 leading-relaxed max-w-sm mt-0.5">
-                {seller.addressLine1}, {seller.city}, {seller.state} - {seller.pincode}
+                Surendranagar, Gujarat - 363530
                 <br />
-                GSTIN: <span className="font-semibold text-slate-700">{seller.gstin}</span> | PAN:{' '}
-                <span className="font-semibold text-slate-700">{seller.pan}</span>
+                GSTIN: <span className="font-semibold text-slate-700">{seller.gstin}</span>
               </div>
             </div>
 
             <div className="sm:text-right space-y-1">
-              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              <div>
+                <span className="inline-block rounded-md bg-emerald-100 border border-emerald-300 px-3 py-1 text-xs font-black text-emerald-800 tracking-wider">
+                  PAID
+                </span>
+              </div>
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">
                 {t.invoiceNumberLabel}
               </div>
               <div className="text-base sm:text-lg font-black font-mono text-slate-950">
-                {invoiceNumber}
+                #{invoiceNumber}
               </div>
               <div className="text-xs text-slate-600">
                 {t.invoiceDateLabel} <strong className="text-slate-900">{issueDate}</strong>
@@ -235,14 +236,8 @@ export default function OrderInvoiceModal({
 
           {/* Financial Calculation Summary */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 pt-2">
-            <div className="text-[11px] text-slate-500 space-y-1 max-w-sm">
-              <div className="flex items-center gap-1.5 font-bold text-slate-700">
-                <ShieldCheck size={14} className="text-emerald-600" />
-                <span>{t.warrantyTitle}</span>
-              </div>
-              <p>
-                {t.warrantyDescription}
-              </p>
+            <div className="text-[11px] text-slate-400 space-y-1 max-w-sm">
+              <p>Official computer-generated tax invoice issued by Worthite LLP.</p>
             </div>
 
             <div className="w-full sm:w-72 space-y-1.5 rounded-lg bg-slate-50 p-4 border border-slate-200 text-xs">
@@ -279,6 +274,19 @@ export default function OrderInvoiceModal({
             </div>
           </div>
 
+          {/* Signature Section */}
+          <div className="flex justify-end pt-3">
+            <div className="text-center min-w-[200px]">
+              <div className="text-xs font-bold text-slate-600 mb-1">For Worthite LLP</div>
+              <div className="font-serif italic text-2xl text-slate-900 border-b border-slate-300 pb-1 mb-1 select-none">
+                Worthite LLP
+              </div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Authorized Signatory
+              </div>
+            </div>
+          </div>
+
           {/* Digital Signature Disclaimer */}
           <div className="border-t border-dashed border-slate-300 pt-4 text-center text-[10px] text-slate-400">
             {t.computerGeneratedNotice}{' '}
@@ -298,10 +306,10 @@ export default function OrderInvoiceModal({
           <button
             type="button"
             onClick={onPrintInvoice}
-            className="flex cursor-pointer items-center gap-1.5 rounded-md bg-white hover:bg-gray-50 border border-gray-300 hover:border-black px-4 py-2 text-xs font-semibold text-black transition-colors shadow-xs"
+            className="flex cursor-pointer items-center gap-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-900 px-4 py-2 text-xs font-bold text-white transition-colors shadow-xs"
           >
             <Download size={14} />
-            <span>{t.downloadPrintButton}</span>
+            <span>Download PDF</span>
           </button>
         </div>
       </div>

@@ -151,6 +151,12 @@ function MainAppContent() {
 
   // Persist page to localStorage whenever it changes
   const navigateTo = (next: AppPage) => {
+    if (next === 'checkout' && !isLoggedIn) {
+      try {
+        localStorage.setItem('repiqr-redirect-after-login', 'checkout');
+      } catch { /* ignore */ }
+      next = 'login';
+    }
     try {
       if (next === 'landing') {
         localStorage.removeItem('repiqr-current-page');
@@ -197,18 +203,33 @@ function MainAppContent() {
     }
   }, [page]);
 
-  // After auth loads or on signout: if on dashboard/distributor but not logged in → send to landing & reset dashboardMode
+  // After auth loads or on signout: if on dashboard/distributor/checkout but not logged in → handle auth gating
   useEffect(() => {
     if (loading) return; // wait for the session restore to resolve
+    if (page === 'checkout' && !isLoggedIn) {
+      try {
+        localStorage.setItem('repiqr-redirect-after-login', 'checkout');
+      } catch { /* ignore */ }
+      navigateTo('login');
+      return;
+    }
     if ((page === 'dashboard' || page === 'distributor') && !isLoggedIn) {
       setDashboardMode(null);
       // Signed-out visitor opened an alert link: go to sign-in but keep the hash,
       // so the owner returns to the same chat thread after logging in.
       if (page === 'dashboard' && isDashboardDeepLink()) setPage('login');
       else navigateTo('landing');
+      return;
     }
     if ((page === 'login' || page === 'register') && isLoggedIn) {
-      navigateTo('dashboard');
+      let target: AppPage = 'dashboard';
+      try {
+        if (localStorage.getItem('repiqr-redirect-after-login') === 'checkout') {
+          target = 'checkout';
+          localStorage.removeItem('repiqr-redirect-after-login');
+        }
+      } catch { /* ignore */ }
+      navigateTo(target);
     }
   }, [loading, isLoggedIn, page]);
 
@@ -238,6 +259,13 @@ function MainAppContent() {
       const pathName = window.location.pathname.toLowerCase();
       const hashString = window.location.hash.toLowerCase();
       if ((pathName === '/checkout' || hashString === '#/checkout') && page !== 'checkout') {
+        if (!isLoggedIn) {
+          try {
+            localStorage.setItem('repiqr-redirect-after-login', 'checkout');
+          } catch { /* ignore */ }
+          navigateTo('login');
+          return;
+        }
         setPage('checkout');
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
         return;
@@ -364,12 +392,17 @@ function MainAppContent() {
           onBackHome={() => navigateTo('landing')}
           onSuccess={() => {
             setAuthPrefillEmail('');
+            let targetPage: AppPage = 'dashboard';
             try {
+              if (localStorage.getItem('repiqr-redirect-after-login') === 'checkout') {
+                targetPage = 'checkout';
+                localStorage.removeItem('repiqr-redirect-after-login');
+              }
               localStorage.removeItem('namoqr-pending-distributor-intent');
-              localStorage.setItem('repiqr-current-page', 'dashboard');
-              localStorage.setItem('namoqr-current-page', 'dashboard');
+              localStorage.setItem('repiqr-current-page', targetPage);
+              localStorage.setItem('namoqr-current-page', targetPage);
             } catch { /* ignore */ }
-            navigateTo('dashboard');
+            navigateTo(targetPage);
           }}
         />
       </Suspense>

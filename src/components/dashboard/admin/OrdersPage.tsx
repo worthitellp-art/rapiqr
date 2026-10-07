@@ -11,6 +11,7 @@ import FxKpiStrip from "../shared/FxKpiStrip";
 import { CodeVisibilityToggleButton } from "./StickerCodeComponents";
 import { useCodesRevealed } from "../../../lib/codeVisibility";
 import { usePolling } from "../../../hooks/usePolling";
+import { formatLocationString } from "../../../utils/formatLocation";
 
 interface OrderItem { name: string; qty: number; price: number }
 interface OrderPayment {
@@ -903,7 +904,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                             <div className="min-w-0">
                               <div className="text-[12px] font-semibold text-[var(--fx-ink)]">{ev.status}</div>
                               <div className="text-[11px] text-[var(--fx-faint)] font-mono truncate">
-                                {[ev.at ? fmtDateTime(ev.at) : null, ev.location].filter(Boolean).join(" · ")}
+                                {[ev.at ? fmtDateTime(ev.at) : null, formatLocationString(ev.location)].filter(Boolean).join(" · ")}
                               </div>
                             </div>
                           </div>

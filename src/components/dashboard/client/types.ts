@@ -85,8 +85,12 @@ export function mapProductRow(row: any): DashboardSticker {
     bloodGroup: details.bloodGroup || '',
     allergies: details.allergies || '',
     meta,
+    // Blank rows (a contact slot opened but never filled) aren't contacts — drop them
+    // so the panel doesn't show a phantom input for every sticker.
     contacts: Array.isArray(details.emergencyContacts)
-      ? details.emergencyContacts.map((c: any) => ({ name: c?.name || '', phone: c?.phone || '' }))
+      ? details.emergencyContacts
+          .map((c: any) => ({ name: String(c?.name || '').trim(), phone: String(c?.phone || '').trim() }))
+          .filter((c: { name: string; phone: string }) => c.name || c.phone)
       : [],
     timeline: [],
     isBackendManaged: true,

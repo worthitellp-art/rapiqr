@@ -12,7 +12,7 @@ import Toast from "./Toast";
 import OverviewPage from "./OverviewPage";
 import QrCodesPage from "./QrCodesPage";
 import AlertsPage from "./AlertsPage";
-import CommunicationPage from "./CommunicationPage";
+import CommunicationPage, { COMMUNICATION_SEEN_KEY } from "./CommunicationPage";
 import MessageManagerPage from "./MessageManagerPage";
 import UsersPage from "./UsersPage";
 import CustomizePage from "./CustomizePage";
@@ -24,6 +24,8 @@ import RepiChatPage from "./RepiChatPage";
 import PrintSheetModal from "./PrintSheetModal";
 import { apiClient, AdminSummary } from "../../../lib/apiClient";
 import { usePolling } from "../../../hooks/usePolling";
+import NotificationToggle from "../../common/NotificationToggle";
+import { connectAsOwner } from "../../../lib/socketClient";
 
 // Slower safety-net refresh of the full fleet list (fallback interval)
 const FLEET_FALLBACK_INTERVAL_MS = 120_000;
@@ -108,17 +110,49 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
     if (res.success) setUnreadChats(res.data.reduce((sum, s) => sum + (s.unread_owner_count || 0), 0));
   }, { intervalMs: CHAT_INTERVAL_MS, enabled: !isAdmin });
 
-  // Summary totals for sidebar badges and Overview KPIs.
-  // Fetched on-demand (initial load, overview visit, or manual refresh) — no continuous background polling.
+  // When the admin last opened Communication. Service requests filed after it are
+  // the "new" ones on that tab's badge.
+  const [communicationSeenAt, setCommunicationSeenAt] = useState<string>(() => {
+    try {
+      return localStorage.getItem(COMMUNICATION_SEEN_KEY) || "";
+    } catch {
+      return "";
+    }
+  });
+
+  // Summary totals for sidebar badges and Overview KPIs. Refreshed on mount, on
+  // navigation, and once a minute so a new request or alert shows up on its badge.
   const refreshSummary = useCallback(async () => {
     if (!isAdmin) return;
     try {
-      const res = await apiClient.admin.getSummary();
+      const res = await apiClient.admin.getSummary({ inquiriesSince: communicationSeenAt || undefined });
       if (res?.success) setSummary(res.data);
     } catch {
       // quiet fallback
     }
-  }, [isAdmin]);
+  }, [isAdmin, communicationSeenAt]);
+
+  usePolling(refreshSummary, { intervalMs: 30_000, enabled: isAdmin });
+
+  // Live signal from the server, so the Communication badge moves without waiting for the poll.
+  useEffect(() => {
+    if (!isAdmin) return;
+    const token = localStorage.getItem("repiqr-token") || localStorage.getItem("namoqr-token") || "";
+    const socket = connectAsOwner(token);
+    const onUpdate = () => { refreshSummary(); };
+    socket.on("admin_update", onUpdate);
+    return () => { socket.off("admin_update", onUpdate); };
+  }, [isAdmin, refreshSummary]);
+
+  // Opening Communication marks its requests as seen, which clears that badge.
+  useEffect(() => {
+    if (!isAdmin || page !== "communication") return;
+    const now = new Date().toISOString();
+    try {
+      localStorage.setItem(COMMUNICATION_SEEN_KEY, now);
+    } catch { /* storage unavailable */ }
+    setCommunicationSeenAt(now);
+  }, [isAdmin, page]);
 
   // Load summary once on mount when admin is authenticated
   useEffect(() => {
@@ -185,6 +219,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
     orders: attention?.ordersToShip ?? 0,
     distributors: attention?.pendingPartners ?? 0,
     messages: attention?.failedMessages24h ?? 0,
+    communication: attention?.newServiceInquiries ?? 0,
     repichat: unreadChats,
   };
 
@@ -232,6 +267,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
       <Sidebar
         page={page} setPage={setPage} admin={admin} onBack={onBack} onSignOut={signOut}
         badges={badges}
+        footerExtra={<NotificationToggle tone="dark" />}
         isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)}
       />
 

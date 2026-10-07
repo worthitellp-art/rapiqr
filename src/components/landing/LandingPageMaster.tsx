@@ -24,7 +24,6 @@ import {
   ShieldAlert,
   MessageSquare,
   QrCode,
-  Package,
   Globe,
   Car,
   Key,
@@ -61,7 +60,6 @@ export interface LandingPageMasterProps {
   onOpenPricing?: () => void;
   onOpenCheckout?: () => void;
   onOpenJoinUs?: (serviceType?: string) => void;
-  onOpenTrackOrder?: () => void;
   onOpenPrivacy?: () => void;
   isEmbeddedInDashboard?: boolean;
 }
@@ -370,7 +368,6 @@ export default function LandingPageMaster({
   onOpenPricing,
   onOpenCheckout,
   onOpenJoinUs,
-  onOpenTrackOrder,
   onOpenPrivacy,
   isEmbeddedInDashboard = false,
 }: LandingPageMasterProps) {
@@ -508,6 +505,14 @@ export default function LandingPageMaster({
   };
 
   const addToCart = (product: ProductItem, qty = 1) => {
+    if (!isLoggedIn) {
+      try {
+        localStorage.setItem('repiqr-redirect-after-login', 'checkout');
+        localStorage.setItem('repiqr-buynow-cart', JSON.stringify([{ product, qty }]));
+      } catch { /* ignore */ }
+      onLogin();
+      return;
+    }
     let updatedCart: CartItem[];
     const existing = cart.find((item) => item.product.id === product.id);
     if (existing) {
@@ -522,10 +527,15 @@ export default function LandingPageMaster({
   };
 
   const handleBuyNow = (product: ProductItem) => {
-    // Hand checkout a one-shot single-item cart synchronously. Relying on the
-    // [cart] persistence effect fails: this component unmounts in the same
-    // batch as the navigation, so the effect never flushes and checkout opens
-    // with an empty cart.
+    if (!isLoggedIn) {
+      try {
+        localStorage.setItem('repiqr-redirect-after-login', 'checkout');
+        localStorage.setItem('repiqr-buynow-cart', JSON.stringify([{ product, qty: 1 }]));
+      } catch { /* ignore */ }
+      onLogin();
+      return;
+    }
+    // Hand checkout a one-shot single-item cart synchronously.
     try {
       localStorage.setItem('repiqr-buynow-cart', JSON.stringify([{ product, qty: 1 }]));
     } catch {
@@ -538,6 +548,13 @@ export default function LandingPageMaster({
 
   const openCheckout = () => {
     setIsCartOpen(false);
+    if (!isLoggedIn) {
+      try {
+        localStorage.setItem('repiqr-redirect-after-login', 'checkout');
+      } catch { /* ignore */ }
+      onLogin();
+      return;
+    }
     if (onOpenCheckout) onOpenCheckout();
     else if (onStart) onStart();
   };
@@ -661,29 +678,20 @@ export default function LandingPageMaster({
 
           {/* Right Action Bar */}
           <div className="hidden lg:flex items-center gap-3">
-            {onOpenTrackOrder && (
+            {isLoggedIn && (
               <button
-                onClick={onOpenTrackOrder}
-                className="cursor-pointer text-xs font-semibold text-neutral-700 hover:text-neutral-950 px-3 py-1.5 rounded-md hover:bg-neutral-100 transition-colors flex items-center gap-1.5 border border-neutral-200/80"
-                title={t.trackOrder}
+                onClick={() => setIsCartOpen(true)}
+                className="relative cursor-pointer p-2 rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors"
+                aria-label={t.openCartAria}
               >
-                <Package size={14} className="text-neutral-500" />
-                <span>{t.trackOrder}</span>
+                <ShoppingBag size={19} />
+                {cartCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-neutral-950 px-1 text-[10px] font-bold text-white">
+                    {cartCount}
+                  </span>
+                )}
               </button>
             )}
-
-            <button
-              onClick={() => setIsCartOpen(true)}
-              className="relative cursor-pointer p-2 rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors"
-              aria-label={t.openCartAria}
-            >
-              <ShoppingBag size={19} />
-              {cartCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-neutral-950 px-1 text-[10px] font-bold text-white">
-                  {cartCount}
-                </span>
-              )}
-            </button>
 
             <div className="h-4 w-px bg-neutral-200 mx-1" />
 
@@ -709,18 +717,20 @@ export default function LandingPageMaster({
 
           {/* Mobile Header Actions */}
           <div className="flex items-center gap-2 lg:hidden">
-            <button
-              onClick={() => setIsCartOpen(true)}
-              className="relative p-2 rounded-md text-neutral-800 hover:bg-neutral-100"
-              aria-label={t.openCartAria}
-            >
-              <ShoppingBag size={20} />
-              {cartCount > 0 && (
-                <span className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-950 text-[9px] font-bold text-white">
-                  {cartCount}
-                </span>
-              )}
-            </button>
+            {isLoggedIn && (
+              <button
+                onClick={() => setIsCartOpen(true)}
+                className="relative p-2 rounded-md text-neutral-800 hover:bg-neutral-100"
+                aria-label={t.openCartAria}
+              >
+                <ShoppingBag size={20} />
+                {cartCount > 0 && (
+                  <span className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-950 text-[9px] font-bold text-white">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+            )}
 
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -784,19 +794,6 @@ export default function LandingPageMaster({
                   <span>{t.joinUsMobileLabel}</span>
                   <ArrowRight size={14} />
                 </button>
-
-                {onOpenTrackOrder && (
-                  <button
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      onOpenTrackOrder();
-                    }}
-                    className="flex w-full items-center gap-2 py-2.5 px-3 rounded-md text-left text-neutral-700 hover:bg-neutral-50 transition-colors"
-                  >
-                    <Package size={15} />
-                    <span>{t.trackOrder}</span>
-                  </button>
-                )}
 
                 <div className="pt-3 border-t border-neutral-100 flex flex-col gap-2">
                   <FlowButton tone="dark" size="md" fullWidth onClick={() => handleSmoothScroll('products-section')}>
@@ -875,21 +872,13 @@ export default function LandingPageMaster({
       {/* ── VERIFIED STATS STRIP ─────────────────────────────────────── */}
       <section className="bg-white py-20 sm:py-24">
         <div className="mx-auto max-w-4xl px-4 sm:px-6">
-          <div className="grid grid-cols-2 gap-6 text-center">
-            <div className="rounded-md bg-neutral-50/70 p-6 border border-neutral-200/80 shadow-xs">
+          <div className="flex justify-center text-center">
+            <div className="w-full max-w-xs rounded-md bg-neutral-50/70 p-6 border border-neutral-200/80 shadow-xs">
               <div className="text-3xl sm:text-5xl font-serif font-normal text-neutral-950">
                 <Counter to={100} suffix="%" />
               </div>
               <p className="mt-2 text-xs sm:text-sm font-bold text-neutral-600 uppercase tracking-wider">
                 {t.statsStrip.privacyLabel}
-              </p>
-            </div>
-            <div className="rounded-md bg-neutral-50/70 p-6 border border-neutral-200/80 shadow-xs">
-              <div className="text-3xl sm:text-5xl font-serif font-normal text-neutral-950">
-                <Counter to={0} suffix="" />
-              </div>
-              <p className="mt-2 text-xs sm:text-sm font-bold text-neutral-600 uppercase tracking-wider">
-                {t.statsStrip.appsLabel}
               </p>
             </div>
           </div>

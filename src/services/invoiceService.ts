@@ -7,17 +7,17 @@ import {
 } from '../types/invoice';
 
 const DEFAULT_SELLER_DETAILS: SellerDetails = {
-  companyName: 'RapiQR Technologies Pvt. Ltd.',
-  brandName: 'RapiQR Safety Systems',
-  gstin: '29AABCR8921N1ZM',
-  pan: 'AABCR8921N',
-  addressLine1: 'Prestige Tech Cloud, Phase 1',
-  addressLine2: 'Outer Ring Road, Kadubeesanahalli',
-  city: 'Bengaluru',
-  state: 'Karnataka',
-  pincode: '560103',
-  supportEmail: 'support@rapiqr.com',
-  website: 'https://rapiqr.com',
+  companyName: 'Worthite LLP',
+  brandName: 'RepiQR',
+  gstin: '24AAFFW7093N1ZH',
+  pan: 'AAFFW7093N',
+  addressLine1: 'Surendranagar',
+  addressLine2: '',
+  city: 'Surendranagar',
+  state: 'Gujarat',
+  pincode: '363530',
+  supportEmail: 'admin@repiqr.com',
+  website: 'https://repiqr.com',
 };
 
 const STANDARD_HSN_CODE = '4911'; // Printed decals & safety QR stickers
@@ -288,18 +288,22 @@ export function printOrderInvoice(invoice: OrderInvoice): void {
         <div class="invoice-container">
           <div class="header">
             <div>
-              <h1 class="brand-title">RAPI<span class="brand-accent">QR</span></h1>
-              <div style="font-size: 12px; color: #475569; font-weight: 600;">${invoice.seller.companyName}</div>
-              <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
-                ${invoice.seller.addressLine1}, ${invoice.seller.city}, ${invoice.seller.state} - ${invoice.seller.pincode}<br />
-                GSTIN: <strong>${invoice.seller.gstin}</strong> | PAN: <strong>${invoice.seller.pan}</strong>
+              <div style="font-size: 26px; font-weight: 900; letter-spacing: -0.5px; color: #0f172a; margin-bottom: 6px;">
+                Repi<span style="color: #EAB308;">QR</span>
+              </div>
+              <div style="font-size: 14px; color: #0f172a; font-weight: 800; margin-bottom: 3px;">
+                ${invoice.seller.companyName}
+              </div>
+              <div style="font-size: 11.5px; color: #475569; line-height: 1.5;">
+                ${invoice.seller.addressLine1}, ${invoice.seller.state} - ${invoice.seller.pincode}<br />
+                GSTIN: <strong>${invoice.seller.gstin}</strong>
               </div>
             </div>
             <div style="text-align: right;">
-              <span class="invoice-badge">Original For Recipient</span>
-              <h2 style="font-size: 18px; margin: 8px 0 2px 0; font-weight: 900;">TAX INVOICE</h2>
-              <div style="font-size: 12px; color: #0f172a; font-weight: 700;"># ${invoice.invoiceNumber}</div>
-              <div style="font-size: 11px; color: #64748b;">Date: ${invoice.issueDate}</div>
+              <span class="invoice-badge" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-weight: 800; font-size: 12px; padding: 4px 12px;">PAID</span>
+              <h2 style="font-size: 18px; margin: 8px 0 2px 0; font-weight: 900; color: #0f172a;">TAX INVOICE</h2>
+              <div style="font-size: 13px; color: #0f172a; font-weight: 700; font-family: monospace;"># ${invoice.invoiceNumber}</div>
+              <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">Date: <strong>${invoice.issueDate}</strong></div>
             </div>
           </div>
 
@@ -364,9 +368,21 @@ export function printOrderInvoice(invoice: OrderInvoice): void {
             </tr>
           </table>
 
+          <!-- Signature Section -->
+          <div style="display: flex; justify-content: flex-end; margin-top: 36px; margin-bottom: 24px;">
+            <div style="text-align: center; min-width: 220px;">
+              <div style="font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 8px;">For Worthite LLP</div>
+              <div style="font-family: 'Brush Script MT', 'Segoe Script', cursive, sans-serif; font-size: 26px; color: #0f172a; margin-bottom: 4px; border-bottom: 1.5px solid #cbd5e1; padding-bottom: 6px;">
+                Worthite LLP
+              </div>
+              <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px;">
+                Authorized Signatory
+              </div>
+            </div>
+          </div>
+
           <div class="footer-note">
-            This is a computer-generated tax invoice and requires no physical signature.<br />
-            Includes 3-Year 3M Weatherproof tag replacement warranty against sunlight fading, water ingress, and peeling.<br />
+            This is a computer-generated tax invoice.<br />
             For support queries or corporate fleet orders, contact <strong>${invoice.seller.supportEmail}</strong>
           </div>
         </div>
@@ -383,6 +399,11 @@ export function printOrderInvoice(invoice: OrderInvoice): void {
 
   printableWindow.document.close();
 }
+
+/**
+ * Download / Print PDF helper.
+ */
+export const downloadOrderInvoice = printOrderInvoice;
 
 /**
  * Basic string sanitizer to prevent injection into printable window.

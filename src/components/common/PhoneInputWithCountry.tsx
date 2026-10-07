@@ -51,6 +51,8 @@ interface PhoneInputWithCountryProps {
   className?: string;
   disabled?: boolean;
   required?: boolean;
+  inputId?: string;
+  inputAriaLabel?: string;
 }
 
 export default function PhoneInputWithCountry({
@@ -59,6 +61,9 @@ export default function PhoneInputWithCountry({
   placeholder = "10-digit mobile",
   className = "",
   disabled = false,
+  required = false,
+  inputId,
+  inputAriaLabel,
 }: PhoneInputWithCountryProps) {
   const parsed = parsePhoneNumber(value);
   const [selectedCountry, setSelectedCountry] = useState(parsed.countryCode);
@@ -136,11 +141,14 @@ export default function PhoneInputWithCountry({
 
         {/* 10-Digit Phone Input */}
         <input
+          id={inputId}
           type="tel"
+          aria-label={inputAriaLabel}
           value={phoneDigits}
           onChange={handleDigitsChange}
           placeholder={placeholder}
           disabled={disabled}
+          aria-required={required}
           maxLength={10}
           /* 16px on phones — below that, focusing a field makes iOS Safari zoom
              the page in and leave it there, which breaks every layout that

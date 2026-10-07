@@ -130,6 +130,49 @@ class GeoController {
     }
   }
 
+  /** GET /api/geo/suggest?q=...&kind=city|state — live place suggestions. */
+  static async suggest(req, res) {
+    const query = String(req.query.q || '').trim().slice(0, 80);
+    const kind = String(req.query.kind || '');
+    if (query.length < 2 || !['city', 'state'].includes(kind)) {
+      return res.status(400).json({ success: false, error: 'A valid city or state search is required.' });
+    }
+
+    const key = `suggest:${kind}:${query.toLowerCase()}`;
+    const cached = cacheGet(key);
+    if (cached) return res.json({ success: true, data: cached });
+
+    try {
+      const searchUrl = NOMINATIM_URL.replace(/\/reverse$/, '/search');
+      const params = new URLSearchParams({
+        format: 'jsonv2',
+        addressdetails: '1',
+        limit: '8',
+        countrycodes: 'in',
+        [kind]: query,
+      });
+      const raw = await fetchJson(`${searchUrl}?${params.toString()}`);
+      const values = [...new Set(
+        (Array.isArray(raw) ? raw : [])
+          .map((item) => {
+            const address = item?.address || {};
+            return kind === 'city'
+              ? first(address.city, address.town, address.village, address.municipality, address.hamlet)
+              : first(address.state, address.region);
+          })
+          .filter(Boolean)
+      )];
+      cacheSet(key, values);
+      return res.json({ success: true, data: values });
+    } catch (err) {
+      logger.warn('GEO_SUGGEST', `Place suggestions failed: ${err.name === 'AbortError' ? 'timeout' : err.message}`);
+      return res.status(err.name === 'AbortError' ? 504 : 502).json({
+        success: false,
+        error: "Couldn't load location suggestions right now.",
+      });
+    }
+  }
+
   /** GET /api/geo/pincode/:pin — Indian PIN → area / city / state. */
   static async pincode(req, res) {
     const pin = String(req.params.pin || '');

@@ -28,8 +28,13 @@ const limitByKind = (req, res, next) =>
 
 // Public: anonymous visitors dispatch SOS/emergency alerts by scanning a sticker
 router.post('/', limitByKind, AlertController.createAlert);
+// Public: a visitor asking for a service their area doesn't have yet
+router.post('/service-inquiry', alertLimiter, AlertController.createServiceInquiry);
 // Admin-only: alert log contains reporter phone numbers + GPS locations
 router.get('/', verifyToken, verifyAdmin, AlertController.getAlerts);
+// Live-location trails: one entry per session, not one per ping
+router.get('/trails', verifyToken, verifyAdmin, AlertController.listTrails);
+router.get('/trails/:id', verifyToken, verifyAdmin, AlertController.getTrail);
 router.delete('/', verifyToken, verifyAdmin, AlertController.deleteAllAlerts);
 router.delete('/:id', verifyToken, verifyAdmin, AlertController.deleteAlert);
 router.patch('/:id/resolve', verifyToken, verifyAdmin, AlertController.resolveAlert);

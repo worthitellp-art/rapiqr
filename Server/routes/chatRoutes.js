@@ -16,6 +16,7 @@ router.get('/admin/online-owners', verifyToken, verifyAdmin, ChatController.list
 router.get('/sessions/:id/messages', optionalAuth, ChatController.getMessages);
 router.post('/sessions/:id/messages', optionalAuth, ChatController.sendMessageRest);
 router.post('/sessions/:id/attachments', optionalAuth, ChatController.sendAttachment);
+router.delete('/sessions/:id/messages/:messageId', optionalAuth, ChatController.deleteMessage);
 router.patch('/sessions/:id/read', optionalAuth, ChatController.markRead);
 
 // Owner-only: end the conversation

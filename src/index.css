@@ -357,10 +357,14 @@ button, input, select, textarea {
 }
 
 /* ── Dashboard theme (client) ──────────────────────────────────────────────
-   Client dashboard keeps the original blue accent.  Admin dashboard has its
+   Client dashboard uses a yellow/gold accent. Admin dashboard has its
    own rule below that overrides accent to near-black so every primary button
    reads as black-on-white — matching the neutral house style the user expects.
-   Distributor stays on the base neutral palette; this never reaches it. */
+   Distributor stays on the base neutral palette; this never reaches it.
+   --fx-accent-ink is a darker shade than --fx-accent (not the same value, unlike
+   the other themes) because this accent also renders as plain text/links on
+   white — a bright yellow there is close to illegible, so text contexts use
+   the deeper tone while solid buttons keep the lighter gold. */
 .fx-shell.client-theme {
   --fx-canvas: #F7F8FC;
   --fx-ink: #1B1E2E;
@@ -368,10 +372,10 @@ button, input, select, textarea {
   --fx-faint: #A0A5B8;
   --fx-border: #EEF0F6;
   --fx-border-strong: #D7DBE8;
-  --fx-accent: #1A6BFF;
-  --fx-accent-hover: #1557CC;
-  --fx-accent-ink: #1A6BFF;
-  --fx-accent-soft: #CFE0FB;
+  --fx-accent: #CA8A04;
+  --fx-accent-hover: #A16207;
+  --fx-accent-ink: #A16207;
+  --fx-accent-soft: #FEF3C7;
   --fx-sidebar-bg: #111111;
   --fx-sidebar-hover: #1F2230;
   --fx-sidebar-ink: #5F6371;
@@ -417,6 +421,100 @@ button, input, select, textarea {
 @media (min-width: 640px) {
   .client-theme .fx-text-heading-page,
   .admin-theme .fx-text-heading-page { font-size: 30px; }
+}
+
+/* ── Checkout page design tokens ──────────────────────────────────────── */
+.checkout-theme {
+  --co-paper: #FFFFFF;
+  --co-panel: #FFFFFF;
+  --co-ink: #111827;
+  --co-ink-soft: #64748B;
+  --co-ink-faint: #94A3B8;
+  --co-line: #E2E8F0;
+  --co-accent: #111111;
+  --co-accent-soft: #E5E7EB;
+  --co-success: #15803D;
+  --co-success-soft: #F0FDF4;
+  --co-danger: #B3261E;
+  --co-danger-soft: #FBEAE8;
+  --co-radius: 18px;
+  --co-radius-sm: 12px;
+}
+
+.checkout-progress-fill {
+  width: 100%;
+  height: 100%;
+  background: var(--co-accent);
+  transform-origin: left center;
+  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.checkout-floating-field {
+  position: relative;
+}
+
+.checkout-floating-label {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  max-width: calc(100% - 28px);
+  overflow: hidden;
+  color: var(--co-ink-soft);
+  font-size: 14px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transform-origin: left center;
+  transition: top 160ms ease, left 160ms ease, color 160ms ease, font-size 160ms ease;
+}
+
+.checkout-floating-field:focus-within > .checkout-floating-label,
+.checkout-floating-field.is-filled > .checkout-floating-label {
+  top: 7px;
+  left: 10px;
+  padding: 0 4px;
+  color: var(--co-accent);
+  background: var(--co-panel);
+  font-size: 11px;
+  transform: none;
+}
+
+.checkout-phone-control > div {
+  height: 54px;
+  border-color: var(--co-line);
+  border-radius: var(--co-radius-sm);
+  background: var(--co-panel);
+}
+
+.checkout-phone-control > div:focus-within {
+  border-color: var(--co-accent);
+  box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.1);
+}
+
+.checkout-phone-control > div > div > button {
+  background: #F8FAFC;
+  border-color: var(--co-line);
+}
+
+.checkout-phone-control > div > input {
+  font-family: inherit;
+  font-weight: 400;
+  color: var(--co-ink);
+}
+
+.checkout-floating-field--phone > .checkout-floating-label {
+  left: 96px;
+  max-width: calc(100% - 110px);
+}
+
+.checkout-floating-field--phone:focus-within > .checkout-floating-label,
+.checkout-floating-field--phone.is-filled > .checkout-floating-label {
+  left: 96px;
+  max-width: calc(100% - 110px);
 }
 
 .fx-shell button,
@@ -947,3 +1045,145 @@ tbody .fx-tr:last-child .fx-td { border-bottom: none; }
 .fx-score-fair { background: var(--fx-amber-soft); color: var(--fx-amber); }
 .fx-score-good { background: var(--fx-lime-soft); color: var(--fx-lime); }
 .fx-score-excellent { background: var(--fx-green-soft); color: var(--fx-green); }
+
+/* ─── Flat Line Pill Button with Fill Animation on Hover ─── */
+.pill-fill-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.15rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid var(--fx-border-strong, #D2D5D9);
+  background: #ffffff;
+  color: var(--fx-ink, #0D0F14);
+  overflow: hidden;
+  z-index: 1;
+  transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease, transform 0.15s ease;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.pill-fill-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--fx-accent, #17191F);
+  border-radius: 9999px;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: -1;
+}
+
+.pill-fill-btn:hover::before {
+  transform: scaleX(1);
+}
+
+.pill-fill-btn:hover {
+  color: #ffffff !important;
+  border-color: var(--fx-accent, #17191F);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+}
+
+.pill-fill-btn:hover svg {
+  color: #ffffff !important;
+}
+
+.pill-fill-btn:active {
+  transform: scale(0.97);
+}
+
+.pill-fill-btn.active {
+  background: var(--fx-accent, #17191F) !important;
+  border-color: var(--fx-accent, #17191F) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.pill-fill-btn.active::before {
+  transform: scaleX(1);
+}
+
+.pill-fill-btn.active svg {
+  color: #ffffff !important;
+}
+
+/* ─── Fully Rounded Big Ball Button with Fill Animation on Hover ─── */
+.ball-fill-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px !important;
+  aspect-ratio: 1 / 1 !important;
+  border: 2px solid var(--fx-border-strong, #CBD5E1);
+  background-color: #ffffff;
+  color: var(--fx-ink, #0F172A);
+  overflow: hidden;
+  z-index: 1;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.25s ease,
+              transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ball-fill-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: var(--fx-accent, #0F172A);
+  border-radius: 9999px;
+  transform: scale(0);
+  transform-origin: center;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: -1;
+}
+
+.ball-fill-btn:hover::before {
+  transform: scale(1);
+}
+
+.ball-fill-btn:hover {
+  color: #ffffff !important;
+  border-color: var(--fx-accent, #0F172A) !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  transform: translateY(-4px) scale(1.04);
+}
+
+.ball-fill-btn:hover svg {
+  color: #ffffff !important;
+  transform: scale(1.12);
+}
+
+.ball-fill-btn svg {
+  color: currentColor;
+  transition: color 0.3s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ball-fill-btn:active {
+  transform: scale(0.95);
+}
+
+.ball-fill-btn.active {
+  background-color: var(--fx-accent, #0F172A) !important;
+  border-color: var(--fx-accent, #0F172A) !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.ball-fill-btn.active::before {
+  transform: scale(1);
+}
+
+.ball-fill-btn.active svg {
+  color: #ffffff !important;
+}

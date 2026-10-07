@@ -1,7 +1,7 @@
 import { useState } from "react";
 import QRCode from "qrcode";
 import { getCategoryLabel } from "../../../stickerModules";
-import { stickerRef, useCodesRevealed } from "../../../lib/codeVisibility";
+import { adminStickerLabel, useCodesRevealed } from "../../../lib/codeVisibility";
 import { X, Printer, Download } from "lucide-react";
 import CopyLinkButton from "./CopyLinkButton";
 import { QrRecord, Template, StickerPos } from "./types";
@@ -30,7 +30,7 @@ export default function QuickLookModal({
 
   if (!qr) return null;
 
-  const displayCode = stickerRef(qr, isCodesRevealed, getCategoryLabel((qr.category || "car") as any));
+  const displayCode = adminStickerLabel(qr, getCategoryLabel((qr.category || "car") as any));
   const displayLabel = qr.vehicleName ? `${qr.vehicleName}` : "FLEET TAG CODE";
 
   // Rendered locally — the sticker URL is never sent to a third-party QR service.

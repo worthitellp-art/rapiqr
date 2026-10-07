@@ -7,7 +7,7 @@ import { fmtDate } from "./helpers";
 import QrRowActions from "./QrRowActions";
 import ConfirmModal from "./ConfirmModal";
 import { CodeVisibilityToggleButton } from "./StickerCodeComponents";
-import { stickerRef, useCodesRevealed } from "../../../lib/codeVisibility";
+import { adminStickerLabel, useCodesRevealed } from "../../../lib/codeVisibility";
 import { apiClient, AdminSummary } from "../../../lib/apiClient";
 import FxTodoList, { FxTodoItem } from "../shared/FxTodoList";
 import FxTransactionsTable, { FxTableColumn } from "../shared/FxTransactionsTable";
@@ -119,7 +119,7 @@ export default function OverviewPage({
   const [tableSearch, setTableSearch] = useState("");
   const [spinning, setSpinning] = useState(false);
   const [codesRevealed, setCodesRevealed] = useCodesRevealed();
-  const refOf = (q: QrRecord) => stickerRef(q, codesRevealed, `${(q.category || "car").charAt(0).toUpperCase()}${(q.category || "car").slice(1)} tag`);
+  const refOf = (q: QrRecord) => adminStickerLabel(q, `${(q.category || "car").charAt(0).toUpperCase()}${(q.category || "car").slice(1)} tag`);
 
   // KPIs come from the database totals, not from the fleet list — that list is
   // capped (500 rows), so counting it would under-report a larger fleet. Until the

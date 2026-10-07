@@ -25,6 +25,7 @@ import {
 import {
   AlertCircle,
   ArrowDown,
+  Ban,
   Check,
   CheckCheck,
   ChevronLeft,
@@ -35,6 +36,7 @@ import {
   MessageCircle,
   RotateCw,
   Send,
+  Trash2,
   X,
 } from "lucide-react";
 import { apiClient, type ChatMessage } from "../../lib/apiClient";
@@ -84,6 +86,41 @@ type UiMessage = ChatMessage & {
 
 export function customerTokenKey(qrId: string) {
   return `repichat-customer-token-${qrId}`;
+}
+
+/* Thread wallpaper: a faint dotted doodle as one small tiled SVG. */
+const CHAT_WALLPAPER = `url("data:image/svg+xml,${encodeURIComponent(
+  "<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120' fill='%23111111' fill-opacity='0.055'>" +
+    "<circle cx='14' cy='18' r='2.5'/><path d='M92 12l4 8 8 4-8 4-4 8-4-8-8-4 8-4z'/>" +
+    "<circle cx='58' cy='66' r='2'/><rect x='18' y='84' width='10' height='10' rx='2' transform='rotate(20 23 89)'/>" +
+    "<circle cx='104' cy='98' r='3'/><path d='M50 104h8v8h-8z' transform='rotate(-15 54 108)'/></svg>"
+)}")`;
+
+/**
+ * While the on-screen keyboard is up, the visible area shrinks but `100dvh`
+ * doesn't on most phone browsers, which pushes the composer under the keyboard.
+ * This reports the visible box only while a keyboard is open, so the thread can
+ * fit itself into what's left. Without a keyboard it stays null and the layout
+ * is untouched.
+ */
+function useKeyboardViewport() {
+  const [box, setBox] = useState<{ height: number; top: number } | null>(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const keyboardOpen = window.innerHeight - vv.height > 120;
+      setBox(keyboardOpen ? { height: vv.height, top: vv.offsetTop } : null);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+  return box;
 }
 
 /* ── Images ─────────────────────────────────────────────────────────────── */
@@ -331,6 +368,9 @@ export default function RepiChat({
   const [attachError, setAttachError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [lightbox, setLightbox] = useState<{ url: string; name?: string | null } | null>(null);
+  // The message whose options sheet is open (long-press / right-click).
+  const [actionMsg, setActionMsg] = useState<UiMessage | null>(null);
+  const viewport = useKeyboardViewport();
 
   const { language } = useLanguage();
   const t = chatTranslations[language];
@@ -592,6 +632,18 @@ export default function RepiChat({
       );
     };
 
+    // The other side deleted a message for everyone — blank it on this side too.
+    const onMessageDeleted = (payload: { sessionId: string; messageId: string; deletedAt: string }) => {
+      if (payload.sessionId !== sessionId) return;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === payload.messageId
+            ? { ...m, body: "", attachment_url: null, attachment_name: null, deleted_at: payload.deletedAt, localPreview: undefined, retryFile: undefined }
+            : m
+        )
+      );
+    };
+
     if (socket.connected) joinRoom();
 
     socket.on("connect", onConnect);
@@ -601,8 +653,10 @@ export default function RepiChat({
     socket.on("read", onRead);
     socket.on("delivered", onDelivered);
     socket.on("live_location", onLiveLocation);
+    socket.on("message_deleted", onMessageDeleted);
 
     return () => {
+      socket.off("message_deleted", onMessageDeleted);
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
       socket.off("new_message", onNewMessage);
@@ -669,6 +723,11 @@ export default function RepiChat({
     el.scrollTo({ top: el.scrollHeight, behavior });
     setUnseenCount(0);
   }, []);
+
+  // The keyboard opening shrinks the thread; keep the latest message in view if the reader was already there.
+  useEffect(() => {
+    if (viewport && atBottomRef.current) scrollToBottom("auto");
+  }, [viewport?.height, scrollToBottom]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleScroll = () => {
     const el = scrollerRef.current;
@@ -896,6 +955,35 @@ export default function RepiChat({
     }
   }, [ready, initialMessage, send]);
 
+  /**
+   * "Me" hides it here at once and tells the server, which keeps it for the
+   * other side. "Everyone" blanks it on both sides; the server only accepts it
+   * from the sender. If the server refuses, the thread is re-read so the screen
+   * matches what's actually stored.
+   */
+  const deleteMessage = async (msg: UiMessage, scope: "me" | "everyone") => {
+    setActionMsg(null);
+    if (scope === "me") {
+      setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+    } else {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === msg.id
+            ? { ...m, body: "", attachment_url: null, attachment_name: null, deleted_at: new Date().toISOString(), localPreview: undefined, retryFile: undefined }
+            : m
+        )
+      );
+    }
+    if (!sessionId) return;
+    try {
+      const res = await apiClient.chat.deleteMessage(sessionId, msg.id, scope, mode === "customer" ? customerToken : undefined);
+      if (!res?.success) throw new Error(res?.error || t.message.deleteFailed);
+    } catch {
+      setAttachError(t.message.deleteFailed);
+      syncHistory(sessionId);
+    }
+  };
+
   const retry = (msg: UiMessage) => {
     if (!msg.failed) return;
     if (msg.retryFile) sendImage(msg.retryFile, msg.id);
@@ -1031,6 +1119,7 @@ export default function RepiChat({
   return (
     <div
       className={`relative flex flex-col h-full w-full min-h-0 bg-white overflow-hidden ${className}`}
+      style={viewport ? { height: viewport.height, transform: `translateY(${viewport.top}px)` } : undefined}
       onDragEnter={handleDragEnter}
       onDragOver={(e) => e.preventDefault()}
       onDragLeave={handleDragLeave}
@@ -1042,7 +1131,7 @@ export default function RepiChat({
         {onClose && (
           <button
             onClick={onClose}
-            className="sm:hidden w-9 h-9 -ml-1 rounded-full hover:bg-[#F6F6F3] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+            className="w-9 h-9 -ml-1 rounded-full hover:bg-[#F6F6F3] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
             aria-label={t.aria.back}
           >
             <ChevronLeft size={22} />
@@ -1078,7 +1167,10 @@ export default function RepiChat({
       </header>
 
       {/* ── Transcript ───────────────────────────────────────────────── */}
-      <div className="relative flex-1 min-h-0 flex flex-col bg-[#FBFBF9]">
+      <div
+        className="relative flex-1 min-h-0 flex flex-col"
+        style={{ backgroundColor: "#EFEDE7", backgroundImage: CHAT_WALLPAPER }}
+      >
         <div
           ref={scrollerRef}
           onScroll={handleScroll}
@@ -1125,6 +1217,7 @@ export default function RepiChat({
                     peerInitial={peerInitial}
                     onRetry={retry}
                     onOpenImage={setLightbox}
+                    onOptions={setActionMsg}
                   />
                 )
               )}
@@ -1216,7 +1309,7 @@ export default function RepiChat({
             disabled={!ready && !sessionId}
             enterKeyHint="send"
             aria-label={t.aria.message}
-            className="flex-1 min-w-0 resize-none max-h-[132px] bg-[#F6F6F3] border border-transparent focus:border-[#111111] focus:bg-white rounded-2xl px-3.5 py-2.5 text-[15px] sm:text-sm leading-snug text-[#211922] placeholder-[#91918C] outline-none disabled:opacity-50 transition-colors"
+            className="no-scrollbar flex-1 min-w-0 resize-none max-h-[132px] [overflow-wrap:anywhere] bg-[#F6F6F3] border border-transparent focus:border-[#111111] focus:bg-white rounded-2xl px-3.5 py-2.5 text-[15px] sm:text-sm leading-snug text-[#211922] placeholder-[#91918C] outline-none disabled:opacity-50 transition-colors"
           />
           <button
             type="submit"
@@ -1240,6 +1333,16 @@ export default function RepiChat({
       )}
 
       {/* ── Lightbox ─────────────────────────────────────────────────── */}
+      {actionMsg && (
+        <MessageActionSheet
+          msg={actionMsg}
+          isOwn={actionMsg.sender_type === mode}
+          onDeleteForMe={() => deleteMessage(actionMsg, "me")}
+          onDeleteForEveryone={() => deleteMessage(actionMsg, "everyone")}
+          onClose={() => setActionMsg(null)}
+        />
+      )}
+
       {lightbox && <Lightbox image={lightbox} onClose={() => setLightbox(null)} />}
     </div>
   );
@@ -1312,6 +1415,7 @@ interface MessageBubbleProps {
   peerInitial: string;
   onRetry: (msg: UiMessage) => void;
   onOpenImage: (image: { url: string; name?: string | null }) => void;
+  onOptions: (msg: UiMessage) => void;
   key?: React.Key;
 }
 
@@ -1354,13 +1458,45 @@ function LiveLocationCard({ loc }: { loc: { lat: number; lng: number; updated_at
   );
 }
 
-function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubbleProps) {
+function MessageBubble({ row, peerInitial, onRetry, onOpenImage, onOptions }: MessageBubbleProps) {
   const { language } = useLanguage();
   const t = chatTranslations[language];
   const { msg, isOwn, firstOfGroup, lastOfGroup } = row;
   const attachment = attachmentOf(msg);
   const caption = captionOf(msg);
   const uploading = msg.uploadProgress !== undefined;
+
+  // Long-press (touch) or right-click opens the options sheet. A tombstone and a
+  // message still on its way have nothing to act on.
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+  }, []);
+  const canAct = !msg.pending && !msg.failed && !msg.deleted_at;
+  const cancelPress = () => {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
+  const startPress = (e: React.PointerEvent) => {
+    if (!canAct || (e.pointerType === "mouse" && e.button !== 0)) return;
+    cancelPress();
+    pressTimer.current = setTimeout(() => {
+      pressTimer.current = null;
+      onOptions(msg);
+    }, 450);
+  };
+  const openOptions = (e: React.MouseEvent) => {
+    if (!canAct) return;
+    e.preventDefault();
+    cancelPress();
+    onOptions(msg);
+  };
+
+  if (msg.deleted_at) {
+    return <DeletedBubble isOwn={isOwn} firstOfGroup={firstOfGroup} lastOfGroup={lastOfGroup} time={clockTime(msg.created_at)} />;
+  }
 
   return (
     <div
@@ -1380,14 +1516,19 @@ function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubble
 
       <div className={`max-w-[82%] sm:max-w-[70%] min-w-0 ${isOwn ? "items-end" : "items-start"} flex flex-col`}>
         <div
-          className={`overflow-hidden rounded-2xl transition-opacity ${
+          onPointerDown={startPress}
+          onPointerUp={cancelPress}
+          onPointerLeave={cancelPress}
+          onPointerCancel={cancelPress}
+          onContextMenu={openOptions}
+          className={`overflow-hidden rounded-2xl transition-opacity select-none ${
             attachment ? "p-1" : "px-3.5 py-2"
           } ${
             isOwn
               ? `${msg.failed ? "bg-[#FDEAEA] text-[#9E0A0A]" : "bg-[#111111] text-white"} ${lastOfGroup ? "rounded-br-md" : ""} ${
                   msg.pending && !attachment ? "opacity-70" : ""
                 }`
-              : `bg-[#F1F1EE] text-[#211922] ${lastOfGroup ? "rounded-bl-md" : ""}`
+              : `bg-white text-[#211922] shadow-[0_1px_1px_rgba(0,0,0,0.12)] ${lastOfGroup ? "rounded-bl-md" : ""}`
           }`}
         >
           {attachment && (
@@ -1424,7 +1565,7 @@ function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubble
 
           {(caption || !attachment) && (
             <p
-              className={`whitespace-pre-wrap break-words text-[14.5px] sm:text-[13.5px] leading-relaxed font-medium ${
+              className={`whitespace-pre-wrap [overflow-wrap:anywhere] min-w-0 text-[14.5px] sm:text-[13.5px] leading-relaxed font-medium ${
                 attachment ? "px-2.5 pt-1.5" : ""
               }`}
             >
@@ -1451,6 +1592,97 @@ function MessageBubble({ row, peerInitial, onRetry, onOpenImage }: MessageBubble
             {msg.retryFile ? t.retry.imageNotSent : t.retry.notSent}
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** What a deleted-for-everyone message leaves in the thread: the bubble stays, the content does not. */
+function DeletedBubble({
+  isOwn,
+  firstOfGroup,
+  lastOfGroup,
+  time,
+}: {
+  isOwn: boolean;
+  firstOfGroup: boolean;
+  lastOfGroup: boolean;
+  time: string;
+}) {
+  const { language } = useLanguage();
+  const t = chatTranslations[language];
+  return (
+    <div className={`flex items-end gap-2 ${isOwn ? "justify-end" : "justify-start"} ${firstOfGroup ? "mt-2.5" : "mt-0.5"}`}>
+      {!isOwn && <div className="w-7 shrink-0" aria-hidden />}
+      <div
+        className={`max-w-[82%] sm:max-w-[70%] rounded-2xl border border-[#E2E2DC] bg-white/80 px-3.5 py-2 ${
+          isOwn && lastOfGroup ? "rounded-br-md" : ""
+        } ${!isOwn && lastOfGroup ? "rounded-bl-md" : ""}`}
+      >
+        <p className="flex items-center gap-1.5 text-[13px] italic text-[#91918C]">
+          <Ban size={13} className="shrink-0" />
+          {t.message.deleted}
+        </p>
+        <div className="mt-0.5 flex justify-end">
+          <span className="text-[10px] font-medium tabular-nums text-[#91918C]">{time}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Bottom sheet with the two delete scopes. "Everyone" is offered only on the sender's own messages. */
+function MessageActionSheet({
+  isOwn,
+  onDeleteForMe,
+  onDeleteForEveryone,
+  onClose,
+}: {
+  msg: UiMessage;
+  isOwn: boolean;
+  onDeleteForMe: () => void;
+  onDeleteForEveryone: () => void;
+  onClose: () => void;
+}) {
+  const { language } = useLanguage();
+  const t = chatTranslations[language];
+
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const rowClass =
+    "w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-[15px] font-semibold text-left transition-colors cursor-pointer";
+
+  return (
+    <div
+      className="absolute inset-0 z-40 flex items-end sm:items-center justify-center bg-black/35 animate-fade-in"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t.message.actionsLabel}
+    >
+      <div
+        className="w-full sm:max-w-sm p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] rounded-t-2xl sm:rounded-2xl bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {isOwn && (
+          <button type="button" onClick={onDeleteForEveryone} className={`${rowClass} text-[#9E0A0A] hover:bg-[#FDEAEA]`}>
+            <Trash2 size={18} />
+            {t.message.deleteForEveryone}
+          </button>
+        )}
+        <button type="button" onClick={onDeleteForMe} className={`${rowClass} text-[#9E0A0A] hover:bg-[#FDEAEA]`}>
+          <Trash2 size={18} />
+          {t.message.deleteForMe}
+        </button>
+        <button type="button" onClick={onClose} className={`${rowClass} justify-center text-[#211922] hover:bg-[#F6F6F3] mt-1`}>
+          {t.message.cancel}
+        </button>
       </div>
     </div>
   );

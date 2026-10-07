@@ -5,6 +5,7 @@ const ChatMessage = require('./schemas/ChatMessage');
 const Alert = require('./schemas/Alert');
 const User = require('./schemas/User');
 const { normalizePhone, isSamePhone } = require('../utils/phone');
+const { sanitizeEmergencyContacts } = require('../utils/emergencyContacts');
 const {
   ID_SCHEME_VERSION: ID_SCHEME_VERSION_V2,
   generateRecoveryCodeV2,
@@ -588,16 +589,17 @@ class QrModel {
       if (activationData.ownerEmail) details.ownerEmail = activationData.ownerEmail;
       if (activationData.notes) details.notes = activationData.notes;
       if (activationData.message) details.notes = activationData.message;
-      if (Array.isArray(activationData.emergencyContacts) && activationData.emergencyContacts.length) {
+      const activationContacts = sanitizeEmergencyContacts(activationData.emergencyContacts);
+      if (activationContacts.length) {
         const priorPhones = new Set(
           (Array.isArray(current.details?.emergencyContacts) ? current.details.emergencyContacts : [])
             .map((c) => normalizePhone(c?.phone))
             .filter(Boolean)
         );
-        newlyAddedContacts = activationData.emergencyContacts.filter(
+        newlyAddedContacts = activationContacts.filter(
           (c) => c?.phone && !priorPhones.has(normalizePhone(c.phone))
         );
-        details.emergencyContacts = activationData.emergencyContacts;
+        details.emergencyContacts = activationContacts;
       } else if (!Array.isArray(details.emergencyContacts)) {
         details.emergencyContacts = [];
       }

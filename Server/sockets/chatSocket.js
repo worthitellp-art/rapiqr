@@ -44,7 +44,7 @@ async function resolveIdentity(auth) {
   if (token) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
-      return { type: 'owner', ownerId: decoded.id };
+      return { type: 'owner', ownerId: decoded.id, isAdmin: decoded.role === 'admin' };
     } catch { /* invalid/expired token */ }
   }
 
@@ -129,6 +129,34 @@ async function markDeliveredIfPeerPresent(sessionId, message, senderType) {
   }
 }
 
+/**
+ * True when a socket for this side ('owner' | 'customer') is in the session
+ * room right now — that person has the thread open on a live connection.
+ */
+async function isSideLive(sessionId, side) {
+  if (!io || !sessionId) return false;
+  try {
+    const sockets = await io.in(`session:${sessionId}`).fetchSockets();
+    return sockets.some((s) => s.data?.identityType === side);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * WhatsApp is the fallback for when a visitor can't reach the owner in the app.
+ * While both people are connected to the thread, the message is already on
+ * their screens, so the WhatsApp ping is skipped. It goes out as soon as either
+ * side is not connected to that session.
+ */
+async function shouldWhatsAppOwner(sessionId) {
+  const [ownerLive, customerLive] = await Promise.all([
+    isSideLive(sessionId, 'owner'),
+    isSideLive(sessionId, 'customer'),
+  ]);
+  return !(ownerLive && customerLive);
+}
+
 function initChatSocket(httpServer, allowedOrigins) {
   io = new Server(httpServer, {
     cors: {
@@ -164,6 +192,8 @@ function initChatSocket(httpServer, allowedOrigins) {
     if (socket.identity.type === 'owner') {
       markOwnerOnline(socket.identity.ownerId);
       socket.join(`owner:${socket.identity.ownerId}`);
+      // Admin consoles get live "something new arrived" signals for the Communication tab and badges.
+      if (socket.identity.isAdmin) socket.join('admins');
       socket.on('disconnect', () => markOwnerOffline(socket.identity.ownerId));
     }
 
@@ -220,7 +250,7 @@ function initChatSocket(httpServer, allowedOrigins) {
         // Push (the latter reaches them even with the dashboard tab closed).
         if (socket.identity.type === 'customer') {
           const label = session.vehicle_label || product?.name || 'your vehicle';
-          if (product?.details?.ownerPhone) {
+          if (product?.details?.ownerPhone && (await shouldWhatsAppOwner(sessionId))) {
             // The owner's "Open Chat" button carries a one-time login token (see loginLinkService).
             const ownerLinkSession = ownerId
               ? await createChatLoginLink({ userId: ownerId, sessionId }).catch(() => sessionId)
@@ -268,4 +298,4 @@ function getIo() {
   return io;
 }
 
-module.exports = { initChatSocket, getIo, getOnlineOwners, markDeliveredIfPeerPresent };
+module.exports = { initChatSocket, getIo, getOnlineOwners, markDeliveredIfPeerPresent, shouldWhatsAppOwner };

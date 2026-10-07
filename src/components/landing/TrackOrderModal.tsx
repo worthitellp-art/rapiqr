@@ -18,6 +18,7 @@ import { apiClient } from '../../lib/apiClient';
 import { FlowButton } from '../ui/flow-button';
 import { useLanguage } from '../../context/LanguageContext';
 import { orderTranslations } from '../../i18n/orderTranslations';
+import { formatLocationString } from '../../utils/formatLocation';
 
 /* ── Types & Domain Models ─────────────────────────────────────────────────── */
 
@@ -266,7 +267,7 @@ function TrackingMilestones({ timeline, t }: MilestonesProps) {
             <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-[#111111] ring-4 ring-white" />
             <p className="text-xs font-semibold text-slate-900">{event.activity || event.status}</p>
             <div className="flex items-center gap-2 text-[11px] text-slate-500">
-              {event.location && <span>{event.location}</span>}
+              {event.location && <span>{formatLocationString(event.location)}</span>}
               {event.at && <span>· {new Date(event.at).toLocaleString('en-IN')}</span>}
             </div>
           </div>

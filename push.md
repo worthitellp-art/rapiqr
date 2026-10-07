@@ -1,4 +1,4 @@
-git add . && git commit -m "enbon" && git push
+git add . && git commit -m "Bugs and design" && git push
 
 
 

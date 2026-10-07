@@ -1,13 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Lock,
   ShieldCheck,
   Truck,
   CheckCircle2,
   ArrowRight,
-  MapPin,
   User,
-  Mail,
   ArrowLeft,
   ShoppingBag,
   Clock,
@@ -20,7 +18,7 @@ import { apiClient } from '../../lib/apiClient';
 import PhoneInputWithCountry from '../common/PhoneInputWithCountry';
 import AutocompleteField from '../common/AutocompleteField';
 import AppLogo from '../common/AppLogo';
-import { INDIAN_STATES, INDIAN_CITIES, INDIAN_CITY_NAMES } from '../../data/locations';
+import { INDIAN_CITIES } from '../../data/locations';
 import { OrderInvoice } from '../../types/invoice';
 import { buildOrderInvoice, printOrderInvoice } from '../../services/invoiceService';
 import OrderInvoiceModal from './OrderInvoiceModal';
@@ -91,6 +89,37 @@ function loadRazorpayScript(): Promise<boolean> {
     script.onerror = () => resolve(false);
     document.body.appendChild(script);
   });
+}
+
+/* Shared checkout field styling — see the .checkout-theme tokens in index.css. */
+const fieldInputCls =
+  'w-full h-[54px] px-3.5 pt-5 pb-2 rounded-[var(--co-radius-sm)] border border-[var(--co-line)] bg-white focus:border-[var(--co-accent)] focus:ring-2 focus:ring-[var(--co-accent-soft)] text-[16px] sm:text-sm text-[var(--co-ink)] outline-none transition-colors';
+const stepBadgeCls =
+  'w-7 h-7 rounded-full bg-[var(--co-accent-soft)] text-[var(--co-accent)] text-xs font-bold flex items-center justify-center shrink-0';
+
+function CheckoutFloatingField({
+  id,
+  label,
+  value,
+  children,
+  className = '',
+}: {
+  id: string;
+  label: string;
+  value: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`checkout-floating-field ${value ? 'is-filled' : ''} ${className}`}
+    >
+      {children}
+      <label htmlFor={id} className="checkout-floating-label">
+        {label}
+      </label>
+    </div>
+  );
 }
 
 export default function CheckoutPage({
@@ -233,11 +262,10 @@ export default function CheckoutPage({
     { id: 'balance-topup', name: 'Balance top-up', category: 'Balance', qty: 1, price: total },
   ];
 
-  // Prefill from account when mounted
+  // Keep the account name and phone convenient; the email is always entered manually.
   useEffect(() => {
     if (profile) {
       setName(profile.fullName || '');
-      setEmail(profile.email || '');
       setPhone(profile.phoneNumber || '');
     }
   }, [profile]);
@@ -275,6 +303,16 @@ export default function CheckoutPage({
   }, [pincode]);
 
   const cleanDigits = (v: string) => (v || '').replace(/\D/g, '');
+  const loadCitySuggestions = useCallback(
+    async (query: string, signal: AbortSignal) =>
+      (await apiClient.geo.suggest(query, 'city', signal)).data,
+    []
+  );
+  const loadStateSuggestions = useCallback(
+    async (query: string, signal: AbortSignal) =>
+      (await apiClient.geo.suggest(query, 'state', signal)).data,
+    []
+  );
 
   const checkRecognized = () => {
     const em = email.trim().toLowerCase();
@@ -477,7 +515,7 @@ export default function CheckoutPage({
     }));
 
     let newOrderId: string = '';
-    const effectiveEmail = email.trim() || `${cleanDigits(phone)}@repiqr.local`;
+    const effectiveEmail = email.trim();
     try {
       const res = await apiClient.orders.create({
         name: name.trim(),
@@ -692,6 +730,7 @@ export default function CheckoutPage({
     if (
       !name.trim() ||
       !phone.trim() ||
+      !email.trim() ||
       !address.trim() ||
       !city.trim() ||
       !pincode.trim()
@@ -699,7 +738,7 @@ export default function CheckoutPage({
       setError(t.errors.requiredFields);
       return;
     }
-    if (email.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
       setError(t.errors.invalidEmail);
       return;
     }
@@ -714,15 +753,18 @@ export default function CheckoutPage({
     runCheckout(isRecognized);
   };
 
+  const stepIndex = step === 'details' ? 0 : step === 'processing' ? 1 : 2;
+  const progressValue = (stepIndex + 1) / 3;
+
   return (
-    <div className="min-h-screen bg-white font-sans text-gray-900 pb-16">
+    <div className="checkout-theme min-h-screen bg-[var(--co-paper)] font-sans text-[var(--co-ink)] pb-16">
 
       {/* ── TOP HEADER BAR ── */}
-      <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/95 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:h-16 sm:px-6">
+      <header className="sticky top-0 z-40 border-b border-[var(--co-line)] bg-[var(--co-panel)]">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <button
             onClick={onBack}
-            className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-gray-500 transition-colors hover:text-gray-900"
+            className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[var(--co-ink-soft)] transition-colors hover:text-[var(--co-ink)]"
             aria-label={t.backToShopAria}
           >
             <ArrowLeft size={16} />
@@ -730,25 +772,44 @@ export default function CheckoutPage({
             <span className="sm:hidden">{t.backToShopShort}</span>
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <AppLogo variant="light" className="h-6 w-auto object-contain sm:h-7" />
-            <span className="text-gray-300 font-medium text-sm">| {t.checkoutLabel}</span>
+            <span className="hidden sm:inline text-[var(--co-line)]">|</span>
+            <span className="hidden sm:inline text-[var(--co-ink-soft)] font-semibold text-sm">{t.checkoutLabel}</span>
           </div>
 
+          <div className="flex items-center gap-1.5 text-[var(--co-ink-faint)]" aria-hidden="true">
+            <Lock size={14} />
+          </div>
+        </div>
+
+        {/* Slim progress line — purely presentational, mirrors `step` */}
+        <div
+          className="h-[3px] w-full bg-[var(--co-line)]"
+          role="progressbar"
+          aria-label={t.checkoutLabel}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(progressValue * 100)}
+        >
+          <div
+            className="checkout-progress-fill"
+            style={{ transform: `scaleX(${progressValue})` }}
+          />
         </div>
       </header>
 
       {/* ── PAGE CONTENT ── */}
-      <main className="mx-auto max-w-6xl px-4 pt-6 sm:px-6 sm:pt-8">
+      <main className="mx-auto max-w-6xl px-4 pt-8 sm:px-6 sm:pt-10">
 
         {/* ── EMPTY CART STATE ── */}
         {cart.length === 0 && step !== 'success' && (
-          <div className="max-w-md mx-auto my-16 p-8 bg-white rounded-lg border border-gray-200 shadow-sm text-center">
-            <div className="w-14 h-14 rounded-md bg-gray-100 text-[#111111] flex items-center justify-center mx-auto mb-4">
+          <div className="max-w-md mx-auto my-16 p-8 bg-[var(--co-panel)] rounded-[var(--co-radius)] border border-[var(--co-line)] text-center">
+            <div className="w-14 h-14 rounded-[var(--co-radius-sm)] bg-[var(--co-paper)] border border-[var(--co-line)] text-[var(--co-ink)] flex items-center justify-center mx-auto mb-4">
               <ShoppingBag size={26} />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">{t.emptyCart.title}</h3>
-            <p className="text-sm text-gray-500 mb-6">
+            <h3 className="text-lg font-bold text-[var(--co-ink)] mb-2">{t.emptyCart.title}</h3>
+            <p className="text-sm text-[var(--co-ink-soft)] mb-6">
               {t.emptyCart.description}
             </p>
             <FlowButton tone="dark" fullWidth onClick={onBack}>
@@ -765,30 +826,27 @@ export default function CheckoutPage({
             <div className="lg:col-span-7 space-y-4">
 
               {/* Free Sticker Banner */}
-              <div className="p-4 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start gap-3">
-                <CheckCircle2 size={20} className="text-emerald-600 shrink-0 mt-0.5" />
+              <div className="p-4 rounded-[var(--co-radius)] bg-[var(--co-success-soft)] border border-[var(--co-success)]/20 text-[var(--co-ink)] flex items-start gap-3">
+                <CheckCircle2 size={20} className="text-[var(--co-success)] shrink-0 mt-0.5" />
                 <div className="min-w-0">
                   <p className="font-bold text-sm sm:text-base">{t.freeStickerBanner.title}</p>
-                  <p className="text-xs sm:text-sm text-emerald-800 mt-0.5 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-[var(--co-ink-soft)] mt-0.5 leading-relaxed">
                     {t.freeStickerBanner.description(total)}
-                    {isLoggedIn && (
-                      <> {t.freeStickerBanner.linkedTo} <strong className="break-all">{profile?.email || email}</strong>.</>
-                    )}
                   </p>
                 </div>
               </div>
 
               {/* Guest Account Banner */}
               {!isLoggedIn && (
-                <div className="p-3.5 rounded-md bg-gray-50 border border-gray-200 text-gray-900 text-xs sm:text-sm flex items-center justify-between gap-3">
+                <div className="p-3.5 rounded-[var(--co-radius)] bg-[var(--co-panel)] border border-[var(--co-line)] text-[var(--co-ink)] text-xs sm:text-sm flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <User size={16} className="text-[#111111] shrink-0" />
+                    <User size={16} className="text-[var(--co-ink)] shrink-0" />
                     <span>{t.guestBanner.message}</span>
                   </div>
                   <button
                     type="button"
                     onClick={onOpenLogin}
-                    className="font-bold text-gray-950 underline hover:text-black shrink-0 cursor-pointer"
+                    className="font-bold text-[var(--co-ink)] underline hover:text-[var(--co-accent)] shrink-0 cursor-pointer"
                   >
                     {t.guestBanner.logIn}
                   </button>
@@ -798,116 +856,132 @@ export default function CheckoutPage({
               <form onSubmit={handleSubmit} className="space-y-5">
 
                 {/* ── 1. Contact Information ── */}
-                <div className="space-y-4 rounded-lg border border-[#14120C]/8 bg-white p-6 sm:p-7 shadow-[0_12px_40px_-15px_rgba(20,18,12,0.05)]">
-                  <div className="flex items-center gap-3 pb-3 border-b border-[#14120C]/6">
-                    <span className="w-6 h-6 rounded-full bg-[#14120C] text-white text-xs font-bold flex items-center justify-center">
-                      1
-                    </span>
+                <div className="space-y-4 rounded-[var(--co-radius)] border border-[var(--co-line)] bg-[var(--co-panel)] p-6 shadow-sm sm:p-7">
+                  <div className="flex items-center gap-3 pb-3 border-b border-[var(--co-line)]">
+                    <span className={stepBadgeCls}>1</span>
                     <div>
-                      <h2 className="font-extrabold text-sm sm:text-base text-[#14120C]">{t.contactSection.title}</h2>
-                      <p className="text-[11px] text-[#14120C]/50">{t.contactSection.subtitle}</p>
+                      <h2 className="font-semibold text-sm sm:text-base text-[var(--co-ink)]">{t.contactSection.title}</h2>
+                      <p className="text-xs text-[var(--co-ink-soft)]">{t.contactSection.subtitle}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-1.5">
-                        {t.contactSection.fullNameLabel}
-                      </label>
+                    <CheckoutFloatingField
+                      id="checkout-name"
+                      label={t.contactSection.fullNameLabel}
+                      value={name}
+                    >
                       <input
+                        id="checkout-name"
                         type="text"
-                        placeholder={t.contactSection.fullNamePlaceholder}
+                        placeholder=" "
+                        autoComplete="name"
                         aria-label={t.contactSection.fullNameAria}
+                        aria-required="true"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full h-11 px-3.5 rounded-md border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
+                        className={fieldInputCls}
                       />
-                    </div>
+                    </CheckoutFloatingField>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-1.5">
-                        {t.contactSection.phoneLabel}
-                      </label>
+                    <CheckoutFloatingField
+                      id="checkout-phone"
+                      label={t.contactSection.phoneLabel}
+                      value={phone}
+                      className="checkout-floating-field--phone"
+                    >
                       <PhoneInputWithCountry
+                        inputId="checkout-phone"
+                        inputAriaLabel={t.contactSection.phoneLabel}
+                        placeholder=" "
+                        required
                         value={phone}
                         onChange={(full) => setPhone(full)}
+                        className="checkout-phone-control"
                       />
-                    </div>
+                    </CheckoutFloatingField>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-1.5">
-                      {t.contactSection.emailLabel}
-                    </label>
-                    <div className="relative">
-                      <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="email"
-                        placeholder={t.contactSection.emailPlaceholder}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full h-11 pl-10 pr-3.5 rounded-md border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
-                      />
-                    </div>
-                  </div>
+                  <CheckoutFloatingField
+                    id="checkout-email"
+                    label={t.contactSection.emailLabel}
+                    value={email}
+                  >
+                    <input
+                      id="checkout-email"
+                      type="email"
+                      placeholder=" "
+                      autoComplete="off"
+                      aria-label={t.contactSection.emailLabel}
+                      aria-required="true"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className={fieldInputCls}
+                    />
+                  </CheckoutFloatingField>
                 </div>
 
                 {/* ── 2. Shipping Address ── */}
-                <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-6 sm:p-7 shadow-xs">
-                  <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
-                    <span className="w-6 h-6 rounded-full bg-black text-white text-xs font-bold flex items-center justify-center">
-                      2
-                    </span>
+                <div className="space-y-4 rounded-[var(--co-radius)] border border-[var(--co-line)] bg-[var(--co-panel)] p-6 shadow-sm sm:p-7">
+                  <div className="flex items-center gap-3 pb-3 border-b border-[var(--co-line)]">
+                    <span className={stepBadgeCls}>2</span>
                     <div>
-                      <h2 className="font-semibold text-sm sm:text-base text-gray-900">{t.addressSection.title}</h2>
-                      <p className="text-xs text-gray-500">{t.addressSection.subtitle}</p>
+                      <h2 className="font-semibold text-sm sm:text-base text-[var(--co-ink)]">{t.addressSection.title}</h2>
+                      <p className="text-xs text-[var(--co-ink-soft)]">{t.addressSection.subtitle}</p>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-1.5">
-                      {t.addressSection.streetLabel}
-                    </label>
-                    <div className="relative">
-                      <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder={t.addressSection.streetPlaceholder}
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        className="w-full h-11 pl-10 pr-3.5 rounded-md border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
-                      />
-                    </div>
-                  </div>
+                  <CheckoutFloatingField
+                    id="checkout-address"
+                    label={t.addressSection.streetLabel}
+                    value={address}
+                  >
+                    <input
+                      id="checkout-address"
+                      type="text"
+                      placeholder=" "
+                      autoComplete="street-address"
+                      aria-required="true"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      className={fieldInputCls}
+                    />
+                  </CheckoutFloatingField>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-1.5">
-                        {t.addressSection.pincodeLabel}
-                      </label>
-                      <input
-                        type="text"
-                        placeholder={t.addressSection.pincodePlaceholder}
-                        inputMode="numeric"
-                        maxLength={6}
+                      <CheckoutFloatingField
+                        id="checkout-pincode"
+                        label={t.addressSection.pincodeLabel}
                         value={pincode}
-                        onChange={(e) =>
-                          setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))
-                        }
-                        className="w-full h-11 px-3.5 rounded-md border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all"
-                      />
+                      >
+                        <input
+                          id="checkout-pincode"
+                          type="text"
+                          placeholder=" "
+                          inputMode="numeric"
+                          autoComplete="postal-code"
+                          maxLength={6}
+                          aria-required="true"
+                          value={pincode}
+                          onChange={(e) =>
+                            setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))
+                          }
+                          className={fieldInputCls}
+                        />
+                      </CheckoutFloatingField>
                       {pincodeStatus === 'looking' && (
-                        <span className="text-xs text-gray-500 mt-1 block">
+                        <span className="text-xs text-[var(--co-ink-soft)] mt-1 block">
                           {t.addressSection.pincodeLookingUp}
                         </span>
                       )}
                       {pincodeStatus === 'found' && (
-                        <span className="text-xs text-emerald-600 font-medium mt-1 block">
+                        <span className="text-xs text-[var(--co-success)] font-medium mt-1 block">
                           {t.addressSection.pincodeFound}
                         </span>
                       )}
                       {pincodeStatus === 'not-found' && (
-                        <span className="text-xs text-gray-500 mt-1 block">
+                        <span className="text-xs text-[var(--co-ink-soft)] mt-1 block">
                           {t.addressSection.pincodeNotFound}
                         </span>
                       )}
@@ -915,30 +989,40 @@ export default function CheckoutPage({
 
                     <AutocompleteField
                       label={t.addressSection.cityLabel}
-                      placeholder={t.addressSection.cityPlaceholder}
+                      inputId="checkout-city"
+                      floatingLabel
+                      required
+                      loadSuggestions={loadCitySuggestions}
+                      placeholder=" "
                       value={city}
                       onChange={setCity}
                       onSelect={(selected) => {
                         const match = INDIAN_CITIES.find((c) => c.name === selected);
                         if (match && !state.trim()) setState(match.state);
                       }}
-                      suggestions={INDIAN_CITY_NAMES}
+                      suggestions={[]}
+                      inputClassName={fieldInputCls}
                     />
 
                     <AutocompleteField
                       label={t.addressSection.stateLabel}
-                      placeholder={t.addressSection.statePlaceholder}
+                      inputId="checkout-state"
+                      floatingLabel
+                      required
+                      loadSuggestions={loadStateSuggestions}
+                      placeholder=" "
                       value={state}
                       onChange={setState}
-                      suggestions={INDIAN_STATES}
+                      suggestions={[]}
+                      inputClassName={fieldInputCls}
                     />
                   </div>
                 </div>
 
                 {/* Error Banner */}
                 {error && (
-                  <div className="p-4 rounded-md bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm font-medium flex items-center gap-3">
-                    <AlertCircle size={18} className="shrink-0 text-red-500" />
+                  <div className="p-4 rounded-[var(--co-radius)] bg-[var(--co-danger-soft)] border border-[var(--co-danger)]/20 text-[var(--co-danger)] text-xs sm:text-sm font-medium flex items-center gap-3">
+                    <AlertCircle size={18} className="shrink-0 text-[var(--co-danger)]" />
                     <span>{error}</span>
                   </div>
                 )}
@@ -949,87 +1033,88 @@ export default function CheckoutPage({
                   {t.payButton(total)}
                 </FlowButton>
 
-                <p className="text-center text-xs text-gray-500 leading-relaxed">
+                <p className="text-center text-xs text-[var(--co-ink-soft)] leading-relaxed">
                   {t.termsNotice}
                 </p>
 
               </form>
             </div>
 
-            {/* ── RIGHT COLUMN: FINAL BILLING SUMMARY (5 COLS) ── */}
+            {/* ── RIGHT COLUMN: ORDER SUMMARY (5 COLS) ── */}
             <div className="lg:col-span-5">
-              <div className="sticky top-24 space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-xs">
+              <div className="sticky top-24 overflow-hidden rounded-[var(--co-radius)] border border-[var(--co-line)] bg-[var(--co-panel)] shadow-sm">
+                <div className="min-w-0">
+                  <div className="p-6 space-y-4">
+                    <div className="flex items-center justify-between pb-3.5 border-b border-[var(--co-line)]">
+                      <h2 className="font-semibold text-[var(--co-ink)] text-base">{t.orderSummary.title}</h2>
+                      <span className="text-xs font-semibold text-[var(--co-ink-soft)] bg-[var(--co-paper)] border border-[var(--co-line)] px-2.5 py-0.5 rounded-full">
+                        {t.orderSummary.itemsCount(cart.reduce((s, i) => s + i.qty, 0))}
+                      </span>
+                    </div>
 
-                <div className="flex items-center justify-between pb-3.5 border-b border-gray-100">
-                  <div className="flex items-center gap-2 font-semibold text-gray-900 text-base">
-                    <Lock size={16} className="text-gray-900" />
-                    <span>{t.orderSummary.title}</span>
-                  </div>
-                  <span className="text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-md">
-                    {t.orderSummary.itemsCount(cart.reduce((s, i) => s + i.qty, 0))}
-                  </span>
-                </div>
-
-                {/* Cart Items List */}
-                <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-                  {cart.map((item) => (
-                    <div
-                      key={item.product.id}
-                      className="p-3 rounded-lg bg-white border border-[#14120C]/6 flex items-center gap-3 shadow-xs"
-                    >
-                      <img
-                        src={item.product.img}
-                        alt={item.product.name}
-                        className="w-12 h-12 rounded-md object-cover border border-[#14120C]/8 shrink-0 bg-[#FAFAF8]"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold text-[13px] text-[#14120C] truncate">
-                          {item.product.name}
+                    {/* Cart Items List */}
+                    <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                      {cart.map((item) => (
+                        <div
+                          key={item.product.id}
+                          className="flex items-center gap-3"
+                        >
+                          <img
+                            src={item.product.img}
+                            alt={item.product.name}
+                            className="w-11 h-11 rounded-[var(--co-radius-sm)] object-cover border border-[var(--co-line)] shrink-0 bg-[var(--co-paper)]"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-[13px] text-[var(--co-ink)] truncate">
+                              {item.product.name}
+                            </div>
+                            <div className="text-[11px] text-[var(--co-ink-faint)] font-medium mt-0.5">{t.orderSummary.qty(item.qty)}</div>
+                          </div>
+                          <span className="font-semibold text-[11px] text-[var(--co-success)]">
+                            {t.orderSummary.free}
+                          </span>
                         </div>
-                        <div className="text-[11px] text-[#14120C]/50 font-semibold mt-0.5">{t.orderSummary.qty(item.qty)}</div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-[var(--co-line)]" />
+
+                  {/* Price breakdown and total */}
+                  <div className="p-6 space-y-2 text-[13px]">
+                    <div className="flex items-center justify-between text-[var(--co-ink-soft)] font-medium">
+                      <span>{t.orderSummary.stickersLabel}</span>
+                      <span className="font-semibold text-[var(--co-success)]">{t.orderSummary.free}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[var(--co-ink-soft)] font-medium">
+                      <span>{t.orderSummary.deliveryLabel}</span>
+                      <span className="font-semibold text-[var(--co-success)]">{t.orderSummary.free}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[var(--co-ink-soft)] font-medium">
+                      <span>{t.orderSummary.balanceTopupLabel}</span>
+                      <span className="font-mono font-semibold text-[var(--co-ink)]">₹{total}</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-3 border-t border-[var(--co-line)] text-base font-bold text-[var(--co-ink)]">
+                      <span>{t.orderSummary.totalAmountLabel}</span>
+                      <span className="font-mono">₹{total}</span>
+                    </div>
+                    <p className="text-xs font-medium text-[var(--co-success)] pt-0.5">
+                      {t.orderSummary.balanceAddedNote(total)}
+                    </p>
+
+                    {/* Trust Badges */}
+                    <div className="pt-3 border-t border-[var(--co-line)] space-y-1.5">
+                      <div className="flex items-center gap-2 text-[11px] font-medium text-[var(--co-ink-soft)]">
+                        <ShieldCheck size={14} className="text-[var(--co-success)] shrink-0" />
+                        <span>{t.orderSummary.sslBadge}</span>
                       </div>
-                      <div className="font-bold text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                        {t.orderSummary.free}
+                      <div className="flex items-center gap-2 text-[11px] font-medium text-[var(--co-ink-soft)]">
+                        <Truck size={14} className="text-[var(--co-ink-faint)] shrink-0" />
+                        <span>{t.orderSummary.replacementBadge}</span>
+                      </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-
-                {/* Price Breakdown */}
-                <div className="space-y-2.5 pt-4 border-t border-[#14120C]/8 text-[13px]">
-                  <div className="flex items-center justify-between text-[#14120C]/70 font-medium">
-                    <span>{t.orderSummary.stickersLabel}</span>
-                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md text-xs">{t.orderSummary.free}</span>
                   </div>
-                  <div className="flex items-center justify-between text-[#14120C]/70 font-medium">
-                    <span>{t.orderSummary.deliveryLabel}</span>
-                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md text-xs">{t.orderSummary.free}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[#14120C]/70 font-medium">
-                    <span>{t.orderSummary.balanceTopupLabel}</span>
-                    <span className="font-bold text-[#14120C]">₹{total}</span>
-                  </div>
-                  <div className="flex items-center justify-between pt-3 border-t border-[#14120C]/10 text-lg font-extrabold text-[#14120C]">
-                    <span>{t.orderSummary.totalAmountLabel}</span>
-                    <span className="text-[#14120C] font-black">₹{total}</span>
-                  </div>
-                  <p className="text-xs font-semibold text-emerald-700">
-                    {t.orderSummary.balanceAddedNote(total)}
-                  </p>
-                </div>
-
-                {/* Trust Badges */}
-                <div className="pt-3 border-t border-[#14120C]/8 space-y-2">
-                  <div className="flex items-center gap-2 text-[11px] font-semibold text-[#14120C]/60">
-                    <ShieldCheck size={14} className="text-[#16A34A] shrink-0" />
-                    <span>{t.orderSummary.sslBadge}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] font-semibold text-[#14120C]/60">
-                    <Truck size={14} className="text-[#14120C] shrink-0" />
-                    <span>{t.orderSummary.replacementBadge}</span>
-                  </div>
-                </div>
-
               </div>
             </div>
 
@@ -1038,10 +1123,10 @@ export default function CheckoutPage({
 
         {/* ── STEP: PROCESSING MODAL ── */}
         {step === 'processing' && (
-          <div className="max-w-md mx-auto my-16 p-8 bg-white rounded-lg border border-gray-200 shadow-lg text-center space-y-3.5">
-            <div className="w-14 h-14 rounded-full border-4 border-[#111111] border-t-transparent animate-spin mx-auto" />
-            <h3 className="text-lg font-bold text-gray-950">{t.processing.title}</h3>
-            <p className="text-sm text-gray-500">
+          <div className="max-w-md mx-auto my-16 p-8 bg-[var(--co-panel)] rounded-[var(--co-radius)] border border-[var(--co-line)] text-center space-y-3.5">
+            <div className="w-14 h-14 rounded-full border-4 border-[var(--co-accent)] border-t-transparent animate-spin mx-auto" />
+            <h3 className="text-lg font-bold text-[var(--co-ink)]">{t.processing.title}</h3>
+            <p className="text-sm text-[var(--co-ink-soft)]">
               {t.processing.description}
             </p>
           </div>
@@ -1049,26 +1134,26 @@ export default function CheckoutPage({
 
         {/* ── STEP: SUCCESS CONFIRMATION ── */}
         {step === 'success' && (
-          <div className="max-w-xl mx-auto my-10 p-6 sm:p-8 bg-white rounded-lg border border-gray-200 shadow-xs text-center space-y-5">
-            <div className="w-14 h-14 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto">
+          <div className="max-w-xl mx-auto my-10 p-6 sm:p-8 bg-[var(--co-panel)] rounded-[var(--co-radius)] border border-[var(--co-line)] text-center space-y-5">
+            <div className="w-14 h-14 rounded-full bg-[var(--co-accent-soft)] text-[var(--co-accent)] border-2 border-[var(--co-accent)] flex items-center justify-center mx-auto">
               <CheckCircle2 size={30} />
             </div>
 
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">{t.success.title}</h2>
-              <p className="text-sm text-gray-600 mt-1.5">
-                {t.success.thankYouPrefix}<span className="font-semibold text-gray-900">{name.trim()}</span>{t.success.orderPrefix}
-                <span className="font-mono font-medium text-gray-900 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+              <h2 className="text-2xl font-bold text-[var(--co-ink)]">{t.success.title}</h2>
+              <p className="text-sm text-[var(--co-ink-soft)] mt-1.5">
+                {t.success.thankYouPrefix}<span className="font-semibold text-[var(--co-ink)]">{name.trim()}</span>{t.success.orderPrefix}
+                <span className="font-mono font-medium text-[var(--co-ink)] bg-[var(--co-paper)] px-2 py-0.5 rounded border border-[var(--co-line)]">
                   {orderId}
                 </span>
-                {t.success.confirmedPrefix}<span className="font-semibold text-gray-900">₹{confirmedTotal}</span>{t.success.balanceSuffix}
+                {t.success.confirmedPrefix}<span className="font-semibold text-[var(--co-ink)]">₹{confirmedTotal}</span>{t.success.balanceSuffix}
               </p>
             </div>
 
             {invoice && (
               <button
                 onClick={() => setIsInvoiceModalOpen(true)}
-                className="text-xs font-semibold text-gray-600 hover:text-black underline underline-offset-2 cursor-pointer"
+                className="text-xs font-semibold text-[var(--co-ink-soft)] hover:text-[var(--co-ink)] underline underline-offset-2 cursor-pointer"
               >
                 {t.success.viewInvoice}
               </button>
@@ -1083,7 +1168,7 @@ export default function CheckoutPage({
                     <button
                       key={s.id}
                       onClick={() => onRegisterSticker(s.id)}
-                      className="w-full py-2.5 px-4 rounded-md bg-white hover:bg-gray-50 text-black border border-gray-300 hover:border-black font-semibold text-xs transition-colors flex items-center justify-between gap-2 cursor-pointer shadow-xs"
+                      className="w-full py-2.5 px-4 rounded-[var(--co-radius-sm)] bg-[var(--co-panel)] hover:bg-[var(--co-paper)] text-[var(--co-ink)] border border-[var(--co-line)] hover:border-[var(--co-ink)] font-semibold text-xs transition-colors flex items-center justify-between gap-2 cursor-pointer"
                     >
                       <span className="capitalize">{t.success.registerTag(cleanName)}</span>
                       <ArrowRight size={13} />

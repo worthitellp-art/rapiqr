@@ -57,7 +57,7 @@ export interface StickerPos {
 
 export interface SystemAlertItem {
   id: string;
-  category: "emergency" | "assistance" | "activation" | "scan" | "fleet";
+  category: "emergency" | "assistance" | "activation" | "scan" | "fleet" | "location";
   title: string;
   subtitle: string;
   timestamp: string;

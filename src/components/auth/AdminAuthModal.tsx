@@ -4,6 +4,8 @@ import { X, ShieldAlert, ArrowRight, Loader2, AlertCircle, Eye, EyeOff } from 'l
 import { useLanguage } from '../../context/LanguageContext';
 import { authTranslations } from '../../i18n/authTranslations';
 
+const SAVED_EMAIL_KEY = 'repiqr-admin-login-email';
+
 interface AdminAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -20,7 +22,13 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
   const { language } = useLanguage();
   const t = authTranslations[language].admin;
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => {
+    try {
+      return localStorage.getItem(SAVED_EMAIL_KEY) || '';
+    } catch {
+      return '';
+    }
+  });
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,6 +53,11 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess }: AdminAuth
       if (!result.success) {
         setErrorMessage(result.error || t.errors.incorrectCredentials);
         return;
+      }
+      try {
+        localStorage.setItem(SAVED_EMAIL_KEY, email.trim());
+      } catch {
+        // localStorage unavailable (private browsing, etc.) — skip saving
       }
       setPassword('');
       onSuccess();

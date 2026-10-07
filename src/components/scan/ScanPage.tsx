@@ -144,6 +144,49 @@ function makeContactId() {
   return `ec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// A refresh mid-activation shouldn't throw away what the visitor already typed —
+// sessionStorage (not localStorage) so it clears itself once the tab/session ends,
+// keyed per tag so two different tags scanned in the same browser don't collide.
+function activationDraftKey(qrId: string) {
+  return `repiqr-activation-draft-${qrId}`;
+}
+
+// The draft is kept in localStorage so it outlives a reload, a tab the phone
+// discarded, or a trip to another app. It expires after two hours so a shared
+// phone doesn't keep someone else's details indefinitely.
+const ACTIVATION_DRAFT_TTL_MS = 2 * 60 * 60 * 1000;
+
+function readActivationDraft(qrId: string): any | null {
+  try {
+    const raw = localStorage.getItem(activationDraftKey(qrId));
+    if (!raw) return null;
+    const draft = JSON.parse(raw);
+    if (!draft || Date.now() - Number(draft.savedAt || 0) > ACTIVATION_DRAFT_TTL_MS) {
+      localStorage.removeItem(activationDraftKey(qrId));
+      return null;
+    }
+    return draft;
+  } catch {
+    return null;
+  }
+}
+
+function writeActivationDraft(qrId: string, draft: object) {
+  try {
+    localStorage.setItem(activationDraftKey(qrId), JSON.stringify({ ...draft, savedAt: Date.now() }));
+  } catch {
+    // Storage unavailable (private browsing, quota) — the draft just won't persist.
+  }
+}
+
+function clearActivationDraft(qrId: string) {
+  try {
+    localStorage.removeItem(activationDraftKey(qrId));
+  } catch {
+    /* ignore */
+  }
+}
+
 // Emergency-contact numbers have no country selector of their own (the input
 // caps entry at 10 digits) — a ">= 7 digits" check let through numbers that
 // were obviously just partially typed (e.g. "1234567") and still proceed.
@@ -490,6 +533,141 @@ function IconTheftDetected() {
 /*  Main Light Theme Component                                             */
 /* ---------------------------------------------------------------------- */
 
+type LocationFix = { lat: number; lng: number; accuracy: number; timestamp: string };
+
+/**
+ * One GPS fix for a request, or null if the visitor declines or no fix arrives. Uses
+ * the same accuracy and timeout as the page's own location request, then retries with
+ * network location, since a cold GPS start often misses the first, tighter window.
+ */
+function getOneLocationFix(): Promise<LocationFix | null> {
+  const attempt = (options: PositionOptions) =>
+    new Promise<LocationFix | null>((resolve) => {
+      if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(null);
+      navigator.geolocation.getCurrentPosition(
+        (p) => resolve({
+          lat: p.coords.latitude,
+          lng: p.coords.longitude,
+          accuracy: Math.round(p.coords.accuracy),
+          timestamp: new Date().toISOString(),
+        }),
+        () => resolve(null),
+        options
+      );
+    });
+
+  return attempt({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
+    .then((fix) => fix ?? attempt({ enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }));
+}
+
+type ServiceRequestSlug = "ambulance" | "mechanic" | "towing";
+type ServiceRequestState = "idle" | "sending" | "sent";
+
+/* What the visitor can say they need, per service. The chosen one reaches the admin with the request. */
+const SERVICE_NEEDS: Record<ServiceRequestSlug, string[]> = {
+  ambulance: ["Medical emergency", "Injured after an accident", "Unwell or unconscious person", "Other medical help"],
+  mechanic: ["Battery dead", "Flat tyre", "Engine won't start", "Other mechanical problem"],
+  towing: ["Vehicle broke down", "Accident, needs towing", "Stuck and can't move", "Other"],
+};
+
+/*
+ * Asks the team for a service no provider covers here yet. The visitor picks what
+ * they need (and can add a note) before anything is sent; the location goes with it.
+ */
+function ServiceRequestButton({
+  service,
+  label,
+  state,
+  onRequest,
+}: {
+  service: ServiceRequestSlug;
+  label: string;
+  state: ServiceRequestState;
+  onRequest: (need: string, note: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [need, setNeed] = useState("");
+  const [note, setNote] = useState("");
+
+  if (state === "sent") {
+    return (
+      <p className="flex items-center justify-center gap-1.5 py-2 text-xs font-bold text-emerald-700">
+        <CheckCircle2 size={14} /> Request sent to our team
+      </p>
+    );
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        disabled={state === "sending"}
+        className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-gray-300 bg-white text-xs font-black text-gray-800 hover:bg-gray-50 disabled:opacity-60 transition-colors cursor-pointer"
+      >
+        <MapPin size={14} />
+        {label}
+      </button>
+    );
+  }
+
+  const sending = state === "sending";
+  return (
+    <div className="rounded-xl border border-gray-300 bg-white p-3 space-y-3">
+      <p className="text-xs font-black text-gray-900">What help do you need?</p>
+      <div className="grid grid-cols-1 gap-2" role="radiogroup" aria-label="What help do you need">
+        {SERVICE_NEEDS[service].map((option) => {
+          const selected = need === option;
+          return (
+            <button
+              key={option}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => setNeed(option)}
+              disabled={sending}
+              className={`text-left px-3 py-2.5 rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
+                selected ? "border-gray-900 bg-gray-900 text-white" : "border-gray-200 bg-gray-50 text-gray-800 hover:bg-gray-100"
+              }`}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        maxLength={300}
+        rows={2}
+        disabled={sending}
+        placeholder="Add a short note (optional)"
+        aria-label="Note for the team"
+        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-900 outline-none focus:border-gray-900"
+      />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          disabled={sending}
+          className="px-3 py-2 rounded-lg bg-gray-100 text-xs font-bold text-gray-700 cursor-pointer"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => onRequest(need, note.trim())}
+          disabled={!need || sending}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-gray-900 text-white text-xs font-black disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+        >
+          {sending ? <Loader2 size={14} className="animate-spin" /> : null}
+          {sending ? "Sending…" : "Send request"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => void; onGoToDashboard?: () => void }) {
   const { profile } = useAuth();
   const { installed: pwaInstalled, installing: pwaInstalling, hint: pwaHint, install: installPwa, showGuide: pwaShowGuide, setShowGuide: setPwaShowGuide } = useInstallPrompt();
@@ -503,6 +681,11 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     (qrData?.category || "car").trim().toLowerCase()
   );
   const [location, setLocation] = useState<GeoLocation | null>(null);
+  // Feedback for the "Location Access Blocked" screen's Try Again button —
+  // see the PERMISSION_DENIED branch in requestLocation() below for why these
+  // are needed (re-requesting after a real OS/browser block fails silently).
+  const [locationRetrying, setLocationRetrying] = useState(false);
+  const [locationStillBlocked, setLocationStillBlocked] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [visitorName, setVisitorName] = useState("");
   const [visitorMessage, setVisitorMessage] = useState("");
@@ -781,6 +964,44 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
     return () => { cancelled = true; };
   }, [visitorCity]);
 
+  // A service no provider covers in this area yet. The visitor can ask for it; the
+  // request reaches the admin with the visitor's coordinates. Tracked per service
+  // so each unavailable tile shows its own state.
+  const [serviceRequests, setServiceRequests] = useState<Partial<Record<ServiceRequestSlug, ServiceRequestState>>>({});
+  const requestService = async (service: ServiceRequestSlug, label: string, need: string, note: string) => {
+    if (!qrData || serviceRequests[service] === "sending" || serviceRequests[service] === "sent") return;
+    setServiceRequests((prev) => ({ ...prev, [service]: "sending" }));
+    try {
+      // The request should carry where the visitor is. If live tracking hasn't
+      // produced a fix yet, ask for one now (this tap is the user gesture).
+      const fix = location ?? (await getOneLocationFix());
+      // Keep a fix we just got, so the rest of the page can use it too.
+      if (!location && fix) setLocation(fix);
+      const res = await apiClient.alerts.createServiceInquiry({
+        qrId: qrData.id,
+        service,
+        city: visitorCity || undefined,
+        latitude: fix?.lat,
+        longitude: fix?.lng,
+        accuracy: fix?.accuracy,
+        customerToken: getChatCustomerToken(),
+        need,
+        note,
+      });
+      if (!res.success) throw new Error(res.error || "Couldn't send the request.");
+      setServiceRequests((prev) => ({ ...prev, [service]: "sent" }));
+      if (fix) {
+        showSentToast(`${label} request sent to our team with your location.`, "success");
+      } else {
+        // Be honest that the team has no position for this one.
+        showSentToast(`${label} request sent, but your location couldn't be read. Allow location and try again for faster help.`, "warning");
+      }
+    } catch (err: any) {
+      setServiceRequests((prev) => ({ ...prev, [service]: "idle" }));
+      showSentToast(err?.message || "Couldn't send the request. Try again.", "error");
+    }
+  };
+
   // The customer side of RepiChat has no account — it's identified by an opaque
   // token held in localStorage per QR id, the same one <RepiChat/> bootstraps
   // with. Resolving/minting it here lets a quick-issue alert land in the exact
@@ -928,6 +1149,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
   // Registration form fields (after activation code is validated)
   const [regName, setRegName] = useState("");
+  // The consent checkbox is part of the saved draft so a reload doesn't un-tick it.
+  const [regAgreed, setRegAgreed] = useState(false);
   const [regPhone, setRegPhone] = useState("");
   const [regVehicleNumber, setRegVehicleNumber] = useState("");
   const [regMessage, setRegMessage] = useState("");
@@ -1550,6 +1773,8 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
       return;
     }
 
+    setLocationRetrying(true);
+
     const toGeo = (pos: GeolocationPosition): GeoLocation => ({
       lat: pos.coords.latitude,
       lng: pos.coords.longitude,
@@ -1559,6 +1784,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        setLocationRetrying(false);
         setLocation(toGeo(pos));
         setPhase("emergency");
 
@@ -1586,7 +1812,14 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         );
       },
       (err) => {
+        setLocationRetrying(false);
         if (err.code === err.PERMISSION_DENIED) {
+          // Once the browser has actually blocked the permission, re-calling
+          // getCurrentPosition() can't re-prompt — it fails again instantly with
+          // the same error. Without this flag, tapping "Try Again" from the
+          // location-denied screen looked broken (same screen, no feedback at
+          // all) since `setPhase` is a no-op when the phase hasn't changed.
+          setLocationStillBlocked(true);
           setPhase("location-denied");
         } else {
           setPhase("gps-off");
@@ -1726,13 +1959,52 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
       // First-time scan → show the registration/activation form; already active → emergency page
       if (record.status === "inactive") {
-        setPhase("activation");
+        // Put the visitor back on the step they were on, with what they had typed.
+        const draft = readActivationDraft(record.id);
+        if (draft) {
+          if (draft.name) setRegName(draft.name);
+          if (draft.phone) setRegPhone(draft.phone);
+          if (draft.vehicleNumber) setRegVehicleNumber(draft.vehicleNumber);
+          if (draft.message) setRegMessage(draft.message);
+          if (draft.country) setRegCountry(draft.country);
+          if (draft.bloodGroup) setRegBloodGroup(draft.bloodGroup);
+          if (draft.allergies) setRegAllergies(draft.allergies);
+          if (draft.address) setRegAddress(draft.address);
+          if (typeof draft.agreed === "boolean") setRegAgreed(draft.agreed);
+          if (draft.pendingVerified === false) setPendingVerified(false);
+          if (Array.isArray(draft.emergencyContacts) && draft.emergencyContacts.length) {
+            setEmergencyContacts(draft.emergencyContacts);
+          }
+        }
+        setPhase(draft?.phase === "register" ? "register" : "activation");
       } else {
         setPhase("emergency");
       }
     }
 
   }, [requestLocation]);
+
+  // Autosave the activation form — including which step it is on and whether the
+  // phone was already verified — so a refresh resumes exactly there. Cleared on
+  // successful activation below.
+  useEffect(() => {
+    if (!qrData?.id) return;
+    if (phase !== "activation" && phase !== "register") return;
+    writeActivationDraft(qrData.id, {
+      phase,
+      name: regName,
+      phone: regPhone,
+      vehicleNumber: regVehicleNumber,
+      message: regMessage,
+      country: regCountry,
+      bloodGroup: regBloodGroup,
+      allergies: regAllergies,
+      address: regAddress,
+      agreed: regAgreed,
+      pendingVerified,
+      emergencyContacts,
+    });
+  }, [qrData?.id, phase, regName, regPhone, regVehicleNumber, regMessage, regCountry, regBloodGroup, regAllergies, regAddress, regAgreed, pendingVerified, emergencyContacts]);
 
   /* ---- Registration Form Submit (after activation code validated) ---- */
   const handleRegisterSubmit = async (verified = true) => {
@@ -1862,6 +2134,11 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
         category: qrData.category,
       }).catch(() => { /* non-blocking */ });
 
+      try {
+        clearActivationDraft(qrData.id);
+      } catch {
+        /* ignore */
+      }
       setPhase("success");
     }, 400);
   };
@@ -1940,7 +2217,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
     const validContacts = emergencyContacts.filter((c) => c.name.trim() && isValidContactPhone(c.phone));
     if (validContacts.length === 0) {
-      setContactsError("Add at least one contact (name + valid 10-digit mobile), or click Skip for now.");
+      setContactsError("Add at least one contact (name + valid 10-digit mobile) to finish activation.");
       return;
     }
     setContactsError(null);
@@ -1949,11 +2226,6 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
 
   // Skips the step entirely — handleRegisterSubmit already drops any incomplete rows,
   // so this simply proceeds without requiring a valid contact first.
-  const handleSkipEmergencyContacts = () => {
-    setContactsError(null);
-    handleRegisterSubmit(pendingVerified);
-  };
-
   // Latest location, read by the interval below without making it restart
   // (and re-send immediately) on every watchPosition refinement tick.
   const latestLocationRef = useRef<GeoLocation | null>(null);
@@ -2139,12 +2411,13 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                 if (onBack) onBack();
                 else window.location.href = "/";
               }}
+              agreed={regAgreed}
+              onAgreedChange={setRegAgreed}
               emergencyContacts={emergencyContacts}
               onAddEmergencyContact={addEmergencyContactRow}
               onRemoveEmergencyContact={removeEmergencyContact}
               onUpdateEmergencyContact={updateEmergencyContact}
               onFinishEmergencyContacts={handleFinishEmergencyContacts}
-              onSkipEmergencyContacts={handleSkipEmergencyContacts}
               onViewTag={() => setPhase("emergency")}
             />
           </div>
@@ -2225,25 +2498,42 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                   <p className="text-slate-500 text-xs leading-relaxed max-w-sm mx-auto mb-6">
                     Please enable location permission in your browser settings so responders know where your vehicle notification originated.
                   </p>
-                  
+
+                  {locationStillBlocked && !locationRetrying && (
+                    <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold text-left">
+                      Still blocked. Your browser hasn't let go of the block yet — update the permission using the steps on the right, then tap Try Again.
+                    </div>
+                  )}
+
                   <button
-                    onClick={requestLocation}
-                    className="w-full py-3.5 rounded-xl bg-black hover:bg-zinc-800 text-white font-bold text-sm shadow-md active:scale-[0.99] transition-all cursor-pointer"
+                    onClick={() => {
+                      setLocationStillBlocked(false);
+                      requestLocation();
+                    }}
+                    disabled={locationRetrying}
+                    className="w-full py-3.5 rounded-xl bg-black hover:bg-zinc-800 text-white font-bold text-sm shadow-md active:scale-[0.99] transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
                   >
-                    Try Again
+                    {locationRetrying ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Checking…</span>
+                      </>
+                    ) : (
+                      <span>Try Again</span>
+                    )}
                   </button>
                 </div>
               </div>
 
               <div className="md:col-span-5">
-                <div className="rounded-[24px] bg-white/90 backdrop-blur-xl border border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.04)] p-4 text-left space-y-2">
+                <div className={`rounded-[24px] bg-white/90 backdrop-blur-xl border p-4 text-left space-y-2 transition-colors ${locationStillBlocked ? 'border-amber-300 shadow-[0_10px_30px_rgba(217,119,6,0.12)]' : 'border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.04)]'}`}>
                   <div className="text-xs font-black text-slate-900 border-b border-slate-100 pb-2">
                     How to enable GPS in browser:
                   </div>
                   <div className="text-[11px] text-slate-600 space-y-1.5">
                     <p>1. Tap the <strong>Lock / Settings icon</strong> in your browser address bar.</p>
                     <p>2. Select <strong>Permissions</strong> → <strong>Location</strong>.</p>
-                    <p>3. Toggle to <strong>Allow</strong> and refresh.</p>
+                    <p>3. Toggle to <strong>Allow</strong>, then tap <strong>Try Again</strong> (or reload the page if it still shows blocked).</p>
                   </div>
                 </div>
               </div>
@@ -2799,13 +3089,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                             <Bot size={22} />
                             <span className="text-[11px] font-black leading-none">Ask Repi</span>
                           </button>
-                        ) : (
-                          <div aria-disabled="true" className="relative flex flex-col items-center justify-center gap-1.5 h-[74px] rounded-2xl bg-gray-100 border border-gray-200 cursor-not-allowed select-none">
-                            <Bot size={22} className="text-gray-400 blur-[2.5px]" />
-                            <span className="text-[11px] font-black leading-none text-gray-500 blur-[2.5px]">Ask Repi</span>
-                            <span className="absolute inset-0 flex items-center justify-center px-2 text-center text-[10px] font-bold text-gray-700">Assistant unavailable right now</span>
-                          </div>
-                        )}
+                        ) : null}
                       </div>
 
                       {/* Services: only what a provider covers in this area is live. */}
@@ -2824,11 +3108,12 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                             </span>
                           </a>
                         ) : (
-                          <div aria-disabled="true" className={`${serviceRow} bg-gray-50 border-gray-200 cursor-not-allowed`}>
-                            <span className="w-9 h-9 rounded-lg bg-gray-200 text-gray-400 flex items-center justify-center flex-shrink-0"><Stethoscope size={17} /></span>
-                            <span className="text-sm font-black text-gray-500 blur-[2.5px]">Ambulance</span>
-                            <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-gray-700">Ambulance not available in your area</span>
-                          </div>
+                          <ServiceRequestButton
+                              service="ambulance"
+                              label="Request an ambulance"
+                              state={serviceRequests.ambulance || "idle"}
+                              onRequest={(need, note) => requestService("ambulance", "Ambulance", need, note)}
+                            />
                         )}
 
                         {familyCount > 0 ? (
@@ -2842,13 +3127,7 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                               <span className="block text-[11px] font-medium text-emerald-700/80">{familyCount} number{familyCount === 1 ? "" : "s"} to call</span>
                             </span>
                           </button>
-                        ) : (
-                          <div aria-disabled="true" className={`${serviceRow} bg-gray-50 border-gray-200 cursor-not-allowed`}>
-                            <span className="w-9 h-9 rounded-lg bg-gray-200 text-gray-400 flex items-center justify-center flex-shrink-0"><User size={17} /></span>
-                            <span className="text-sm font-black text-gray-500 blur-[2.5px]">Family contacts</span>
-                            <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-gray-700">No family contacts added yet</span>
-                          </div>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   );
@@ -2914,6 +3193,14 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       ) : (
                         <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
                           <p className="text-xs font-semibold text-gray-400">Mechanic is not available in your area</p>
+                          <div className="mt-3">
+                            <ServiceRequestButton
+                              service="mechanic"
+                              label="Request a mechanic"
+                              state={serviceRequests.mechanic || "idle"}
+                              onRequest={(need, note) => requestService("mechanic", "Mechanic", need, note)}
+                            />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2980,6 +3267,14 @@ export default function ScanPage({ onBack, onGoToDashboard }: { onBack: () => vo
                       ) : (
                         <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center">
                           <p className="text-xs font-semibold text-gray-400">Tow truck is not available in your area</p>
+                          <div className="mt-3">
+                            <ServiceRequestButton
+                              service="towing"
+                              label="Request a tow truck"
+                              state={serviceRequests.towing || "idle"}
+                              onRequest={(need, note) => requestService("towing", "Tow truck", need, note)}
+                            />
+                          </div>
                         </div>
                       )}
                     </div>

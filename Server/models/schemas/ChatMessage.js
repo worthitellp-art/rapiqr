@@ -14,6 +14,11 @@ const chatMessageSchema = new Schema({
   attachment_name: { type: String, default: null },
   attachment_width: { type: Number, default: null },
   attachment_height: { type: Number, default: null },
+  // "Delete for everyone" blanks the message in place and stamps this, so both
+  // sides see a tombstone rather than a gap in the thread.
+  deleted_at: { type: Date, default: null },
+  // "Delete for me" records the side that hid it. The row stays for the other side.
+  deleted_for: { type: [String], enum: ['owner', 'customer'], default: [] },
 }, { versionKey: false });
 
 chatMessageSchema.index({ session_id: 1, created_at: 1 });

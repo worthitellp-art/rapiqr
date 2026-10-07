@@ -241,6 +241,8 @@ export interface ChatMessage {
   attachment_name?: string | null;
   attachment_width?: number | null;
   attachment_height?: number | null;
+  /** Set when the sender deleted this for everyone — the bubble becomes a tombstone. */
+  deleted_at?: string | null;
 }
 
 export interface ChatSession {
@@ -281,7 +283,7 @@ export interface OrderTracking {
 /** GET /api/admin/summary — exact fleet totals plus the "needs attention" counts. */
 export interface AdminSummary {
   tags: { total: number; active: number; inactive: number; scans: number; lastCreatedAt: string | null };
-  attention: { unresolvedAlerts: number; ordersToShip: number; pendingPartners: number; failedMessages24h: number };
+  attention: { unresolvedAlerts: number; newServiceInquiries: number; ordersToShip: number; pendingPartners: number; failedMessages24h: number };
   generatedAt: string;
 }
 
@@ -376,7 +378,7 @@ export const apiClient = {
     // the actual OTP client-side (its length is whatever the widget is
     // configured for in the MSG91 dashboard, not fixed here).
     async sendPhoneLoginOtp(phoneNumber: string) {
-      return request<{ success: boolean; simulated?: boolean; error?: string; message?: string; debugCode?: string }>('/auth/phone-login/send', {
+      return request<{ success: boolean; exists?: boolean; simulated?: boolean; error?: string; message?: string; debugCode?: string }>('/auth/phone-login/send', {
         method: 'POST',
         body: JSON.stringify({ phoneNumber }),
       });
@@ -384,10 +386,12 @@ export const apiClient = {
 
     // Verifying the OTP signs into (or creates) the account for that phone number.
     // `accessToken` comes from the MSG91 OTP Widget's verifyOtp() (src/lib/msg91Widget.ts).
-    async verifyPhoneLoginOtp(phoneNumber: string, accessToken: string) {
+    // `mode: 'login'` only signs into an existing account (404 when there is none);
+    // `mode: 'register'` creates the account with `fullName`.
+    async verifyPhoneLoginOtp(phoneNumber: string, accessToken: string, fullName?: string, mode: 'login' | 'register' = 'login') {
       return request<{ success: boolean; token?: string; user?: any; error?: string }>('/auth/phone-login/verify', {
         method: 'POST',
-        body: JSON.stringify({ phoneNumber, accessToken }),
+        body: JSON.stringify({ phoneNumber, accessToken, fullName, mode }),
       });
     },
 
@@ -703,8 +707,14 @@ export const apiClient = {
 
     // Every event across all of the caller's stickers in ONE request (each row
     // carries its `sticker_id`) — instead of one getHistory call per sticker.
-    async getAllHistory() {
-      return request<{ success: boolean; data: any[] }>('/products/history', { method: 'GET' }, 15_000);
+    /** `from` inclusive, `to` exclusive (ISO strings). Omit both for the most recent records. */
+    async getAllHistory(opts: { from?: string; to?: string; limit?: number } = {}) {
+      const params = new URLSearchParams();
+      if (opts.from) params.set('from', opts.from);
+      if (opts.to) params.set('to', opts.to);
+      if (opts.limit) params.set('limit', String(opts.limit));
+      const qs = params.toString();
+      return request<{ success: boolean; data: any[] }>(`/products/history${qs ? `?${qs}` : ''}`, { method: 'GET' }, 15_000);
     },
   },
 
@@ -731,8 +741,23 @@ export const apiClient = {
       });
     },
 
-    async getAlerts(limit = 50) {
-      return request<{ success: boolean; data: any[] }>(`/alerts?limit=${limit}`, {
+    async getAlerts(limit = 50, type?: string) {
+      const typeQs = type ? `&type=${encodeURIComponent(type)}` : '';
+      return request<{ success: boolean; data: any[] }>(`/alerts?limit=${limit}${typeQs}`, {
+        method: 'GET',
+      });
+    },
+
+    /** One row per live-location session (not per ping), newest first. */
+    async getTrails(limit = 200) {
+      return request<{ success: boolean; data: any[] }>(`/alerts/trails?limit=${limit}`, {
+        method: 'GET',
+      });
+    },
+
+    /** One session with its recent points, for the expanded row. */
+    async getTrail(id: string) {
+      return request<{ success: boolean; data: any }>(`/alerts/trails/${encodeURIComponent(id)}`, {
         method: 'GET',
       });
     },
@@ -752,6 +777,25 @@ export const apiClient = {
     async resolveAlert(id: string) {
       return request<{ success: boolean; message?: string; data?: any }>(`/alerts/${id}/resolve`, {
         method: 'PATCH',
+      });
+    },
+
+    /** A visitor asks for a service that no provider covers in their area yet. */
+    async createServiceInquiry(payload: {
+      qrId: string;
+      service: 'ambulance' | 'mechanic' | 'towing';
+      city?: string;
+      latitude?: number;
+      longitude?: number;
+      accuracy?: number;
+      customerToken?: string;
+      /** What the visitor said they need, from the option list for that service. */
+      need?: string;
+      note?: string;
+    }) {
+      return request<{ success: boolean; duplicate?: boolean; message?: string; error?: string }>('/alerts/service-inquiry', {
+        method: 'POST',
+        body: JSON.stringify(payload),
       });
     },
   },
@@ -845,6 +889,20 @@ export const apiClient = {
           method: 'POST',
           headers: customerToken ? { 'x-customer-token': customerToken } : undefined,
           body: JSON.stringify(payload),
+        }
+      );
+    },
+
+    /**
+     * `me` hides the message for the caller only. `everyone` blanks it for both
+     * sides and is only accepted from the person who sent it.
+     */
+    async deleteMessage(sessionId: string, messageId: string, scope: 'me' | 'everyone', customerToken?: string) {
+      return request<{ success: boolean; error?: string }>(
+        `/chat/sessions/${sessionId}/messages/${messageId}?scope=${scope}`,
+        {
+          method: 'DELETE',
+          headers: customerToken ? { 'x-customer-token': customerToken } : undefined,
         }
       );
     },
@@ -1208,8 +1266,10 @@ export const apiClient = {
   admin: {
     // One small response (no rows, no PII) that the console polls instead of
     // re-downloading the alert, order and QR lists on separate timers.
-    async getSummary() {
-      return request<{ success: boolean; data: AdminSummary }>('/admin/summary', { method: 'GET' });
+    /** `inquiriesSince`: ISO time the admin last opened Communication; service requests after it are counted as new. */
+    async getSummary(opts: { inquiriesSince?: string } = {}) {
+      const qs = opts.inquiriesSince ? `?inquiriesSince=${encodeURIComponent(opts.inquiriesSince)}` : '';
+      return request<{ success: boolean; data: AdminSummary }>(`/admin/summary${qs}`, { method: 'GET' });
     },
 
     // reveal=true asks the backend for unmasked phone/email — the backend
@@ -1424,6 +1484,13 @@ export const apiClient = {
         { method: 'GET', signal }
       );
     },
+    async suggest(query: string, kind: 'city' | 'state', signal?: AbortSignal) {
+      const params = new URLSearchParams({ q: query, kind });
+      return request<{ success: boolean; data: string[] }>(
+        `/geo/suggest?${params.toString()}`,
+        { method: 'GET', signal }
+      );
+    },
     async pincode(pin: string, signal?: AbortSignal) {
       return request<{ success: boolean; data: Omit<GeoAddress, 'address' | 'formatted' | 'latitude' | 'longitude'> }>(
         `/geo/pincode/${encodeURIComponent(pin)}`,
@@ -1532,6 +1599,13 @@ export const apiClient = {
         body: JSON.stringify(updates),
       });
     },
+    /** `image` is a base64 data URL (e.g. from canvas.toDataURL() or FileReader). */
+    async uploadAvatar(image: string) {
+      return request<{ success: boolean; data: any }>('/privacy/avatar', {
+        method: 'POST',
+        body: JSON.stringify({ image }),
+      });
+    },
     async getSharing() {
       return request<{ success: boolean; data: any[] }>('/privacy/sharing', { method: 'GET' });
     },
@@ -1550,10 +1624,15 @@ export const apiClient = {
         body: JSON.stringify({ purpose }),
       });
     },
-    async requestErasure(reason?: string) {
+    async sendErasureOtp() {
+      return request<{ success: boolean; message?: string }>('/privacy/erasure-otp', {
+        method: 'POST',
+      });
+    },
+    async requestErasure(code: string, reason?: string) {
       return request<{ success: boolean; data: any }>('/privacy/erasure-request', {
         method: 'POST',
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify({ code, reason }),
       });
     },
     async exportData() {
@@ -1576,4 +1655,3 @@ export const apiClient = {
     },
   },
 };
-

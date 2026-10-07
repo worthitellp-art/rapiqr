@@ -13,6 +13,7 @@ export const dashboardTranslations: Record<Language, {
       setup: string;
       products: string;
       chat: string;
+      mysticker: string;
       contacts: string;
       history: string;
       settings: string;
@@ -236,7 +237,8 @@ export const dashboardTranslations: Record<Language, {
         overview: 'Home Overview',
         setup: 'Setup Guide',
         products: 'Products',
-        chat: 'Live Visitor Chat',
+        chat: 'Chat',
+        mysticker: 'My Sticker',
         contacts: 'Emergency Contacts',
         history: 'Alert History',
         settings: 'Account Settings',
@@ -476,7 +478,8 @@ export const dashboardTranslations: Record<Language, {
         overview: 'होम अवलोकन',
         setup: 'सेटअप गाइड',
         products: 'उत्पाद',
-        chat: 'लाइव विज़िटर चैट',
+        chat: 'चैट',
+        mysticker: 'मेरा स्टिकर',
         contacts: 'आपातकालीन संपर्क',
         history: 'अलर्ट इतिहास',
         settings: 'खाता सेटिंग्स',
@@ -716,7 +719,8 @@ export const dashboardTranslations: Record<Language, {
         overview: 'હોમ ઓવરવ્યૂ',
         setup: 'સેટઅપ ગાઇડ',
         products: 'ઉત્પાદનો',
-        chat: 'લાઇવ વિઝિટર ચેટ',
+        chat: 'ચેટ',
+        mysticker: 'મારું સ્ટીકર',
         contacts: 'ઇમરજન્સી સંપર્કો',
         history: 'એલર્ટ ઇતિહાસ',
         settings: 'એકાઉન્ટ સેટિંગ્સ',

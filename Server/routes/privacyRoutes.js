@@ -12,12 +12,14 @@ const erasureLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 3, message: 'T
 
 router.get('/me', verifyToken, PrivacyController.me);
 router.patch('/me', verifyToken, PrivacyController.updateMe);
+router.post('/avatar', verifyToken, PrivacyController.uploadAvatar);
 router.get('/sharing', verifyToken, PrivacyController.sharing);
 
 router.get('/consent', verifyToken, PrivacyController.listConsent);
 router.post('/consent', verifyToken, PrivacyController.grantConsent);
 router.post('/consent/withdraw', verifyToken, PrivacyController.withdrawConsent);
 
+router.post('/erasure-otp', verifyToken, erasureLimiter, PrivacyController.sendErasureOtp);
 router.post('/erasure-request', verifyToken, erasureLimiter, PrivacyController.requestErasure);
 router.get('/export', verifyToken, PrivacyController.exportData);
 router.post('/nominee', verifyToken, PrivacyController.setNominee);

@@ -9,6 +9,7 @@ const geoLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 40, message: 'Too 
 
 router.get('/reverse', geoLimiter, GeoController.reverse);
 router.get('/forward', geoLimiter, GeoController.forward);
+router.get('/suggest', geoLimiter, GeoController.suggest);
 router.get('/pincode/:pin', geoLimiter, GeoController.pincode);
 
 module.exports = router;

@@ -10,6 +10,9 @@ const { logger } = require('../middleware/loggerMiddleware');
 const { sendServerError } = require('../utils/httpErrors');
 const { clampLimit } = require('../utils/pagination');
 const { logAuditEvent } = require('../services/auditService');
+const { notifyAdmins } = require('../services/adminNotifier');
+const LocationTrailModel = require('../models/locationTrailModel');
+const { registeredName } = require('../utils/stickerNames');
 const SecurityEventTypes = require('../utils/securityEventTypes');
 const { WHATSAPP_ERROR_CODES, createWhatsAppError } = require('../utils/whatsappErrorCatalog');
 
@@ -22,6 +25,9 @@ const ownerWhatsAppSentAt = new Map(); // threadKey -> last WhatsApp time (ms)
 
 
 const CHAT_TEXT_MAX = 600;
+
+const SERVICE_INQUIRY_LABELS = { ambulance: 'Ambulance', mechanic: 'Mechanic', towing: 'Tow truck' };
+const SERVICE_INQUIRY_DEDUPE_MS = 24 * 60 * 60 * 1000;
 
 function buildAlertChatText(label, rawMessage) {
   if (!rawMessage) {
@@ -55,8 +61,42 @@ class AlertController {
         alertPayload.productId = product.id;
       }
 
-      const result = await AlertModel.createAlert(alertPayload);
+      // Live-location fixes go into the visitor's trail for this sticker — one
+      // entry per session with its points — instead of one alert row per 5 seconds.
+      let result;
+      if (alertPayload.type === 'location_ping') {
+        const lat = Number(alertPayload.latitude);
+        const lng = Number(alertPayload.longitude);
+        if (qrId && Number.isFinite(lat) && Number.isFinite(lng)) {
+          result = await LocationTrailModel.recordPing({
+            stickerId: qrId,
+            visitorKey: alertPayload.customerToken,
+            lat,
+            lng,
+            accuracy: Number(alertPayload.accuracy) || null,
+            at: alertPayload.timestamp ? new Date(alertPayload.timestamp) : new Date(),
+          });
+        } else {
+          result = { id: null };
+        }
+      } else {
+        result = await AlertModel.createAlert(alertPayload);
+      }
       logger.success('ALERT_EMERGENCY', `Alert dispatched successfully: ${result.id || 'ok'}`);
+
+      // Live-location pings update a card in the chat; they aren't new alerts for the admin.
+      if (alertPayload.type !== 'location_ping') {
+        getIo()?.to('admins').emit('admin_update', { kind: 'alert', sticker: qrId || null });
+
+        const isSos = String(alertPayload.type || '').toLowerCase() === 'emergency';
+        const who = registeredName(product?.name) || qrId || 'a sticker';
+        notifyAdmins({
+          title: isSos ? 'SOS alert' : 'New alert',
+          body: `${who}: ${String(alertPayload.message || 'Alert received').slice(0, 120)}`,
+          url: '/admin',
+          tag: `alert-${result.id || qrId}`,
+        });
+      }
 
       // Best-effort WhatsApp to the sticker owner AND, for emergencies, their
       // registered emergency contacts. SMS is deliberately not used and is not a
@@ -245,13 +285,135 @@ class AlertController {
   }
 
   /**
+   * A visitor asks for a service (ambulance, mechanic, tow truck) that no
+   * provider covers in their area. The request lands in the admin Alerts log
+   * and Communication tab with the visitor's coordinates, so someone can line
+   * up a provider for that spot.
+   */
+  static async createServiceInquiry(req, res) {
+    try {
+      const { qrId, service, city, latitude, longitude, accuracy, customerToken, need, note } = req.body || {};
+
+      const label = SERVICE_INQUIRY_LABELS[String(service || '').toLowerCase()];
+      if (!label) return res.status(400).json({ success: false, error: 'Choose a service to request.' });
+
+      const stickerId = String(qrId || '').trim();
+      if (!stickerId) return res.status(400).json({ success: false, error: 'qrId is required' });
+
+      // A bad or spoofed fix is dropped rather than rejected — the request still matters without GPS.
+      const lat = Number(latitude);
+      const lng = Number(longitude);
+      const hasFix = Number.isFinite(lat) && Number.isFinite(lng)
+        && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
+
+      const place = String(city || '').trim().slice(0, 80) || 'an unknown area';
+      // What the visitor picked and any note, so the admin knows what help to send.
+      const needText = String(need || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+      const noteText = String(note || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+      const message = `Service inquiry: ${label} requested in ${place}.`
+        + (needText ? ` Need: ${needText}.` : '')
+        + (noteText ? ` Note: ${noteText}` : '')
+        + ' No provider covers this area yet.';
+
+      // Repeated taps (or a reload) in the same day shouldn't stack up identical rows.
+      const duplicate = await AlertModel.findRecentServiceInquiry(
+        stickerId,
+        message,
+        new Date(Date.now() - SERVICE_INQUIRY_DEDUPE_MS)
+      );
+      if (duplicate) {
+        return res.json({ success: true, duplicate: true, message: 'Already requested — we have it.' });
+      }
+
+      const product = await ProductModel.getByQrCodeId(stickerId).catch(() => null);
+      await AlertModel.createAlert({
+        qrId: stickerId,
+        type: 'service_inquiry',
+        message,
+        productLabel: product?.name || 'RapiQR Item',
+        latitude: hasFix ? lat : undefined,
+        longitude: hasFix ? lng : undefined,
+        accuracy: hasFix ? Number(accuracy) || null : undefined,
+        timestamp: new Date().toISOString(),
+      });
+
+      // The visitor's fix also goes into the live-location collection, so it sits
+      // with the other coordinates for this sticker rather than only on the alert.
+      if (hasFix) {
+        await LocationTrailModel.recordPing({
+          stickerId,
+          visitorKey: customerToken,
+          lat,
+          lng,
+          accuracy: Number(accuracy) || null,
+          at: new Date(),
+        }).catch((err) => logger.warn('SERVICE_INQUIRY', `Could not record fix: ${err?.message || err}`));
+      }
+
+      getIo()?.to('admins').emit('admin_update', { kind: 'service_inquiry', sticker: stickerId });
+
+      notifyAdmins({
+        title: 'New service request',
+        body: `${label} requested in ${place}`,
+        url: '/admin',
+        // A unique tag per request: the push throttle keys on the tag, and every new
+        // request should reach the admin, not just the first one for a sticker.
+        tag: `service-inquiry-${stickerId}-${Date.now()}`,
+      });
+
+      logger.event('SERVICE_INQUIRY', '📍', `${label} requested in ${place} for QR ${stickerId}`);
+      return res.json({ success: true, message: 'Request sent' });
+    } catch (err) {
+      logger.error('SERVICE_INQUIRY', 'Failed to save service inquiry', err);
+      return sendServerError(res, err);
+    }
+  }
+
+  /** Live-location trails, one per session, newest first. GET /api/alerts/trails */
+  static async listTrails(req, res) {
+    try {
+      const parseDate = (value) => {
+        if (!value) return null;
+        const d = new Date(String(value));
+        return Number.isNaN(d.getTime()) ? null : d;
+      };
+      const limit = clampLimit(req.query.limit, { fallback: 200, max: 500 });
+      const data = await LocationTrailModel.listSummaries({
+        from: parseDate(req.query.from),
+        to: parseDate(req.query.to),
+        limit,
+      });
+      return res.json({ success: true, data });
+    } catch (err) {
+      logger.error('ALERT_TRAILS', 'Failed to list location trails', err);
+      return sendServerError(res, err);
+    }
+  }
+
+  /** One trail with its recent points. GET /api/alerts/trails/:id */
+  static async getTrail(req, res) {
+    try {
+      if (!/^[0-9a-fA-F]{24}$/.test(String(req.params.id))) {
+        return res.status(400).json({ success: false, error: 'Invalid trail id' });
+      }
+      const trail = await LocationTrailModel.getById(req.params.id);
+      if (!trail) return res.status(404).json({ success: false, error: 'Trail not found' });
+      return res.json({ success: true, data: trail });
+    } catch (err) {
+      logger.error('ALERT_TRAILS', 'Failed to load location trail', err);
+      return sendServerError(res, err);
+    }
+  }
+
+  /**
    * Get Alerts Log
    */
   static async getAlerts(req, res) {
     try {
       const limit = clampLimit(req.query.limit, { fallback: 50, max: 500 });
       logger.info('ALERT_LIST', `Fetching emergency alerts log (limit: ${limit})`);
-      const data = await AlertModel.getAlerts(limit);
+      const type = typeof req.query.type === 'string' && req.query.type ? req.query.type : null;
+      const data = await AlertModel.getAlerts(limit, { type });
       return res.json({ success: true, data });
     } catch (err) {
       logger.error('ALERT_LIST', 'Failed to fetch alerts log', err);

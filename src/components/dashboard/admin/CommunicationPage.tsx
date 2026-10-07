@@ -5,6 +5,8 @@ import {
   RefreshCw, ChevronLeft, ChevronRight, LocateFixed, CheckCircle2, XCircle,
 } from "lucide-react";
 import { apiClient, type ProviderInput } from "../../../lib/apiClient";
+import { usePolling } from "../../../hooks/usePolling";
+import { connectAsOwner } from "../../../lib/socketClient";
 import PhoneInputWithCountry from "../../common/PhoneInputWithCountry";
 import { SERVICE_TYPES, slugifyService } from "../../scan/tileActions";
 import { getServiceMeta } from "../../scan/serviceMeta";
@@ -115,6 +117,109 @@ function Modal({ onClose, children, wide = false }: { onClose: () => void; child
 }
 
 const MapFallback = ({ h = "h-64" }: { h?: string }) => <div className={`${h} w-full animate-pulse rounded-xl bg-[var(--fx-canvas)]`} />;
+
+/** When this admin last opened Communication. Shared with the sidebar badge in AdminDashboard. */
+export const COMMUNICATION_SEEN_KEY = "repiqr-admin-communication-seen-at";
+
+/**
+ * Visitor requests for a service no provider covers yet, newest first, with the spot they
+ * were filed from. Refreshes every 30 seconds; requests that arrived since the admin last
+ * opened this tab are marked new.
+ */
+function ServiceInquiriesPanel() {
+  // Read on mount, before the dashboard marks this tab as seen, so "new" means since the last visit.
+  const [seenBefore] = useState<number>(() => {
+    try {
+      const stored = Date.parse(localStorage.getItem(COMMUNICATION_SEEN_KEY) || "");
+      return Number.isNaN(stored) ? Date.now() - 24 * 60 * 60 * 1000 : stored;
+    } catch {
+      return Date.now() - 24 * 60 * 60 * 1000;
+    }
+  });
+  const [rows, setRows] = useState<any[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await apiClient.alerts.getAlerts(200, "service_inquiry");
+      setRows(res.data || []);
+      setError(null);
+    } catch (err: any) {
+      setError(err?.message || "Couldn't load service inquiries.");
+      throw err; // lets the poller back off while the server is unreachable
+    }
+  }, []);
+
+  usePolling(load, { intervalMs: 30_000 });
+
+  // The server pushes a signal the moment a request arrives, so the list doesn't wait for the next poll.
+  useEffect(() => {
+    const token = localStorage.getItem("repiqr-token") || localStorage.getItem("namoqr-token") || "";
+    const socket = connectAsOwner(token);
+    const onUpdate = () => { load().catch(() => { /* the poll shows the error */ }); };
+    socket.on("admin_update", onUpdate);
+    return () => { socket.off("admin_update", onUpdate); };
+  }, [load]);
+
+  const isNew = (r: any) => new Date(r.created_at).getTime() > seenBefore;
+  const newCount = rows ? rows.filter(isNew).length : 0;
+
+  return (
+    <section className="rounded-xl border border-[var(--fx-border)] bg-white" aria-label="Service inquiries">
+      <header className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--fx-border)]">
+        <h2 className="fx-text-label-tab text-[var(--fx-ink)]">Service inquiries</h2>
+        <div className="flex items-center gap-2">
+          {newCount > 0 && (
+            <span className="rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white tabular-nums" aria-live="polite">
+              {newCount} new
+            </span>
+          )}
+          {rows && <span className="text-xs font-bold text-[var(--fx-ink-2)] tabular-nums">{rows.length}</span>}
+        </div>
+      </header>
+
+      {error ? (
+        <p className="px-4 py-4 text-sm text-red-600">{error}</p>
+      ) : rows === null ? (
+        <div className="m-4 h-14 animate-pulse rounded-lg bg-[var(--fx-canvas)]" />
+      ) : rows.length === 0 ? (
+        <p className="px-4 py-4 text-sm text-[var(--fx-ink-2)]">No service requests from visitors yet.</p>
+      ) : (
+        <ul className="divide-y divide-[var(--fx-border)]">
+          {rows.slice(0, 25).map((r) => {
+            const lat = r.location?.lat;
+            const lng = r.location?.lng;
+            return (
+              <li key={r.id} className={`flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 ${isNew(r) ? "bg-red-50/40" : ""}`}>
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-[var(--fx-ink)]">
+                    {isNew(r) && <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-extrabold text-red-700">NEW</span>}
+                    <span>{r.message}</span>
+                  </p>
+                  <p className="text-xs text-[var(--fx-ink-2)]">
+                    {new Date(r.created_at).toLocaleString()} · {r.product_label}
+                  </p>
+                </div>
+                {lat != null && lng != null ? (
+                  <a
+                    href={`https://www.google.com/maps?q=${lat},${lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--fx-ink)] underline underline-offset-2 tabular-nums"
+                  >
+                    <MapPin size={13} /> {Number(lat).toFixed(5)}, {Number(lng).toFixed(5)}
+                  </a>
+                ) : (
+                  <span className="text-xs text-[var(--fx-ink-2)]">Location not shared</span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
 
 export default function CommunicationPage({ setToast }: { setToast: (msg: string | null) => void }) {
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -246,6 +351,8 @@ export default function CommunicationPage({ setToast }: { setToast: (msg: string
           { key: "active", label: "Active", value: counts.active, tone: "green" },
         ]}
       />
+
+      <ServiceInquiriesPanel />
 
       {/* Tabs + search */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">

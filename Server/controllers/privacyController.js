@@ -9,6 +9,16 @@ const { logAuditEvent } = require('../services/auditService');
 const SecurityEventTypes = require('../utils/securityEventTypes');
 const { PROCESSORS } = require('../config/processorRegistry');
 const { logger } = require('../middleware/loggerMiddleware');
+const { createOtp, verifyOtp } = require('../services/phoneVerificationService');
+const { sendWhatsAppOtp, sendSmsOtp } = require('../services/smsService');
+const { normalizePhone } = require('../utils/phone');
+const { uploadPublicFile } = require('../services/storageService');
+const crypto = require('crypto');
+
+// Same allowlist/size cap as chat image attachments (chatController.js) — no
+// reason for avatars to be more permissive.
+const AVATAR_ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif'];
+const AVATAR_MAX_BYTES = 4 * 1024 * 1024;
 
 // Bump this whenever PrivacyPolicyPage.tsx's substantive content changes —
 // consent records and /privacy/me both cite it so "what did they actually
@@ -55,6 +65,47 @@ class PrivacyController {
     } catch (err) {
       logger.error('PRIVACY_UPDATE_ME', 'PrivacyController.updateMe failed', err);
       return res.status(500).json({ success: false, error: 'Failed to update profile' });
+    }
+  }
+
+  /**
+   * POST /api/privacy/avatar — Account Settings' "upload a photo" control.
+   * Takes a base64 data URL (same convention as chat image attachments, see
+   * chatController.sendAttachment) rather than multipart, stores it through
+   * the shared storage service (S3 or local-disk fallback), and saves the
+   * resulting URL straight onto the profile.
+   */
+  static async uploadAvatar(req, res) {
+    try {
+      const { image } = req.body || {};
+      if (!image) return res.status(400).json({ success: false, error: 'image (base64 data URL) is required' });
+
+      const mimeMatch = String(image).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/);
+      const contentType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      if (!AVATAR_ALLOWED_TYPES.includes(contentType)) {
+        return res.status(400).json({ success: false, error: `Unsupported image type: ${contentType}` });
+      }
+
+      const buffer = Buffer.from(mimeMatch ? String(image).split(',')[1] : String(image), 'base64');
+      if (!buffer.length) return res.status(400).json({ success: false, error: 'The image data was empty or malformed.' });
+      if (buffer.length > AVATAR_MAX_BYTES) {
+        return res.status(413).json({
+          success: false,
+          error: `That image is ${(buffer.length / 1024 / 1024).toFixed(1)} MB — the limit is ${AVATAR_MAX_BYTES / 1024 / 1024} MB.`,
+        });
+      }
+
+      const ext = (contentType.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+      // Random filename, not the user's: avoids collisions and doesn't leak
+      // anything about the original file.
+      const key = `avatars/${req.user.id}/${crypto.randomUUID()}.${ext}`;
+      const publicUrl = await uploadPublicFile(key, buffer, contentType);
+
+      const updated = await UserModel.updateProfile(req.user.id, { avatarUrl: publicUrl });
+      return res.json({ success: true, data: updated });
+    } catch (err) {
+      logger.error('AVATAR_UPLOAD', 'PrivacyController.uploadAvatar failed', err);
+      return res.status(500).json({ success: false, error: 'Failed to upload avatar' });
     }
   }
 
@@ -145,14 +196,60 @@ class PrivacyController {
   }
 
   /**
-   * POST /api/privacy/erasure-request — identity is already proven by the JWT
-   * that got the caller here, so this auto-fulfills through the existing
-   * account-deletion service rather than sitting in a manual queue. The
-   * PrivacyRequest record is what makes that auditable (task.md §26).
+   * POST /api/privacy/erasure-otp — step 1 of self-service deletion: send a
+   * code to the account's own phone. Deletion is irreversible, so the JWT
+   * alone (proves "signed in as this account") isn't enough on its own —
+   * this adds a second factor the way password reset already does.
+   */
+  static async sendErasureOtp(req, res) {
+    try {
+      const profile = await UserModel.findById(req.user.id);
+      if (!profile?.phone_number) {
+        return res.status(400).json({ success: false, error: 'No phone number on this account — add one in Account Settings first so we can verify it\'s really you before deleting.' });
+      }
+      const norm = normalizePhone(profile.phone_number);
+      const code = createOtp(`delete:${req.user.id}`, profile.phone_number);
+      const text = `Your RapiQR account deletion verification code is ${code}. Valid for 5 minutes. Didn't request this? Ignore this message.`;
+      sendWhatsAppOtp({ to: profile.phone_number, code, event: 'ACCOUNT_DELETE_WHATSAPP' }).catch(() => {});
+      sendSmsOtp({ to: profile.phone_number, code, body: text, event: 'ACCOUNT_DELETE_SMS' }).catch(() => {});
+      logger.security('ACCOUNT_DELETE_OTP_SENT', `Account deletion OTP dispatched to ${norm} for user ${req.user.id}`);
+      return res.json({ success: true, message: 'Verification code sent to your phone number.' });
+    } catch (err) {
+      logger.error('ACCOUNT_DELETE_OTP_SEND', 'Failed to send account deletion OTP', err);
+      return res.status(500).json({ success: false, error: err.message || 'Failed to send verification code.' });
+    }
+  }
+
+  /**
+   * POST /api/privacy/erasure-request — step 2: verify the code from
+   * sendErasureOtp, then auto-fulfill through the existing account-deletion
+   * service rather than sitting in a manual queue. The PrivacyRequest record
+   * is what makes that auditable (task.md §26). Also drops an alert the
+   * admin fleet dashboard already shows (Alert History) so admin knows this
+   * account/id was deleted, since the user row won't exist to look up after.
    */
   static async requestErasure(req, res) {
     let request;
     try {
+      const code = req.body?.code;
+      if (!code || !String(code).trim()) {
+        return res.status(400).json({ success: false, error: 'Verification code is required.' });
+      }
+      const verification = verifyOtp(`delete:${req.user.id}`, String(code).trim());
+      if (!verification.ok) {
+        const messages = {
+          no_pending_otp: 'No active verification code — please request a new one.',
+          expired: 'Verification code has expired — please request a new one.',
+          too_many_attempts: 'Too many incorrect attempts — please request a new code.',
+          invalid_code: `Incorrect code.${verification.attemptsLeft ? ` ${verification.attemptsLeft} attempt(s) left.` : ''}`,
+        };
+        return res.status(400).json({ success: false, error: messages[verification.reason] || 'Verification failed.' });
+      }
+
+      // Snapshot identity before the row is gone — the admin alert and audit
+      // trail need something a human can recognize, not just a deleted id.
+      const profileSnapshot = await UserModel.findById(req.user.id).catch(() => null);
+
       request = await PrivacyModel.createPrivacyRequest({ userId: req.user.id, type: 'ERASURE', reason: req.body?.reason });
 
       await logAuditEvent({
@@ -175,6 +272,13 @@ class PrivacyController {
         resourceId: req.user.id,
         reason: 'Self-service erasure request fulfilled',
       });
+
+      // Best-effort admin-visible alert — must never block the deletion itself.
+      AlertModel.createAlert({
+        productLabel: profileSnapshot?.full_name || profileSnapshot?.phone_number || profileSnapshot?.email || 'Unknown user',
+        type: 'account_deleted',
+        message: `Account deleted via self-service erasure (OTP-verified). Name: ${profileSnapshot?.full_name || 'N/A'} • Phone: ${profileSnapshot?.phone_number || 'N/A'} • Email: ${profileSnapshot?.email || 'N/A'} • User ID: ${req.user.id}`,
+      }).catch((alertErr) => logger.warn('ACCOUNT_DELETE_ALERT', `Failed to create admin alert: ${alertErr.message}`));
 
       return res.json({ success: true, data: fulfilled });
     } catch (err) {

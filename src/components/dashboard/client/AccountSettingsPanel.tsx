@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { ShieldCheck, KeyRound, Mail, Smartphone, Loader2, Check, Copy, Bell, Save, Lock, User, RefreshCw, AlertCircle } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ShieldCheck, Mail, Loader2, Check, Bell, Save, User, RefreshCw, AlertCircle, Camera } from 'lucide-react';
+import InitialAvatar from '../../common/InitialAvatar';
 import { useAuth } from '../../../context/AuthContext';
 import { apiClient, isApiBackendConfigured } from '../../../lib/apiClient';
 import { isPushSupported, getExistingSubscription, subscribeToPush, unsubscribeFromPush } from '../../../lib/push';
@@ -9,6 +10,36 @@ import { sendMsg91Otp, verifyMsg91Otp, retryMsg91Otp, toMsg91Identifier } from '
 const inputCls = 'w-full px-3.5 py-2.5 text-sm bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-lg outline-none focus:border-[var(--fx-ink)] transition-colors';
 const labelCls = 'block text-xs font-bold text-[var(--fx-ink-2)] mb-1';
 const cardCls = 'bg-white border border-[var(--fx-border)] rounded-xl p-5 sm:p-6 space-y-4 shadow-xs';
+
+const AVATAR_MAX_SOURCE_BYTES = 8 * 1024 * 1024; // reject obviously-oversized picks before even decoding them
+
+/** Downscales to at most `maxSize`px on the long edge and re-encodes as JPEG — keeps
+ * the upload small regardless of what the camera/gallery produced. */
+function resizeImageToDataUrl(file: File, maxSize = 512): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read the selected file.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('That file is not a readable image.'));
+      img.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Could not process the image.'));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 function Banner({ tone, message }: { tone: 'success' | 'error'; message: string }) {
   return (
@@ -61,11 +92,7 @@ export default function AccountSettingsPanel({
         isAdmin={isAdmin}
       />
 
-      {/* PASSWORD CHANGE & PHONE OTP RESET SECTION */}
-      <PasswordSecuritySection profile={profile} showToast={showToast} />
-
       {/* SECURITY CONTROLS */}
-      <TwoFactorSection profile={profile} refreshProfile={refreshProfile} showToast={showToast} />
       <PushNotificationsSection showToast={showToast} />
 
       {!isAdmin && <DangerZoneSection onAccountDeleted={onAccountDeleted} />}
@@ -93,7 +120,10 @@ function UnifiedAccountForm({
 
   // Basic Details
   const [fullName, setFullName] = useState(profile?.fullName || '');
-  const [email, setEmail] = useState(profile?.email || '');
+  // Deliberately NOT prefilled from profile.email — stays blank unless the
+  // user types something, so an untouched blank field is never mistaken for
+  // "clear my email" on save (see emailChanged below).
+  const [email, setEmail] = useState('');
 
   // Password confirmation for email changes
   const [currentPassword, setCurrentPassword] = useState('');
@@ -112,17 +142,51 @@ function UnifiedAccountForm({
   const [loadingStickers, setLoadingStickers] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(0);
 
-  // Keep state synced if profile updates externally
+  // Avatar upload
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarMsg, setAvatarMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+
+  // Keep state synced if profile updates externally (email is intentionally
+  // excluded — it stays blank unless the user types into it).
   useEffect(() => {
     if (profile?.fullName) setFullName(profile.fullName);
-    if (profile?.email) setEmail(profile.email);
-  }, [profile?.fullName, profile?.email]);
+  }, [profile?.fullName]);
 
   useEffect(() => {
     if (resendCountdown <= 0) return;
     const timer = setInterval(() => setResendCountdown((c) => (c > 1 ? c - 1 : 0)), 1000);
     return () => clearInterval(timer);
   }, [resendCountdown]);
+
+  const handleAvatarPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow picking the same file again later
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setAvatarMsg({ tone: 'error', text: 'Please choose an image file.' });
+      return;
+    }
+    if (file.size > AVATAR_MAX_SOURCE_BYTES) {
+      setAvatarMsg({ tone: 'error', text: 'That image is too large — please choose one under 8 MB.' });
+      return;
+    }
+
+    setAvatarUploading(true);
+    setAvatarMsg(null);
+    try {
+      const dataUrl = await resizeImageToDataUrl(file);
+      const res = await apiClient.privacy.uploadAvatar(dataUrl);
+      if (!res?.success) throw new Error('Upload failed.');
+      await refreshProfile();
+      showToast('Profile photo updated');
+    } catch (err: any) {
+      setAvatarMsg({ tone: 'error', text: err?.message || 'Failed to upload photo.' });
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
 
   const handleLoadStickers = async () => {
     setLoadingStickers(true);
@@ -206,7 +270,9 @@ function UnifiedAccountForm({
     setMsg(null);
 
     const nameChanged = fullName.trim() !== (profile?.fullName || '');
-    const emailChanged = email.trim() !== (profile?.email || '');
+    // An untouched blank field must never be read as "clear my email" —
+    // only a non-blank value that actually differs from the saved one counts.
+    const emailChanged = email.trim() !== '' && email.trim() !== (profile?.email || '');
 
     if (!nameChanged && !emailChanged) {
       setMsg({ tone: 'success', text: 'No changes detected.' });
@@ -278,6 +344,31 @@ function UnifiedAccountForm({
         <span className="text-[11px] font-semibold text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-md">
           {profile?.role === 'admin' ? 'Admin Account' : 'Standard Account'}
         </span>
+      </div>
+
+      {/* PROFILE PHOTO */}
+      <div className="flex items-center gap-4">
+        <InitialAvatar name={profile?.fullName} email={profile?.email} avatarUrl={profile?.avatarUrl} size={56} />
+        <div>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleAvatarPick}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={avatarUploading}
+            className="px-3.5 py-2 rounded-lg border border-[var(--fx-border)] bg-white text-xs font-semibold text-[var(--fx-ink)] hover:bg-[var(--fx-canvas)] disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
+          >
+            {avatarUploading ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
+            <span>{avatarUploading ? 'Uploading…' : 'Change photo'}</span>
+          </button>
+          <p className="text-[11px] text-[var(--fx-ink-2)] mt-1">JPG, PNG, WEBP or GIF, up to 8 MB.</p>
+          {avatarMsg && <div className="mt-2"><Banner tone={avatarMsg.tone} message={avatarMsg.text} /></div>}
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -423,7 +514,7 @@ function UnifiedAccountForm({
         </div>
 
         {/* EMAIL CHANGE CONFIRMATION (SHOWN ONLY IF EMAIL CHANGED) */}
-        {email.trim() !== (profile?.email || '') && !isAdmin && (
+        {email.trim() !== '' && email.trim() !== (profile?.email || '') && !isAdmin && (
           <div className="border-t border-[var(--fx-border)] pt-4 space-y-2 animate-fade-in max-w-sm">
             <label className={labelCls}>Confirm Current Password (Required to update email)</label>
             <input
@@ -454,555 +545,6 @@ function UnifiedAccountForm({
           </button>
         </div>
       </form>
-    </div>
-  );
-}
-
-/* ──────────────────────────────────────────────────────────────────────────
- * PASSWORD CHANGE & PHONE OTP RESET SECTION
- * ────────────────────────────────────────────────────────────────────────── */
-function PasswordSecuritySection({ profile, showToast }: { profile: any; showToast: (msg: string) => void }) {
-  const [tab, setTab] = useState<'otp' | 'forgot' | 'password'>('otp');
-  const [phone, setPhone] = useState(profile?.phoneNumber || '');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
-  const [countdown, setCountdown] = useState(0);
-
-  useEffect(() => {
-    if (profile?.phoneNumber && !phone) {
-      setPhone(profile.phoneNumber);
-    }
-  }, [profile?.phoneNumber, phone]);
-
-  useEffect(() => {
-    if (countdown <= 0) return;
-    const t = setInterval(() => setCountdown((c) => (c > 1 ? c - 1 : 0)), 1000);
-    return () => clearInterval(t);
-  }, [countdown]);
-
-  const handleSendOtp = async (targetPhone: string) => {
-    const clean = (targetPhone || '').replace(/\D/g, '');
-    if (clean.length < 10) {
-      setMsg({ tone: 'error', text: 'Please enter a valid 10-digit mobile number.' });
-      return;
-    }
-    setLoading(true);
-    setMsg(null);
-    try {
-      const res = await apiClient.auth.sendPasswordResetPhoneOtp(targetPhone);
-      if (res?.success) {
-        setOtpSent(true);
-        setCountdown(30);
-        setMsg({ tone: 'success', text: `OTP verification code sent to ${targetPhone} via SMS & WhatsApp.` });
-        showToast(`Verification code sent to ${targetPhone}`);
-      } else {
-        setMsg({ tone: 'error', text: res?.error || 'Failed to send OTP code. Please try again.' });
-      }
-    } catch (err: any) {
-      setMsg({ tone: 'error', text: err?.message || 'Failed to send OTP code.' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyAndUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setMsg(null);
-
-    if (newPassword.length < 6) {
-      setMsg({ tone: 'error', text: 'New password must be at least 6 characters long.' });
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setMsg({ tone: 'error', text: 'New password and confirmation password do not match.' });
-      return;
-    }
-
-    if (tab === 'otp' || tab === 'forgot') {
-      const targetPhone = (tab === 'otp' ? (profile?.phoneNumber || phone) : phone).trim();
-      if (!targetPhone) {
-        setMsg({ tone: 'error', text: 'Please enter a valid mobile number.' });
-        return;
-      }
-      if (!otpCode.trim()) {
-        setMsg({ tone: 'error', text: 'Please enter the 4-digit verification code.' });
-        return;
-      }
-      setLoading(true);
-      try {
-        const res = await apiClient.auth.resetPasswordWithPhoneOtp({
-          phoneNumber: targetPhone,
-          code: otpCode.trim(),
-          newPassword,
-        });
-        if (res?.success) {
-          setMsg({ tone: 'success', text: 'Password successfully updated! Your account is secured.' });
-          showToast('Password updated successfully');
-          setOtpCode('');
-          setNewPassword('');
-          setConfirmPassword('');
-          setOtpSent(false);
-        } else {
-          setMsg({ tone: 'error', text: res?.error || 'Invalid or expired OTP code.' });
-        }
-      } catch (err: any) {
-        setMsg({ tone: 'error', text: err?.message || 'Failed to reset password.' });
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      // standard current password change
-      if (!currentPassword) {
-        setMsg({ tone: 'error', text: 'Please enter your current password.' });
-        return;
-      }
-      setLoading(true);
-      try {
-        const res = await apiClient.auth.changePassword(currentPassword, newPassword);
-        if (res?.success) {
-          setMsg({ tone: 'success', text: 'Password updated successfully.' });
-          showToast('Password updated successfully');
-          setCurrentPassword('');
-          setNewPassword('');
-          setConfirmPassword('');
-        } else {
-          setMsg({ tone: 'error', text: res?.error || 'Failed to update password.' });
-        }
-      } catch (err: any) {
-        setMsg({ tone: 'error', text: err?.message || 'Incorrect current password or update failed.' });
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
-  return (
-    <div className={cardCls}>
-      <div className="flex items-center justify-between border-b border-[var(--fx-border)] pb-4">
-        <div>
-          <h2 className="font-bold text-base text-[var(--fx-ink)] flex items-center gap-2">
-            <KeyRound size={17} className="text-[var(--fx-accent)]" /> Password &amp; Security
-          </h2>
-          <p className="text-xs text-[var(--fx-ink-2)] mt-0.5">
-            Reset or change your password with instant mobile OTP verification or current password.
-          </p>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-[var(--fx-border)] pb-3">
-        <button
-          type="button"
-          onClick={() => { setTab('otp'); setMsg(null); setOtpSent(false); }}
-          className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-            tab === 'otp'
-              ? 'bg-[var(--fx-ink)] text-white shadow-xs'
-              : 'border border-[var(--fx-border)] text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]'
-          }`}
-        >
-          Verify via Phone OTP
-        </button>
-        <button
-          type="button"
-          onClick={() => { setTab('forgot'); setMsg(null); setOtpSent(false); }}
-          className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-            tab === 'forgot'
-              ? 'bg-[var(--fx-ink)] text-white shadow-xs'
-              : 'border border-[var(--fx-border)] text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]'
-          }`}
-        >
-          Forgot Password (Phone Reset)
-        </button>
-        <button
-          type="button"
-          onClick={() => { setTab('password'); setMsg(null); }}
-          className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-            tab === 'password'
-              ? 'bg-[var(--fx-ink)] text-white shadow-xs'
-              : 'border border-[var(--fx-border)] text-[var(--fx-ink-2)] hover:bg-[var(--fx-canvas)]'
-          }`}
-        >
-          Use Current Password
-        </button>
-      </div>
-
-      {/* Form Content */}
-      <form onSubmit={handleVerifyAndUpdatePassword} className="space-y-4 pt-1">
-        {/* TAB 1: PHONE OTP VERIFICATION */}
-        {tab === 'otp' && (
-          <div className="space-y-4">
-            <div className="rounded-lg bg-[var(--fx-canvas)] p-3.5 border border-[var(--fx-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <span className="text-xs font-bold text-[var(--fx-ink)] flex items-center gap-1.5">
-                  <Smartphone size={14} className="text-[var(--fx-accent)]" /> Registered Phone Number
-                </span>
-                <p className="font-mono text-sm font-bold text-[var(--fx-ink)] mt-0.5">
-                  {profile?.phoneNumber || phone || 'No phone attached yet'}
-                </p>
-                <p className="text-[11px] text-[var(--fx-ink-2)] mt-0.5">
-                  We will send a one-time code to verify your phone before setting your new password.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {!otpSent ? (
-                  <button
-                    type="button"
-                    onClick={() => handleSendOtp(phone || profile?.phoneNumber || '')}
-                    disabled={loading || !(phone || profile?.phoneNumber)}
-                    className="px-4 py-2 rounded-lg bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5 shadow-xs"
-                  >
-                    {loading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={14} />}
-                    <span>Send Verification OTP</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleSendOtp(phone || profile?.phoneNumber || '')}
-                    disabled={loading || countdown > 0}
-                    className="px-3 py-1.5 rounded-lg border border-[var(--fx-border)] bg-white text-xs font-semibold text-[var(--fx-ink)] hover:bg-neutral-50 disabled:opacity-50 cursor-pointer"
-                  >
-                    {countdown > 0 ? `Resend in ${countdown}s` : 'Resend Code'}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {otpSent && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2 animate-fade-in">
-                <div>
-                  <label className={labelCls}>Verification Code (OTP)</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="Enter code"
-                    className={`${inputCls} font-mono tracking-widest`}
-                    autoFocus
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>New Password</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Min 6 characters"
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Confirm New Password</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Re-enter password"
-                    className={inputCls}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 2: FORGOT PASSWORD (PHONE NUMBER RESET) */}
-        {tab === 'forgot' && (
-          <div className="space-y-4">
-            <p className="text-xs text-[var(--fx-ink-2)]">
-              Enter your mobile phone number to verify identity and reset your password right now without knowing your old password.
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 max-w-md">
-              <div className="flex-1">
-                <PhoneInputWithCountry
-                  value={phone}
-                  onChange={(val) => { setPhone(val); setMsg(null); }}
-                  placeholder="10-digit mobile number"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => handleSendOtp(phone)}
-                disabled={loading || !phone || countdown > 0}
-                className="px-4 py-2.5 rounded-lg bg-[var(--fx-ink)] hover:bg-black text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
-              >
-                {loading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={14} />}
-                <span>{countdown > 0 ? `Wait ${countdown}s` : otpSent ? 'Resend OTP' : 'Send Reset Code'}</span>
-              </button>
-            </div>
-
-            {otpSent && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2 animate-fade-in">
-                <div>
-                  <label className={labelCls}>Verification Code (OTP)</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="Enter code"
-                    className={`${inputCls} font-mono tracking-widest`}
-                    autoFocus
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>New Password</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Min 6 characters"
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Confirm New Password</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Re-enter password"
-                    className={inputCls}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 3: CURRENT PASSWORD */}
-        {tab === 'password' && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-            <div>
-              <label className={labelCls}>Current Password</label>
-              <input
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Current password"
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>New Password</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Min 6 characters"
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Confirm New Password</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Re-type new password"
-                className={inputCls}
-              />
-            </div>
-          </div>
-        )}
-
-        {msg && <Banner tone={msg.tone} message={msg.text} />}
-
-        {((tab === 'password') || (otpSent && (tab === 'otp' || tab === 'forgot'))) && (
-          <div className="pt-2 flex justify-end">
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-2.5 rounded-lg bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-2 shadow-xs transition-all"
-            >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
-              <span>{tab === 'forgot' ? 'Reset Password' : 'Confirm & Update Password'}</span>
-            </button>
-          </div>
-        )}
-      </form>
-    </div>
-  );
-}
-
-/* ──────────────────────────────────────────────────────────────────────────
- * TWO FACTOR AUTHENTICATION SECTION (Reduced radius)
- * ────────────────────────────────────────────────────────────────────────── */
-function TwoFactorSection({ profile, refreshProfile, showToast }: any) {
-  const [setupData, setSetupData] = useState<{ secret: string; otpauthUrl: string } | null>(null);
-  const [code, setCode] = useState('');
-  const [disablePassword, setDisablePassword] = useState('');
-  const [showDisableForm, setShowDisableForm] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
-
-  const enabled = Boolean(profile?.twoFactorEnabled);
-
-  const startSetup = async () => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      const res = await apiClient.twoFactor.setup();
-      setSetupData({ secret: res.secret || '', otpauthUrl: res.otpauthUrl || '' });
-    } catch (err: any) {
-      setMsg({ tone: 'error', text: err.message || 'Failed to start 2FA setup' });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const verifyCode = async () => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      await apiClient.twoFactor.verify(code);
-      await refreshProfile();
-      setSetupData(null);
-      setCode('');
-      showToast('Two-factor authentication enabled');
-    } catch (err: any) {
-      setMsg({ tone: 'error', text: err.message || 'Invalid code' });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const disable2FA = async () => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      await apiClient.twoFactor.disable(disablePassword);
-      await refreshProfile();
-      setShowDisableForm(false);
-      setDisablePassword('');
-      showToast('Two-factor authentication disabled');
-    } catch (err: any) {
-      setMsg({ tone: 'error', text: err.message || 'Failed to disable 2FA' });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const copySecret = () => {
-    if (!setupData) return;
-    navigator.clipboard.writeText(setupData.secret);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
-  };
-
-  return (
-    <div className={cardCls}>
-      <div className="flex items-center justify-between">
-        <h3 className="font-bold text-sm text-[var(--fx-ink)] flex items-center gap-2">
-          <ShieldCheck size={15} /> Two-Factor Authentication (2FA)
-        </h3>
-        <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-md ${enabled ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[var(--fx-canvas)] text-[var(--fx-ink-2)]'}`}>
-          {enabled ? 'Enabled' : 'Disabled'}
-        </span>
-      </div>
-
-      {!enabled && !setupData && (
-        <div className="space-y-3">
-          <p className="text-xs text-[var(--fx-ink-2)]">Add an extra layer of protection using Google Authenticator, Authy, or Microsoft Authenticator.</p>
-          <button
-            onClick={startSetup}
-            disabled={busy}
-            className="px-4 py-2 rounded-lg bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5 shadow-xs transition-all"
-          >
-            {busy && <Loader2 size={13} className="animate-spin" />} Set Up 2FA
-          </button>
-        </div>
-      )}
-
-      {!enabled && setupData && (
-        <div className="space-y-3">
-          <p className="text-xs text-[var(--fx-ink-2)]">Enter this secret key in your authenticator app:</p>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 text-sm font-mono font-bold bg-[var(--fx-canvas)] border border-[var(--fx-border)] rounded-lg px-3.5 py-2 break-all">
-              {setupData.secret}
-            </code>
-            <button
-              onClick={copySecret}
-              className="w-9 h-9 flex-shrink-0 rounded-lg bg-[var(--fx-canvas)] border border-[var(--fx-border)] flex items-center justify-center cursor-pointer"
-            >
-              {copied ? <Check size={14} className="text-[#16A34A]" /> : <Copy size={14} />}
-            </button>
-          </div>
-          <div>
-            <label className={labelCls}>6-digit code from app</label>
-            <input
-              className={`${inputCls} font-mono tracking-widest`}
-              maxLength={6}
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-              placeholder="000000"
-            />
-          </div>
-          {msg && <Banner tone={msg.tone} message={msg.text} />}
-          <div className="flex gap-2">
-            <button
-              onClick={() => { setSetupData(null); setCode(''); }}
-              className="flex-1 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={verifyCode}
-              disabled={busy || code.length !== 6}
-              className="flex-1 py-2 rounded-lg bg-[var(--fx-accent)] hover:bg-[var(--fx-accent-ink)] text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5 shadow-xs transition-all"
-            >
-              {busy && <Loader2 size={13} className="animate-spin" />} Verify &amp; Enable
-            </button>
-          </div>
-        </div>
-      )}
-
-      {enabled && !showDisableForm && (
-        <button
-          onClick={() => setShowDisableForm(true)}
-          className="px-4 py-2 rounded-lg bg-[#FEE2E2] hover:bg-[#FECACA] text-[#DC2626] text-xs font-bold cursor-pointer"
-        >
-          Disable 2FA
-        </button>
-      )}
-
-      {enabled && showDisableForm && (
-        <div className="space-y-3">
-          <label className={labelCls}>Confirm password to disable 2FA</label>
-          <input
-            type="password"
-            className={inputCls}
-            value={disablePassword}
-            onChange={(e) => setDisablePassword(e.target.value)}
-          />
-          {msg && <Banner tone={msg.tone} message={msg.text} />}
-          <div className="flex gap-2">
-            <button
-              onClick={() => { setShowDisableForm(false); setDisablePassword(''); }}
-              className="flex-1 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={disable2FA}
-              disabled={busy}
-              className="flex-1 py-2 rounded-lg bg-[#DC2626] hover:opacity-90 text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5"
-            >
-              {busy && <Loader2 size={13} className="animate-spin" />} Confirm Disable
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1091,27 +633,46 @@ function PushNotificationsSection({ showToast }: any) {
  * DANGER ZONE SECTION (Reduced radius)
  * ────────────────────────────────────────────────────────────────────────── */
 function DangerZoneSection({ onAccountDeleted }: { onAccountDeleted?: () => void }) {
-  const { deleteAccount } = useAuth();
-  const [confirming, setConfirming] = useState(false);
+  const { sendDeleteAccountOtp, deleteAccount } = useAuth();
+  // idle → confirm (warning) → otp (code sent, waiting to verify)
+  const [stage, setStage] = useState<'idle' | 'confirm' | 'otp'>('idle');
+  const [otpCode, setOtpCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
-  const handleDelete = async () => {
-    if (!confirming) {
-      setConfirming(true);
-      setMsg(null);
+  const handleSendOtp = async () => {
+    setBusy(true);
+    setMsg(null);
+    const res = await sendDeleteAccountOtp();
+    setBusy(false);
+    if (res.success) {
+      setStage('otp');
+      setMsg({ tone: 'success', text: 'Verification code sent to your phone.' });
+    } else {
+      setMsg({ tone: 'error', text: res.error || 'Failed to send verification code.' });
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!otpCode.trim()) {
+      setMsg({ tone: 'error', text: 'Enter the verification code sent to your phone.' });
       return;
     }
     setBusy(true);
     setMsg(null);
-    const res = await deleteAccount();
+    const res = await deleteAccount(otpCode.trim());
     setBusy(false);
     if (res.success) {
       onAccountDeleted?.();
     } else {
       setMsg({ tone: 'error', text: res.error || 'Failed to delete account.' });
-      setConfirming(false);
     }
+  };
+
+  const handleCancel = () => {
+    setStage('idle');
+    setOtpCode('');
+    setMsg(null);
   };
 
   return (
@@ -1121,25 +682,80 @@ function DangerZoneSection({ onAccountDeleted }: { onAccountDeleted?: () => void
         Permanently delete your account, profile, and all attached safety stickers. This action cannot be undone.
       </p>
       {msg && <Banner tone={msg.tone} message={msg.text} />}
-      {confirming && !msg && (
-        <div className="p-3 bg-[#FEF2F2] border border-[#FECACA] rounded-lg flex items-center justify-between">
-          <p className="text-xs font-semibold text-[#DC2626]">Are you sure? This action is permanent.</p>
+
+      {stage === 'confirm' && !msg && (
+        <div className="p-3 bg-[#FEF2F2] border border-[#FECACA] rounded-lg flex items-center justify-between gap-3">
+          <p className="text-xs font-semibold text-[#DC2626]">Are you sure? This action is permanent. We'll text a verification code to your phone first.</p>
           <button
             type="button"
-            onClick={() => setConfirming(false)}
-            className="text-xs text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] underline cursor-pointer ml-2"
+            onClick={handleCancel}
+            className="text-xs text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] underline cursor-pointer ml-2 shrink-0"
           >
             Cancel
           </button>
         </div>
       )}
-      <button
-        onClick={handleDelete}
-        disabled={busy}
-        className="px-4 py-2 rounded-lg bg-[#FEE2E2] hover:bg-[#FECACA] text-[#DC2626] text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5 w-fit"
-      >
-        {busy && <Loader2 size={13} className="animate-spin" />} {confirming ? 'Confirm Delete Account' : 'Delete Account'}
-      </button>
+
+      {stage === 'otp' && (
+        <div className="space-y-2.5 max-w-xs">
+          <label className={labelCls}>Verification code</label>
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={4}
+            autoFocus
+            value={otpCode}
+            onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            placeholder="Enter 4-digit code"
+            className={`${inputCls} font-mono tracking-widest`}
+          />
+          <button
+            type="button"
+            onClick={handleSendOtp}
+            disabled={busy}
+            className="text-xs font-semibold text-[var(--fx-accent)] hover:underline disabled:opacity-50 cursor-pointer"
+          >
+            Resend code
+          </button>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        {stage === 'idle' && (
+          <button
+            onClick={() => setStage('confirm')}
+            className="px-4 py-2 rounded-lg bg-[#FEE2E2] hover:bg-[#FECACA] text-[#DC2626] text-xs font-bold cursor-pointer flex items-center gap-1.5 w-fit"
+          >
+            Delete Account
+          </button>
+        )}
+        {stage === 'confirm' && (
+          <button
+            onClick={handleSendOtp}
+            disabled={busy}
+            className="px-4 py-2 rounded-lg bg-[#FEE2E2] hover:bg-[#FECACA] text-[#DC2626] text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5 w-fit"
+          >
+            {busy && <Loader2 size={13} className="animate-spin" />} Send Verification Code
+          </button>
+        )}
+        {stage === 'otp' && (
+          <>
+            <button
+              onClick={handleConfirmDelete}
+              disabled={busy || otpCode.trim().length < 4}
+              className="px-4 py-2 rounded-lg bg-[#DC2626] hover:opacity-90 text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5 w-fit"
+            >
+              {busy && <Loader2 size={13} className="animate-spin" />} Confirm Delete Account
+            </button>
+            <button
+              onClick={handleCancel}
+              className="text-xs text-[var(--fx-ink-2)] hover:text-[var(--fx-ink)] underline cursor-pointer"
+            >
+              Cancel
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

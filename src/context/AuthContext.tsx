@@ -47,10 +47,19 @@ interface AuthContextType {
   verifyEmailOtp: (email: string, code: string) => Promise<{ success: boolean; error?: string }>;
   // Passwordless phone login: pre-flight check, then send the OTP via the MSG91
   // widget and verify it (verifying IS the login) to log in or create an account.
-  sendPhoneLoginOtp: (phoneNumber: string) => Promise<{ success: boolean; simulated?: boolean; message?: string; debugCode?: string; error?: string }>;
-  verifyPhoneLoginOtp: (phoneNumber: string, accessToken: string) => Promise<{ success: boolean; error?: string }>;
+  sendPhoneLoginOtp: (phoneNumber: string) => Promise<{ success: boolean; exists?: boolean; simulated?: boolean; message?: string; debugCode?: string; error?: string }>;
+  verifyPhoneLoginOtp: (
+    phoneNumber: string,
+    accessToken: string,
+    fullName?: string,
+    mode?: 'login' | 'register'
+  ) => Promise<{ success: boolean; error?: string; code?: 'ACCOUNT_NOT_FOUND' }>;
   signOut: () => Promise<void>;
-  deleteAccount: (reason?: string) => Promise<{ success: boolean; error?: string }>;
+  // Two-step, OTP-gated self-service deletion (irreversible, so a second
+  // factor beyond "has a valid JWT" is required): sendDeleteAccountOtp texts
+  // a code to the account's own phone, deleteAccount takes that code.
+  sendDeleteAccountOtp: () => Promise<{ success: boolean; error?: string }>;
+  deleteAccount: (code: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
   resetPassword: (email: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   demoLogin: () => void;
   // Links a phone number to the logged-in account — used at signup and to auto-link
@@ -352,9 +361,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => window.removeEventListener('rapiqr:unauthorized', handleUnauthorized);
   }, [signOut]);
 
+  const sendDeleteAccountOtp = async () => {
+    if (!isApiBackendConfigured) {
+      return { success: false, error: 'Account deletion requires the RapiQR backend to be connected.' };
+    }
+    try {
+      await apiClient.privacy.sendErasureOtp();
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to send verification code.' };
+    }
+  };
+
   // Permanently deletes the account server-side (task.md #3 — DPDP/GDPR "right to
   // be forgotten"), then clears the local session the same way signOut does.
-  const deleteAccount = async (reason?: string) => {
+  // Requires the phone OTP from sendDeleteAccountOtp — deletion is irreversible,
+  // so the backend checks a second factor beyond just "has a valid JWT".
+  const deleteAccount = async (code: string, reason?: string) => {
     if (!isApiBackendConfigured) {
       return { success: false, error: 'Account deletion requires the RapiQR backend to be connected.' };
     }
@@ -362,7 +385,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Routed through /privacy/erasure-request (not /auth/me) so every
       // self-service deletion leaves the DPDP-required PrivacyRequest audit
       // trail — see Server/controllers/privacyController.js.requestErasure.
-      await apiClient.privacy.requestErasure(reason);
+      await apiClient.privacy.requestErasure(code, reason);
       await signOut();
       return { success: true };
     } catch (err: any) {
@@ -537,7 +560,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     try {
       const res = await apiClient.auth.sendPhoneLoginOtp(cleanPhone);
-      return { success: true, simulated: res.simulated, message: res.message, debugCode: res.debugCode };
+      return { success: true, exists: res.exists, simulated: res.simulated, message: res.message, debugCode: res.debugCode };
     } catch (err: any) {
       return { success: false, error: err.message || 'Failed to send OTP to phone.' };
     }
@@ -547,13 +570,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // `accessToken` comes from the MSG91 OTP Widget's verifyOtp() (src/lib/msg91Widget.ts) —
   // the widget runs the actual code exchange with MSG91; this hands the resulting
   // token to the backend to confirm and finalize.
-  const verifyPhoneLoginOtp = async (phoneNumber: string, accessToken: string) => {
+  const verifyPhoneLoginOtp = async (phoneNumber: string, accessToken: string, fullName?: string, mode: 'login' | 'register' = 'login') => {
     const cleanPhone = phoneNumber.trim();
+    const cleanName = fullName?.trim() || '';
     if (!isApiBackendConfigured) {
       const demoUser: UserProfileData = {
         id: 'user-' + Date.now(),
         email: `${cleanPhone.replace(/[^0-9]/g, '')}@repiqr.local`,
-        fullName: `User ${cleanPhone.slice(-4)}`,
+        fullName: cleanName || `User ${cleanPhone.slice(-4)}`,
         phoneNumber: cleanPhone,
         role: 'user',
         isPhoneVerified: true,
@@ -567,13 +591,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const res = await apiClient.auth.verifyPhoneLoginOtp(cleanPhone, accessToken);
+      const res = await apiClient.auth.verifyPhoneLoginOtp(cleanPhone, accessToken, cleanName || undefined, mode);
       if (res?.token) {
         localStorage.setItem('repiqr-token', res.token);
         localStorage.setItem('namoqr-token', res.token);
       }
       if (res?.user) {
         const userProfile = backendUserToProfile(res.user);
+        if (cleanName && (!userProfile.fullName || userProfile.fullName.startsWith('User '))) {
+          userProfile.fullName = cleanName;
+          try {
+            await apiClient.auth.updateProfile({ fullName: cleanName });
+          } catch { /* ignore */ }
+        }
         userProfile.isPhoneVerified = true;
         setProfile(userProfile);
         localStorage.setItem('repiqr-auth-user', JSON.stringify(userProfile));
@@ -583,6 +613,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return { success: true };
     } catch (err: any) {
+      // The server answers 404 when a login is attempted for a number with no account.
+      if (err?.status === 404) {
+        return { success: false, code: 'ACCOUNT_NOT_FOUND', error: err.message };
+      }
       return { success: false, error: err.message || 'Verification failed.' };
     }
   };
@@ -743,6 +777,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         verifyPhoneOtp,
         refreshProfile,
         signOut,
+        sendDeleteAccountOtp,
         deleteAccount,
         resetPassword,
         demoLogin,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Loader2, Save, Users, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Loader2, Save, Users, AlertCircle, MessageCircle } from 'lucide-react';
 import { getCategoryIcon, getCategoryLabel } from '../../../stickerModules';
 import type { DashboardSticker, EmergencyContact } from './types';
 import PhoneInputWithCountry from '../../common/PhoneInputWithCountry';
@@ -63,7 +63,7 @@ function StickerContactsCard({
         return;
       }
       if (phoneDigits.length < 10) {
-        setValidationError(`Please enter a valid 10-digit mobile number for ${name}.`);
+        setValidationError(`Please enter a valid 10-digit active WhatsApp number for ${name}.`);
         return;
       }
     }
@@ -98,6 +98,11 @@ function StickerContactsCard({
         </span>
       </div>
 
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--fx-radius-control)] bg-emerald-50/80 border border-emerald-200/90 text-[11px] font-medium text-emerald-800">
+        <MessageCircle size={13} className="shrink-0 text-emerald-600" />
+        <span>Numbers should be actively registered on WhatsApp to receive instant SOS alerts.</span>
+      </div>
+
       <div className="space-y-3">
         {contacts.length === 0 && (
           <p className="text-xs text-[var(--fx-faint)] italic">No emergency contacts added yet.</p>
@@ -116,7 +121,7 @@ function StickerContactsCard({
               <PhoneInputWithCountry
                 value={c.phone}
                 onChange={(full) => updateContact(idx, 'phone', full)}
-                placeholder="10-digit mobile"
+                placeholder="10-digit WhatsApp number"
               />
             </div>
             <button
@@ -172,6 +177,18 @@ export default function EmergencyContactsPanel({
       <div>
         <h1 className="fx-text-heading-page text-[var(--fx-ink)]">Emergency Contacts</h1>
         <p className="text-[13px] text-[var(--fx-ink-2)] mt-1">{products.length} sticker{products.length === 1 ? '' : 's'} with contacts attached</p>
+      </div>
+
+      <div className="flex items-start gap-3 p-4 rounded-[var(--fx-radius-card)] bg-emerald-50 border border-emerald-200 text-emerald-950">
+        <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+          <MessageCircle size={17} />
+        </div>
+        <div>
+          <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wider">Active WhatsApp Number Required</h4>
+          <p className="text-xs text-emerald-800 mt-1 leading-relaxed font-medium">
+            Please make sure every emergency contact number is actively registered on WhatsApp. When someone scans your tag during an emergency or sends an SOS alert, notifications and live location links are delivered directly to these WhatsApp numbers.
+          </p>
+        </div>
       </div>
 
       {products.length === 0 ? (

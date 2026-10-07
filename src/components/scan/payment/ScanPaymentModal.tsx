@@ -12,7 +12,6 @@ import {
   Plus,
   X,
 } from 'lucide-react';
-import ScanExitConfirmModal from './ScanExitConfirmModal';
 import { isVehicleCategory } from '../../../stickerModules';
 import { ACTIVATION_COUNTRIES, getPhoneDigitRule } from '../ScanPage';
 
@@ -38,6 +37,9 @@ export interface ScanPaymentModalProps {
   onCountryChange?: (country: string) => void;
   message?: string;
   onMessageChange?: (message: string) => void;
+  /** Optional: when the parent owns the consent checkbox, it survives a reload with the rest of the form. */
+  agreed?: boolean;
+  onAgreedChange?: (agreed: boolean) => void;
   otpStep?: boolean;
   otpInput?: string;
   onOtpInputChange?: (otp: string) => void;
@@ -111,6 +113,8 @@ export default function ScanPaymentModal({
   onBackToPhone,
   onSuccess,
   onExit,
+  agreed,
+  onAgreedChange,
   phase = 'activation',
   emergencyContacts = [],
   onAddEmergencyContact,
@@ -120,8 +124,9 @@ export default function ScanPaymentModal({
   onSkipEmergencyContacts,
   onViewTag,
 }: ScanPaymentModalProps) {
-  const [showExitModal, setShowExitModal] = useState(false);
-  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [agreeLocal, setAgreeLocal] = useState(false);
+  const agreeTerms = agreed ?? agreeLocal;
+  const setAgreeTerms = onAgreedChange ?? setAgreeLocal;
   const [consentTouched, setConsentTouched] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(category);
 
@@ -139,11 +144,6 @@ export default function ScanPaymentModal({
     if (otpStep) return 1;
     return 0;
   })();
-
-  const handleConfirmExit = () => {
-    setShowExitModal(false);
-    onExit();
-  };
 
   const handleOwnerDetailsSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -361,13 +361,6 @@ export default function ScanPaymentModal({
                     <span>Continue</span>
                   )}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setShowExitModal(true)}
-                  className="w-full mt-3 text-xs text-slate-500 hover:text-slate-900 font-medium transition-colors cursor-pointer"
-                >
-                  Skip for now
-                </button>
               </div>
             </form>
           )}
@@ -567,16 +560,6 @@ export default function ScanPaymentModal({
                   <span>Save &amp; activate tag</span>
                 )}
               </button>
-              {onSkipEmergencyContacts && (
-                <button
-                  type="button"
-                  onClick={onSkipEmergencyContacts}
-                  disabled={isProcessing}
-                  className="w-full text-xs text-slate-500 hover:text-slate-900 font-medium transition-colors cursor-pointer"
-                >
-                  Skip for now
-                </button>
-              )}
             </div>
           )}
 
@@ -599,13 +582,6 @@ export default function ScanPaymentModal({
           )}
         </div>
       </div>
-
-      <ScanExitConfirmModal
-        isOpen={showExitModal}
-        onContinuePayment={() => setShowExitModal(false)}
-        onConfirmExit={handleConfirmExit}
-        onViewTag={activeStepIndex >= 2 ? onViewTag : undefined}
-      />
     </div>
   );
 }
