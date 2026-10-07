@@ -133,6 +133,24 @@ export default function QrCodesPage({
   const [isMoveToFolderOpen, setIsMoveToFolderOpen] = useState(false);
   const [moveToFolderTargetIds, setMoveToFolderTargetIds] = useState<string[]>([]);
 
+  // Count unassigned stickers
+  const unassignedCount = useMemo(() => {
+    return qrList.filter((q) => !q.folderName).length;
+  }, [qrList]);
+
+  // All folders, auto-including "Unassigned Stock" if there are any stickers without a folder
+  const allDisplayFolders = useMemo(() => {
+    const list = [...folders];
+    if (unassignedCount > 0 && !list.some((f) => f.name.toLowerCase() === "unassigned stock")) {
+      list.push({
+        id: "f-unassigned-stock",
+        name: "Unassigned Stock",
+        createdAt: new Date().toISOString(),
+      });
+    }
+    return list;
+  }, [folders, unassignedCount]);
+
   // Count stickers per folder
   const folderCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -142,8 +160,11 @@ export default function QrCodesPage({
         counts[k] = (counts[k] || 0) + 1;
       }
     });
+    if (unassignedCount > 0) {
+      counts["unassigned stock"] = unassignedCount;
+    }
     return counts;
-  }, [qrList]);
+  }, [qrList, unassignedCount]);
 
   // Recovery codes reveal & print progress
   const [revealedCodes, setRevealedCodes] = useCodesRevealed();
@@ -168,12 +189,30 @@ export default function QrCodesPage({
   // Compute stable slot numbers for all records so deleting #3 leaves #4 as #4 forever
   const stableSlotMap = useMemo(() => getStableSlotMap(qrList), [qrList]);
 
-  // Metrics computation
+  // Metrics computation (scoped to active folder if one is open)
   const metrics = useMemo(() => {
-    const total = qrList.length;
+    let dataset = qrList;
+    if (activeFolder) {
+      if (
+        activeFolder.toLowerCase() === "unassigned stock" ||
+        activeFolder.toLowerCase() === "unassigned"
+      ) {
+        dataset = dataset.filter(
+          (q) =>
+            !q.folderName ||
+            q.folderName.toLowerCase() === "unassigned" ||
+            q.folderName.toLowerCase() === "unassigned stock"
+        );
+      } else {
+        dataset = dataset.filter(
+          (q) => (q.folderName || "").toLowerCase() === activeFolder.toLowerCase()
+        );
+      }
+    }
+    const total = dataset.length;
     let active = 0;
     let printed = 0;
-    qrList.forEach((q) => {
+    dataset.forEach((q) => {
       const phone = q.ownerPhone || q.phoneNumber || (q as any).phone;
       if (phone && phone.trim()) active += 1;
       else if (q.status === "active") active += 1;
@@ -186,7 +225,7 @@ export default function QrCodesPage({
       printed,
       unprinted: total - printed,
     };
-  }, [qrList, printedStickerIds]);
+  }, [qrList, printedStickerIds, activeFolder]);
 
   // Reset page to 1 whenever filters or tab changes (Requirement 3: deterministic filter fetch)
   const handleTabChange = (newTab: TabFilter) => {
@@ -272,9 +311,21 @@ export default function QrCodesPage({
 
     // Folder filter: when inside a folder, only show stickers belonging to that folder
     if (activeFolder) {
-      result = result.filter(
-        (q) => (q.folderName || "").toLowerCase() === activeFolder.toLowerCase()
-      );
+      if (
+        activeFolder.toLowerCase() === "unassigned stock" ||
+        activeFolder.toLowerCase() === "unassigned"
+      ) {
+        result = result.filter(
+          (q) =>
+            !q.folderName ||
+            q.folderName.toLowerCase() === "unassigned" ||
+            q.folderName.toLowerCase() === "unassigned stock"
+        );
+      } else {
+        result = result.filter(
+          (q) => (q.folderName || "").toLowerCase() === activeFolder.toLowerCase()
+        );
+      }
     }
 
     // Search query filter
@@ -392,17 +443,47 @@ export default function QrCodesPage({
 
   // ── Folder Operations ────────────────────────────────────────────────────
   const handlePrintActiveFolder = () => {
-    const folderStickers = qrList.filter(
-      (q) => (q.folderName || "").toLowerCase() === (activeFolder || "").toLowerCase()
-    );
+    let folderStickers = qrList;
+    if (activeFolder) {
+      if (
+        activeFolder.toLowerCase() === "unassigned stock" ||
+        activeFolder.toLowerCase() === "unassigned"
+      ) {
+        folderStickers = qrList.filter(
+          (q) =>
+            !q.folderName ||
+            q.folderName.toLowerCase() === "unassigned" ||
+            q.folderName.toLowerCase() === "unassigned stock"
+        );
+      } else {
+        folderStickers = qrList.filter(
+          (q) => (q.folderName || "").toLowerCase() === activeFolder.toLowerCase()
+        );
+      }
+    }
     if (folderStickers.length === 0) return;
     handleTriggerPrint(undefined, folderStickers);
   };
 
   const handleAssignActiveFolderLabel = () => {
-    const folderStickers = qrList.filter(
-      (q) => (q.folderName || "").toLowerCase() === (activeFolder || "").toLowerCase()
-    );
+    let folderStickers = qrList;
+    if (activeFolder) {
+      if (
+        activeFolder.toLowerCase() === "unassigned stock" ||
+        activeFolder.toLowerCase() === "unassigned"
+      ) {
+        folderStickers = qrList.filter(
+          (q) =>
+            !q.folderName ||
+            q.folderName.toLowerCase() === "unassigned" ||
+            q.folderName.toLowerCase() === "unassigned stock"
+        );
+      } else {
+        folderStickers = qrList.filter(
+          (q) => (q.folderName || "").toLowerCase() === activeFolder.toLowerCase()
+        );
+      }
+    }
     if (folderStickers.length === 0) return;
     setAssignLabelTargetIds(folderStickers.map((q) => q.id));
     setIsAssignLabelOpen(true);
@@ -439,10 +520,24 @@ export default function QrCodesPage({
     setTimeout(() => setToast(null), 2500);
   };
 
-  const handleDeleteFolder = (folder: StickerFolder) => {
-    if (!window.confirm(`Delete folder "${folder.name}"? Stickers inside will remain safe.`)) return;
+  const handleDeleteFolder = async (folder: StickerFolder) => {
+    const affectedStickers = qrList.filter(
+      (q) => (q.folderName || "").toLowerCase() === folder.name.toLowerCase()
+    );
+    const count = affectedStickers.length;
+
+    const confirmMsg =
+      count > 0
+        ? `Delete folder "${folder.name}"?\n\nNOTE: None of the ${count} sticker(s) will be deleted. They will remain completely safe in your sticker fleet as unassigned.`
+        : `Delete empty folder "${folder.name}"?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    // 1. Remove folder metadata from folder list
     const updated = removeFolder(folder.id);
     setFolders(updated);
+
+    // 2. Keep ALL stickers in state, only unsetting their folderName
     setQrList((prev) =>
       prev.map((q) =>
         (q.folderName || "").toLowerCase() === folder.name.toLowerCase()
@@ -450,11 +545,30 @@ export default function QrCodesPage({
           : q
       )
     );
+
+    // 3. Return to root view if user was viewing this folder
     if (activeFolder?.toLowerCase() === folder.name.toLowerCase()) {
       setActiveFolder(null);
     }
-    setToast(`Folder "${folder.name}" deleted.`);
-    setTimeout(() => setToast(null), 2500);
+
+    // 4. Update database so stickers' folder_name is safely set to null without deleting the stickers
+    if (affectedStickers.length > 0) {
+      try {
+        await apiClient.qr.bulkUpdateFolder(
+          affectedStickers.map((q) => q.id),
+          null
+        );
+      } catch (err) {
+        console.warn("Could not sync folder detachment to server:", err);
+      }
+    }
+
+    setToast(
+      count > 0
+        ? `Folder "${folder.name}" deleted. All ${count} stickers safely preserved.`
+        : `Folder "${folder.name}" deleted.`
+    );
+    setTimeout(() => setToast(null), 3000);
   };
 
   // Trigger print modal
@@ -598,20 +712,47 @@ export default function QrCodesPage({
         <div className="flex items-center gap-3.5">
           {/* Header Squircle Icon Badge matching reference image */}
           <div className="w-12 h-12 rounded-2xl bg-orange-500/10 text-orange-600 flex items-center justify-center border border-orange-200/50 shadow-2xs shrink-0">
-            <QrCode size={22} strokeWidth={2.2} />
+            {activeFolder ? <Folder size={22} className="fill-amber-500 text-amber-600" /> : <QrCode size={22} strokeWidth={2.2} />}
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">
-              QR Stickers Fleet
+              {activeFolder ? activeFolder : "QR Stickers Fleet"}
             </h1>
             <p className="text-xs sm:text-sm text-gray-500 font-normal">
-              Manage, track, print and deploy vehicle & asset QR tags
+              {activeFolder
+                ? `Showing sticker collection inside folder "${activeFolder}"`
+                : "Double-click or double-tap any folder to open its sticker collection"}
             </p>
           </div>
         </div>
 
         {/* Primary Header Action: ONE Create Button + Utility Actions */}
         <div className="flex items-center gap-2 flex-wrap">
+          {activeFolder && (
+            <button
+              type="button"
+              onClick={() => {
+                setActiveFolder(null);
+                setPage(1);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 font-semibold text-xs transition-colors cursor-pointer shadow-2xs"
+            >
+              <ChevronLeft size={15} />
+              <span>All Folders</span>
+            </button>
+          )}
+
+          {!activeFolder && (
+            <button
+              type="button"
+              onClick={() => setIsCreateFolderOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold text-xs transition-all shadow-xs cursor-pointer"
+            >
+              <FolderPlus size={15} />
+              <span>New Folder</span>
+            </button>
+          )}
+
           {/* Single Primary Create Button (Requirement 5) */}
           <button
             type="button"
@@ -657,123 +798,13 @@ export default function QrCodesPage({
         </div>
       </div>
 
-      {/* ── 2. Segmented Capsule Tabs (Matching Reference Image) ──────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200/80 pb-4">
-        {/* Capsule Tabs */}
-        <div className="inline-flex p-1 rounded-xl bg-gray-200/70 border border-gray-200/80 self-start">
-          <button
-            type="button"
-            onClick={() => handleTabChange("all")}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-              activeTab === "all"
-                ? "bg-white text-gray-950 shadow-2xs font-bold"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            All Stickers ({metrics.total})
-          </button>
-          <button
-            type="button"
-            onClick={() => handleTabChange("active")}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-              activeTab === "active"
-                ? "bg-white text-gray-950 shadow-2xs font-bold"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            Active ({metrics.active})
-          </button>
-          <button
-            type="button"
-            onClick={() => handleTabChange("pending")}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-              activeTab === "pending"
-                ? "bg-white text-gray-950 shadow-2xs font-bold"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            Pending Stock ({metrics.pending})
-          </button>
-          <button
-            type="button"
-            onClick={() => handleTabChange("printed")}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-              activeTab === "printed"
-                ? "bg-white text-gray-950 shadow-2xs font-bold"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            Printed ({metrics.printed})
-          </button>
-        </div>
-
-        {/* View Mode Switcher: Cards vs Table */}
-        <div className="flex items-center gap-1.5 self-end sm:self-auto">
-          <div className="inline-flex p-0.5 rounded-lg border border-gray-200/80 bg-white shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setViewMode("cards")}
-              className={`p-1.5 rounded-md transition-all cursor-pointer ${
-                viewMode === "cards" ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900"
-              }`}
-              title="Cards Grid View"
-            >
-              <LayoutGrid size={15} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("table")}
-              className={`p-1.5 rounded-md transition-all cursor-pointer ${
-                viewMode === "table" ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900"
-              }`}
-              title="Table View"
-            >
-              <TableIcon size={15} />
-            </button>
-          </div>
-
-          {/* Reveal Recovery Codes Toggle */}
-          <button
-            type="button"
-            onClick={async () => {
-              const next = !revealedCodes;
-              setRevealedCodes(next);
-              if (next) await fetchMissingRecoveryCodes(qrList.map((q) => q.id));
-            }}
-            disabled={revealingCodes}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200/80 transition-colors cursor-pointer ${
-              revealedCodes ? "bg-gray-900 text-white" : "bg-white text-gray-700 hover:bg-gray-50"
-            }`}
-          >
-            {revealingCodes ? (
-              <Loader2 size={13} className="animate-spin" />
-            ) : revealedCodes ? (
-              <EyeOff size={13} />
-            ) : (
-              <Eye size={13} />
-            )}
-            <span className="hidden sm:inline">{revealedCodes ? "Hide Codes" : "See Codes"}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ── 2.5 Folders Section / Windows 11 Explorer Breadcrumbs ─────────── */}
-      {activeFolder ? (
-        <FolderBreadcrumbs
-          currentFolder={activeFolder}
-          folderCount={filtered.length}
-          onBackToAll={() => {
-            setActiveFolder(null);
-            setPage(1);
-          }}
-          onPrintFolder={handlePrintActiveFolder}
-          onAssignFolderLabel={handleAssignActiveFolderLabel}
-          onCreateStickerInFolder={() => setCreateModalOpen(true)}
-        />
-      ) : (
+      {/* ── 2. Windows 11 Explorer Folders Grid (Root) vs Inside Folder View ── */}
+      {!activeFolder ? (
+        /* Root View: Show ONLY Windows 11 Explorer Folders (No stickers outside folder) */
         <FolderGrid
-          folders={folders}
+          folders={allDisplayFolders}
           stickerCounts={folderCounts}
+          totalStickersCount={qrList.length}
           selectedFolderId={selectedFolderId}
           onSelectFolder={(f) => setSelectedFolderId(f.id)}
           onOpenFolder={(f) => {
@@ -781,14 +812,18 @@ export default function QrCodesPage({
             setPage(1);
           }}
           onPrintFolder={(f) => {
-            const stickersInFolder = qrList.filter(
-              (q) => (q.folderName || "").toLowerCase() === f.name.toLowerCase()
+            const stickersInFolder = qrList.filter((q) =>
+              f.name.toLowerCase() === "unassigned stock"
+                ? !q.folderName || q.folderName.toLowerCase() === "unassigned" || q.folderName.toLowerCase() === "unassigned stock"
+                : (q.folderName || "").toLowerCase() === f.name.toLowerCase()
             );
             handleTriggerPrint(undefined, stickersInFolder);
           }}
           onAssignLabelFolder={(f) => {
-            const stickersInFolder = qrList.filter(
-              (q) => (q.folderName || "").toLowerCase() === f.name.toLowerCase()
+            const stickersInFolder = qrList.filter((q) =>
+              f.name.toLowerCase() === "unassigned stock"
+                ? !q.folderName || q.folderName.toLowerCase() === "unassigned" || q.folderName.toLowerCase() === "unassigned stock"
+                : (q.folderName || "").toLowerCase() === f.name.toLowerCase()
             );
             if (stickersInFolder.length > 0) {
               setAssignLabelTargetIds(stickersInFolder.map((q) => q.id));
@@ -798,7 +833,119 @@ export default function QrCodesPage({
           onDeleteFolder={handleDeleteFolder}
           onCreateFolderClick={() => setIsCreateFolderOpen(true)}
         />
-      )}
+      ) : (
+        /* Inside Folder View: Breadcrumbs, Filter Bar, and Stickers Collection */
+        <div className="space-y-6 animate-in fade-in duration-150">
+          <FolderBreadcrumbs
+            currentFolder={activeFolder}
+            folderCount={filtered.length}
+            onBackToAll={() => {
+              setActiveFolder(null);
+              setPage(1);
+            }}
+            onPrintFolder={handlePrintActiveFolder}
+            onAssignFolderLabel={handleAssignActiveFolderLabel}
+            onCreateStickerInFolder={() => setCreateModalOpen(true)}
+          />
+
+          {/* Segmented Capsule Tabs (Within Folder) */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200/80 pb-4">
+            <div className="inline-flex p-1 rounded-xl bg-gray-200/70 border border-gray-200/80 self-start">
+              <button
+                type="button"
+                onClick={() => handleTabChange("all")}
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  activeTab === "all"
+                    ? "bg-white text-gray-950 shadow-2xs font-bold"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                All in Folder ({metrics.total})
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTabChange("active")}
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  activeTab === "active"
+                    ? "bg-white text-gray-950 shadow-2xs font-bold"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Active ({metrics.active})
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTabChange("pending")}
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  activeTab === "pending"
+                    ? "bg-white text-gray-950 shadow-2xs font-bold"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Pending Stock ({metrics.pending})
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTabChange("printed")}
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  activeTab === "printed"
+                    ? "bg-white text-gray-950 shadow-2xs font-bold"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Printed ({metrics.printed})
+              </button>
+            </div>
+
+            {/* View Mode Switcher: Cards vs Table */}
+            <div className="flex items-center gap-1.5 self-end sm:self-auto">
+              <div className="inline-flex p-0.5 rounded-lg border border-gray-200/80 bg-white shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("cards")}
+                  className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                    viewMode === "cards" ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900"
+                  }`}
+                  title="Cards Grid View"
+                >
+                  <LayoutGrid size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("table")}
+                  className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                    viewMode === "table" ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900"
+                  }`}
+                  title="Table View"
+                >
+                  <TableIcon size={15} />
+                </button>
+              </div>
+
+              {/* Reveal Recovery Codes Toggle */}
+              <button
+                type="button"
+                onClick={async () => {
+                  const next = !revealedCodes;
+                  setRevealedCodes(next);
+                  if (next) await fetchMissingRecoveryCodes(qrList.map((q) => q.id));
+                }}
+                disabled={revealingCodes}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200/80 transition-colors cursor-pointer ${
+                  revealedCodes ? "bg-gray-900 text-white" : "bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {revealingCodes ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : revealedCodes ? (
+                  <EyeOff size={13} />
+                ) : (
+                  <Eye size={13} />
+                )}
+                <span className="hidden sm:inline">{revealedCodes ? "Hide Codes" : "See Codes"}</span>
+              </button>
+            </div>
+          </div>
 
       {/* ── 3. Single Unified Horizontal Filter Bar (Requirement 4) ───────── */}
       <div className="p-3 bg-white border border-gray-200/80 rounded-2xl shadow-2xs flex flex-wrap items-center justify-between gap-3">
@@ -1419,6 +1566,8 @@ export default function QrCodesPage({
               <ChevronRight size={14} />
             </button>
           </div>
+        </div>
+      )}
         </div>
       )}
 
