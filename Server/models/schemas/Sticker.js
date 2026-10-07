@@ -69,9 +69,10 @@ const stickerSchema = new Schema({
   // with user_id on the same document, but kept for compatibility).
   client_id: { type: String, default: 'UNASSIGNED' },
 
-  // Label organization and print tracking
+  // Label and Folder organization and print tracking
   label_name: { type: String, default: null, index: true },
   label_color: { type: String, default: null },
+  folder_name: { type: String, default: null, index: true },
   is_printed: { type: Boolean, default: false, index: true },
   printed_at: { type: Date, default: null },
 

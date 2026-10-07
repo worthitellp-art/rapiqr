@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const QrController = require('../controllers/qrController');
 const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
+const { requirePermission, PERMISSIONS } = require('../middleware/rbacMiddleware');
 const { rateLimit } = require('../middleware/rateLimiter');
 
 // Anonymous visitors could otherwise hammer Twilio (billing abuse) by spamming
@@ -20,8 +21,10 @@ router.post('/', verifyToken, verifyAdmin, QrController.saveQrCode);
 // QrModel.saveV2). New issuance only — existing v1 stickers are untouched.
 router.post('/v2', verifyToken, verifyAdmin, QrController.saveQrCodeV2);
 router.patch('/bulk/label', verifyToken, verifyAdmin, QrController.bulkUpdateLabels);
+router.patch('/bulk/folder', verifyToken, verifyAdmin, QrController.bulkUpdateFolder);
 router.patch('/bulk/print-status', verifyToken, verifyAdmin, QrController.bulkUpdatePrintStatus);
-router.delete('/', verifyToken, verifyAdmin, QrController.deleteAllQrCodes);
+// Nuclear: deleting ALL stickers is restricted to Super Admin only
+router.delete('/', verifyToken, verifyAdmin, requirePermission(PERMISSIONS.STICKERS_DELETE_ALL), QrController.deleteAllQrCodes);
 router.delete('/:id', verifyToken, verifyAdmin, QrController.deleteQrCode);
 router.post('/:id/restore', verifyToken, verifyAdmin, restoreLimiter, QrController.restoreQrCode);
 // Public, code-only recovery for id-scheme v2 stickers — no sticker id

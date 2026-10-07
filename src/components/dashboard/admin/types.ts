@@ -28,6 +28,7 @@ export interface QrRecord {
   isPrinted?: boolean;
   labelName?: string;
   labelColor?: string;
+  folderName?: string;
 }
 
 export interface Template {

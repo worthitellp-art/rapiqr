@@ -564,6 +564,13 @@ export const apiClient = {
       });
     },
 
+    async bulkUpdateFolder(ids: string[], folderName: string | null) {
+      return request<{ success: boolean; data?: { updatedCount: number }; error?: string }>('/qr/bulk/folder', {
+        method: 'PATCH',
+        body: JSON.stringify({ ids, folderName }),
+      });
+    },
+
     async bulkUpdatePrintStatus(ids: string[], isPrinted: boolean) {
       return request<{ success: boolean; data?: { updatedCount: number }; error?: string }>('/qr/bulk/print-status', {
         method: 'PATCH',
@@ -1654,4 +1661,58 @@ export const apiClient = {
       return request<{ success: boolean; data: any[] }>('/privacy/grievances', { method: 'GET' });
     },
   },
+
+  // Super Admin Console & Nuclear Operations
+  superAdmin: {
+    /**
+     * Permanently delete all stickers from the database (SUPER_ADMIN only).
+     * High-security action requiring explicit confirmation phrase.
+     */
+    async deleteAllStickers(confirmPhrase = 'DELETE_ALL_STICKERS') {
+      return request<{ success: boolean; message?: string; error?: string }>('/super-admin/stickers/all', {
+        method: 'DELETE',
+        body: JSON.stringify({ confirm: confirmPhrase }),
+      });
+    },
+
+    async bulkDeleteStickers(ids: string[]) {
+      return request<{ success: boolean; deletedCount?: number; error?: string }>('/super-admin/stickers/bulk', {
+        method: 'DELETE',
+        body: JSON.stringify({ ids }),
+      });
+    },
+
+    async listAdmins() {
+      return request<{ success: boolean; data: any[]; error?: string }>('/super-admin/admins', {
+        method: 'GET',
+      });
+    },
+
+    async createAdmin(data: { email: string; full_name?: string; role_name?: string; password?: string }) {
+      return request<{ success: boolean; data?: any; error?: string }>('/super-admin/admins', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+
+    async changeRole(id: string, role_name: string) {
+      return request<{ success: boolean; message?: string; error?: string }>(`/super-admin/admins/${id}/role`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role_name }),
+      });
+    },
+
+    async deleteAdmin(id: string) {
+      return request<{ success: boolean; message?: string; error?: string }>(`/super-admin/admins/${id}`, {
+        method: 'DELETE',
+      });
+    },
+
+    async getAuditLogs(page = 1, limit = 50) {
+      return request<{ success: boolean; data?: any[]; total?: number; error?: string }>(`/super-admin/audit?page=${page}&limit=${limit}`, {
+        method: 'GET',
+      });
+    },
+  },
 };
+

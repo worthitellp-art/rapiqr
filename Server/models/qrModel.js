@@ -45,7 +45,7 @@ function getDuplicateDetails(err) {
 // document; without this whitelist, an unauthenticated caller who knows a
 // sticker's ID could pull a stranger's medical/contact details straight off
 // GET /api/qr/:id or the activate/scan response.
-const PUBLIC_QR_FIELDS = '_id client_id status scans_count last_scanned_at template_name fg_color bg_color category created_at recovered_at vehicle_number label_name label_color is_printed printed_at';
+const PUBLIC_QR_FIELDS = '_id client_id status scans_count last_scanned_at template_name fg_color bg_color category created_at recovered_at vehicle_number label_name label_color folder_name is_printed printed_at';
 
 function toPublicQr(doc) {
   if (!doc) return null;
@@ -68,6 +68,7 @@ function toPublicQr(doc) {
     vehicle_number: doc.vehicle_number || null,
     label_name: doc.label_name || null,
     label_color: doc.label_color || null,
+    folder_name: doc.folder_name || null,
     is_printed: Boolean(doc.is_printed),
     printed_at: doc.printed_at || null,
   };
@@ -233,6 +234,7 @@ class QrModel {
           activated_at: doc.details?.activatedAt || null,
           label_name: doc.label_name || null,
           label_color: doc.label_color || null,
+          folder_name: doc.folder_name || null,
           is_printed: Boolean(doc.is_printed),
           printed_at: doc.printed_at || null,
         };
@@ -464,6 +466,24 @@ class QrModel {
     } catch (err) {
       console.error('QrModel.bulkUpdatePrintStatus Error:', err);
       logger.error('DB_QR', 'QrModel.bulkUpdatePrintStatus failed', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Bulk update folder assignment for sticker IDs
+   */
+  static async bulkUpdateFolder(ids, folderName) {
+    try {
+      if (!Array.isArray(ids) || ids.length === 0) return { updatedCount: 0 };
+      const res = await Sticker.updateMany(
+        { _id: { $in: ids }, deleted_at: null },
+        { $set: { folder_name: folderName ? String(folderName).trim() : null } }
+      );
+      return { updatedCount: res.modifiedCount || 0 };
+    } catch (err) {
+      console.error('QrModel.bulkUpdateFolder Error:', err);
+      logger.error('DB_QR', 'QrModel.bulkUpdateFolder failed', err);
       throw err;
     }
   }

@@ -414,6 +414,24 @@ class QrController {
       return sendServerError(res, err);
     }
   }
+
+  /**
+   * Bulk update folder assignment for stickers
+   */
+  static async bulkUpdateFolder(req, res) {
+    try {
+      const { ids, folderName } = req.body || {};
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, error: 'ids array is required' });
+      }
+      const result = await QrModel.bulkUpdateFolder(ids, folderName || null);
+      logger.info('QR_BULK_FOLDER', `Updated folder for ${result.updatedCount} stickers to "${folderName || 'Unassigned'}"`);
+      return res.json({ success: true, data: result });
+    } catch (err) {
+      logger.error('QR_BULK_FOLDER', 'Failed to bulk update folder', err);
+      return sendServerError(res, err);
+    }
+  }
 }
 
 module.exports = QrController;
