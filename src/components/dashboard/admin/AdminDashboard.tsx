@@ -21,7 +21,6 @@ import ShopProductsPage from "./ShopProductsPage";
 import OrdersPage from "./OrdersPage";
 import ReviewsPage from "./ReviewsPage";
 import RepiChatPage from "./RepiChatPage";
-import SuperAdminPage from "./SuperAdminPage";
 import PrintSheetModal from "./PrintSheetModal";
 import { apiClient, AdminSummary } from "../../../lib/apiClient";
 import { usePolling } from "../../../hooks/usePolling";
@@ -230,7 +229,7 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
     try {
       localStorage.setItem("repiqr-admin-active-menu", page);
     } catch { /* fallback */ }
-    if (!isAdmin && (page === "overview" || page === "orders" || page === "distributors" || page === "users" || page === "communication" || page === "messages" || page === "customize" || page === "products" || page === "superadmin")) {
+    if (!isAdmin && (page === "overview" || page === "orders" || page === "distributors" || page === "users" || page === "communication" || page === "messages" || page === "customize" || page === "products")) {
       setPage("qr");
     }
     // Admin has no RepiChat inbox (see "Online Now" on Overview instead) — a
@@ -238,9 +237,9 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
     if (isAdmin && page === "repichat") {
       setPage("overview");
     }
-    // Backup & Restore was removed — a stale localStorage value shouldn't
+    // Backup & Restore and Super Admin were removed — a stale localStorage value shouldn't
     // strand anyone on a page with no nav entry and no component behind it.
-    if (page === "backup") {
+    if (page === "backup" || page === "superadmin") {
       setPage(isAdmin ? "overview" : "qr");
     }
     setSearchQuery("");
@@ -327,14 +326,6 @@ export default function AdminDashboard({ onBack }: { onBack: () => void }) {
               stickerPos={stickerPos}
               setToast={setToast}
               openPrintSheet={() => handleOpenPrintSheet()}
-            />
-          )}
-
-          {page === "superadmin" && (
-            <SuperAdminPage
-              qrList={qrList}
-              setQrList={setQrList}
-              setToast={setToast}
             />
           )}
         </div>

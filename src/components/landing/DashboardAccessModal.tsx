@@ -21,6 +21,7 @@ interface DashboardAccessModalProps {
   /** Pre-filled with the phone number just entered at checkout — the order was
       already linked to it server-side, so this is usually just one OTP away. */
   initialPhone: string;
+  initialName?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -30,19 +31,32 @@ interface DashboardAccessModalProps {
  * auto-created) Client Dashboard with nothing but their phone number + OTP —
  * no separate signup form, since the account already exists server-side.
  */
-export default function DashboardAccessModal({ isOpen, initialPhone, onClose, onSuccess }: DashboardAccessModalProps) {
+export default function DashboardAccessModal({ isOpen, initialPhone, initialName = '', onClose, onSuccess }: DashboardAccessModalProps) {
   const { sendPhoneLoginOtp, verifyPhoneLoginOtp } = useAuth();
   const { language } = useLanguage();
   const t = joinUsTranslations[language].dashboardAccessModal;
 
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
-  const [fullName, setFullName] = useState('');
+  const [fullName, setFullName] = useState(initialName || '');
   const [phoneNumber, setPhoneNumber] = useState(initialPhone ? `+91 ${initialPhone.replace(/\D/g, '').slice(-10)}` : '');
   const [phoneDigits, setPhoneDigits] = useState(initialPhone.replace(/\D/g, '').slice(-10));
   const [otpCode, setOtpCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
+
+  useEffect(() => {
+    if (initialName && !fullName) {
+      setFullName(initialName);
+    }
+  }, [initialName]);
+
+  useEffect(() => {
+    if (initialPhone) {
+      setPhoneNumber(`+91 ${initialPhone.replace(/\D/g, '').slice(-10)}`);
+      setPhoneDigits(initialPhone.replace(/\D/g, '').slice(-10));
+    }
+  }, [initialPhone]);
 
   const activePhone = phoneNumber || phoneDigits;
 

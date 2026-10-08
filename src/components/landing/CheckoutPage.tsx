@@ -10,6 +10,7 @@ import {
   ShoppingBag,
   Clock,
   AlertCircle,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -315,6 +316,7 @@ export default function CheckoutPage({
   );
 
   const checkRecognized = () => {
+    if (isLoggedIn) return true;
     const em = email.trim().toLowerCase();
     const ph = cleanDigits(phone);
     if (isLoggedIn && profile) {
@@ -336,6 +338,31 @@ export default function CheckoutPage({
       /* ignore */
     }
     return false;
+  };
+
+  // Safe invoice opener that ensures invoice data is ready before opening the modal
+  const handleOpenInvoice = () => {
+    if (!invoice && orderId) {
+      const fallbackInvoice = buildOrderInvoice({
+        orderId,
+        customerName: name.trim() || 'Valued Customer',
+        customerEmail: email.trim(),
+        customerPhone: phone.trim(),
+        shippingAddress: {
+          address: address.trim(),
+          city: city.trim(),
+          state: state.trim(),
+          pincode: pincode.trim(),
+        },
+        items: invoiceItems(),
+        subtotal: total,
+        deliveryFee,
+        paymentMethod: payment,
+        deliveryType: delivery,
+      });
+      setInvoice(fallbackInvoice);
+    }
+    setIsInvoiceModalOpen(true);
   };
 
   // Reconstruct invoice record if navigating to success screen without cached state
@@ -376,19 +403,6 @@ export default function CheckoutPage({
     deliveryFee,
     delivery,
   ]);
-
-  // Auto-redirect a signed-in/recognized buyer straight into the Client
-  // Dashboard once the purchase confirms — the sticker was already claimed
-  // onto their account server-side (see PaymentController.verify), so
-  // there's nothing left for them to do here. A short delay lets them
-  // actually see the "Order Confirmed" state first instead of it flashing
-  // by. A buyer we couldn't recognize/log in gets left on this screen so
-  // they can verify their phone via the DashboardAccessModal below instead.
-  useEffect(() => {
-    if (step !== 'success' || !recognized) return;
-    const timer = setTimeout(() => onViewDashboard(), 1800);
-    return () => clearTimeout(timer);
-  }, [step, recognized, onViewDashboard]);
 
   const finalizeLocalRecords = (
     id: string,
@@ -644,28 +658,25 @@ export default function CheckoutPage({
           if (Array.isArray(verifyRes.data?.stickers)) {
             setPurchasedStickers(verifyRes.data.stickers);
           }
-          // PaymentController.verify auto-provisions (or matches) an account for
-          // the checkout phone number and hands back a token+user — but typing a
-          // phone number into a form proves nothing about who actually owns it.
-          // Only trust that session automatically when this buyer was ALREADY
-          // recognized/logged-in before paying (checked in handleSubmit, before
-          // Razorpay even opened); a genuine guest checkout must still prove
-          // phone ownership via DashboardAccessModal's OTP step before the
-          // success screen gives them a session or auto-redirects to the
-          // dashboard. Never store an auto-provisioned token/session for an
-          // unrecognized buyer — that would grant dashboard access to whoever
-          // typed the number, verified or not.
-          if (recognized && verifyRes.user) {
-            localStorage.setItem('repiqr-auth-user', JSON.stringify(verifyRes.user));
-            localStorage.setItem('namoqr-auth-user', JSON.stringify(verifyRes.user));
+          // Session handling:
+          // If the user was already logged in (isLoggedIn is true), preserve their existing
+          // authenticated session and NEVER overwrite tokens/user profiles, which would downgrade
+          // roles (e.g. admin -> user) or cause 401 token invalidation / auto-logout!
+          // If the buyer was NOT logged in (guest checkout), establish their verified session
+          // using the credentials returned from payment verification.
+          if (!isLoggedIn && verifyRes?.token && verifyRes?.user) {
+            try {
+              localStorage.setItem('repiqr-token', verifyRes.token);
+              localStorage.setItem('namoqr-token', verifyRes.token);
+              localStorage.setItem('repiqr-auth-user', JSON.stringify(verifyRes.user));
+              localStorage.setItem('namoqr-auth-user', JSON.stringify(verifyRes.user));
+              await refreshProfile();
+            } catch {
+              /* non-fatal */
+            }
           }
           localStorage.setItem('rapiqr-phone-number-filled', 'true');
           localStorage.setItem('rapiqr-phone-asked-once', 'true');
-          if (recognized && verifyRes.token) {
-            localStorage.setItem('repiqr-token', verifyRes.token);
-            localStorage.setItem('namoqr-token', verifyRes.token);
-            await refreshProfile();
-          }
         } catch (err: any) {
           setStep('details');
           setError(
@@ -1150,23 +1161,30 @@ export default function CheckoutPage({
               </p>
             </div>
 
-            {invoice && (
+            {/* View Tax Invoice Action */}
+            <div className="flex justify-center">
               <button
-                onClick={() => setIsInvoiceModalOpen(true)}
-                className="text-xs font-semibold text-[var(--co-ink-soft)] hover:text-[var(--co-ink)] underline underline-offset-2 cursor-pointer"
+                type="button"
+                onClick={handleOpenInvoice}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[var(--co-radius-sm)] bg-[var(--co-paper)] hover:bg-slate-100 text-xs font-semibold text-[var(--co-ink)] border border-[var(--co-line)] transition-colors cursor-pointer shadow-2xs"
               >
-                {t.success.viewInvoice}
+                <FileText size={14} className="text-[var(--co-ink-soft)]" />
+                <span>{t.success.viewInvoice}</span>
               </button>
-            )}
+            </div>
 
             {/* ── Register Your Sticker(s) ── */}
             {purchasedStickers.length > 0 && onRegisterSticker && (
-              <div className="space-y-2 text-left">
+              <div className="space-y-2 text-left pt-2 border-t border-[var(--co-line)]">
+                <p className="text-xs font-bold text-[var(--co-ink-soft)] uppercase tracking-wider">
+                  Minted Safety Tags
+                </p>
                 {purchasedStickers.map((s) => {
                   const cleanName = (s.itemName || s.category || 'Safety').replace(/\s*tag\s*$/i, '');
                   return (
                     <button
                       key={s.id}
+                      type="button"
                       onClick={() => onRegisterSticker(s.id)}
                       className="w-full py-2.5 px-4 rounded-[var(--co-radius-sm)] bg-[var(--co-panel)] hover:bg-[var(--co-paper)] text-[var(--co-ink)] border border-[var(--co-line)] hover:border-[var(--co-ink)] font-semibold text-xs transition-colors flex items-center justify-between gap-2 cursor-pointer"
                     >
@@ -1178,11 +1196,18 @@ export default function CheckoutPage({
               </div>
             )}
 
-            {recognized ? (
+            {/* ── Primary Navigation Actions ── */}
+            <div className="pt-2 border-t border-[var(--co-line)] space-y-2.5">
               <div className="flex flex-col sm:flex-row gap-2">
-                <FlowButton tone="dark" size="sm" className="flex-1" onClick={onViewDashboard}>
-                  {t.success.openDashboard}
-                </FlowButton>
+                {isLoggedIn || recognized ? (
+                  <FlowButton tone="dark" size="sm" className="flex-1" onClick={onViewDashboard}>
+                    {t.success.openDashboard}
+                  </FlowButton>
+                ) : (
+                  <FlowButton tone="dark" size="sm" className="flex-1" onClick={() => setDashboardAccessOpen(true)}>
+                    {t.success.accessDashboard}
+                  </FlowButton>
+                )}
                 {onTrackOrder && (
                   <FlowButton size="sm" onClick={() => onTrackOrder(orderId, phone.trim())}>
                     <Truck size={13} />
@@ -1190,19 +1215,16 @@ export default function CheckoutPage({
                   </FlowButton>
                 )}
               </div>
-            ) : (
-              <div className="flex flex-col sm:flex-row gap-2">
-                <FlowButton tone="dark" size="sm" className="flex-1" onClick={() => setDashboardAccessOpen(true)}>
-                  {t.success.accessDashboard}
-                </FlowButton>
-                {onTrackOrder && (
-                  <FlowButton size="sm" onClick={() => onTrackOrder(orderId, phone.trim())}>
-                    <Truck size={13} />
-                    {t.success.trackOrder}
-                  </FlowButton>
-                )}
-              </div>
-            )}
+
+              <button
+                type="button"
+                onClick={onBack}
+                className="w-full py-1.5 text-xs font-semibold text-[var(--co-ink-soft)] hover:text-[var(--co-ink)] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <ArrowLeft size={13} />
+                <span>{t.backToShopFull}</span>
+              </button>
+            </div>
 
           </div>
         )}
@@ -1224,6 +1246,7 @@ export default function CheckoutPage({
       <DashboardAccessModal
         isOpen={dashboardAccessOpen}
         initialPhone={phone}
+        initialName={name.trim()}
         onClose={() => setDashboardAccessOpen(false)}
         onSuccess={() => {
           setRecognized(true);
