@@ -1,4 +1,4 @@
-import { Gauge, ScanLine, Receipt, Handshake, Quote, Headset, Mailbox, Siren, Fingerprint, Gem, Palette, MessagesSquare, ShieldAlert } from "lucide-react";
+import { Gauge, ScanLine, Receipt, Handshake, Quote, Headset, Mailbox, Siren, Fingerprint, Gem, Palette, MessagesSquare } from "lucide-react";
 
 export const FONT_OPTIONS = [
   { id: "Pinterest Sans", label: "Pinterest Sans", css: "'Pinterest Sans', 'Pin Sans', ui-sans-serif, system-ui" },
@@ -22,7 +22,6 @@ export const NAV_ITEMS = [
   { id: "users", label: "Users", icon: Fingerprint, section: "Management" },
   { id: "products", label: "Shop Products", icon: Gem, section: "Management" },
   { id: "customize", label: "Sticker & Print", icon: Palette, section: "Management" },
-  { id: "superadmin", label: "Super Admin", icon: ShieldAlert, section: "Security & Control" },
 ];
 
 // Client (sticker owner) only nav item — their link into the RepiChat inbox.

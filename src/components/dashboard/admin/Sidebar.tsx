@@ -197,11 +197,6 @@ export default function Sidebar({
                   </div>
 
                   {/* Badge Pills */}
-                  {item.id === "superadmin" && (
-                    <span className="text-[9.5px] font-black tracking-wider uppercase px-1.5 py-0.5 rounded bg-red-500/25 text-red-400 border border-red-500/30 shrink-0">
-                      SUPER
-                    </span>
-                  )}
                   {badgeCount > 0 && (
                     <span
                       className={`
