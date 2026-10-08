@@ -1,16 +1,7 @@
 import React, { useEffect } from 'react';
-import {
-  Printer,
-  X,
-  FileText,
-  Building2,
-  CheckCircle2,
-  Download,
-  ShieldCheck,
-} from 'lucide-react';
+import { X, Download } from 'lucide-react';
 import { OrderInvoice } from '../../types/invoice';
-import { useLanguage } from '../../context/LanguageContext';
-import { orderTranslations } from '../../i18n/orderTranslations';
+import { INVOICE_LOGO_BASE64, INVOICE_ICON_BASE64 } from '../../services/invoiceAssets';
 
 interface OrderInvoiceModalProps {
   isOpen: boolean;
@@ -19,15 +10,16 @@ interface OrderInvoiceModalProps {
   onPrintInvoice: () => void;
 }
 
+function formatCurrency(val: number): string {
+  return '₹ ' + val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export default function OrderInvoiceModal({
   isOpen,
   onClose,
   invoice,
   onPrintInvoice,
 }: OrderInvoiceModalProps) {
-  const { language } = useLanguage();
-  const t = orderTranslations[language].invoiceModal;
-
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -53,20 +45,19 @@ export default function OrderInvoiceModal({
   const {
     invoiceNumber,
     issueDate,
-    orderReferenceId,
-    orderTimestamp,
-    seller,
     customerName,
     customerEmail,
     customerPhone,
     shippingAddress,
     items,
     taxBreakdown,
-    paymentMethod,
-    paymentStatus,
-    paymentTransactionId,
-    deliveryType,
   } = invoice;
+
+  const addressLines = [
+    shippingAddress.address,
+    [shippingAddress.city, shippingAddress.state].filter(Boolean).join(', '),
+    shippingAddress.pincode,
+  ].filter(Boolean);
 
   return (
     <div
@@ -79,14 +70,13 @@ export default function OrderInvoiceModal({
       <div className="absolute inset-0" onClick={onClose} />
 
       {/* Modal Card Container */}
-      <div className="relative z-10 w-full max-w-3xl max-h-[92vh] flex flex-col rounded-lg bg-white shadow-2xl border border-slate-200 overflow-hidden text-slate-900">
+      <div className="relative z-10 w-full max-w-3xl max-h-[94vh] flex flex-col rounded-3xl bg-slate-100 shadow-2xl border border-slate-200 overflow-hidden text-slate-900">
         {/* Top Control Bar */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/90 px-5 py-3.5 sm:px-6">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white/95 px-5 py-3.5 sm:px-6">
           <div className="flex items-center gap-2 text-sm font-black text-slate-900">
-            <FileText size={18} className="text-[#111111]" />
-            <span id="invoice-modal-title">{t.title}</span>
-            <span className="hidden sm:inline-block rounded-sm bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-900">
-              #{invoiceNumber}
+            <span>Official Tax Invoice</span>
+            <span className="rounded-sm bg-yellow-100 px-2 py-0.5 text-xs font-bold text-yellow-900">
+              Nº: {invoiceNumber}
             </span>
           </div>
 
@@ -94,221 +84,180 @@ export default function OrderInvoiceModal({
             <button
               type="button"
               onClick={onPrintInvoice}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-800 shadow-xs"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-slate-900 px-4 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-800 shadow-xs"
               title="Download PDF"
             >
-              <Download size={14} className="text-white" />
+              <Download size={13} className="text-white" />
               <span>Download PDF</span>
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-slate-200/80 text-slate-600 transition-colors hover:bg-slate-300 hover:text-slate-900"
-              aria-label={t.closeAria}
+              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-900"
+              aria-label="Close"
             >
-              <X size={17} />
+              <X size={16} />
             </button>
           </div>
         </div>
 
         {/* Scrollable Printable Invoice Content */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-8 space-y-6 text-xs sm:text-sm">
-          {/* Header row: Brand & Invoice Meta */}
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-950">
-                  Repi<span className="text-[#EAB308]">QR</span>
-                </span>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-8">
+          <div
+            className="w-full bg-white rounded-3xl p-6 sm:p-10 shadow-xs border border-slate-200/80 relative overflow-hidden"
+            style={{
+              backgroundImage:
+                'radial-gradient(circle at 45% 8%, rgba(254, 240, 138, 0.45) 0%, rgba(255, 255, 255, 0) 48%), radial-gradient(circle at 80% 92%, rgba(254, 240, 138, 0.5) 0%, rgba(255, 255, 255, 0) 42%)',
+            }}
+          >
+            {/* Top Row: Logo & Invoice Pill */}
+            <div className="flex items-start justify-between gap-4 mb-8">
+              <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-100 inline-flex items-center">
+                <img src={INVOICE_LOGO_BASE64} alt="RepiQR" className="h-8 sm:h-9 w-auto object-contain" />
               </div>
-              <div className="mt-1 font-bold text-slate-900 text-sm">Worthite LLP</div>
-              <div className="text-[11px] text-slate-500 leading-relaxed max-w-sm mt-0.5">
-                Surendranagar, Gujarat - 363530
-                <br />
-                GSTIN: <span className="font-semibold text-slate-700">{seller.gstin}</span>
+              <div className="bg-white rounded-full px-5 py-2 text-xs sm:text-sm font-extrabold tracking-widest text-slate-900 shadow-xs border border-slate-100 uppercase">
+                INVOICE
               </div>
             </div>
 
-            <div className="sm:text-right space-y-1">
+            {/* 3-Column Info Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8 text-xs">
+              {/* Col 1: Invoice to */}
               <div>
-                <span className="inline-block rounded-md bg-emerald-100 border border-emerald-300 px-3 py-1 text-xs font-black text-emerald-800 tracking-wider">
-                  PAID
+                <span className="inline-block bg-[#FFD233] text-black font-bold text-[11px] px-2.5 py-1 rounded-md mb-2.5">
+                  Invoice to:
                 </span>
+                <h3 className="text-base font-extrabold text-slate-900 mb-1">{customerName}</h3>
+                {customerPhone && <p className="text-slate-600 text-[11px] mb-0.5">{customerPhone}</p>}
+                {customerEmail && <p className="text-slate-600 text-[11px] mb-1">{customerEmail}</p>}
+                <p className="text-slate-500 text-[11px] leading-relaxed">
+                  {addressLines.join(', ')}
+                </p>
               </div>
-              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">
-                {t.invoiceNumberLabel}
-              </div>
-              <div className="text-base sm:text-lg font-black font-mono text-slate-950">
-                #{invoiceNumber}
-              </div>
-              <div className="text-xs text-slate-600">
-                {t.invoiceDateLabel} <strong className="text-slate-900">{issueDate}</strong>
-              </div>
-              <div className="text-xs text-slate-500">
-                {t.orderIdLabel} <strong className="font-mono text-slate-700">{orderReferenceId}</strong>
-              </div>
-            </div>
-          </div>
 
-          {/* Customer & Order Metadata */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4 space-y-1">
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                {t.billedShippedTo}
+              {/* Col 2: Date & Seller */}
+              <div>
+                <span className="inline-block bg-[#FFD233] text-black font-bold text-[11px] px-2.5 py-1 rounded-md mb-2.5">
+                  Date:
+                </span>
+                <h3 className="text-base font-extrabold text-slate-900 mb-1">{issueDate}</h3>
+                <p className="font-bold text-slate-800 text-[11px] mb-0.5">Worthite LLP</p>
+                <p className="font-semibold text-slate-600 text-[11px] mb-1">GSTIN- 24AAFFW7093N1ZH</p>
+                <p className="text-slate-500 text-[11px] leading-relaxed">
+                  38, KADAMBARI COMPLEX, OPP. ASTHALNI JAGYA, Thangadh, Surendra Nagar, Gujarat, India, 363530.
+                </p>
               </div>
-              <div className="font-extrabold text-slate-900">{customerName}</div>
-              <div className="text-xs text-slate-600 leading-relaxed">
-                {shippingAddress.address}
-                <br />
-                {shippingAddress.city}, {shippingAddress.state} - {shippingAddress.pincode}
-              </div>
-              <div className="pt-1 text-[11px] text-slate-500">
-                {t.phoneLabel} <strong className="text-slate-700">{customerPhone}</strong>
-                <br />
-                {t.emailLabel} <strong className="text-slate-700">{customerEmail}</strong>
+
+              {/* Col 3: Invoice Number */}
+              <div>
+                <span className="inline-block bg-[#FFD233] text-black font-bold text-[11px] px-2.5 py-1 rounded-md mb-2.5">
+                  Invoice number:
+                </span>
+                <h3 className="text-base font-extrabold text-slate-900">Nº: {invoiceNumber}</h3>
               </div>
             </div>
 
-            <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4 space-y-1">
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                {t.orderPaymentStatus}
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-extrabold pt-0.5">
-                <CheckCircle2 size={14} className="text-emerald-600" />
-                <span>{t.paymentStatusPrefix}{paymentStatus}</span>
-              </div>
-              <div className="text-xs text-slate-600">
-                {t.paymentModeLabel} <strong className="text-slate-900">{paymentMethod}</strong>
-              </div>
-              {paymentTransactionId && (
-                <div className="text-[11px] text-slate-500 font-mono">
-                  {t.gatewayRefLabel} {paymentTransactionId}
-                </div>
-              )}
-              <div className="text-[11px] text-slate-500">
-                {t.fulfilledViaLabel}{' '}
-                <strong className="text-slate-700">
-                  {deliveryType === 'express' ? t.expressPriority : t.standardDelivery}
-                </strong>
-              </div>
-              <div className="text-[11px] text-slate-400">{t.orderPlacedLabel} {orderTimestamp}</div>
-            </div>
-          </div>
-
-          {/* Line Items Table */}
-          <div className="rounded-lg border border-slate-200 overflow-hidden">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-900 text-white text-[11px] uppercase tracking-wider">
-                  <th className="py-2.5 px-3 w-10 text-center">#</th>
-                  <th className="py-2.5 px-3">{t.itemDescriptionHeader}</th>
-                  <th className="py-2.5 px-3 text-center w-14">{t.qtyHeader}</th>
-                  <th className="py-2.5 px-3 text-right w-24">{t.unitRateHeader}</th>
-                  <th className="py-2.5 px-3 text-right w-28">{t.amountHeader}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 text-xs">
-                {items.map((item, index) => (
-                  <tr key={item.id || index} className="hover:bg-slate-50/60">
-                    <td className="py-2.5 px-3 text-center text-slate-400 font-medium">
-                      {index + 1}
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <div className="font-extrabold text-slate-900">{item.name}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">
-                        {t.hsnSacLabel} {item.hsnSacCode}
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-3 text-center font-bold text-slate-800">
-                      {item.quantity}
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-medium text-slate-600">
-                      ₹{item.unitPrice.toFixed(2)}
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-extrabold text-slate-900">
-                      ₹{item.totalPrice.toFixed(2)}
-                    </td>
+            {/* Line Items Table */}
+            <div className="w-full mb-8 overflow-hidden rounded-xl">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-900 text-xs font-bold">
+                    <th className="py-3 px-4 rounded-l-xl">Item</th>
+                    <th className="py-3 px-4 text-center">Price</th>
+                    <th className="py-3 px-4 text-center">Qty</th>
+                    <th className="py-3 px-4 text-right rounded-r-xl">Total</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Financial Calculation Summary */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 pt-2">
-            <div className="text-[11px] text-slate-400 space-y-1 max-w-sm">
-              <p>Official computer-generated tax invoice issued by Worthite LLP.</p>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {items.map((item, idx) => (
+                    <tr key={item.id || idx}>
+                      <td className="py-3.5 px-4 font-bold text-slate-900">{item.name}</td>
+                      <td className="py-3.5 px-4 text-center text-slate-600 font-medium">
+                        {formatCurrency(item.unitPrice)}
+                      </td>
+                      <td className="py-3.5 px-4 text-center text-slate-600 font-medium">
+                        {item.quantity}
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-extrabold text-slate-900">
+                        {formatCurrency(item.totalPrice)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
-            <div className="w-full sm:w-72 space-y-1.5 rounded-lg bg-slate-50 p-4 border border-slate-200 text-xs">
-              <div className="flex justify-between text-slate-600">
-                <span>{t.taxableBaseLabel}</span>
-                <span className="font-semibold text-slate-800">
-                  ₹{taxBreakdown.taxableSubtotal.toFixed(2)}
-                </span>
+            {/* Bottom Section: Terms & Totals */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 items-start mb-10 pt-2">
+              <div className="text-[11px] text-slate-500 leading-relaxed">
+                <div className="font-extrabold text-slate-900 text-xs mb-1.5">Terms &amp; Conditions:</div>
+                <p>
+                  Product is non-refundable after activation. Customer is responsible for providing accurate
+                  information. RepiQR is not liable for service interruptions, misuse, or issues caused by
+                  damaged/incorrectly placed QR stickers. Emergency assistance depends on respective service
+                  providers. By purchasing, you agree to RepiQR's Terms &amp; Privacy Policy.
+                </p>
               </div>
-              <div className="flex justify-between text-slate-600">
-                <span>{t.cgstLabel}</span>
-                <span className="font-semibold text-slate-800">
-                  ₹{taxBreakdown.centralGstAmount.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between text-slate-600">
-                <span>{t.sgstLabel}</span>
-                <span className="font-semibold text-slate-800">
-                  ₹{taxBreakdown.stateGstAmount.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between text-slate-600">
-                <span>{t.shippingFeeLabel}</span>
-                <span className="font-semibold text-slate-800">
-                  {taxBreakdown.deliveryFee === 0
-                    ? t.free
-                    : `₹${taxBreakdown.deliveryFee.toFixed(2)}`}
-                </span>
-              </div>
-              <div className="flex justify-between border-t border-slate-300 pt-2 text-sm font-black text-slate-950">
-                <span>{t.totalAmountPaidLabel}</span>
-                <span className="text-[#111111]">₹{taxBreakdown.grandTotal.toFixed(2)}</span>
+
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between items-center py-0.5">
+                  <span className="font-bold text-slate-900">Subtotal</span>
+                  <span className="font-extrabold text-amber-600 text-sm">
+                    {formatCurrency(taxBreakdown.taxableSubtotal)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-0.5 text-slate-600">
+                  <span className="font-bold text-slate-800">CGST 9%</span>
+                  <span>{formatCurrency(taxBreakdown.centralGstAmount)}</span>
+                </div>
+                <div className="flex justify-between items-center py-0.5 text-slate-600">
+                  <span className="font-bold text-slate-800">SGST 9%</span>
+                  <span>{formatCurrency(taxBreakdown.stateGstAmount)}</span>
+                </div>
+                {taxBreakdown.deliveryFee > 0 && (
+                  <div className="flex justify-between items-center py-0.5 text-slate-600">
+                    <span className="font-bold text-slate-800">Delivery Fee</span>
+                    <span>{formatCurrency(taxBreakdown.deliveryFee)}</span>
+                  </div>
+                )}
+                <div className="bg-slate-50 rounded-xl p-3.5 flex justify-between items-center mt-2 border border-slate-100">
+                  <span className="font-extrabold text-sm text-slate-900">Invoice total</span>
+                  <span className="font-black text-sm text-slate-950">
+                    {formatCurrency(taxBreakdown.grandTotal)}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Signature Section */}
-          <div className="flex justify-end pt-3">
-            <div className="text-center min-w-[200px]">
-              <div className="text-xs font-bold text-slate-600 mb-1">For Worthite LLP</div>
-              <div className="font-serif italic text-2xl text-slate-900 border-b border-slate-300 pb-1 mb-1 select-none">
-                Worthite LLP
+            {/* Footer: Brand & Glyph */}
+            <div className="flex justify-between items-end pt-6 border-t border-slate-100 text-xs">
+              <div>
+                <div className="font-extrabold text-slate-900 text-sm mb-0.5">RepiQR</div>
+                <div className="text-slate-500 text-[11px]">www.repiqr.com</div>
+                <div className="text-slate-500 text-[11px]">admin@repiqr.com &nbsp;/&nbsp; +91 93137 19720</div>
               </div>
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                Authorized Signatory
+              <div>
+                <img src={INVOICE_ICON_BASE64} alt="R" className="h-10 w-auto object-contain" />
               </div>
             </div>
-          </div>
-
-          {/* Digital Signature Disclaimer */}
-          <div className="border-t border-dashed border-slate-300 pt-4 text-center text-[10px] text-slate-400">
-            {t.computerGeneratedNotice}{' '}
-            <span className="font-semibold text-slate-600">{seller.supportEmail}</span>
           </div>
         </div>
 
         {/* Modal Action Footer */}
-        <div className="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50/50 px-5 py-3.5 sm:px-6">
+        <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-white px-5 py-3.5 sm:px-6">
           <button
             type="button"
             onClick={onClose}
-            className="cursor-pointer rounded-md border border-gray-300 hover:border-black bg-white hover:bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-700 transition-colors"
+            className="cursor-pointer rounded-full border border-slate-300 hover:border-slate-900 bg-white hover:bg-slate-50 px-4 py-2 text-xs font-bold text-slate-700 transition-colors"
           >
-            {t.closeButton}
+            Close
           </button>
           <button
             type="button"
             onClick={onPrintInvoice}
-            className="flex cursor-pointer items-center gap-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-900 px-4 py-2 text-xs font-bold text-white transition-colors shadow-xs"
+            className="flex cursor-pointer items-center gap-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-900 px-5 py-2 text-xs font-bold text-white transition-colors shadow-xs"
           >
-            <Download size={14} />
+            <Download size={13} />
             <span>Download PDF</span>
           </button>
         </div>

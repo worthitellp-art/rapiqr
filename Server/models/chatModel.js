@@ -296,8 +296,24 @@ class ChatModel {
 
   static async deleteSession(sessionId) {
     try {
-      await ChatMessage.deleteMany({ session_id: sessionId });
-      await ChatSession.findByIdAndDelete(sessionId);
+      if (!sessionId) return false;
+      const mongoose = require('mongoose');
+      const cleanId = String(sessionId).trim();
+      const isOid = mongoose.Types.ObjectId.isValid(cleanId);
+      const queryId = isOid ? new mongoose.Types.ObjectId(cleanId) : cleanId;
+
+      await ChatMessage.deleteMany({
+        $or: [
+          { session_id: queryId },
+          { session_id: cleanId },
+        ],
+      });
+      await ChatSession.deleteOne({
+        $or: [
+          { _id: queryId },
+          { _id: cleanId },
+        ],
+      });
     } catch (err) {
       console.error(`ChatModel.deleteSession (${sessionId}) Error:`, err);
       logger.error('DB_CHAT', `ChatModel.deleteSession failed (${sessionId})`, err);

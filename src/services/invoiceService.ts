@@ -5,19 +5,20 @@ import {
   OrderInvoice,
   SellerDetails,
 } from '../types/invoice';
+import { INVOICE_LOGO_BASE64, INVOICE_ICON_BASE64 } from './invoiceAssets';
 
-const DEFAULT_SELLER_DETAILS: SellerDetails = {
+export const DEFAULT_SELLER_DETAILS: SellerDetails = {
   companyName: 'Worthite LLP',
   brandName: 'RepiQR',
   gstin: '24AAFFW7093N1ZH',
   pan: 'AAFFW7093N',
-  addressLine1: 'Surendranagar',
+  addressLine1: '38, KADAMBARI COMPLEX, OPP. ASTHALNI JAGYA, Thangadh',
   addressLine2: '',
-  city: 'Surendranagar',
-  state: 'Gujarat',
+  city: 'Surendra Nagar',
+  state: 'Gujarat, India',
   pincode: '363530',
   supportEmail: 'admin@repiqr.com',
-  website: 'https://repiqr.com',
+  website: 'www.repiqr.com',
 };
 
 const STANDARD_HSN_CODE = '4911'; // Printed decals & safety QR stickers
@@ -46,12 +47,19 @@ export function calculateGstTaxBreakdown(
 }
 
 /**
- * Formats a clean, structured invoice number from order reference and timestamp.
+ * Formats a clean, structured invoice number e.g. 000027.
  */
-export function generateInvoiceNumber(orderId: string, timestamp: Date): string {
-  const sanitizedId = orderId.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-  const yearMonth = `${timestamp.getFullYear()}${String(timestamp.getMonth() + 1).padStart(2, '0')}`;
-  return `INV-${yearMonth}-${sanitizedId.slice(-6)}`;
+export function generateInvoiceNumber(orderId: string, _timestamp?: Date): string {
+  const digits = orderId.replace(/\D/g, '');
+  if (digits.length >= 4) {
+    return digits.slice(-6).padStart(6, '0');
+  }
+  const sanitized = orderId.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  return (sanitized.slice(-6) || '000001').padStart(6, '0');
+}
+
+function formatCurrency(val: number): string {
+  return '₹ ' + val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 interface BuildInvoiceParameters {
@@ -76,7 +84,7 @@ interface BuildInvoiceParameters {
 }
 
 /**
- * Constructs a fully normalized OrderInvoice instance for display and printing.
+ * Constructs a fully normalized OrderInvoice instance matching the demo template.
  */
 export function buildOrderInvoice({
   orderId,
@@ -105,14 +113,17 @@ export function buildOrderInvoice({
   const taxBreakdown = calculateGstTaxBreakdown(subtotal, deliveryFee);
   const invoiceNumber = generateInvoiceNumber(orderId, timestamp);
 
+  // e.g. "June 26, 2024"
+  const formattedIssueDate = timestamp.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
   return {
     invoiceNumber,
     orderReferenceId: orderId,
-    issueDate: timestamp.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    }),
+    issueDate: formattedIssueDate,
     orderTimestamp: timestamp.toLocaleString('en-IN', {
       day: '2-digit',
       month: 'short',
@@ -136,10 +147,10 @@ export function buildOrderInvoice({
 }
 
 /**
- * Opens a dedicated print dialog for the invoice with isolated styling.
+ * Opens a dedicated print dialog for the invoice styled precisely to invoicedemo.png.
  */
 export function printOrderInvoice(invoice: OrderInvoice): void {
-  const printableWindow = window.open('', '_blank', 'width=840,height=1000');
+  const printableWindow = window.open('', '_blank', 'width=900,height=1100');
   if (!printableWindow) {
     alert('Please allow popups to print or download your invoice.');
     return;
@@ -147,20 +158,30 @@ export function printOrderInvoice(invoice: OrderInvoice): void {
 
   const itemsHtml = invoice.items
     .map(
-      (item, index) => `
+      (item) => `
       <tr>
-        <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 12px;">${index + 1}</td>
-        <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 12px;">
-          <strong>${escapeHtml(item.name)}</strong>
-          <div style="font-size: 11px; color: #64748b;">HSN: ${item.hsnSacCode}</div>
+        <td style="padding: 14px 18px; font-size: 13.5px; font-weight: 700; color: #0f172a;">
+          ${escapeHtml(item.name)}
         </td>
-        <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 12px; text-align: center;">${item.quantity}</td>
-        <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 12px; text-align: right;">₹${item.unitPrice.toFixed(2)}</td>
-        <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 12px; text-align: right;">₹${item.totalPrice.toFixed(2)}</td>
+        <td style="padding: 14px 18px; font-size: 13px; color: #334155; text-align: center;">
+          ${formatCurrency(item.unitPrice)}
+        </td>
+        <td style="padding: 14px 18px; font-size: 13px; color: #334155; text-align: center;">
+          ${item.quantity}
+        </td>
+        <td style="padding: 14px 18px; font-size: 13.5px; font-weight: 800; color: #0f172a; text-align: right;">
+          ${formatCurrency(item.totalPrice)}
+        </td>
       </tr>
     `
     )
     .join('');
+
+  const addressLines = [
+    invoice.shippingAddress.address,
+    [invoice.shippingAddress.city, invoice.shippingAddress.state].filter(Boolean).join(', '),
+    invoice.shippingAddress.pincode,
+  ].filter(Boolean);
 
   printableWindow.document.write(`
     <!DOCTYPE html>
@@ -171,219 +192,324 @@ export function printOrderInvoice(invoice: OrderInvoice): void {
         <style>
           * {
             box-sizing: border-box;
-            font-family: 'Pinterest Sans', 'Pin Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             color: #0f172a;
           }
           body {
             margin: 0;
-            padding: 32px;
+            padding: 30px;
+            background: #e2e8f0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+          }
+          .invoice-card {
+            position: relative;
+            width: 100%;
+            max-width: 820px;
             background: #ffffff;
+            border-radius: 28px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+            padding: 44px 48px;
+            /* Subtle ambient gradient waves from invoicedemo.png */
+            background-image: 
+              radial-gradient(circle at 45% 8%, rgba(254, 240, 138, 0.45) 0%, rgba(255, 255, 255, 0) 48%),
+              radial-gradient(circle at 80% 92%, rgba(254, 240, 138, 0.5) 0%, rgba(255, 255, 255, 0) 42%);
+            background-repeat: no-repeat;
           }
-          .invoice-container {
-            max-width: 780px;
-            margin: 0 auto;
-          }
-          .header {
+          .top-row {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            border-bottom: 2px solid #0f172a;
-            padding-bottom: 20px;
-            margin-bottom: 24px;
+            margin-bottom: 34px;
           }
-          .brand-title {
-            font-size: 26px;
-            font-weight: 900;
-            letter-spacing: -0.5px;
-            margin: 0 0 4px 0;
+          .logo-box {
+            background: #ffffff;
+            border-radius: 22px;
+            padding: 16px 22px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            display: inline-flex;
+            align-items: center;
           }
-          .brand-accent {
-            color: #d97706;
+          .logo-img {
+            height: 38px;
+            width: auto;
+            object-fit: contain;
           }
-          .invoice-badge {
-            display: inline-block;
-            background: #f1f5f9;
+          .invoice-pill {
+            background: #ffffff;
+            border-radius: 9999px;
+            padding: 9px 26px;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
             color: #0f172a;
-            font-weight: 800;
-            font-size: 12px;
-            padding: 4px 10px;
-            border-radius: 6px;
-            letter-spacing: 0.5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border: 1px solid rgba(0,0,0,0.05);
             text-transform: uppercase;
           }
-          .meta-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-            margin-bottom: 24px;
-          }
-          .meta-card {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 14px 16px;
-            font-size: 12px;
-            line-height: 1.6;
-          }
-          .meta-title {
+          .tag-pill {
+            display: inline-block;
+            background: #FFD233;
+            color: #000000;
+            font-weight: 700;
             font-size: 11px;
+            padding: 3.5px 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+          }
+          .info-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 1.2fr 0.9fr;
+            gap: 28px;
+            margin-bottom: 36px;
+          }
+          .info-col h3 {
+            margin: 0 0 6px 0;
+            font-size: 17px;
             font-weight: 800;
-            text-transform: uppercase;
-            color: #64748b;
-            margin-bottom: 6px;
+            color: #0f172a;
+            letter-spacing: -0.2px;
+          }
+          .info-col p {
+            margin: 0 0 3px 0;
+            font-size: 12px;
+            color: #475569;
+            line-height: 1.5;
+          }
+          .table-container {
+            width: 100%;
+            margin-bottom: 30px;
           }
           table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 24px;
           }
-          th {
-            background: #0f172a;
-            color: #ffffff;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 10px 12px;
+          .table-header th {
+            background: #F8FAFC;
+            color: #0f172a;
+            font-size: 12.5px;
+            font-weight: 700;
+            padding: 12px 18px;
             text-align: left;
           }
-          .totals-table {
-            width: 320px;
-            margin-left: auto;
-            border-collapse: collapse;
-            margin-bottom: 24px;
+          .table-header th:first-child {
+            border-top-left-radius: 10px;
+            border-bottom-left-radius: 10px;
           }
-          .totals-table td {
-            padding: 6px 12px;
-            font-size: 12px;
+          .table-header th:last-child {
+            border-top-right-radius: 10px;
+            border-bottom-right-radius: 10px;
           }
-          .totals-table tr.grand-total td {
-            border-top: 2px solid #0f172a;
-            font-size: 15px;
+          .bottom-section {
+            display: grid;
+            grid-template-columns: 1.15fr 0.95fr;
+            gap: 36px;
+            align-items: start;
+            margin-top: 10px;
+            margin-bottom: 48px;
+          }
+          .terms-box {
+            font-size: 10.5px;
+            color: #64748b;
+            line-height: 1.6;
+          }
+          .terms-title {
+            font-size: 11.5px;
+            font-weight: 800;
+            color: #0f172a;
+            margin-bottom: 6px;
+          }
+          .totals-list {
+            width: 100%;
+            space-y: 6px;
+          }
+          .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+            font-size: 12.5px;
+          }
+          .total-row-accent {
+            color: #0f172a;
+            font-weight: 700;
+          }
+          .subtotal-val {
+            color: #D97706;
+            font-weight: 800;
+            font-size: 13.5px;
+          }
+          .invoice-total-box {
+            background: #F8FAFC;
+            border-radius: 10px;
+            padding: 12px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+          }
+          .invoice-total-box span:first-child {
+            font-size: 13.5px;
+            font-weight: 800;
+            color: #0f172a;
+          }
+          .invoice-total-box span:last-child {
+            font-size: 14.5px;
             font-weight: 900;
             color: #0f172a;
-            padding-top: 10px;
           }
-          .footer-note {
-            border-top: 1px dashed #cbd5e1;
-            padding-top: 16px;
+          .footer-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding-top: 24px;
+            border-top: 1px solid rgba(226, 232, 240, 0.6);
+          }
+          .footer-brand {
+            font-size: 13px;
+            font-weight: 800;
+            color: #0f172a;
+            margin-bottom: 3px;
+          }
+          .footer-meta {
             font-size: 11px;
             color: #64748b;
             line-height: 1.5;
-            text-align: center;
           }
+          .footer-glyph {
+            height: 48px;
+            width: auto;
+            object-fit: contain;
+          }
+
           @media print {
             body {
               padding: 0;
+              background: #ffffff;
             }
-            .invoice-container {
+            .invoice-card {
               max-width: 100%;
+              box-shadow: none;
+              border-radius: 0;
+              padding: 24px 32px;
             }
             @page {
-              margin: 15mm;
+              margin: 10mm;
+              size: A4 portrait;
             }
           }
         </style>
       </head>
       <body>
-        <div class="invoice-container">
-          <div class="header">
+        <div class="invoice-card">
+          <!-- Top Row: Logo & Invoice Pill -->
+          <div class="top-row">
+            <div class="logo-box">
+              <img src="${INVOICE_LOGO_BASE64}" alt="RepiQR" class="logo-img" />
+            </div>
+            <div class="invoice-pill">
+              INVOICE
+            </div>
+          </div>
+
+          <!-- 3-Column Info Grid -->
+          <div class="info-grid">
+            <!-- Col 1: Invoice to -->
+            <div class="info-col">
+              <div class="tag-pill">Invoice to:</div>
+              <h3>${escapeHtml(invoice.customerName)}</h3>
+              ${invoice.customerPhone ? `<p>${escapeHtml(invoice.customerPhone)}</p>` : ''}
+              ${invoice.customerEmail ? `<p>${escapeHtml(invoice.customerEmail)}</p>` : ''}
+              <p style="color: #64748b; margin-top: 4px;">
+                ${addressLines.map(escapeHtml).join(', ')}
+              </p>
+            </div>
+
+            <!-- Col 2: Date & Seller -->
+            <div class="info-col">
+              <div class="tag-pill">Date:</div>
+              <h3>${escapeHtml(invoice.issueDate)}</h3>
+              <p style="font-weight: 700; color: #334155; margin-bottom: 2px;">${escapeHtml(invoice.seller.companyName)}</p>
+              <p style="font-weight: 600; color: #475569; margin-bottom: 4px;">GSTIN- ${escapeHtml(invoice.seller.gstin)}</p>
+              <p style="color: #64748b; font-size: 11px; line-height: 1.45;">
+                ${escapeHtml(invoice.seller.addressLine1)}, ${escapeHtml(invoice.seller.city)}, ${escapeHtml(invoice.seller.state)}, ${escapeHtml(invoice.seller.pincode)}.
+              </p>
+            </div>
+
+            <!-- Col 3: Invoice Number -->
+            <div class="info-col">
+              <div class="tag-pill">Invoice number:</div>
+              <h3>Nº: ${escapeHtml(invoice.invoiceNumber)}</h3>
+            </div>
+          </div>
+
+          <!-- Items Table -->
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr class="table-header">
+                  <th style="width: 48%;">Item</th>
+                  <th style="width: 20%; text-align: center;">Price</th>
+                  <th style="width: 12%; text-align: center;">Qty</th>
+                  <th style="width: 20%; text-align: right;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Bottom Section: Terms & Totals -->
+          <div class="bottom-section">
+            <div class="terms-box">
+              <div class="terms-title">Terms &amp; Conditions:</div>
+              Product is non-refundable after activation. Customer is responsible for providing accurate information. RepiQR is not liable for service interruptions, misuse, or issues caused by damaged/incorrectly placed QR stickers. Emergency assistance depends on respective service providers. By purchasing, you agree to RepiQR's Terms &amp; Privacy Policy.
+            </div>
+
+            <div class="totals-list">
+              <div class="total-row">
+                <span class="total-row-accent">Subtotal</span>
+                <span class="subtotal-val">${formatCurrency(invoice.taxBreakdown.taxableSubtotal)}</span>
+              </div>
+              <div class="total-row">
+                <span class="total-row-accent">CGST 9%</span>
+                <span style="color: #475569;">${formatCurrency(invoice.taxBreakdown.centralGstAmount)}</span>
+              </div>
+              <div class="total-row">
+                <span class="total-row-accent">SGST 9%</span>
+                <span style="color: #475569;">${formatCurrency(invoice.taxBreakdown.stateGstAmount)}</span>
+              </div>
+              ${
+                invoice.taxBreakdown.deliveryFee > 0
+                  ? `
+                <div class="total-row">
+                  <span class="total-row-accent">Delivery Fee</span>
+                  <span style="color: #475569;">${formatCurrency(invoice.taxBreakdown.deliveryFee)}</span>
+                </div>
+              `
+                  : ''
+              }
+              <div class="invoice-total-box">
+                <span>Invoice total</span>
+                <span>${formatCurrency(invoice.taxBreakdown.grandTotal)}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer: RepiQR Contact & Icon -->
+          <div class="footer-row">
             <div>
-              <div style="font-size: 26px; font-weight: 900; letter-spacing: -0.5px; color: #0f172a; margin-bottom: 6px;">
-                Repi<span style="color: #EAB308;">QR</span>
-              </div>
-              <div style="font-size: 14px; color: #0f172a; font-weight: 800; margin-bottom: 3px;">
-                ${invoice.seller.companyName}
-              </div>
-              <div style="font-size: 11.5px; color: #475569; line-height: 1.5;">
-                ${invoice.seller.addressLine1}, ${invoice.seller.state} - ${invoice.seller.pincode}<br />
-                GSTIN: <strong>${invoice.seller.gstin}</strong>
-              </div>
+              <div class="footer-brand">RepiQR</div>
+              <div class="footer-meta">www.repiqr.com</div>
+              <div class="footer-meta">admin@repiqr.com &nbsp;/&nbsp; +91 93137 19720</div>
             </div>
-            <div style="text-align: right;">
-              <span class="invoice-badge" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-weight: 800; font-size: 12px; padding: 4px 12px;">PAID</span>
-              <h2 style="font-size: 18px; margin: 8px 0 2px 0; font-weight: 900; color: #0f172a;">TAX INVOICE</h2>
-              <div style="font-size: 13px; color: #0f172a; font-weight: 700; font-family: monospace;"># ${invoice.invoiceNumber}</div>
-              <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">Date: <strong>${invoice.issueDate}</strong></div>
+            <div>
+              <img src="${INVOICE_ICON_BASE64}" alt="R" class="footer-glyph" />
             </div>
-          </div>
-
-          <div class="meta-grid">
-            <div class="meta-card">
-              <div class="meta-title">Billed &amp; Shipped To</div>
-              <strong>${escapeHtml(invoice.customerName)}</strong><br />
-              ${escapeHtml(invoice.shippingAddress.address)}<br />
-              ${escapeHtml(invoice.shippingAddress.city)}, ${escapeHtml(invoice.shippingAddress.state)} - ${escapeHtml(invoice.shippingAddress.pincode)}<br />
-              Phone: ${escapeHtml(invoice.customerPhone)}<br />
-              Email: ${escapeHtml(invoice.customerEmail)}
-            </div>
-
-            <div class="meta-card">
-              <div class="meta-title">Order &amp; Payment Details</div>
-              Order Reference: <strong>${escapeHtml(invoice.orderReferenceId)}</strong><br />
-              Placed On: ${invoice.orderTimestamp}<br />
-              Payment Mode: <strong>${invoice.paymentMethod}</strong><br />
-              Payment Status: <strong style="color: #16a34a;">${invoice.paymentStatus}</strong><br />
-              ${invoice.paymentTransactionId ? `Transaction Ref: <span style="font-family: monospace;">${escapeHtml(invoice.paymentTransactionId)}</span><br />` : ''}
-              Delivery Method: ${invoice.deliveryType === 'express' ? 'Express Priority (24-48 hrs)' : 'Standard Tracked Delivery (3-5 days)'}
-            </div>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 40px;">#</th>
-                <th>Item Description</th>
-                <th style="width: 60px; text-align: center;">Qty</th>
-                <th style="width: 100px; text-align: right;">Unit Price</th>
-                <th style="width: 110px; text-align: right;">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsHtml}
-            </tbody>
-          </table>
-
-          <table class="totals-table">
-            <tr>
-              <td style="color: #64748b;">Taxable Base:</td>
-              <td style="text-align: right; font-weight: 600;">₹${invoice.taxBreakdown.taxableSubtotal.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td style="color: #64748b;">CGST (9%):</td>
-              <td style="text-align: right; font-weight: 600;">₹${invoice.taxBreakdown.centralGstAmount.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td style="color: #64748b;">SGST (9%):</td>
-              <td style="text-align: right; font-weight: 600;">₹${invoice.taxBreakdown.stateGstAmount.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td style="color: #64748b;">Shipping Fee:</td>
-              <td style="text-align: right; font-weight: 600; color: ${invoice.taxBreakdown.deliveryFee === 0 ? '#16a34a' : '#0f172a'};">
-                ${invoice.taxBreakdown.deliveryFee === 0 ? 'FREE' : `₹${invoice.taxBreakdown.deliveryFee.toFixed(2)}`}
-              </td>
-            </tr>
-            <tr class="grand-total">
-              <td>Total Paid:</td>
-              <td style="text-align: right;">₹${invoice.taxBreakdown.grandTotal.toFixed(2)}</td>
-            </tr>
-          </table>
-
-          <!-- Signature Section -->
-          <div style="display: flex; justify-content: flex-end; margin-top: 36px; margin-bottom: 24px;">
-            <div style="text-align: center; min-width: 220px;">
-              <div style="font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 8px;">For Worthite LLP</div>
-              <div style="font-family: 'Brush Script MT', 'Segoe Script', cursive, sans-serif; font-size: 26px; color: #0f172a; margin-bottom: 4px; border-bottom: 1.5px solid #cbd5e1; padding-bottom: 6px;">
-                Worthite LLP
-              </div>
-              <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px;">
-                Authorized Signatory
-              </div>
-            </div>
-          </div>
-
-          <div class="footer-note">
-            This is a computer-generated tax invoice.<br />
-            For support queries or corporate fleet orders, contact <strong>${invoice.seller.supportEmail}</strong>
           </div>
         </div>
 

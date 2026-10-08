@@ -28,16 +28,35 @@ async function ownerButtonValue(ownerId, sessionId) {
 async function isOwnerOfSession(req, session) {
   if (!req.user) return false;
   if (req.user.role === 'admin') return true;
-  if (session.owner_id && req.user.id === session.owner_id) return true;
+  const currentUserId = String(req.user.id || req.user._id || '');
+  if (session.owner_id && String(session.owner_id) === currentUserId) return true;
 
   if (session.qr_code_id) {
     const product = await ProductModel.getByQrCodeId(session.qr_code_id).catch(() => null);
-    if (product && product.user_id === req.user.id) {
+    if (product && String(product.user_id) === currentUserId) {
       if (!session.owner_id) {
-        ChatSession.findByIdAndUpdate(session.id, { $set: { owner_id: req.user.id } }).catch(() => { /* best effort */ });
-        session.owner_id = req.user.id;
+        ChatSession.findByIdAndUpdate(session.id, { $set: { owner_id: currentUserId } }).catch(() => { /* best effort */ });
+        session.owner_id = currentUserId;
       }
       return true;
+    }
+
+    try {
+      const Sticker = require('../models/schemas/Sticker');
+      const stickerDoc = await Sticker.findOne({
+        _id: session.qr_code_id,
+        user_id: currentUserId,
+        deleted_at: null,
+      }).lean();
+      if (stickerDoc) {
+        if (!session.owner_id) {
+          ChatSession.findByIdAndUpdate(session.id, { $set: { owner_id: currentUserId } }).catch(() => { /* best effort */ });
+          session.owner_id = currentUserId;
+        }
+        return true;
+      }
+    } catch {
+      /* ignore query error */
     }
   }
   return false;

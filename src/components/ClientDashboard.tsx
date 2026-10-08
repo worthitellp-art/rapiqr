@@ -1346,7 +1346,7 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
                     onClick={(e) => handleDeleteChatSession(e, sess.id)}
                     title={t.chatInbox.deleteConversation}
                     aria-label={t.chatInbox.deleteConversation}
-                    className="mr-2 hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--fx-faint)] hover:bg-[#FEE2E2] hover:text-[#DC2626] group-hover:flex cursor-pointer"
+                    className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--fx-faint)] hover:bg-[#FEE2E2] hover:text-[#DC2626] md:opacity-0 md:group-hover:opacity-100 transition-opacity cursor-pointer"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -1366,6 +1366,11 @@ export default function ClientDashboard({ onBack, onPurchaseSticker }: ClientDas
             title={selectedChatSession.customer_name}
             subtitle={[selectedChatSession.vehicle_label, selectedChatSession.qr_code_id].filter(Boolean).join(' · ') || undefined}
             onClose={() => openChatSession(null)}
+            onDeleteSession={(id) => {
+              setOwnerSessions((prev) => prev.filter((s) => s.id !== id));
+              openChatSession(null);
+              showToast('Chat conversation deleted');
+            }}
             className="h-full"
           />
         ) : (

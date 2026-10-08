@@ -66,6 +66,7 @@ interface RepiChatProps {
   title?: string;
   subtitle?: string;
   onClose?: () => void;
+  onDeleteSession?: (sessionId: string) => void;
   className?: string;
   key?: React.Key;
 }
@@ -344,6 +345,7 @@ export default function RepiChat({
   title,
   subtitle,
   onClose,
+  onDeleteSession,
   className = "",
 }: RepiChatProps) {
   // On the visitor side the session id only comes back from `startSession`, but
@@ -1154,6 +1156,31 @@ export default function RepiChat({
           <p className="text-[13.5px] sm:text-[15px] font-bold truncate leading-tight">{headerTitle}</p>
           <p className="text-[11px] sm:text-xs text-[#62625B] font-medium truncate mt-0.5">{statusLine}</p>
         </div>
+
+        {mode === "owner" && sessionId && (
+          <button
+            type="button"
+            onClick={async () => {
+              if (!window.confirm("Are you sure you want to delete this chat conversation?")) return;
+              try {
+                const res = await apiClient.chat.deleteSession(sessionId);
+                if (res?.success) {
+                  onDeleteSession?.(sessionId);
+                  onClose?.();
+                } else {
+                  alert(res?.message || "Failed to delete chat");
+                }
+              } catch {
+                alert("Failed to delete chat");
+              }
+            }}
+            className="w-9 h-9 rounded-full hover:bg-[#FEE2E2] text-[#62625B] hover:text-[#DC2626] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+            title="Delete conversation"
+            aria-label="Delete conversation"
+          >
+            <Trash2 size={16} />
+          </button>
+        )}
 
         {onClose && (
           <button
