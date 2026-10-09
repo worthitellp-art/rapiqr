@@ -5,4 +5,20 @@ Disallow: /distributor
 Disallow: /checkout
 Disallow: /auth
 
+# Explicit Search Engine & AI Crawler allowances for rapid indexing & citations
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
 Sitemap: https://repiqr.com/sitemap.xml
