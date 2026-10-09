@@ -65,9 +65,9 @@ export default function FolderGrid({
   }, [folders, searchQuery, sortBy, stickerCounts]);
 
   return (
-    <div className="bg-white border border-gray-200/90 rounded-2xl shadow-xs overflow-hidden select-none">
+    <div className="bg-white border border-gray-200/90 rounded-2xl shadow-xs select-none">
       {/* ── 1. Windows 11 Explorer Address Bar & Search ─────────────────────── */}
-      <div className="p-3 bg-gray-50/70 border-b border-gray-200/80 flex flex-wrap items-center justify-between gap-3">
+      <div className="p-3 bg-gray-50/70 border-b border-gray-200/80 rounded-t-2xl flex flex-wrap items-center justify-between gap-3">
         {/* Address Bar (This PC > New Volume (D:) style) */}
         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-gray-200/80 shadow-2xs text-xs font-medium text-gray-700 flex-1 min-w-[260px] max-w-xl">
           <Monitor size={14} className="text-blue-500 shrink-0" />
@@ -193,7 +193,7 @@ export default function FolderGrid({
       </div>
 
       {/* ── 4. Windows 11 Explorer Bottom Status Bar ────────────────────────── */}
-      <div className="px-4 py-2 bg-gray-50/80 border-t border-gray-200/80 flex items-center justify-between text-[11px] text-gray-500 font-medium">
+      <div className="px-4 py-2 bg-gray-50/80 border-t border-gray-200/80 rounded-b-2xl flex items-center justify-between text-[11px] text-gray-500 font-medium">
         <div>
           <span>{displayedFolders.length} folders</span>
           {totalStickersCount > 0 && (

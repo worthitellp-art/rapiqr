@@ -432,6 +432,68 @@ class QrController {
       return sendServerError(res, err);
     }
   }
+
+  /**
+   * List sticker folders (shared across all admin accounts)
+   */
+  static async getFolders(req, res) {
+    try {
+      const data = await QrModel.listFolders();
+      return res.json({ success: true, data });
+    } catch (err) {
+      logger.error('QR_FOLDERS', 'Failed to list folders', err);
+      return sendServerError(res, err);
+    }
+  }
+
+  /**
+   * Create a sticker folder
+   */
+  static async createFolder(req, res) {
+    try {
+      const { name } = req.body || {};
+      if (!name || !String(name).trim()) {
+        return res.status(400).json({ success: false, error: 'Folder name is required' });
+      }
+      const data = await QrModel.createFolder(name);
+      return res.json({ success: true, data });
+    } catch (err) {
+      logger.error('QR_FOLDERS', 'Failed to create folder', err);
+      return sendServerError(res, err);
+    }
+  }
+
+  /**
+   * Rename a sticker folder
+   */
+  static async renameFolder(req, res) {
+    try {
+      const { name } = req.body || {};
+      if (!name || !String(name).trim()) {
+        return res.status(400).json({ success: false, error: 'Folder name is required' });
+      }
+      const data = await QrModel.renameFolder(req.params.id, name);
+      if (!data) return res.status(404).json({ success: false, error: 'Folder not found' });
+      return res.json({ success: true, data });
+    } catch (err) {
+      logger.error('QR_FOLDERS', 'Failed to rename folder', err);
+      return sendServerError(res, err);
+    }
+  }
+
+  /**
+   * Delete a sticker folder
+   */
+  static async deleteFolder(req, res) {
+    try {
+      const ok = await QrModel.deleteFolder(req.params.id);
+      if (!ok) return res.status(404).json({ success: false, error: 'Folder not found' });
+      return res.json({ success: true });
+    } catch (err) {
+      logger.error('QR_FOLDERS', 'Failed to delete folder', err);
+      return sendServerError(res, err);
+    }
+  }
 }
 
 module.exports = QrController;

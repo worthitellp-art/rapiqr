@@ -579,6 +579,33 @@ export const apiClient = {
       });
     },
 
+    // Folders are persisted server-side so every admin account sees the same list.
+    async getFolders() {
+      return request<{ success: boolean; data?: any[]; error?: string }>('/qr/folders', {
+        method: 'GET',
+      });
+    },
+
+    async createFolder(name: string) {
+      return request<{ success: boolean; data?: any; error?: string }>('/qr/folders', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      });
+    },
+
+    async renameFolder(id: string, name: string) {
+      return request<{ success: boolean; data?: any; error?: string }>(`/qr/folders/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name }),
+      });
+    },
+
+    async deleteFolder(id: string) {
+      return request<{ success: boolean; error?: string }>(`/qr/folders/${id}`, {
+        method: 'DELETE',
+      });
+    },
+
     /**
      * Code-only recovery for id-scheme v2 stickers — no sticker id needed,
      * unlike restoreQrCode. The server re-derives the id from the code alone

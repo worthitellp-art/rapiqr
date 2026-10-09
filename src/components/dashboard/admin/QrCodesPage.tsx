@@ -49,13 +49,7 @@ import FolderBreadcrumbs from "./folders/FolderBreadcrumbs";
 import CreateFolderModal from "./folders/CreateFolderModal";
 import MoveToFolderModal from "./folders/MoveToFolderModal";
 import RenameFolderModal from "./folders/RenameFolderModal";
-import {
-  StickerFolder,
-  getStoredFolders,
-  addFolder,
-  renameFolder,
-  removeFolder,
-} from "./folders/folderStorage";
+import { StickerFolder } from "./folders/folderStorage";
 
 type ViewMode = "cards" | "table";
 type TabFilter = "all" | "active" | "pending" | "printed";
@@ -122,13 +116,22 @@ export default function QrCodesPage({
   const [isAssignLabelOpen, setIsAssignLabelOpen] = useState(false);
   const [isBulkPrintByLabelOpen, setIsBulkPrintByLabelOpen] = useState(false);
   const [assignLabelTargetIds, setAssignLabelTargetIds] = useState<string[]>([]);
-  // Bulk confirmation modal
-  const [showDeleteSelectedConfirm, setShowDeleteSelectedConfirm] = useState(false);
-  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
   // ── Folders State ─────────────────────────────────────────────────────────
-  const [folders, setFolders] = useState<StickerFolder[]>(() => getStoredFolders());
+  // Persisted server-side (not localStorage) so every admin account sees the
+  // same folder list instead of only the browser that created it.
+  const [folders, setFolders] = useState<StickerFolder[]>([]);
+
+  useEffect(() => {
+    apiClient.qr.getFolders().then((res) => {
+      if (res?.success && res.data) setFolders(res.data);
+    }).catch((err) => console.warn("Could not load folders:", err));
+  }, []);
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
+  // Default view is the flat sticker list (all stickers, with search/filter/
+  // batch tools) — the folder grid is opt-in via the "Folders" button, not
+  // something blocking the list on every page load.
+  const [showFolderGrid, setShowFolderGrid] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [isMoveToFolderOpen, setIsMoveToFolderOpen] = useState(false);
@@ -415,34 +418,6 @@ export default function QrCodesPage({
     }
   };
 
-  // ── Delete Selected stickers ────────────────────────────────────────────
-  const handleDeleteSelected = async () => {
-    const ids: string[] = Array.from(selectedIds);
-    if (ids.length === 0) return;
-    setIsDeletingBulk(true);
-    let successCount = 0;
-    let failCount = 0;
-    for (const id of ids) {
-      try {
-        const res = await apiClient.qr.deleteQrCode(id);
-        if (res?.success) successCount++;
-        else failCount++;
-      } catch {
-        failCount++;
-      }
-    }
-    setQrList((prev) => prev.filter((q) => !ids.includes(q.id)));
-    setSelectedIds(new Set());
-    setShowDeleteSelectedConfirm(false);
-    setIsDeletingBulk(false);
-    if (failCount === 0) {
-      setToast(`${successCount} sticker${successCount !== 1 ? 's' : ''} permanently deleted.`);
-    } else {
-      setToast(`${successCount} deleted, ${failCount} failed. Check connection.`);
-    }
-    setTimeout(() => setToast(null), 4000);
-  };
-
   // ── Folder Operations ────────────────────────────────────────────────────
   const handlePrintActiveFolder = () => {
     let folderStickers = qrList;
@@ -515,10 +490,20 @@ export default function QrCodesPage({
     }
   };
 
-  const handleCreateFolder = (name: string) => {
-    const newF = addFolder(name);
-    setFolders(getStoredFolders());
-    setToast(`Folder "${newF.name}" created.`);
+  const handleCreateFolder = async (name: string) => {
+    try {
+      const res = await apiClient.qr.createFolder(name);
+      if (res?.success && res.data) {
+        setFolders((prev) =>
+          prev.some((f) => f.id === res.data.id) ? prev : [...prev, res.data]
+        );
+        setToast(`Folder "${res.data.name}" created.`);
+      } else {
+        setToast(res?.error || "Failed to create folder.");
+      }
+    } catch (err: any) {
+      setToast(err?.message || "Failed to create folder.");
+    }
     setTimeout(() => setToast(null), 2500);
   };
 
@@ -527,9 +512,20 @@ export default function QrCodesPage({
     if (!trimmed || trimmed === folder.name) return;
 
     const oldName = folder.name;
-    // 1. Rename in storage
-    const updated = renameFolder(folder.id, trimmed);
-    setFolders(updated);
+    // 1. Rename server-side
+    try {
+      const res = await apiClient.qr.renameFolder(folder.id, trimmed);
+      if (!res?.success) {
+        setToast(res?.error || "Failed to rename folder.");
+        setTimeout(() => setToast(null), 3000);
+        return;
+      }
+    } catch (err: any) {
+      setToast(err?.message || "Failed to rename folder.");
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
+    setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, name: trimmed } : f)));
 
     // 2. Update affected stickers in local state
     const affectedStickers = qrList.filter(
@@ -565,53 +561,38 @@ export default function QrCodesPage({
   };
 
   const handleDeleteFolder = async (folder: StickerFolder) => {
-    const affectedStickers = qrList.filter(
+    const count = qrList.filter(
       (q) => (q.folderName || "").toLowerCase() === folder.name.toLowerCase()
-    );
-    const count = affectedStickers.length;
+    ).length;
 
-    const confirmMsg =
-      count > 0
-        ? `Delete folder "${folder.name}"?\n\nNOTE: None of the ${count} sticker(s) will be deleted. They will remain completely safe in your sticker fleet as unassigned.`
-        : `Delete empty folder "${folder.name}"?`;
+    if (count > 0) {
+      window.alert(
+        `Can't delete folder "${folder.name}" — it still has ${count} sticker${count !== 1 ? "s" : ""} inside.\n\nMove or unassign them first, then delete the folder.`
+      );
+      return;
+    }
 
-    if (!window.confirm(confirmMsg)) return;
+    if (!window.confirm(`Delete empty folder "${folder.name}"?`)) return;
 
-    // 1. Remove folder metadata from folder list
-    const updated = removeFolder(folder.id);
-    setFolders(updated);
+    try {
+      const res = await apiClient.qr.deleteFolder(folder.id);
+      if (!res?.success) {
+        setToast(res?.error || "Failed to delete folder.");
+        setTimeout(() => setToast(null), 3000);
+        return;
+      }
+    } catch (err: any) {
+      setToast(err?.message || "Failed to delete folder.");
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
+    setFolders((prev) => prev.filter((f) => f.id !== folder.id));
 
-    // 2. Keep ALL stickers in state, only unsetting their folderName
-    setQrList((prev) =>
-      prev.map((q) =>
-        (q.folderName || "").toLowerCase() === folder.name.toLowerCase()
-          ? { ...q, folderName: undefined }
-          : q
-      )
-    );
-
-    // 3. Return to root view if user was viewing this folder
     if (activeFolder?.toLowerCase() === folder.name.toLowerCase()) {
       setActiveFolder(null);
     }
 
-    // 4. Update database so stickers' folder_name is safely set to null without deleting the stickers
-    if (affectedStickers.length > 0) {
-      try {
-        await apiClient.qr.bulkUpdateFolder(
-          affectedStickers.map((q) => q.id),
-          null
-        );
-      } catch (err) {
-        console.warn("Could not sync folder detachment to server:", err);
-      }
-    }
-
-    setToast(
-      count > 0
-        ? `Folder "${folder.name}" deleted. All ${count} stickers safely preserved.`
-        : `Folder "${folder.name}" deleted.`
-    );
+    setToast(`Folder "${folder.name}" deleted.`);
     setTimeout(() => setToast(null), 3000);
   };
 
@@ -760,19 +741,21 @@ export default function QrCodesPage({
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">
-              {activeFolder ? activeFolder : "QR Stickers Fleet"}
+              {activeFolder ? activeFolder : showFolderGrid ? "Folders" : "QR Stickers Fleet"}
             </h1>
             <p className="text-xs sm:text-sm text-gray-500 font-normal">
               {activeFolder
                 ? `Showing sticker collection inside folder "${activeFolder}"`
-                : "Double-click or double-tap any folder to open its sticker collection"}
+                : showFolderGrid
+                ? "Double-click or double-tap any folder to open its sticker collection"
+                : `All ${qrList.length} stickers across your fleet`}
             </p>
           </div>
         </div>
 
         {/* Primary Header Action: ONE Create Button + Utility Actions */}
         <div className="flex items-center gap-2 flex-wrap">
-          {activeFolder && (
+          {activeFolder ? (
             <button
               type="button"
               onClick={() => {
@@ -783,6 +766,24 @@ export default function QrCodesPage({
             >
               <ChevronLeft size={15} />
               <span>All Folders</span>
+            </button>
+          ) : showFolderGrid ? (
+            <button
+              type="button"
+              onClick={() => setShowFolderGrid(false)}
+              className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 font-semibold text-xs transition-colors cursor-pointer shadow-2xs"
+            >
+              <ChevronLeft size={15} />
+              <span>All Stickers</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowFolderGrid(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 font-semibold text-xs transition-colors cursor-pointer shadow-2xs"
+            >
+              <Folder size={15} />
+              <span>Folders</span>
             </button>
           )}
 
@@ -842,45 +843,9 @@ export default function QrCodesPage({
         </div>
       </div>
 
-      {/* ── 2. Windows 11 Explorer Folders Grid (Root) vs Inside Folder View ── */}
-      {!activeFolder ? (
-        /* Root View: Show ONLY Windows 11 Explorer Folders (No stickers outside folder) */
-        <FolderGrid
-          folders={allDisplayFolders}
-          stickerCounts={folderCounts}
-          totalStickersCount={qrList.length}
-          selectedFolderId={selectedFolderId}
-          onSelectFolder={(f) => setSelectedFolderId(f.id)}
-          onOpenFolder={(f) => {
-            setActiveFolder(f.name);
-            setPage(1);
-          }}
-          onPrintFolder={(f) => {
-            const stickersInFolder = qrList.filter((q) =>
-              f.name.toLowerCase() === "unassigned stock"
-                ? !q.folderName || q.folderName.toLowerCase() === "unassigned" || q.folderName.toLowerCase() === "unassigned stock"
-                : (q.folderName || "").toLowerCase() === f.name.toLowerCase()
-            );
-            handleTriggerPrint(undefined, stickersInFolder);
-          }}
-          onAssignLabelFolder={(f) => {
-            const stickersInFolder = qrList.filter((q) =>
-              f.name.toLowerCase() === "unassigned stock"
-                ? !q.folderName || q.folderName.toLowerCase() === "unassigned" || q.folderName.toLowerCase() === "unassigned stock"
-                : (q.folderName || "").toLowerCase() === f.name.toLowerCase()
-            );
-            if (stickersInFolder.length > 0) {
-              setAssignLabelTargetIds(stickersInFolder.map((q) => q.id));
-              setIsAssignLabelOpen(true);
-            }
-          }}
-          onDeleteFolder={handleDeleteFolder}
-          onRenameFolder={(f) => setFolderToRename(f)}
-          onCreateFolderClick={() => setIsCreateFolderOpen(true)}
-        />
-      ) : (
-        /* Inside Folder View: Breadcrumbs, Filter Bar, and Stickers Collection */
-        <div className="space-y-6 animate-in fade-in duration-150">
+      {/* ── 2. Folder navigation (optional) + sticker list controls ── */}
+      <div className="space-y-6 animate-in fade-in duration-150">
+        {activeFolder ? (
           <FolderBreadcrumbs
             currentFolder={activeFolder}
             folderCount={filtered.length}
@@ -906,8 +871,49 @@ export default function QrCodesPage({
             }}
             onCreateStickerInFolder={() => setCreateModalOpen(true)}
           />
+        ) : showFolderGrid ? (
+          /* Folder browsing, opt-in via the "Folders" header button */
+          <FolderGrid
+            folders={allDisplayFolders}
+            stickerCounts={folderCounts}
+            totalStickersCount={qrList.length}
+            selectedFolderId={selectedFolderId}
+            onSelectFolder={(f) => setSelectedFolderId(f.id)}
+            onOpenFolder={(f) => {
+              setActiveFolder(f.name);
+              setPage(1);
+            }}
+            onPrintFolder={(f) => {
+              const stickersInFolder = qrList.filter((q) =>
+                f.name.toLowerCase() === "unassigned stock"
+                  ? !q.folderName || q.folderName.toLowerCase() === "unassigned" || q.folderName.toLowerCase() === "unassigned stock"
+                  : (q.folderName || "").toLowerCase() === f.name.toLowerCase()
+              );
+              handleTriggerPrint(undefined, stickersInFolder);
+            }}
+            onAssignLabelFolder={(f) => {
+              const stickersInFolder = qrList.filter((q) =>
+                f.name.toLowerCase() === "unassigned stock"
+                  ? !q.folderName || q.folderName.toLowerCase() === "unassigned" || q.folderName.toLowerCase() === "unassigned stock"
+                  : (q.folderName || "").toLowerCase() === f.name.toLowerCase()
+              );
+              if (stickersInFolder.length > 0) {
+                setAssignLabelTargetIds(stickersInFolder.map((q) => q.id));
+                setIsAssignLabelOpen(true);
+              }
+            }}
+            onDeleteFolder={handleDeleteFolder}
+            onRenameFolder={(f) => setFolderToRename(f)}
+            onCreateFolderClick={() => setIsCreateFolderOpen(true)}
+          />
+        ) : null}
 
-          {/* Segmented Capsule Tabs (Within Folder) */}
+        {/* Sticker list controls (tabs, filter bar, batch toolbar) — the
+            default view, shown for "all stickers" and for inside-a-folder.
+            Hidden only while actively browsing the folder grid itself. */}
+        {!(showFolderGrid && !activeFolder) && (
+        <>
+          {/* Segmented Capsule Tabs */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200/80 pb-4">
             <div className="inline-flex p-1 rounded-xl bg-gray-200/70 border border-gray-200/80 self-start">
               <button
@@ -919,7 +925,7 @@ export default function QrCodesPage({
                     : "text-gray-600 hover:text-gray-900"
                 }`}
               >
-                All in Folder ({metrics.total})
+                {activeFolder ? `All in Folder (${metrics.total})` : `All (${metrics.total})`}
               </button>
               <button
                 type="button"
@@ -1171,16 +1177,6 @@ export default function QrCodesPage({
               <span>Print Sheet Modal ({selectedIds.size})</span>
             </button>
 
-            {/* ── Delete Selected (destructive, red) ───────────────── */}
-            <button
-              type="button"
-              onClick={() => setShowDeleteSelectedConfirm(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs"
-            >
-              <Trash2 size={13} />
-              <span>Delete Selected ({selectedIds.size})</span>
-            </button>
-
             <button
               type="button"
               onClick={() => setSelectedIds(new Set())}
@@ -1191,6 +1187,9 @@ export default function QrCodesPage({
           </div>
         </div>
       )}
+        </>
+        )}
+      </div>
 
       {/* ── 5. Main Content: Cards Grid vs Table ───────────────────────────── */}
       {filtered.length === 0 ? (
@@ -1627,8 +1626,6 @@ export default function QrCodesPage({
           </div>
         </div>
       )}
-        </div>
-      )}
 
       {/* ── 7. Safe Delete Confirmation Modal (Requirement 7) ─────────────── */}
       {deleteTarget && (
@@ -1678,54 +1675,6 @@ export default function QrCodesPage({
         </div>
       )}
 
-      {/* ── 8. Delete Selected Confirmation Modal ─────────────────────────── */}
-      {showDeleteSelectedConfirm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-950/50 backdrop-blur-xs select-none"
-          onClick={() => !isDeletingBulk && setShowDeleteSelectedConfirm(false)}
-        >
-          <div
-            className="bg-white rounded-2xl border border-red-200 shadow-2xl p-6 max-w-sm w-full space-y-4 animate-in fade-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0 border border-red-200">
-                <Trash2 size={20} />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-gray-950">
-                  Delete {selectedIds.size} selected sticker{selectedIds.size !== 1 ? 's' : ''}?
-                </h3>
-                <p className="text-xs text-gray-500 font-normal leading-relaxed">
-                  This will permanently remove{' '}
-                  <strong className="text-gray-800">{selectedIds.size} sticker{selectedIds.size !== 1 ? 's' : ''}</strong>{' '}
-                  from the database. This action <strong className="text-red-700">cannot be undone</strong>.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-gray-100">
-              <button
-                type="button"
-                disabled={isDeletingBulk}
-                onClick={() => setShowDeleteSelectedConfirm(false)}
-                className="px-4 py-2 text-xs font-semibold rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={isDeletingBulk}
-                onClick={handleDeleteSelected}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-red-600 text-white hover:bg-red-700 active:scale-98 transition-all cursor-pointer disabled:opacity-50 shadow-xs"
-              >
-                {isDeletingBulk ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-                <span>{isDeletingBulk ? 'Deleting…' : `Delete ${selectedIds.size} Stickers`}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {/* ── 10. Create Tag Modal (Hidden by default; open ONLY on [+ Create]) ─ */}
       <GenerateTagModal
         isOpen={createModalOpen}

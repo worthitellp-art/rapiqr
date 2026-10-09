@@ -55,6 +55,7 @@ export default function FolderCard({
       className={`
         group relative flex flex-col items-center justify-between p-3.5 rounded-2xl
         transition-all duration-150 select-none cursor-pointer border
+        ${menuOpen ? "z-40" : ""}
         ${
           isSelected
             ? "bg-blue-50/70 border-blue-400 ring-2 ring-blue-500/20 shadow-xs"

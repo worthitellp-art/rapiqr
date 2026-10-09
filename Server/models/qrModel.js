@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const Sticker = require('./schemas/Sticker');
+const Folder = require('./schemas/Folder');
 const ChatSession = require('./schemas/ChatSession');
 const ChatMessage = require('./schemas/ChatMessage');
 const Alert = require('./schemas/Alert');
@@ -485,6 +486,81 @@ class QrModel {
     } catch (err) {
       console.error('QrModel.bulkUpdateFolder Error:', err);
       logger.error('DB_QR', 'QrModel.bulkUpdateFolder failed', err);
+      throw err;
+    }
+  }
+
+  /**
+   * List all sticker folders, oldest first
+   */
+  static async listFolders() {
+    try {
+      const docs = await Folder.find({}).sort({ created_at: 1 }).lean();
+      return docs.map((f) => ({
+        id: String(f._id),
+        name: f.name,
+        color: f.color || null,
+        description: f.description || null,
+        createdAt: f.created_at,
+      }));
+    } catch (err) {
+      console.error('QrModel.listFolders Error:', err);
+      logger.error('DB_QR', 'QrModel.listFolders failed', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Create a new sticker folder. Returns the existing folder if the name
+   * (case-insensitive) already exists, matching the old localStorage behavior.
+   */
+  static async createFolder(name) {
+    const trimmed = String(name || '').trim();
+    if (!trimmed) throw new Error('Folder name is required');
+    try {
+      const doc = await Folder.create({ name: trimmed });
+      return { id: String(doc._id), name: doc.name, color: doc.color || null, description: doc.description || null, createdAt: doc.created_at };
+    } catch (err) {
+      if (isDuplicateError(err)) {
+        const existing = await Folder.findOne({ name: trimmed }).collation({ locale: 'en', strength: 2 }).lean();
+        if (existing) {
+          return { id: String(existing._id), name: existing.name, color: existing.color || null, description: existing.description || null, createdAt: existing.created_at };
+        }
+      }
+      console.error('QrModel.createFolder Error:', err);
+      logger.error('DB_QR', 'QrModel.createFolder failed', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Rename a folder by id
+   */
+  static async renameFolder(id, newName) {
+    const trimmed = String(newName || '').trim();
+    if (!trimmed) throw new Error('Folder name is required');
+    try {
+      const doc = await Folder.findByIdAndUpdate(id, { $set: { name: trimmed } }, { new: true }).lean();
+      if (!doc) return null;
+      return { id: String(doc._id), name: doc.name, color: doc.color || null, description: doc.description || null, createdAt: doc.created_at };
+    } catch (err) {
+      console.error('QrModel.renameFolder Error:', err);
+      logger.error('DB_QR', 'QrModel.renameFolder failed', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Delete a folder by id. Stickers that reference it by name are untouched —
+   * callers unassign them separately via bulkUpdateFolder.
+   */
+  static async deleteFolder(id) {
+    try {
+      const doc = await Folder.findByIdAndDelete(id).lean();
+      return Boolean(doc);
+    } catch (err) {
+      console.error('QrModel.deleteFolder Error:', err);
+      logger.error('DB_QR', 'QrModel.deleteFolder failed', err);
       throw err;
     }
   }

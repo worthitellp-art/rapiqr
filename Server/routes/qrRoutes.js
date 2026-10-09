@@ -23,6 +23,12 @@ router.post('/v2', verifyToken, verifyAdmin, QrController.saveQrCodeV2);
 router.patch('/bulk/label', verifyToken, verifyAdmin, QrController.bulkUpdateLabels);
 router.patch('/bulk/folder', verifyToken, verifyAdmin, QrController.bulkUpdateFolder);
 router.patch('/bulk/print-status', verifyToken, verifyAdmin, QrController.bulkUpdatePrintStatus);
+// Folders are shared across all admin accounts (persisted in Mongo, not
+// localStorage) so a folder created by one admin is visible to every other.
+router.get('/folders', verifyToken, verifyAdmin, QrController.getFolders);
+router.post('/folders', verifyToken, verifyAdmin, QrController.createFolder);
+router.patch('/folders/:id', verifyToken, verifyAdmin, QrController.renameFolder);
+router.delete('/folders/:id', verifyToken, verifyAdmin, QrController.deleteFolder);
 // Nuclear: deleting ALL stickers is restricted to Super Admin only
 router.delete('/', verifyToken, verifyAdmin, requirePermission(PERMISSIONS.STICKERS_DELETE_ALL), QrController.deleteAllQrCodes);
 router.delete('/:id', verifyToken, verifyAdmin, QrController.deleteQrCode);

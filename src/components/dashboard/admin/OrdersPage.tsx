@@ -91,7 +91,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: "single"; order: Order } | { type: "all" } | { type: "bulk" } | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -176,7 +176,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
   const revenue = orders.filter((o) => o.payment?.status === "paid").reduce((sum, o) => sum + (o.total || 0), 0);
 
   const handleStatusChange = async (orderId: string, status: Order["status"]) => {
-    setUpdatingStatus(true);
+    setUpdatingStatusId(orderId);
     try {
       const res = await apiClient.orders.updateStatus(orderId, status);
       if (res?.success && res.data) {
@@ -189,7 +189,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
     } catch {
       showToast("Failed to update order status.");
     } finally {
-      setUpdatingStatus(false);
+      setUpdatingStatusId(null);
     }
   };
 
@@ -645,7 +645,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                                 {NEXT_STATUS[order.status] && (
                                   <button
                                     onClick={() => handleStatusChange(order.id, NEXT_STATUS[order.status]!)}
-                                    disabled={updatingStatus}
+                                    disabled={updatingStatusId === order.id}
                                     className="flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[11px] font-bold bg-[var(--fx-accent)] text-white hover:bg-[var(--fx-accent-ink)] transition-all cursor-pointer disabled:opacity-50 shadow-xs"
                                   >
                                     <Truck size={12} />
@@ -967,7 +967,7 @@ export default function OrdersPage({ setToast }: { setToast: (msg: string | null
                       <button
                         key={s}
                         onClick={() => handleStatusChange(selectedOrder.id, s)}
-                        disabled={updatingStatus || isActive}
+                        disabled={updatingStatusId === selectedOrder.id || isActive}
                         className={`h-9 px-4 rounded-[10px] text-[12px] font-bold capitalize transition-all cursor-pointer disabled:cursor-default ${
                           isActive ? `${meta.bg} ${meta.color}` : "bg-[var(--fx-canvas)] text-[var(--fx-ink-2)] border border-[var(--fx-border)] hover:bg-[var(--fx-canvas)]"
                         }`}
