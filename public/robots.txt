@@ -4,3 +4,5 @@ Disallow: /admin
 Disallow: /distributor
 Disallow: /checkout
 Disallow: /auth
+
+Sitemap: https://repiqr.com/sitemap.xml
