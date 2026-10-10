@@ -4,5 +4,8 @@ compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 
 # Serve static assets from the dist/ folder with single-page-application fallback
-assets = { directory = "./dist", not_found_handling = "single-page-application" }
+# `binding = "ASSETS"` is required so src/worker.ts can call env.ASSETS.fetch() —
+# without it, every route that isn't a literal static file (i.e. everything but "/")
+# 500s because env.ASSETS is undefined.
+assets = { directory = "./dist", binding = "ASSETS", not_found_handling = "single-page-application" }
 

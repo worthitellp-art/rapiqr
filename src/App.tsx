@@ -58,7 +58,7 @@ function isScanUrl(): boolean {
 
   const isSingleSegmentQrPath =
     /^\/([A-Z0-9_-]{3,})$/i.test(pathName) &&
-    !/^\/(admin|distributor|checkout|auth|callback|login|register|signup|privacy|terms|join)$/i.test(pathName);
+    !/^\/(admin|distributor|checkout|auth|callback|login|register|signup|privacy|terms|join|pricing|become-partner)$/i.test(pathName);
 
   return !!directQrMatch || legacyPathMatch || hashMatch || queryMatch || isSingleSegmentQrPath;
 }
@@ -135,6 +135,9 @@ function MainAppContent() {
     const hashString = window.location.hash.toLowerCase();
     if (pathName === '/checkout' || hashString === '#/checkout') return 'checkout';
     if (pathName === '/privacy' || hashString === '#/privacy') return 'privacy';
+    if (pathName === '/join' || hashString === '#/join') return 'join';
+    if (pathName === '/pricing' || hashString === '#/pricing') return 'pricing';
+    if (pathName === '/become-partner' || hashString === '#/become-partner') return 'become-partner';
     try {
       const saved = localStorage.getItem('repiqr-current-page') || localStorage.getItem('namoqr-current-page');
       if (saved === 'dashboard') return 'dashboard';
@@ -170,6 +173,18 @@ function MainAppContent() {
         window.history.pushState({}, '', '/register');
       } else if (next === 'privacy') {
         window.history.pushState({}, '', '/privacy');
+      } else if (next === 'join') {
+        window.history.pushState({}, '', '/join');
+        localStorage.setItem('repiqr-current-page', next);
+        localStorage.setItem('namoqr-current-page', next);
+      } else if (next === 'pricing') {
+        window.history.pushState({}, '', '/pricing');
+        localStorage.setItem('repiqr-current-page', next);
+        localStorage.setItem('namoqr-current-page', next);
+      } else if (next === 'become-partner') {
+        window.history.pushState({}, '', '/become-partner');
+        localStorage.setItem('repiqr-current-page', next);
+        localStorage.setItem('namoqr-current-page', next);
       } else if (next === 'checkout') {
         window.history.pushState({}, '', '/checkout');
         localStorage.setItem('repiqr-current-page', 'checkout');
@@ -183,24 +198,102 @@ function MainAppContent() {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   };
 
-  // Sync browser top tab bar title with RepiQR brand and current page
+  // Sync <title>, meta description, canonical link, robots directive and
+  // Open Graph/Twitter tags per page. The SPA ships one static index.html,
+  // so without this every route reports the homepage's canonical URL and
+  // description to search engines (they all look like duplicates of "/").
   useEffect(() => {
-    const pageTitles: Partial<Record<AppPage, string>> = {
-      landing: 'RepiQR - Smart Safety QR Tags',
-      dashboard: 'RepiQR - Dashboard',
-      scan: 'RepiQR - Emergency Safety Tag',
-      distributor: 'RepiQR - Franchise & Distributor Partner',
-      checkout: 'RepiQR - Secure Checkout',
-      join: 'RepiQR - Join Our Network',
-      'become-partner': 'RepiQR - Partner Program',
-      pricing: 'RepiQR - Safety Tag Pricing',
-      login: 'RepiQR - Sign In',
-      register: 'RepiQR - Create Account',
-      privacy: 'RepiQR - Privacy Policy',
+    type SeoEntry = { title: string; description: string; path: string; robots: string };
+    const siteOrigin = 'https://repiqr.com';
+    const seoByPage: Record<AppPage, SeoEntry> = {
+      landing: {
+        title: 'RepiQR - Smart Safety QR Tags for Vehicles & Essentials | Masked Calling',
+        description: 'RepiQR smart QR & NFC safety tags for cars, bikes, pets, and luggage. Scan to instantly connect via private masked calling and WhatsApp alerts without exposing your personal phone number.',
+        path: '/',
+        robots: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
+      },
+      join: {
+        title: 'RepiQR - Join Our Partner Network',
+        description: "Apply to join RepiQR's growing network of service and delivery partners across India.",
+        path: '/join',
+        robots: 'index, follow',
+      },
+      'become-partner': {
+        title: 'RepiQR - Franchise & Distributor Partner Program',
+        description: 'Become a RepiQR distributor or franchise partner and unlock a dedicated dashboard to manage orders, stock, and customers in your region.',
+        path: '/become-partner',
+        robots: 'index, follow',
+      },
+      pricing: {
+        title: 'RepiQR - Safety Tag Pricing',
+        description: 'Simple, transparent pricing for RepiQR smart safety QR tags, starting at ₹299 with free standard delivery across India.',
+        path: '/pricing',
+        robots: 'index, follow',
+      },
+      privacy: {
+        title: 'RepiQR - Privacy Policy',
+        description: 'How RepiQR collects, uses, and protects your personal data, including masked calling and location-sharing features.',
+        path: '/privacy',
+        robots: 'index, follow',
+      },
+      login: {
+        title: 'RepiQR - Sign In',
+        description: 'Sign in to your RepiQR account to manage safety tags, scans, and emergency contacts.',
+        path: '/login',
+        robots: 'noindex, follow',
+      },
+      register: {
+        title: 'RepiQR - Create Account',
+        description: 'Create a free RepiQR account to register your smart safety tags and start receiving scan alerts.',
+        path: '/register',
+        robots: 'noindex, follow',
+      },
+      dashboard: {
+        title: 'RepiQR - Dashboard',
+        description: 'Manage your RepiQR smart safety tags, scans, and emergency contacts.',
+        path: '/dashboard',
+        robots: 'noindex, follow',
+      },
+      distributor: {
+        title: 'RepiQR - Distributor Dashboard',
+        description: 'Manage orders, inventory, and customers from your RepiQR distributor dashboard.',
+        path: '/distributor',
+        robots: 'noindex, follow',
+      },
+      checkout: {
+        title: 'RepiQR - Secure Checkout',
+        description: 'Complete your secure RepiQR safety tag order.',
+        path: '/checkout',
+        robots: 'noindex, follow',
+      },
+      scan: {
+        title: 'RepiQR - Emergency Safety Tag',
+        description: 'Scan result for a RepiQR smart safety tag.',
+        path: typeof window !== 'undefined' ? window.location.pathname : '/',
+        robots: 'noindex, follow',
+      },
     };
-    if (pageTitles[page]) {
-      document.title = pageTitles[page]!;
-    }
+
+    const entry = seoByPage[page];
+    if (!entry) return;
+
+    document.title = entry.title;
+
+    const setMeta = (selector: string, attr: string, value: string) => {
+      const el = document.head.querySelector(selector);
+      if (el) el.setAttribute(attr, value);
+    };
+
+    const canonicalUrl = `${siteOrigin}${entry.path}`;
+    setMeta('link[rel="canonical"]', 'href', canonicalUrl);
+    setMeta('meta[name="robots"]', 'content', entry.robots);
+    setMeta('meta[name="description"]', 'content', entry.description);
+    setMeta('meta[property="og:title"]', 'content', entry.title);
+    setMeta('meta[property="og:description"]', 'content', entry.description);
+    setMeta('meta[property="og:url"]', 'content', canonicalUrl);
+    setMeta('meta[name="twitter:title"]', 'content', entry.title);
+    setMeta('meta[name="twitter:description"]', 'content', entry.description);
+    setMeta('meta[name="twitter:url"]', 'content', canonicalUrl);
   }, [page]);
 
   // After auth loads or on signout: if on dashboard/distributor/checkout but not logged in → handle auth gating
